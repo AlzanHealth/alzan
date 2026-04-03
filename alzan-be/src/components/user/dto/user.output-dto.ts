@@ -279,3 +279,45 @@ export class UserOutputDto {
   @Expose()
   banned_until?: string;
 }
+
+export class UserProfileDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  username!: string | null;
+
+  @Expose()
+  display_name?: string | null;
+
+  @Expose()
+  avatar_url?: string | null;
+
+  @Expose()
+  followers_count!: number;
+
+  @Expose()
+  following_count!: number;
+}
+
+export class FollowCountDto {
+  @Expose()
+  followersCount!: number;
+
+  @Expose()
+  followingCount!: number;
+}
+
+export class FollowResponseDto {
+  @Expose()
+  id!: string;
+
+  @Expose()
+  username!: string | null;
+
+  @Expose()
+  display_name!: string | null;
+
+  @Expose()
+  avatar_url!: string | null;
+}

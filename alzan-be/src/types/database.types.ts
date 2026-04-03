@@ -1,3 +1,5 @@
+import { SupabaseClient } from '@supabase/supabase-js';
+
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
@@ -2597,3 +2599,5 @@ export const Constants = {
     },
   },
 } as const;
+
+export type DbClient = SupabaseClient<Database>;

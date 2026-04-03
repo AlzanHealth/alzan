@@ -1,15 +1,15 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Database } from '../../types/database.types';
+import { createClient } from '@supabase/supabase-js';
+import { Database, DbClient } from '../../types/database.types';
 
 @Injectable()
 export class SupabaseService implements OnModuleInit {
-  private supabase!: SupabaseClient<Database>;
+  private supabase!: DbClient;
 
   constructor(private readonly configService: ConfigService) {}
 
-  public get client(): SupabaseClient<Database> {
+  public get client() {
     return this.supabase;
   }
 
