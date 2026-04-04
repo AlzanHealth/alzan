@@ -3,12 +3,12 @@ import { User } from '@supabase/supabase-js';
 import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 import { DbClient } from '../../types/database.types';
 
-export interface RequestContext {
+export interface UserCtx {
   user: User;
   supabase: DbClient;
 }
 
-export const RequestContext = createParamDecorator((_data: unknown, ctx: ExecutionContext): RequestContext => {
+export const UserContext = createParamDecorator((_data: unknown, ctx: ExecutionContext): UserCtx => {
   const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
   return { user: request.user, supabase: request.supabase };
 });

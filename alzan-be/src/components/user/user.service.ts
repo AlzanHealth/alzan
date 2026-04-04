@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 
 import { PaginationDto } from '../../common/dto/pagination.dto';
-import { RequestContext } from '../../common/decorators/request-context.decorator';
+import { UserCtx } from '../../common/decorators/request-context.decorator';
 
 @Injectable()
 export class UserService {
@@ -19,7 +19,7 @@ export class UserService {
    * @param ctx - Request context containing the user-scoped Supabase client
    * @param id - The user ID to look up
    */
-  async getUserById(ctx: RequestContext, id: string) {
+  async getUserById(ctx: UserCtx, id: string) {
     const { data: user, error: userError } = await ctx.supabase.from('users').select('*').eq('id', id).single();
 
     if (userError || !user) {
@@ -35,7 +35,7 @@ export class UserService {
    * @param ctx - Request context containing the authenticated user and scoped client
    * @param userId - Optional: look up a different user's profile; defaults to the requester's own profile
    */
-  async getProfile(ctx: RequestContext, userId?: string) {
+  async getProfile(ctx: UserCtx, userId?: string) {
     const { user } = ctx;
     const user_identifier: string = userId ?? user.id;
 
@@ -60,7 +60,7 @@ export class UserService {
    * @param ctx - Request context containing the authenticated user and scoped client
    * @param to - The username of the user to follow
    */
-  public async follow(ctx: RequestContext, to: string) {
+  public async follow(ctx: UserCtx, to: string) {
     const { user, supabase } = ctx;
     this.logger.debug(`UserService: Trying to follow user ${to}`);
 
@@ -103,7 +103,7 @@ export class UserService {
    * @param ctx - Request context containing the authenticated user and scoped client
    * @param to - The username of the user to unfollow
    */
-  public async unfollow(ctx: RequestContext, to: string) {
+  public async unfollow(ctx: UserCtx, to: string) {
     const { user, supabase } = ctx;
     this.logger.debug(`UserService: Trying to unfollow user ${to}`);
     const { data: targetUser, error: findError } = await supabase
@@ -134,7 +134,7 @@ export class UserService {
    * @param userId - The user whose followers to retrieve
    * @param pagination - Pagination parameters
    */
-  public async getFollowers(ctx: RequestContext, userId: string, pagination: PaginationDto) {
+  public async getFollowers(ctx: UserCtx, userId: string, pagination: PaginationDto) {
     const { supabase } = ctx;
     this.logger.debug(`UserService: Trying to get followers for user ${userId}`);
     const { data, error } = await supabase
@@ -167,7 +167,7 @@ export class UserService {
    * @param userId - The user whose following list to retrieve
    * @param pagination - Pagination parameters
    */
-  public async getFollowing(ctx: RequestContext, userId: string, pagination: PaginationDto) {
+  public async getFollowing(ctx: UserCtx, userId: string, pagination: PaginationDto) {
     const { supabase } = ctx;
     this.logger.debug(`UserService: Trying to get following for user ${userId}`);
     const { data, error } = await supabase
@@ -198,7 +198,7 @@ export class UserService {
    *
    * @param ctx - Request context containing the authenticated user and scoped client
    */
-  public async getSocialMediaCount(ctx: RequestContext) {
+  public async getSocialMediaCount(ctx: UserCtx) {
     const { user } = ctx;
     this.logger.debug('UserService: Trying to get follow count');
     const userId = user.id;
@@ -216,7 +216,7 @@ export class UserService {
    * @param ctx - Request context containing the authenticated user and scoped client
    * @param userId - The user whose followers count to retrieve
    */
-  private async getFollowersCount(ctx: RequestContext, userId: string) {
+  private async getFollowersCount(ctx: UserCtx, userId: string) {
     const { supabase } = ctx;
     this.logger.debug(`UserService: Trying to get followers count for user ${userId}`);
     const { data, error } = await supabase.from('social_follows').select('*').eq('id_followed', userId);
@@ -232,7 +232,7 @@ export class UserService {
    * @param ctx - Request context containing the authenticated user and scoped client
    * @param userId - The user whose following count to retrieve
    */
-  private async getFollowingCount(ctx: RequestContext, userId: string) {
+  private async getFollowingCount(ctx: UserCtx, userId: string) {
     const { supabase } = ctx;
     this.logger.debug(`UserService: Trying to get following count for user ${userId}`);
     const { data, error } = await supabase.from('social_follows').select('*').eq('id_follower', userId);

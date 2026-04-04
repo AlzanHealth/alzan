@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import { UserModule } from './user/user.module';
-import { SocialModule } from './social/social.module';
+import { NotificationModule } from './notifications/notification.module';
 
 @Module({
-  imports: [UserModule, SocialModule],
-  exports: [UserModule, SocialModule],
+  imports: [UserModule, NotificationModule],
 })
 export class ComponentsModule {}

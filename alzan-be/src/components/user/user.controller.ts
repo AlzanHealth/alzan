@@ -4,10 +4,7 @@ import { FollowResponseDto, UserOutputDto } from './dto/user.output-dto';
 import { VoidResponse } from '../../core/interceptors/response-serializer.interceptor';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { UserService } from './user.service';
-import {
-  RequestContext,
-  type RequestContext as RequestContextType,
-} from '../../common/decorators/request-context.decorator';
+import { UserContext, UserCtx } from '../../common/decorators/request-context.decorator';
 
 @Controller('users')
 @SupabaseUserAuth()
@@ -20,7 +17,7 @@ export class UserController {
    * Get current authenticated user
    */
   @Get()
-  getCurrentUser(@RequestContext() ctx: RequestContextType): UserOutputDto {
+  getCurrentUser(@UserContext() ctx: UserCtx): UserOutputDto {
     return ctx.user;
   }
 
@@ -30,7 +27,7 @@ export class UserController {
    * @param userId - Username of the user to follow
    */
   @Post(':userId/follow')
-  async followUser(@RequestContext() ctx: RequestContextType, @Param('userId') userId: string): Promise<void> {
+  async followUser(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<void> {
     this.logger.debug(`Controller layer: trying to follow user ${userId}`, ctx.user.id);
     return this.service.follow(ctx, userId);
   }
@@ -41,10 +38,7 @@ export class UserController {
    * @param userId - Username of the user to unfollow
    */
   @Post(':userId/unfollow')
-  async unfollowUser(
-    @RequestContext() ctx: RequestContextType,
-    @Param('userId') userId: string,
-  ): Promise<VoidResponse> {
+  async unfollowUser(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<VoidResponse> {
     this.logger.debug(`Controller layer: trying to unfollow user ${userId}`, ctx.user.id);
     await this.service.unfollow(ctx, userId);
 
@@ -59,7 +53,7 @@ export class UserController {
    */
   @Get(':userId/followers')
   async getFollowers(
-    @RequestContext() ctx: RequestContextType,
+    @UserContext() ctx: UserCtx,
     @Param('userId') userId: string,
     @Query() pagination: PaginationDto,
   ): Promise<FollowResponseDto[]> {
@@ -75,7 +69,7 @@ export class UserController {
    */
   @Get(':userId/following')
   async getFollowing(
-    @RequestContext() ctx: RequestContextType,
+    @UserContext() ctx: UserCtx,
     @Param('userId') userId: string,
     @Query() pagination: PaginationDto,
   ): Promise<FollowResponseDto[]> {
