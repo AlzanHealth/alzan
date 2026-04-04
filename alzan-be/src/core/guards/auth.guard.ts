@@ -2,14 +2,14 @@ import { Injectable, CanActivate, UnauthorizedException, ExecutionContext, Logge
 import { AuthenticatedRequest } from '../../common/interfaces/authenticated-request.interface';
 import { Reflector } from '@nestjs/core';
 import { Scope, SCOPES_KEY } from './auth.decorator';
-import { UserService } from '../../components/user/user.service';
+import { SupabaseAdminService } from '../supabase/supabase.service';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   private readonly logger = new Logger(AuthGuard.name);
 
   constructor(
-    private readonly userService: UserService,
+    private readonly supabaseAdminService: SupabaseAdminService,
     private readonly reflector: Reflector,
   ) {}
 
@@ -36,8 +36,18 @@ export class AuthGuard implements CanActivate {
     }
 
     try {
-      // Attach user to request object for use in controllers
-      request.user = await this.userService.getUser(token);
+      // Validate JWT using the admin client (bypasses RLS for auth operations)
+      const { data, error } = await this.supabaseAdminService.client.auth.getUser(token);
+
+      if (error || !data.user) {
+        throw new UnauthorizedException('Unauthorized!');
+      }
+
+      // Attach user, token, and a per-request RLS-scoped client to the request
+      request.user = data.user;
+      request.token = token;
+      request.supabase = this.supabaseAdminService.getAuthenticatedClient(token);
+
       return true;
     } catch (error) {
       this.logger.warn({

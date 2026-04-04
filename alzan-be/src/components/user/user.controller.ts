@@ -1,11 +1,13 @@
 import { Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from '@supabase/supabase-js';
 import { SupabaseUserAuth } from '../../core/guards/auth.decorator';
 import { FollowResponseDto, UserOutputDto } from './dto/user.output-dto';
 import { VoidResponse } from '../../core/interceptors/response-serializer.interceptor';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { UserService } from './user.service';
+import {
+  RequestContext,
+  type RequestContext as RequestContextType,
+} from '../../common/decorators/request-context.decorator';
 
 @Controller('users')
 @SupabaseUserAuth()
@@ -18,59 +20,66 @@ export class UserController {
    * Get current authenticated user
    */
   @Get()
-  getCurrentUser(@CurrentUser() user: User): UserOutputDto {
-    return user;
+  getCurrentUser(@RequestContext() ctx: RequestContextType): UserOutputDto {
+    return ctx.user;
   }
 
   /**
    * Follow a user
-   * @param user
-   * @param userId
+   * @param ctx - Request context
+   * @param userId - Username of the user to follow
    */
   @Post(':userId/follow')
-  async followUser(@CurrentUser() user: User, @Param('userId') userId: string): Promise<void> {
-    this.logger.debug(`Controller layer: trying to follow user ${userId}`, user.id);
-    return this.service.follow(user, userId);
+  async followUser(@RequestContext() ctx: RequestContextType, @Param('userId') userId: string): Promise<void> {
+    this.logger.debug(`Controller layer: trying to follow user ${userId}`, ctx.user.id);
+    return this.service.follow(ctx, userId);
   }
 
   /**
    * Unfollow a user
-   * @param user
-   * @param userId
+   * @param ctx - Request context
+   * @param userId - Username of the user to unfollow
    */
   @Post(':userId/unfollow')
-  async unfollowUser(@CurrentUser() user: User, @Param('userId') userId: string): Promise<VoidResponse> {
-    this.logger.debug(`Controller layer: trying to unfollow user ${userId}`, user.id);
-    await this.service.unfollow(user, userId);
+  async unfollowUser(
+    @RequestContext() ctx: RequestContextType,
+    @Param('userId') userId: string,
+  ): Promise<VoidResponse> {
+    this.logger.debug(`Controller layer: trying to unfollow user ${userId}`, ctx.user.id);
+    await this.service.unfollow(ctx, userId);
 
     return VoidResponse;
   }
 
   /**
    * Get followers of the user provided
-   * @param userId
+   * @param ctx - Request context
+   * @param userId - User whose followers to retrieve
    * @param pagination
    */
   @Get(':userId/followers')
   async getFollowers(
+    @RequestContext() ctx: RequestContextType,
     @Param('userId') userId: string,
     @Query() pagination: PaginationDto,
   ): Promise<FollowResponseDto[]> {
     this.logger.debug(`Controller layer: trying to get followers for ${userId}`);
-    return this.service.getFollowers(userId, pagination);
+    return this.service.getFollowers(ctx, userId, pagination);
   }
 
   /**
    * Get following of the user provided
-   * @param userId
+   * @param ctx - Request context
+   * @param userId - User whose following list to retrieve
    * @param pagination
    */
   @Get(':userId/following')
   async getFollowing(
+    @RequestContext() ctx: RequestContextType,
     @Param('userId') userId: string,
     @Query() pagination: PaginationDto,
   ): Promise<FollowResponseDto[]> {
     this.logger.debug(`Controller layer: trying to get following for ${userId}`);
-    return this.service.getFollowing(userId, pagination);
+    return this.service.getFollowing(ctx, userId, pagination);
   }
 }

@@ -11,6 +11,7 @@ export interface EnvironmentVariables {
   // supabase config
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
+  SUPABASE_ANON_KEY: string;
 }
 
 type EnvKeys = keyof EnvironmentVariables;
@@ -23,6 +24,7 @@ const REQUIRED_KEYS: EnvKeys[] = [
 
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_ANON_KEY',
 ];
 
 const NOT_REQUIRED_IN_LOCAL: EnvKeys[] = ['PORT'];

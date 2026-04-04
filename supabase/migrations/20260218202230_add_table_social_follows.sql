@@ -1,7 +1,9 @@
 
   create table "public"."social_follows" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "id_follower" uuid not null,
     "id_followed" uuid not null,
+    "is_accepted" boolean default false,
     "created_at" timestamp with time zone not null default now()
       );
 
