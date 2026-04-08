@@ -4,6 +4,7 @@ import { nutritionService } from '../services/nutritionService';
 import { DietTemplateInsert, DietTemplateUpdate, MealLog, MealLogInsert } from '../../../types/requests.types';
 import { IngredientInput } from '../types/db';
 import { useAuth } from '../../../context/AuthContext';
+import { getCurrentAppLocale } from '../../../services/localization';
 
 const KEYS = {
   TEMPLATES: ['dietTemplates'],
@@ -167,9 +168,11 @@ export function useSaveMealWithIngredients() {
 }
 
 export function useMealItems(logId: string | undefined) {
+  const languageCode = getCurrentAppLocale();
+
   return useQuery({
-    queryKey: ['mealItems', logId],
-    queryFn: () => nutritionService.getMealItems(logId!),
+    queryKey: ['mealItems', logId, languageCode],
+    queryFn: () => nutritionService.getMealItems(logId!, languageCode),
     enabled: !!logId,
   });
 }

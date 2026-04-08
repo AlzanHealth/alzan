@@ -1,12 +1,16 @@
 import { supabase } from '../lib/supabaseClient';
 import { DbIngredient, IngredientsCategory, Insert } from '../types/requests.types';
 import {
+  buildTokenIlikeClauses,
   buildLooseIlikePattern,
+  getCurrentAppLocale,
   getLocalizedIngredientName,
   getLocalizedIngredientNotes,
+  getSearchRelevanceScore,
   matchesLoosely,
   normalizeSearchText,
 } from './localization';
+import { Locale } from '../i18n';
 
 export interface CalculatedMacros {
   energy_kcal: number;
@@ -25,6 +29,10 @@ export interface IngredientSearchResult extends IngredientRuntimeFields {
   notes: string | null;
 }
 
+const INGREDIENT_SEARCH_TIMEOUT_MS = 7000;
+const INGREDIENT_CANDIDATE_MULTIPLIER = 6;
+const INGREDIENT_CANDIDATE_FLOOR = 60;
+
 // 1. Normalization
 export const normalizeInput = (str: string): string => {
   return str
@@ -36,69 +44,106 @@ export const normalizeInput = (str: string): string => {
 };
 
 // 2. Search
-function mapIngredientResult(ingredient: IngredientRuntimeFields): IngredientSearchResult {
+function mapIngredientResult(ingredient: IngredientRuntimeFields, languageCode: Locale): IngredientSearchResult {
   return {
     ...ingredient,
-    name: getLocalizedIngredientName(ingredient),
-    notes: getLocalizedIngredientNotes(ingredient),
+    name: getLocalizedIngredientName(ingredient, languageCode),
+    notes: getLocalizedIngredientNotes(ingredient, languageCode),
   };
 }
 
 function sortIngredientResults(results: IngredientSearchResult[], query: string): IngredientSearchResult[] {
-  const normalizedQuery = normalizeSearchText(query);
-
   return results.sort((a, b) => {
-    const startA = [a.name_es, a.name_en]
-      .map(name => normalizeSearchText(name ?? ''))
-      .some(name => name.startsWith(normalizedQuery));
-    const startB = [b.name_es, b.name_en]
-      .map(name => normalizeSearchText(name ?? ''))
-      .some(name => name.startsWith(normalizedQuery));
+    const scoreA = getSearchRelevanceScore(query, a.name, a.name_es, a.name_en, a.notes, a.notes_es, a.notes_en);
+    const scoreB = getSearchRelevanceScore(query, b.name, b.name_es, b.name_en, b.notes, b.notes_es, b.notes_en);
 
-    if (startA && !startB) return -1;
-    if (!startA && startB) return 1;
+    if (scoreA !== scoreB) return scoreB - scoreA;
 
-    return (b.quality_score || 0) - (a.quality_score || 0);
+    const qualityDiff = (b.quality_score || 0) - (a.quality_score || 0);
+    if (qualityDiff !== 0) return qualityDiff;
+
+    return normalizeSearchText(a.name).localeCompare(normalizeSearchText(b.name));
   });
 }
 
-export const searchIngredients = async (query: string): Promise<IngredientSearchResult[]> => {
-  const normQuery = normalizeInput(query);
-  const likePattern = buildLooseIlikePattern(query);
-  if (!normQuery) return [];
-
-  console.log(`[ingredientsService] Searching for normalized query: "${normQuery}"`);
+const withTimeout = async <T>(promiseLike: PromiseLike<T>, timeoutMs: number): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   try {
-    console.log(`[ingredientsService] Trying similar match with ILIKE...`);
-    const { data, error } = await supabase
-      .from('ingredients')
-      .select('*')
-      .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`)
-      .order('quality_score', { ascending: false })
-      .limit(25)
-      .returns<IngredientRuntimeFields[]>();
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error('Ingredient search timed out'));
+      }, timeoutMs);
+    });
+
+    return await Promise.race([Promise.resolve(promiseLike), timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
+const buildIngredientSearchClauses = (query: string): string[] => {
+  const normQuery = normalizeInput(query);
+  if (!normQuery) return [];
+
+  const likePattern = buildLooseIlikePattern(query).replace(/['"()]/g, '');
+  const startsWithNormPattern = `${normQuery}%`;
+  const startsWithLoosePattern = `${likePattern}%`;
+  const tokenClauses = buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
+
+  return Array.from(
+    new Set([
+      `name_norm_es.ilike.${startsWithNormPattern}`,
+      `name_es.ilike.${startsWithLoosePattern}`,
+      `name_en.ilike.${startsWithLoosePattern}`,
+      `name_norm_es.ilike.%${normQuery}%`,
+      `name_es.ilike.%${likePattern}%`,
+      `name_en.ilike.%${likePattern}%`,
+      ...tokenClauses,
+    ]),
+  );
+};
+
+export const searchIngredients = async (
+  query: string,
+  locale?: Locale,
+  maxResults = 10,
+): Promise<IngredientSearchResult[]> => {
+  const languageCode = locale ?? getCurrentAppLocale();
+  const normQuery = normalizeInput(query);
+  if (!normQuery || normQuery.length < 2) return [];
+
+  const orClauses = buildIngredientSearchClauses(query);
+
+  try {
+    const candidateLimit = Math.max(maxResults * INGREDIENT_CANDIDATE_MULTIPLIER, INGREDIENT_CANDIDATE_FLOOR);
+    const { data, error } = await withTimeout(
+      supabase
+        .from('ingredients')
+        .select('*')
+        .or(orClauses.join(','))
+        .order('quality_score', { ascending: false })
+        .limit(candidateLimit)
+        .returns<IngredientRuntimeFields[]>(),
+      INGREDIENT_SEARCH_TIMEOUT_MS,
+    );
 
     if (error) {
-      console.error('[ingredientsService] Similar match error:', JSON.stringify(error));
+      console.error('[ingredientsService] Search error:', JSON.stringify(error));
       return [];
     }
 
     if (!data || data.length === 0) {
-      console.log(`[ingredientsService] No results found for: "${normQuery}"`);
       return [];
     }
 
     const localizedResults = data
-      .map(mapIngredientResult)
+      .map(item => mapIngredientResult(item, languageCode))
       .filter(ing => matchesLoosely(query, ing.name_es, ing.name_en, ing.notes_es, ing.notes_en));
 
-    console.log(`[ingredientsService] Found ${localizedResults.length} similar matches`);
-    localizedResults.forEach((ing, i) => {
-      console.log(`  ${i + 1}. ${ing.name_es} (norm: ${ing.name_norm_es})`);
-    });
-
-    return sortIngredientResults(localizedResults, query);
+    return sortIngredientResults(localizedResults, query).slice(0, maxResults);
   } catch (err) {
     console.error('[ingredientsService] Unexpected error:', err);
     return [];
@@ -128,9 +173,15 @@ export interface IngredientSearchFilters {
 
 export const searchIngredientsWithFilters = async (
   filters: IngredientSearchFilters,
+  locale?: Locale,
+  maxResults = 10,
 ): Promise<IngredientSearchResult[]> => {
+  const languageCode = locale ?? getCurrentAppLocale();
   const { query, category, letter } = filters;
-  const likePattern = query ? buildLooseIlikePattern(query) : '';
+  const hasQuery = !!query && query.length >= 2;
+  const normalizedLetter = letter?.toLowerCase() ?? 'todas';
+  const hasLetterFilter = normalizedLetter !== 'todas';
+  const orClauses = hasQuery ? buildIngredientSearchClauses(query) : [];
 
   // Build query
   let supabaseQuery = supabase.from('ingredients').select('*');
@@ -140,25 +191,27 @@ export const searchIngredientsWithFilters = async (
     supabaseQuery = supabaseQuery.eq('category', category);
   }
 
-  // Filter by first letter
-  if (letter && letter !== 'todas') {
-    // Use ILIKE to match names starting with the letter (case-insensitive)
-    supabaseQuery = supabaseQuery.or(`name_es.ilike.${letter}%,name_en.ilike.${letter}%`);
+  // Filter by text query (partial match)
+  if (hasQuery && orClauses.length > 0) {
+    supabaseQuery = supabaseQuery.or(orClauses.join(','));
   }
 
-  // Filter by text query (partial match)
-  if (query && query.length >= 2) {
-    const normQuery = normalizeInput(query);
-    supabaseQuery = supabaseQuery.or(
-      `name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`,
-    );
+  // When only letter filter is active, keep filtering at DB level for better coverage.
+  if (!hasQuery && hasLetterFilter) {
+    supabaseQuery = supabaseQuery.or(`name_es.ilike.${normalizedLetter}%,name_en.ilike.${normalizedLetter}%`);
   }
+
+  const baseCandidateLimit = Math.max(maxResults * INGREDIENT_CANDIDATE_MULTIPLIER, INGREDIENT_CANDIDATE_FLOOR);
+  const candidateLimit = hasQuery && hasLetterFilter ? baseCandidateLimit * 2 : baseCandidateLimit;
 
   // Order and limit
-  supabaseQuery = supabaseQuery.order('quality_score', { ascending: false }).limit(100);
+  supabaseQuery = supabaseQuery.order('quality_score', { ascending: false }).limit(candidateLimit);
 
   try {
-    const { data, error } = await supabaseQuery.returns<IngredientRuntimeFields[]>();
+    const { data, error } = await withTimeout(
+      supabaseQuery.returns<IngredientRuntimeFields[]>(),
+      INGREDIENT_SEARCH_TIMEOUT_MS,
+    );
 
     if (error) {
       console.error('[ingredientsService] Filter search error:', error);
@@ -170,18 +223,28 @@ export const searchIngredientsWithFilters = async (
     }
 
     const localizedResults = data
-      .map(mapIngredientResult)
-      .filter(
-        ing =>
-          !query || query.length < 2 || matchesLoosely(query, ing.name_es, ing.name_en, ing.notes_es, ing.notes_en),
-      );
+      .map(item => mapIngredientResult(item, languageCode))
+      .filter(ing => {
+        if (!hasLetterFilter) return true;
+
+        const firstLetterEs = (ing.name_es || '').trim().charAt(0).toLowerCase();
+        const firstLetterEn = (ing.name_en || '').trim().charAt(0).toLowerCase();
+        return firstLetterEs === normalizedLetter || firstLetterEn === normalizedLetter;
+      })
+      .filter(ing => !hasQuery || matchesLoosely(query, ing.name_es, ing.name_en, ing.notes_es, ing.notes_en));
 
     // If there's a query, prioritize items that start with it
-    if (query && query.length >= 2) {
-      return sortIngredientResults(localizedResults, query);
+    if (hasQuery) {
+      return sortIngredientResults(localizedResults, query).slice(0, maxResults);
     }
 
-    return localizedResults;
+    return localizedResults
+      .sort((a, b) => {
+        const qualityDiff = (b.quality_score || 0) - (a.quality_score || 0);
+        if (qualityDiff !== 0) return qualityDiff;
+        return normalizeSearchText(a.name).localeCompare(normalizeSearchText(b.name));
+      })
+      .slice(0, maxResults);
   } catch (err) {
     console.error('[ingredientsService] Unexpected error in filter search:', err);
     return [];

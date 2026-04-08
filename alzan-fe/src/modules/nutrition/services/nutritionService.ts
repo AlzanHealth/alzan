@@ -16,6 +16,7 @@ import {
 } from '../../../types/requests.types';
 import { IngredientInput } from '../types/db';
 import { getLocalizedIngredientName } from '../../../services/localization';
+import { Locale } from '../../../i18n';
 
 interface IngredientNameLookupRow {
   id: string;
@@ -296,7 +297,7 @@ export const nutritionService = {
     return data.total_ml;
   },
 
-  async getMealItems(logId: string): Promise<LocalizedMealItem[]> {
+  async getMealItems(logId: string, locale?: Locale): Promise<LocalizedMealItem[]> {
     const { data, error } = await supabase.from('meal_items').select('*').eq('meal_log_id', logId);
 
     if (error) throw error;
@@ -326,7 +327,7 @@ export const nutritionService = {
     }
 
     const ingredientNamesById = new Map(
-      ingredients.map(ingredient => [ingredient.id, getLocalizedIngredientName(ingredient)]),
+      ingredients.map(ingredient => [ingredient.id, getLocalizedIngredientName(ingredient, locale)]),
     );
 
     return mealItems.map(item => ({

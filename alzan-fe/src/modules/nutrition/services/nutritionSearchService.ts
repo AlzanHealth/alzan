@@ -11,13 +11,17 @@ import {
 import { getFoodNutritionById, warmNutritionApiHeaders } from '../../../services/nutritionApi';
 import { FoodSearchResult, MealComponent } from '../types/ingredients';
 import {
+  buildTokenIlikeClauses,
   buildLooseIlikePattern,
+  getCurrentAppLocale,
   getLocalizedIngredientName,
   getLocalizedIngredientNotes,
   getLocalizedRecipeDescription,
   getLocalizedRecipeName,
+  getSearchRelevanceScore,
   matchesLoosely,
 } from '../../../services/localization';
+import { Locale } from '../../../i18n';
 
 interface RecipeSearchRow {
   id: string;
@@ -38,13 +42,19 @@ interface IngredientSearchRow extends DbIngredient {
  * Search for ingredients with filters (category, letter, text)
  * Used by IngredientSearchPanel - includes ALL ingredient categories
  */
-export async function searchFoodsWithFilters(filters: IngredientSearchFilters): Promise<MealComponent[]> {
+export async function searchFoodsWithFilters(
+  filters: IngredientSearchFilters,
+  locale?: Locale,
+  options?: { maxResults?: number },
+): Promise<MealComponent[]> {
+  const languageCode = locale ?? getCurrentAppLocale();
+  const maxResults = options?.maxResults ?? 10;
   try {
-    const ingredients = await searchIngredientsWithFilters(filters);
+    const ingredients = await searchIngredientsWithFilters(filters, languageCode, maxResults);
 
     return ingredients.map(ing => ({
       id: `ingredient_${ing.id}`,
-      name: getLocalizedIngredientName(ing),
+      name: getLocalizedIngredientName(ing, languageCode),
       source: 'database' as const,
       external_id: ing.id,
       category: ing.category,
@@ -59,7 +69,7 @@ export async function searchFoodsWithFilters(filters: IngredientSearchFilters): 
       sodium_mg_100: ing.sodium_mg_100,
       salt_g_100: ing.salt_g_100,
       quality_score: ing.quality_score,
-      notes: getLocalizedIngredientNotes(ing) ?? undefined,
+      notes: getLocalizedIngredientNotes(ing, languageCode) ?? undefined,
       source_primary: ing.source_primary,
       source_secondary: ing.source_secondary,
     }));
@@ -73,11 +83,14 @@ export async function searchFoodsWithFilters(filters: IngredientSearchFilters): 
  * Search for meals by name - searches BOTH recipes and precooked ingredients
  * Used by MealLogFormScreen meal name input
  */
-export async function searchMealByName(query: string): Promise<MealComponent[]> {
+export async function searchMealByName(query: string, locale?: Locale): Promise<MealComponent[]> {
+  const languageCode = locale ?? getCurrentAppLocale();
   if (!query || query.length < 2) return [];
 
   const normQuery = normalizeInput(query);
   const likePattern = buildLooseIlikePattern(query);
+  const recipeTokenClauses = buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
+  const ingredientTokenClauses = buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
   const results: MealComponent[] = [];
 
   // ===== 1. SEARCH RECIPES (partial match) =====
@@ -95,7 +108,16 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
                 quality_score
             `,
       )
-      .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`)
+      .or(
+        Array.from(
+          new Set([
+            `name_norm_es.ilike.%${normQuery}%`,
+            `name_es.ilike.%${likePattern}%`,
+            `name_en.ilike.%${likePattern}%`,
+            ...recipeTokenClauses,
+          ]),
+        ).join(','),
+      )
       .order('quality_score', { ascending: false })
       .limit(15)
       .returns<RecipeSearchRow[]>();
@@ -144,8 +166,8 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
         const factor = totalWeight > 0 ? 100 / totalWeight : 0;
         results.push({
           id: `recipe_${recipe.id}`,
-          name: getLocalizedRecipeName(recipe),
-          description: getLocalizedRecipeDescription(recipe) ?? undefined,
+          name: getLocalizedRecipeName(recipe, languageCode),
+          description: getLocalizedRecipeDescription(recipe, languageCode) ?? undefined,
           source: 'database',
           external_id: recipe.id,
           itemType: 'recipe',
@@ -191,7 +213,16 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
         `,
       )
       .eq('category', 'precocinado')
-      .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`)
+      .or(
+        Array.from(
+          new Set([
+            `name_norm_es.ilike.%${normQuery}%`,
+            `name_es.ilike.%${likePattern}%`,
+            `name_en.ilike.%${likePattern}%`,
+            ...ingredientTokenClauses,
+          ]),
+        ).join(','),
+      )
       .order('quality_score', { ascending: false })
       .limit(15)
       .returns<IngredientSearchRow[]>();
@@ -202,7 +233,7 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
         .forEach(ing => {
           results.push({
             id: `ingredient_${ing.id}`,
-            name: getLocalizedIngredientName(ing),
+            name: getLocalizedIngredientName(ing, languageCode),
             source: 'database',
             external_id: ing.id,
             itemType: 'ingredient',
@@ -210,7 +241,7 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
             quality_score: ing.quality_score,
             source_primary: ing.source_primary,
             source_secondary: ing.source_secondary,
-            notes: getLocalizedIngredientNotes(ing) ?? undefined,
+            notes: getLocalizedIngredientNotes(ing, languageCode) ?? undefined,
             kcal_100: Math.round(ing.kcal_100 || 0),
             protein_g_100: Math.round((ing.protein_g_100 || 0) * 10) / 10,
             carbs_g_100: Math.round((ing.carbs_g_100 || 0) * 10) / 10,
@@ -224,13 +255,10 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
 
   // Sort: prioritize items that start with the query
   results.sort((a, b) => {
-    const aNorm = normalizeInput(a.name);
-    const bNorm = normalizeInput(b.name);
-    const startA = aNorm.startsWith(normQuery);
-    const startB = bNorm.startsWith(normQuery);
+    const scoreA = getSearchRelevanceScore(query, a.name, a.description ?? null);
+    const scoreB = getSearchRelevanceScore(query, b.name, b.description ?? null);
 
-    if (startA && !startB) return -1;
-    if (!startA && startB) return 1;
+    if (scoreA !== scoreB) return scoreB - scoreA;
     return (b.quality_score || 0) - (a.quality_score || 0);
   });
 

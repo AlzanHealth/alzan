@@ -13,6 +13,7 @@ export default {
     finish: 'Finalizar',
     skip: 'Saltar',
     done: 'Listo',
+    loadMore: 'Cargar más',
     ok: 'OK',
     add10s: '+10s',
     execution: 'Ejecución',

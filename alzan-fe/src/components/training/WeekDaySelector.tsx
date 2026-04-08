@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, Platform } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
-import { spacing, borderRadius } from '../../theme';
+import { spacing } from '../../theme';
 
 interface WeekDaySelectorProps {
   selectedDays: number[]; // 0 = Sunday, 1 = Monday, etc.
@@ -24,6 +24,20 @@ export const WeekDaySelector = ({
   singleSelect = false,
 }: WeekDaySelectorProps) => {
   const { colors: themeColors, isDark } = useTrainingStyles();
+  const { width } = useWindowDimensions();
+
+  const { chipSize, chipFontSize, rowGap } = useMemo(() => {
+    const horizontalPadding = Platform.OS === 'web' ? 140 : 44;
+    const usableWidth = Math.max(width - horizontalPadding, 260);
+    const computed = Math.floor((usableWidth - 6 * 8) / 7);
+    const normalizedSize = Math.min(56, Math.max(34, computed));
+
+    return {
+      chipSize: normalizedSize,
+      chipFontSize: normalizedSize >= 46 ? 18 : normalizedSize >= 40 ? 16 : 14,
+      rowGap: normalizedSize >= 46 ? 10 : 8,
+    };
+  }, [width]);
 
   const days = [
     { label: 'L', value: 1 },
@@ -55,7 +69,7 @@ export const WeekDaySelector = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.daysRow}>
+      <View style={[styles.daysRow, { gap: rowGap }]}>
         {days.map(day => {
           const isSelected = selectedDays.includes(day.value);
           return (
@@ -63,6 +77,11 @@ export const WeekDaySelector = ({
               key={day.value}
               style={[
                 styles.dayChip,
+                {
+                  width: chipSize,
+                  height: chipSize,
+                  borderRadius: chipSize / 2,
+                },
                 isSelected && styles.activeDayChip,
                 !isSelected && {
                   backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
@@ -79,6 +98,7 @@ export const WeekDaySelector = ({
               <Text
                 style={[
                   styles.dayChipText,
+                  { fontSize: chipFontSize },
                   isSelected && styles.activeDayChipText,
                   !isSelected && { color: themeColors.textSecondary },
                 ]}
@@ -115,22 +135,19 @@ const styles = StyleSheet.create({
   },
   daysRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
   },
   dayChip: {
-    flex: 1,
-    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: borderRadius.full,
     borderWidth: 1,
   },
   activeDayChip: {
     // Colors handled inline for dynamic support
   },
   dayChipText: {
-    fontSize: 14,
     fontWeight: '600',
   },
   activeDayChipText: {

@@ -11,6 +11,7 @@ const en = {
     finish: 'Finish',
     skip: 'Skip',
     done: 'Done',
+    loadMore: 'Load more',
     ok: 'OK',
     add10s: '+10s',
     execution: 'Execution',

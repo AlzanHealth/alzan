@@ -41,6 +41,7 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { fetchByBarcode } from '../../modules/nutrition/services/nutritionSearchService';
 import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
+import { getCurrentAppLocale } from '../../services/localization';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 
@@ -48,6 +49,7 @@ type InputMode = 'search' | 'scan' | 'manual' | 'photo';
 
 export const MealLogFormScreen = () => {
   const { t } = useTranslation();
+  const languageCode = getCurrentAppLocale();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
   const route = useRoute<RouteProp<NutritionStackParamList, 'MealLogForm'>>();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
@@ -180,7 +182,7 @@ export const MealLogFormScreen = () => {
     if (item.itemType === 'recipe' && item.external_id) {
       setMealDetailLoading(true);
       try {
-        const ingredients = await getRecipeIngredients(item.external_id);
+        const ingredients = await getRecipeIngredients(item.external_id, languageCode);
         setMealDetailIngredients(ingredients);
       } catch (error) {
         console.error('[MealLogForm] Error fetching recipe details:', error);
@@ -211,7 +213,7 @@ export const MealLogFormScreen = () => {
     setMealSearchResults([]);
 
     try {
-      const results = await searchMealByName(name);
+      const results = await searchMealByName(name, languageCode);
       console.log('[MealLogForm] Search results:', results.length);
 
       if (results.length > 0) {
@@ -240,7 +242,7 @@ export const MealLogFormScreen = () => {
     // If it's a recipe, fetch its ingredients
     if (item.itemType === 'recipe' && item.external_id) {
       try {
-        const recipeIngredients = await getRecipeIngredients(item.external_id);
+        const recipeIngredients = await getRecipeIngredients(item.external_id, languageCode);
         if (recipeIngredients.length > 0) {
           const transformedIngredients: MealComponent[] = recipeIngredients.map((ri, index: number) => ({
             id: `recipe-${index}-${Date.now()}`,

@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,9 +10,11 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { SportIcon } from '../../../components/icons/SportIcon';
 import {
+  addMonths,
+  addYears,
   addDays,
   endOfMonth,
   endOfWeek,
@@ -43,6 +46,8 @@ export type CalendarRangeMode = 'week' | 'month' | 'year' | 'last_30_days';
 export interface ActivityCalendarViewState {
   mode: CalendarRangeMode;
   monthAnchorTimestamp: number;
+  weekAnchorTimestamp?: number;
+  yearAnchorTimestamp?: number;
 }
 
 interface ActivityCalendarViewProps {
@@ -269,8 +274,14 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
   const today = startOfDay(now);
 
   const [mode, setMode] = useState<CalendarRangeMode>(initialViewState?.mode ?? 'month');
+  const [weekAnchorDate, setWeekAnchorDate] = useState<Date>(() =>
+    initialViewState?.weekAnchorTimestamp ? new Date(initialViewState.weekAnchorTimestamp) : today,
+  );
   const [monthAnchorDate, setMonthAnchorDate] = useState<Date>(() =>
     initialViewState?.monthAnchorTimestamp ? new Date(initialViewState.monthAnchorTimestamp) : today,
+  );
+  const [yearAnchorDate, setYearAnchorDate] = useState<Date>(() =>
+    initialViewState?.yearAnchorTimestamp ? new Date(initialViewState.yearAnchorTimestamp) : today,
   );
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isDayModalVisible, setIsDayModalVisible] = useState(false);
@@ -279,10 +290,10 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
 
   const currentWeekRange = useMemo<CalendarRange>(
     () => ({
-      start: startOfWeek(today, { weekStartsOn: WEEK_STARTS_ON_MONDAY }),
-      end: endOfWeek(today, { weekStartsOn: WEEK_STARTS_ON_MONDAY }),
+      start: startOfWeek(weekAnchorDate, { weekStartsOn: WEEK_STARTS_ON_MONDAY }),
+      end: endOfWeek(weekAnchorDate, { weekStartsOn: WEEK_STARTS_ON_MONDAY }),
     }),
-    [today],
+    [weekAnchorDate],
   );
 
   const currentMonthRange = useMemo<CalendarRange>(
@@ -295,10 +306,10 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
 
   const currentYearRange = useMemo<CalendarRange>(
     () => ({
-      start: startOfYear(today),
-      end: endOfYear(today),
+      start: startOfYear(yearAnchorDate),
+      end: endOfYear(yearAnchorDate),
     }),
-    [today],
+    [yearAnchorDate],
   );
 
   const last30DaysRange = useMemo<CalendarRange>(
@@ -312,6 +323,10 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
   const calendarFetchStartDate = isBefore(last30DaysRange.start, currentYearRange.start)
     ? last30DaysRange.start
     : currentYearRange.start;
+  const calendarFetchStartDateFinal = useMemo(() => {
+    const candidateStarts = [calendarFetchStartDate, currentMonthRange.start, currentWeekRange.start];
+    return candidateStarts.reduce((minDate, date) => (isBefore(date, minDate) ? date : minDate), candidateStarts[0]);
+  }, [calendarFetchStartDate, currentMonthRange.start, currentWeekRange.start]);
 
   useEffect(() => {
     if (!onViewStateChange) {
@@ -321,11 +336,13 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
     onViewStateChange({
       mode,
       monthAnchorTimestamp: startOfDay(monthAnchorDate).getTime(),
+      weekAnchorTimestamp: startOfDay(weekAnchorDate).getTime(),
+      yearAnchorTimestamp: startOfDay(yearAnchorDate).getTime(),
     });
-  }, [mode, monthAnchorDate, onViewStateChange]);
+  }, [mode, monthAnchorDate, weekAnchorDate, yearAnchorDate, onViewStateChange]);
 
   const { sessions, isLoading } = useEnduranceSessions({
-    startDate: calendarFetchStartDate.toISOString(),
+    startDate: calendarFetchStartDateFinal.toISOString(),
     endDate: today.toISOString(),
   });
 
@@ -553,14 +570,14 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
       case 'week':
         return `${format(selectedRange.start, 'd/M/yyyy')} - ${format(selectedRange.end, 'd/M/yyyy')}`;
       case 'month':
-        return format(monthAnchorDate, 'LLLL', { locale: getDateFnsLocale() });
+        return format(monthAnchorDate, 'LLLL yyyy', { locale: getDateFnsLocale() });
       case 'year':
-        return format(today, 'yyyy');
+        return format(yearAnchorDate, 'yyyy');
       case 'last_30_days':
       default:
         return t('training.last30Days');
     }
-  }, [mode, monthAnchorDate, selectedRange.end, selectedRange.start, t, today]);
+  }, [mode, monthAnchorDate, selectedRange.end, selectedRange.start, t, yearAnchorDate]);
 
   const monthGridRows = useMemo(() => {
     const gridStart = startOfWeek(currentMonthRange.start, { weekStartsOn: WEEK_STARTS_ON_MONDAY });
@@ -591,9 +608,26 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
     setMode('month');
   };
 
-  const handleModePress = (nextMode: CalendarRangeMode) => {
-    if (nextMode === mode) {
+  const resetAnchorToCurrent = (targetMode: CalendarRangeMode) => {
+    if (targetMode === 'week') {
+      setWeekAnchorDate(today);
+      return;
+    }
+
+    if (targetMode === 'month') {
       setMonthAnchorDate(today);
+      return;
+    }
+
+    if (targetMode === 'year') {
+      setYearAnchorDate(today);
+    }
+  };
+
+  const handleModePress = (nextMode: CalendarRangeMode) => {
+    resetAnchorToCurrent(nextMode);
+
+    if (nextMode === mode) {
       setSelectedDay(null);
       setIsDayModalVisible(false);
       return;
@@ -601,6 +635,64 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
 
     setMode(nextMode);
   };
+
+  const handleNavigateRange = useCallback(
+    (direction: 'previous' | 'next') => {
+      const step = direction === 'next' ? 1 : -1;
+
+      if (mode === 'week') {
+        setWeekAnchorDate(previous => addDays(previous, step * 7));
+        return;
+      }
+
+      if (mode === 'month') {
+        setMonthAnchorDate(previous => addMonths(previous, step));
+        return;
+      }
+
+      if (mode === 'year') {
+        setYearAnchorDate(previous => addYears(previous, step));
+      }
+    },
+    [mode],
+  );
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          if (mode !== 'week' && mode !== 'month' && mode !== 'year') {
+            return false;
+          }
+
+          const absDx = Math.abs(gestureState.dx);
+          const absDy = Math.abs(gestureState.dy);
+          return absDx > 12 && absDx > absDy * 1.15;
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (mode !== 'week' && mode !== 'month' && mode !== 'year') {
+            return;
+          }
+
+          const absDx = Math.abs(gestureState.dx);
+          const absDy = Math.abs(gestureState.dy);
+
+          if (absDx < 34 || absDx <= absDy) {
+            return;
+          }
+
+          if (gestureState.dx > 0) {
+            handleNavigateRange('previous');
+            return;
+          }
+
+          handleNavigateRange('next');
+        },
+        onPanResponderTerminationRequest: () => true,
+      }),
+    [handleNavigateRange, mode],
+  );
 
   const handleDayPress = (date: Date) => {
     setSelectedDay(startOfDay(date));
@@ -835,7 +927,35 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
           })}
         </View>
 
-        <Text style={[styles.title, { color: themeColors.textPrimary }]}>{calendarTitle}</Text>
+        <View style={styles.titleRow}>
+          {mode === 'week' || mode === 'month' || mode === 'year' ? (
+            <TouchableOpacity
+              style={styles.titleNavButton}
+              onPress={() => handleNavigateRange('previous')}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <ChevronLeft size={18} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.titleNavPlaceholder} />
+          )}
+
+          <View>
+            <Text style={[styles.title, { color: themeColors.textPrimary }]}>{calendarTitle}</Text>
+          </View>
+
+          {mode === 'week' || mode === 'month' || mode === 'year' ? (
+            <TouchableOpacity
+              style={styles.titleNavButton}
+              onPress={() => handleNavigateRange('next')}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <ChevronRight size={18} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.titleNavPlaceholder} />
+          )}
+        </View>
         <Text style={[styles.exerciseCount, { color: themeColors.textSecondary }]}>
           {t('training.activityCount', { count: sessionsInSelectedRange.length })}
         </Text>
@@ -854,6 +974,7 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
                   backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.75)',
                 },
               ]}
+              {...panResponder.panHandlers}
             >
               {shouldShowWeekdays && (
                 <View style={styles.weekdaysRow}>
@@ -1126,14 +1247,32 @@ const styles = StyleSheet.create({
   modeTabTextCompact: {
     fontSize: 13,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  titleNavButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleNavPlaceholder: {
+    width: 30,
+    height: 30,
+  },
   title: {
     ...typography.h2,
     fontWeight: '700',
-    marginBottom: spacing.xs,
     textTransform: 'capitalize',
   },
   exerciseCount: {
     ...typography.body,
+    alignSelf: 'center',
+    textAlign: 'center',
     marginBottom: spacing.m,
   },
   loadingContainer: {
