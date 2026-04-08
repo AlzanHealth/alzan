@@ -18,8 +18,7 @@ import { UserProfileDto } from '../../openapi/generated/alzan-be/types.gen';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { User } from '../../openapi/generated/alzan-be/sdk.gen';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { TabParamList } from '../../types/navigation.types';
+import { AlzanScreenNavigationProp } from '../../types/navigation.types';
 
 interface UserSearchSheetProps {
   visible: boolean;
@@ -30,9 +29,9 @@ export const UserSearchSheet: React.FC<UserSearchSheetProps> = ({ visible, onClo
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
   const queryClient = useQueryClient();
-  const navigation = useNavigation<StackNavigationProp<any>>();
+  const navigation = useNavigation<AlzanScreenNavigationProp>();
 
-  const { searchResults, isLoading, handleSearch, searchQuery, refetch } = useUserSearch();
+  const { searchResults, isLoading, handleSearch, searchQuery } = useUserSearch();
 
   // Mutations for follow/unfollow mapping exactly to the swagger endpoints
   const followMutation = useMutation({
@@ -130,7 +129,7 @@ export const UserSearchSheet: React.FC<UserSearchSheetProps> = ({ visible, onClo
           <Search size={20} color={colors.textSecondary} />
           <TextInput
             style={[styles.searchInput, { color: colors.textPrimary }]}
-            placeholder={t('alzan.searchPlaceholder' as any) || 'Buscar usuarios...'}
+            placeholder={t('social.searchPlaceholder')}
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={handleSearch}
@@ -155,7 +154,7 @@ export const UserSearchSheet: React.FC<UserSearchSheetProps> = ({ visible, onClo
         ) : (
           <View style={styles.centerContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {searchQuery.length > 0 ? t('alzan.noUsersFound' as any) : t('alzan.searchPrompt' as any)}
+              {searchQuery.length > 0 ? t('social.noUsersFound') : t('social.searchPrompt')}
             </Text>
           </View>
         )}

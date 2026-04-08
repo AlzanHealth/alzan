@@ -190,12 +190,18 @@ export type SettingsStackParamList = {
   StatsGlobal: undefined;
 };
 
+export type AlzanStackParamList = {
+  AlzanProfile: { userId: string };
+};
+
 // ============================================================================
 // Navigation Props (Helper Types)
 // ============================================================================
 
 // Auth screens can navigate within auth stack
 export type AuthScreenNavigationProp = StackNavigationProp<AuthStackParamList>;
+
+export type AlzanScreenNavigationProp = StackNavigationProp<AlzanStackParamList>;
 
 // Onboarding screens can navigate within onboarding stack
 export type OnboardingScreenNavigationProp = StackNavigationProp<OnboardingStackParamList>;

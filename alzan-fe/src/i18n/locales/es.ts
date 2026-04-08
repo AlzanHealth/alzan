@@ -1388,6 +1388,12 @@ export default {
     pdfAvgPower: 'Potencia media',
     pdfMaxPower: 'Potencia máxima',
   },
+  social: {
+    noNotifications: 'No hay notificaciones',
+    searchPlaceholder: 'Buscar usuarios...',
+    noUsersFound: 'No se encontraron usuarios',
+    searchPrompt: 'Busca usuarios para conectar',
+  },
   tabs: {
     home: 'Inicio',
     training: 'Entreno',

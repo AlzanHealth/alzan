@@ -24,7 +24,6 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../../types/navigation.types';
 import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react-native';
-import { UserSearchSheet } from '../../components/social/UserSearchSheet';
 import { NotificationsSheet } from '../../components/social/NotificationsSheet';
 import { useNotifications } from '../../hooks/useNotifications';
 

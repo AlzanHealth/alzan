@@ -21,7 +21,7 @@
     "supabase:types": "pnpm run supabase:gen && pnpm run copy:db:types && pnpm run copy:request:types && pnpm run format",
     "copy:request:types": "cp supabase/requests.types.ts alzan-fe/src/types/requests.types.ts && cp supabase/requests.types.ts alzan-be/src/types/requests.types.ts",
     "copy:db:types": "cp supabase/database.types.ts alzan-fe/src/types/database.types.ts && cp supabase/database.types.ts alzan-be/src/types/database.types.ts",
-    "openapi:fe": "pnpm --prefix alzan-fe openapi"
+    "openapi": "pnpm --prefix alzan-fe openapi"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

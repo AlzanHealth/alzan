@@ -1372,6 +1372,12 @@ const en = {
     mapInfoProviderLink: 'OpenFreeMap',
     mapInfoDataLink: 'OpenStreetMap',
   },
+  social: {
+    noNotifications: 'No notifications',
+    searchPlaceholder: 'Search users...',
+    noUsersFound: 'No users found',
+    searchPrompt: 'Search users...',
+  },
   tabs: {
     home: 'Home',
     training: 'Training',

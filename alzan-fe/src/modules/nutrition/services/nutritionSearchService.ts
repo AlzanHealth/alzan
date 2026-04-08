@@ -13,7 +13,6 @@ import { FoodSearchResult, MealComponent } from '../types/ingredients';
 import {
   buildLooseIlikePattern,
   getLocalizedIngredientName,
-  getLocalizedIngredientNotes,
   getLocalizedRecipeDescription,
   getLocalizedRecipeName,
   matchesLoosely,

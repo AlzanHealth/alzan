@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { formatDistanceToNow } from 'date-fns';
@@ -36,7 +36,7 @@ export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible,
   };
 
   const getNotificationText = (notification: Notification) => {
-    const data = notification.data as Record<string, any>;
+    const data = notification.data;
     const followerName = data?.follower_name || 'Alguien';
 
     switch (notification.type) {
@@ -58,7 +58,7 @@ export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible,
       locale: getDateFnsLocale(),
     });
 
-    const data = notification.data as Record<string, any>;
+    const data = notification.data;
     const avatar = data?.follower_avatar;
 
     return (
@@ -134,7 +134,7 @@ export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible,
           ) : notifications.length === 0 ? (
             <View style={styles.centerContainer}>
               <Bell size={48} color={colors.textSecondary} opacity={0.3} style={{ marginBottom: 16 }} />
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No tienes notificaciones</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('social.noNotifications')}</Text>
             </View>
           ) : (
             notifications.map(renderNotification)

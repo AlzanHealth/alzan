@@ -183,7 +183,7 @@ export async function getStrengthExerciseStats(
     const statsMap = new Map<string, StrengthExerciseStat>();
 
     sets.forEach(set => {
-      const exerciseName = set.exercises ? getLocalizedExerciseName(set.exercises as any) : 'Desconocido';
+      const exerciseName = set.exercises ? getLocalizedExerciseName(set.exercises) : 'Desconocido';
       const exerciseId = set.exercise_id;
 
       if (!statsMap.has(exerciseId)) {

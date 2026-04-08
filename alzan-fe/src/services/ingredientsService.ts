@@ -15,9 +15,7 @@ export interface CalculatedMacros {
   fats_g: number;
 }
 
-interface IngredientRuntimeFields extends DbIngredient {}
-
-export interface IngredientSearchResult extends IngredientRuntimeFields {
+export interface IngredientSearchResult extends DbIngredient {
   name: string;
   notes: string | null;
 }
@@ -33,7 +31,7 @@ export const normalizeInput = (str: string): string => {
 };
 
 // 2. Search
-function mapIngredientResult(ingredient: IngredientRuntimeFields): IngredientSearchResult {
+function mapIngredientResult(ingredient: DbIngredient): IngredientSearchResult {
   return {
     ...ingredient,
     name: getLocalizedIngredientName(ingredient),
@@ -74,7 +72,7 @@ export const searchIngredients = async (query: string): Promise<IngredientSearch
       .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`)
       .order('quality_score', { ascending: false })
       .limit(25)
-      .returns<IngredientRuntimeFields[]>();
+      .returns<DbIngredient[]>();
 
     if (error) {
       console.error('[ingredientsService] Similar match error:', JSON.stringify(error));
@@ -155,7 +153,7 @@ export const searchIngredientsWithFilters = async (
   supabaseQuery = supabaseQuery.order('quality_score', { ascending: false }).limit(100);
 
   try {
-    const { data, error } = await supabaseQuery.returns<IngredientRuntimeFields[]>();
+    const { data, error } = await supabaseQuery.returns<DbIngredient[]>();
 
     if (error) {
       console.error('[ingredientsService] Filter search error:', error);

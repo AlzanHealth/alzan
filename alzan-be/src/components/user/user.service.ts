@@ -49,7 +49,7 @@ export class UserService {
         .select('id_followed')
         .eq('id_follower', ctx.user.id)
         .in('id_followed', userIds);
-      
+
       if (followsData) {
         followingSet = new Set(followsData.map(f => f.id_followed));
       }

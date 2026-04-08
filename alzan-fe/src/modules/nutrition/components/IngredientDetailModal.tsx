@@ -172,11 +172,11 @@ export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
             </View>
 
             {/* Notes */}
-            {getLocalizedIngredientNotes(ingredient as any) && (
+            {getLocalizedIngredientNotes(ingredient) && (
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>{t('nutrition.notes')}</Text>
                 <Text style={[styles.notesText, { color: themeColors.textPrimary }]}>
-                  {getLocalizedIngredientNotes(ingredient as any)}
+                  {getLocalizedIngredientNotes(ingredient)}
                 </Text>
               </View>
             )}

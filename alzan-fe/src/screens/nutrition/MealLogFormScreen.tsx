@@ -35,7 +35,7 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useSaveMealWithIngredients, useMealItems } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
 import { format } from 'date-fns';
-import { getLocalizedIngredientName, getLocalizedIngredientNotes } from '../../services/localization';
+import { getLocalizedIngredientNotes } from '../../services/localization';
 import { getRecipeIngredients } from '../../modules/nutrition/services/recipeService';
 import { searchMealByName } from '../../modules/nutrition/services/nutritionSearchService';
 import { Alert } from '../../components/common/Alert';
@@ -274,7 +274,7 @@ export const MealLogFormScreen = () => {
       // It's a precooked ingredient - add as single item
       // Extract real weight from localized notes if available.
       let defaultAmount = 100;
-      const localizedNotes = getLocalizedIngredientNotes(item as any);
+      const localizedNotes = getLocalizedIngredientNotes(item);
       if (localizedNotes) {
         const weightMatch = localizedNotes.match(/(?:Peso Real|Actual weight):\s*(\d+)/i);
         if (weightMatch && weightMatch[1]) {
@@ -1384,13 +1384,13 @@ export const MealLogFormScreen = () => {
                     )}
 
                     {/* Notes */}
-                    {getLocalizedIngredientNotes(selectedMealDetail as any) && (
+                    {getLocalizedIngredientNotes(selectedMealDetail) && (
                       <View style={styles.detailSection}>
                         <Text style={[styles.detailSectionLabel, { color: themeColors.textSecondary }]}>
                           {t('nutrition.notesAllCaps')}
                         </Text>
                         <Text style={[styles.notesText, { color: themeColors.textPrimary }]}>
-                          {getLocalizedIngredientNotes(selectedMealDetail as any)}
+                          {getLocalizedIngredientNotes(selectedMealDetail)}
                         </Text>
                       </View>
                     )}
