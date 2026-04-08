@@ -392,7 +392,9 @@ export const ExerciseDetailScreen = () => {
             >
               <Dumbbell size={48} color={themeColors.primary} />
             </View>
-            <Text style={[styles.exerciseName, dynamicStyles.title]}>{exercise.name || getLocalizedExerciseName(exercise)}</Text>
+            <Text style={[styles.exerciseName, dynamicStyles.title]}>
+              {exercise.name || getLocalizedExerciseName(exercise)}
+            </Text>
           </GlassCard>
           {/* Quick Stats Grid */}
           <View style={styles.statsRow}>

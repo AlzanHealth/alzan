@@ -15,17 +15,139 @@
         "tags": ["App"]
       }
     },
-    "/user": {
+    "/users/{userId}/follow": {
+      "post": {
+        "operationId": "followUser",
+        "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": { "201": { "description": "" } },
+        "summary": "Follow a user",
+        "tags": ["User"]
+      }
+    },
+    "/users/{userId}/accept": {
+      "post": {
+        "operationId": "acceptFollowRequest",
+        "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": { "201": { "description": "" } },
+        "summary": "Accept a follow request",
+        "tags": ["User"]
+      }
+    },
+    "/users/{userId}/reject": {
+      "post": {
+        "operationId": "rejectFollowRequest",
+        "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": { "201": { "description": "" } },
+        "summary": "Reject a follow request",
+        "tags": ["User"]
+      }
+    },
+    "/users/{userId}/unfollow": {
+      "post": {
+        "operationId": "unfollowUser",
+        "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VoidResponse" } } }
+          }
+        },
+        "summary": "Unfollow a user",
+        "tags": ["User"]
+      }
+    },
+    "/users/{userId}/followers": {
       "get": {
-        "operationId": "getCurrentUser",
-        "parameters": [],
+        "operationId": "getFollowers",
+        "parameters": [
+          { "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "default": 10, "type": "number" }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 0, "default": 0, "type": "number" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserOutputDto" } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FollowResponseDto" } }
+              }
+            }
           }
         },
-        "summary": "Get current authenticated user",
+        "summary": "Get followers of the user provided",
+        "tags": ["User"]
+      }
+    },
+    "/users/{userId}/following": {
+      "get": {
+        "operationId": "getFollowing",
+        "parameters": [
+          { "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "default": 10, "type": "number" }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 0, "default": 0, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FollowResponseDto" } }
+              }
+            }
+          }
+        },
+        "summary": "Get following of the user provided",
+        "tags": ["User"]
+      }
+    },
+    "/users/search": {
+      "get": {
+        "operationId": "searchUsers",
+        "parameters": [
+          { "name": "q", "required": true, "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "default": 10, "type": "number" }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 0, "default": 0, "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FollowResponseDto" } }
+              }
+            }
+          }
+        },
         "tags": ["User"]
       }
     }
@@ -57,126 +179,26 @@
         },
         "required": ["status", "timestamp", "environment", "baseUrl"]
       },
-      "UserAppMetadata": {
-        "type": "object",
-        "properties": {
-          "provider": {
-            "type": "string",
-            "description": "The first provider that the user used to sign up with",
-            "example": "email"
-          },
-          "providers": {
-            "description": "A list of all providers that the user has linked to their account",
-            "example": ["email"],
-            "type": "array",
-            "items": { "type": "string" }
-          }
-        }
-      },
-      "UserMetadata": { "type": "object", "properties": {} },
-      "IdentityData": { "type": "object", "properties": {} },
-      "UserIdentity": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "description": "Identity ID", "example": "76a88c8c-7bf4-4faf-b1dc-c549e13a48c0" },
-          "user_id": { "type": "string", "description": "User ID", "example": "4424c5d6-5751-4038-aa39-bd85895ddb78" },
-          "identity_data": {
-            "description": "Identity data",
-            "allOf": [{ "$ref": "#/components/schemas/IdentityData" }]
-          },
-          "identity_id": {
-            "type": "string",
-            "description": "Identity ID",
-            "example": "76a88c8c-7bf4-4faf-b1dc-c549e13a48c0"
-          },
-          "provider": { "type": "string", "description": "Authentication provider", "example": "email" },
-          "created_at": {
-            "type": "string",
-            "description": "Identity creation timestamp",
-            "example": "2026-01-10T17:14:06.995337Z"
-          },
-          "last_sign_in_at": {
-            "type": "string",
-            "description": "Last sign in timestamp",
-            "example": "2026-01-10T17:14:06.995323Z"
-          },
-          "updated_at": {
-            "type": "string",
-            "description": "Identity update timestamp",
-            "example": "2026-01-10T17:14:06.995337Z"
-          }
-        },
-        "required": ["id", "user_id", "identity_id", "provider"]
-      },
-      "UserOutputDto": {
+      "VoidResponse": { "type": "object", "properties": {} },
+      "FollowResponseDto": {
         "type": "object",
         "properties": {
           "id": { "type": "string", "description": "User ID", "example": "4424c5d6-5751-4038-aa39-bd85895ddb78" },
-          "app_metadata": {
-            "description": "Application metadata",
-            "allOf": [{ "$ref": "#/components/schemas/UserAppMetadata" }]
-          },
-          "user_metadata": {
-            "description": "User metadata",
-            "allOf": [{ "$ref": "#/components/schemas/UserMetadata" }]
-          },
-          "aud": { "type": "string", "description": "User audience", "example": "authenticated" },
-          "confirmation_sent_at": {
+          "username": { "type": "string", "nullable": true, "description": "Unique username", "example": "johndoe" },
+          "display_name": {
             "type": "string",
-            "description": "Confirmation sent at timestamp",
-            "example": "2026-01-10T17:14:06.996671Z"
+            "nullable": true,
+            "description": "Display name shown publicly",
+            "example": "John Doe"
           },
-          "recovery_sent_at": { "type": "string", "description": "Recovery sent at timestamp" },
-          "email_change_sent_at": { "type": "string", "description": "Email change sent at timestamp" },
-          "new_email": { "type": "string", "description": "New email (during email change)" },
-          "new_phone": { "type": "string", "description": "New phone (during phone change)" },
-          "invited_at": { "type": "string", "description": "Invited at timestamp" },
-          "action_link": { "type": "string", "description": "Action link" },
-          "email": { "type": "string", "description": "User email", "example": "info@alzan.com" },
-          "phone": { "type": "string", "description": "User phone number" },
-          "created_at": {
+          "avatar_url": {
             "type": "string",
-            "description": "User creation timestamp",
-            "example": "2026-01-10T17:14:06.990543Z"
-          },
-          "confirmed_at": {
-            "type": "string",
-            "description": "Account confirmation timestamp",
-            "example": "2026-01-10T17:14:06.996671Z"
-          },
-          "email_confirmed_at": {
-            "type": "string",
-            "description": "Email confirmation timestamp",
-            "example": "2026-01-10T17:14:06.996671Z"
-          },
-          "phone_confirmed_at": { "type": "string", "description": "Phone confirmation timestamp" },
-          "last_sign_in_at": {
-            "type": "string",
-            "description": "Last sign in timestamp",
-            "example": "2026-01-25T14:05:04.820838Z"
-          },
-          "role": { "type": "string", "description": "User role", "example": "authenticated" },
-          "updated_at": {
-            "type": "string",
-            "description": "User update timestamp",
-            "example": "2026-01-25T14:05:04.824569Z"
-          },
-          "identities": {
-            "description": "User identities",
-            "type": "array",
-            "items": { "$ref": "#/components/schemas/UserIdentity" }
-          },
-          "is_anonymous": { "type": "boolean", "description": "Whether user is anonymous", "example": false },
-          "is_sso_user": { "type": "boolean", "description": "Whether user is SSO user" },
-          "factors": {
-            "description": "MFA factors (not included in typical responses)",
-            "type": "array",
-            "items": { "type": "object" }
-          },
-          "deleted_at": { "type": "string", "description": "Deleted at timestamp" },
-          "banned_until": { "type": "string", "description": "Banned until timestamp" }
+            "nullable": true,
+            "description": "URL of the user's avatar image",
+            "example": "https://cdn.alzan.com/avatars/johndoe.png"
+          }
         },
-        "required": ["id", "app_metadata", "user_metadata", "aud", "created_at"]
+        "required": ["id", "username", "display_name", "avatar_url"]
       }
     }
   },

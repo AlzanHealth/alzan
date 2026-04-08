@@ -1281,7 +1281,9 @@ export const ActiveWorkoutScreen = () => {
                       >
                         <View style={styles.exerciseHeader}>
                           <View style={styles.exerciseInfo}>
-                            <Text style={[styles.exerciseName, dynamicStyles.title]}>{item.exercise ? getLocalizedExerciseName(item.exercise) : ''}</Text>
+                            <Text style={[styles.exerciseName, dynamicStyles.title]}>
+                              {item.exercise ? getLocalizedExerciseName(item.exercise) : ''}
+                            </Text>
                           </View>
                           <TouchableOpacity onPress={() => setMenuVisibleForExercise(exerciseId)}>
                             <MoreVertical size={20} color={themeColors.textSecondary} />
@@ -1715,7 +1717,11 @@ export const ActiveWorkoutScreen = () => {
                   onPress={() => {
                     const exercise = visibleExercises.find(e => e.exercise_id === menuVisibleForExercise);
                     if (exercise)
-                      handleDeleteLastSet(exercise.exercise_id, (exercise.exercise ? getLocalizedExerciseName(exercise.exercise) : undefined) || t('training.exercise'));
+                      handleDeleteLastSet(
+                        exercise.exercise_id,
+                        (exercise.exercise ? getLocalizedExerciseName(exercise.exercise) : undefined) ||
+                          t('training.exercise'),
+                      );
                   }}
                 >
                   <Trash2 size={20} color={themeColors.warning || '#FF9500'} />
@@ -1731,7 +1737,8 @@ export const ActiveWorkoutScreen = () => {
                     if (exercise)
                       handleDeleteExercise(
                         exercise.exercise_id,
-                        (exercise.exercise ? getLocalizedExerciseName(exercise.exercise) : undefined) || t('training.exercise'),
+                        (exercise.exercise ? getLocalizedExerciseName(exercise.exercise) : undefined) ||
+                          t('training.exercise'),
                       );
                   }}
                 >
