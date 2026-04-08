@@ -13,7 +13,6 @@
     "typecheck": "tsc -p . --noEmit",
     "format": "prettier \"src/**/*.{js,jsx,ts,tsx,html,css,scss,json}\" --write",
     "format:check": "prettier \"src/**/*.{js,jsx,ts,tsx,html,css,scss,json}\" --check",
-    "supabase:types": "cd .. && supabase gen types --local > alzan-fe/src/types/database.types.ts && cd alzan-fe && pnpm format",
     "generate-openapi": "openapi-ts && pnpm format",
     "fetch-openapi": "tsx scripts/fetch-openapi.ts && pnpm format",
     "postinstall": "pnpm run generate-openapi",

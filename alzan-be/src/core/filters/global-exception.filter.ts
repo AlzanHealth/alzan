@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { type Response, type Request } from 'express';
+import { type Response } from 'express';
+import { AuthenticatedRequest } from '../../common/interfaces/authenticated-request.interface';
 
 export function extractMessage(res: string | object): string | null {
   if (typeof res === 'string') {
@@ -20,7 +21,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<AuthenticatedRequest>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal Server Error';
@@ -45,6 +46,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       method: request.method,
       path: request.url,
       message,
+      meta: this.getDefaultMetaFromRequest(request),
       stack,
     };
 
@@ -60,5 +62,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
     });
+  }
+
+  private getDefaultMetaFromRequest(request: AuthenticatedRequest): Record<string, unknown> {
+    const meta: Record<string, unknown> = {};
+
+    if (request?.user) {
+      meta.userId = request.user.id;
+      meta.email = request.user.email;
+    }
+
+    meta.targetUserId = meta.targetUserId ?? request?.params?.userId;
+    meta.notificationId = meta.notificationId ?? request?.params?.notificationId;
+
+    return meta;
   }
 }
