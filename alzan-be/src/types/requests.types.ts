@@ -93,13 +93,14 @@ export interface NutritionSettingsJson {
 }
 
 // --- Ingredients & Imports ---
-export interface IngredientSource {
+import { Json } from './database.types';
+export type IngredientSource = {
   provider: string;
   retrieved_at: string;
   url?: string;
   original_id?: string;
-  [key: string]: unknown;
-}
+  [key: string]: Json | undefined;
+};
 
 type PublicSchema = DatabaseGenerated['public'];
 type GeneratedTables = PublicSchema['Tables'];

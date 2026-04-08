@@ -10,6 +10,7 @@ import { CATEGORY_LABELS } from './IngredientCategoryFilter';
 import { IngredientSource } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../../i18n/dateLocale';
+import { getLocalizedIngredientNotes } from '../../../services/localization';
 
 interface IngredientDetailModalProps {
   visible: boolean;
@@ -171,10 +172,10 @@ export const IngredientDetailModal: React.FC<IngredientDetailModalProps> = ({
             </View>
 
             {/* Notes */}
-            {ingredient.notes && (
+            {getLocalizedIngredientNotes(ingredient as any) && (
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>{t('nutrition.notes')}</Text>
-                <Text style={[styles.notesText, { color: themeColors.textPrimary }]}>{ingredient.notes}</Text>
+                <Text style={[styles.notesText, { color: themeColors.textPrimary }]}>{getLocalizedIngredientNotes(ingredient as any)}</Text>
               </View>
             )}
 

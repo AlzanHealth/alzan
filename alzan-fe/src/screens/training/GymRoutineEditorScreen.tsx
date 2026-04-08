@@ -36,7 +36,7 @@ import { format } from 'date-fns';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
-import { isTimeBasedExerciseType } from '../../services/localization';
+import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
 import { ExerciseWithDetails } from '../../types/training';
 
 export const GymRoutineEditorScreen = () => {
@@ -199,6 +199,7 @@ export const GymRoutineEditorScreen = () => {
             description: selectedExercise.description ?? null,
             exercise_type_code: selectedExercise.exercise_type_code ?? null,
             exercise_type: null,
+            base_name: getLocalizedExerciseName(selectedExercise),
           },
         };
 

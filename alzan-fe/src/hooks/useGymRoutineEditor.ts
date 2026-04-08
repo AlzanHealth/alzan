@@ -21,10 +21,6 @@ export type RoutineEditorData = {
 };
 
 interface RoutineExerciseLookupRow extends Exercise {
-  base_name_es?: string | null;
-  base_name_en?: string | null;
-  description_es?: string | null;
-  description_en?: string | null;
   exercise_type: {
     id: number;
     code: string;

@@ -66,7 +66,6 @@ export const ExerciseSearchScreen = () => {
         return matchesLoosely(
           searchQuery,
           ex.name,
-          ex.base_name,
           ex.base_name_es,
           ex.base_name_en,
           ex.description,

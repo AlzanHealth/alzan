@@ -1,13 +1,9 @@
 import { Exercise } from './requests.types';
 
 export type ExerciseWithDetails = Exercise & {
-  load_type?: 'bodyweight' | 'external' | 'assisted' | 'mixed' | null;
+  load_type: 'bodyweight' | 'external' | 'assisted' | 'mixed' | null;
   name: string;
   description?: string | null;
-  base_name_es?: string | null;
-  base_name_en?: string | null;
-  description_es?: string | null;
-  description_en?: string | null;
   muscle_name?: string;
   secondary_muscle_name?: string;
   equipment_name?: string;

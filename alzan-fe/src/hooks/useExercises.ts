@@ -15,11 +15,7 @@ interface TranslationRow {
 }
 
 interface ExerciseLookupRow extends Exercise {
-  load_type?: 'bodyweight' | 'external' | 'assisted' | 'mixed' | null;
-  base_name_es?: string | null;
-  base_name_en?: string | null;
-  description_es?: string | null;
-  description_en?: string | null;
+  load_type: 'bodyweight' | 'external' | 'assisted' | 'mixed' | null;
   exercise_type: {
     id: number;
     code: string;
@@ -94,9 +90,8 @@ const mapExerciseLookupRow = (item: ExerciseLookupRow, languageCode: string): Ex
   return {
     ...item,
     load_type: normalizeExerciseLoadType(item.load_type),
-    base_name: exerciseName,
     name: exerciseName,
-    description: exerciseDescription ?? item.description ?? null,
+    description: exerciseDescription ?? item.description_es ?? null,
     muscle_name: muscleName,
     secondary_muscle_name: secondaryMuscleName,
     equipment_name: equipName,

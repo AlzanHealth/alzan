@@ -16,6 +16,7 @@ import {
   isTimeBasedExerciseType,
   normalizeExerciseDifficulty,
   normalizeExerciseLoadType,
+  getLocalizedExerciseName,
 } from '../../services/localization';
 import { useExerciseById } from '../../hooks/useExercises';
 import { type ExerciseProgressMetric, useExerciseProgress } from '../../hooks/useExerciseProgress';
@@ -375,7 +376,7 @@ export const ExerciseDetailScreen = () => {
             <ArrowLeft size={24} color={themeColors.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.title, dynamicStyles.title]} numberOfLines={1}>
-            {exercise.name || exercise.base_name}
+            {exercise.name || getLocalizedExerciseName(exercise)}
           </Text>
           <View style={{ width: 24 }} />
         </View>
@@ -391,7 +392,7 @@ export const ExerciseDetailScreen = () => {
             >
               <Dumbbell size={48} color={themeColors.primary} />
             </View>
-            <Text style={[styles.exerciseName, dynamicStyles.title]}>{exercise.name || exercise.base_name}</Text>
+            <Text style={[styles.exerciseName, dynamicStyles.title]}>{exercise.name || getLocalizedExerciseName(exercise)}</Text>
           </GlassCard>
           {/* Quick Stats Grid */}
           <View style={styles.statsRow}>
@@ -435,7 +436,7 @@ export const ExerciseDetailScreen = () => {
                     exerciseId,
                     metric: progressMetric,
                     loadType: normalizedLoadType,
-                    exerciseName: exercise.name || exercise.base_name || undefined,
+                    exerciseName: exercise.name || getLocalizedExerciseName(exercise) || undefined,
                   });
                 }}
                 disabled={!exerciseId}

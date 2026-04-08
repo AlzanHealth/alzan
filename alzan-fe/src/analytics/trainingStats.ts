@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient';
 import { SportType } from '../types/requests.types';
 import { DateRange } from './types';
 import { startOfWeek, format, eachWeekOfInterval } from 'date-fns';
+import { getLocalizedExerciseName } from '../services/localization';
 
 export type WeeklyTrainingVolume = {
   weekStart: string;
@@ -168,7 +169,7 @@ export async function getStrengthExerciseStats(
 
     const { data: sets, error } = await supabase
       .from('workout_sets')
-      .select('*, exercises(base_name)')
+      .select('*, exercises(base_name_es, base_name_en)')
       .in('session_id', sessionIds)
       .order('created_at', { ascending: true });
 
@@ -182,7 +183,7 @@ export async function getStrengthExerciseStats(
     const statsMap = new Map<string, StrengthExerciseStat>();
 
     sets.forEach(set => {
-      const exerciseName = set.exercises?.base_name || 'Desconocido';
+      const exerciseName = set.exercises ? getLocalizedExerciseName(set.exercises as any) : 'Desconocido';
       const exerciseId = set.exercise_id;
 
       if (!statsMap.has(exerciseId)) {

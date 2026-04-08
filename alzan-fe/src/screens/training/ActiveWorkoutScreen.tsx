@@ -45,7 +45,7 @@ import { ExerciseWithDetails } from '../../types/training';
 import { ActivitySessionSupersetLink, WorkoutTemplateExercise } from '../../types/requests.types';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
-import { isTimeBasedExerciseType } from '../../services/localization';
+import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
 
 export type WorkoutTemplateExerciseWithDetails = WorkoutTemplateExercise & { exercise: ExerciseWithType | null };
 
@@ -1281,7 +1281,7 @@ export const ActiveWorkoutScreen = () => {
                       >
                         <View style={styles.exerciseHeader}>
                           <View style={styles.exerciseInfo}>
-                            <Text style={[styles.exerciseName, dynamicStyles.title]}>{item.exercise?.base_name}</Text>
+                            <Text style={[styles.exerciseName, dynamicStyles.title]}>{item.exercise ? getLocalizedExerciseName(item.exercise) : ''}</Text>
                           </View>
                           <TouchableOpacity onPress={() => setMenuVisibleForExercise(exerciseId)}>
                             <MoreVertical size={20} color={themeColors.textSecondary} />
@@ -1715,7 +1715,7 @@ export const ActiveWorkoutScreen = () => {
                   onPress={() => {
                     const exercise = visibleExercises.find(e => e.exercise_id === menuVisibleForExercise);
                     if (exercise)
-                      handleDeleteLastSet(exercise.exercise_id, exercise.exercise?.base_name || t('training.exercise'));
+                      handleDeleteLastSet(exercise.exercise_id, (exercise.exercise ? getLocalizedExerciseName(exercise.exercise) : undefined) || t('training.exercise'));
                   }}
                 >
                   <Trash2 size={20} color={themeColors.warning || '#FF9500'} />
@@ -1731,7 +1731,7 @@ export const ActiveWorkoutScreen = () => {
                     if (exercise)
                       handleDeleteExercise(
                         exercise.exercise_id,
-                        exercise.exercise?.base_name || t('training.exercise'),
+                        (exercise.exercise ? getLocalizedExerciseName(exercise.exercise) : undefined) || t('training.exercise'),
                       );
                   }}
                 >
