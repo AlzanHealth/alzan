@@ -1,7 +1,7 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { User } from '@supabase/supabase-js';
 import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
-import { DbClient } from '../../types/request.types';
+import { DbClient } from '../../core/database/supabase.client';
 
 export interface UserCtx {
   user: User;

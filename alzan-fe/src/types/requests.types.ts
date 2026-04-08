@@ -1,14 +1,96 @@
 /**
- * Constants and types for Supabase requests to ensure type safety.
+ * File copied from the root
+ * ONLY EDIT IN THE ROOT!
  */
 
 import { Database as DatabaseGenerated } from './database.types';
-import {
-  AppearanceSettingsJson,
-  NotificationSettingsJson,
-  NutritionSettingsJson,
-  PrivacySettingsJson,
-} from './userPreferences.types';
+
+export type UserFollowNotificationData = {
+  follower_id: string;
+  follower_name?: string;
+  follower_avatar?: string;
+  follower_username?: string;
+};
+
+export interface NotificationDataMap {
+  USER_FOLLOW_REQUEST: UserFollowNotificationData;
+  USER_FOLLOW_REQUEST_ACCEPTED: UserFollowNotificationData;
+  USER_FOLLOW_REQUEST_REJECTED: UserFollowNotificationData;
+}
+
+export type MergeDeep<S, D> = {
+  [K in keyof S | keyof D]: K extends keyof D
+    ? K extends keyof S
+      ? S[K] extends Record<string, unknown>
+        ? D[K] extends Record<string, unknown>
+          ? MergeDeep<S[K], D[K]>
+          : D[K]
+        : D[K]
+      : D[K]
+    : K extends keyof S
+      ? S[K]
+      : never;
+};
+
+// 1. Appearance
+export interface AppearanceSettingsJson {
+  theme: 'light' | 'dark' | 'system';
+  accessibility: {
+    reduceMotion: boolean;
+    largeText: boolean;
+  };
+}
+
+// 2. Notifications
+export interface NotificationSettingsJson {
+  meals: {
+    breakfast: { enabled: boolean; time: string };
+    almuerzo: { enabled: boolean; time: string };
+    lunch: { enabled: boolean; time: string };
+    merienda: { enabled: boolean; time: string };
+    dinner: { enabled: boolean; time: string };
+  };
+  training: {
+    scheduled_reminder: boolean;
+    scheduled_reminder_time: string;
+    inactivity_days: number | null;
+    post_workout_summary: boolean;
+  };
+  health: {
+    weight_reminder: 'weekly' | 'custom' | null;
+    weight_time: string;
+    weight_days: number[];
+    hydration: boolean;
+    sleep: boolean;
+    sleep_time: string;
+  };
+  app: {
+    general: boolean;
+    news: boolean;
+    smart_reminders: boolean;
+  };
+}
+
+// 3. Privacy
+export interface PrivacySettingsJson {
+  profile_public: boolean;
+  default_workout_visibility: 'private' | 'followers' | 'public';
+}
+
+// 4. Nutrition
+export interface NutritionSettingsJson {
+  enabled_meals: Record<string, boolean>;
+  snack_behavior: {
+    treat_as_meal: boolean;
+    show_only_if_content: boolean;
+  };
+  macro_display: 'per_meal' | 'daily_total';
+  copy_mode: 'none' | 'sequential' | 'alternating' | null;
+  show_diet_calories_only?: boolean;
+  show_training_calories_only?: boolean;
+  last_visible_week?: string;
+  last_planned_training_week?: string;
+}
 
 // --- Ingredients & Imports ---
 export interface IngredientSource {
@@ -127,11 +209,61 @@ type UserPreferencesOverride = {
   Relationships: GeneratedTables['user_preferences']['Relationships'];
 };
 
+type NotificationsOverride = {
+  Row: Omit<GeneratedTables['notifications']['Row'], 'type' | 'data'> &
+    (
+      | {
+          type: 'USER_FOLLOW_REQUEST';
+          data: NotificationDataMap['USER_FOLLOW_REQUEST'];
+        }
+      | {
+          type: 'USER_FOLLOW_REQUEST_ACCEPTED';
+          data: NotificationDataMap['USER_FOLLOW_REQUEST_ACCEPTED'];
+        }
+      | {
+          type: 'USER_FOLLOW_REQUEST_REJECTED';
+          data: NotificationDataMap['USER_FOLLOW_REQUEST_REJECTED'];
+        }
+    );
+  Insert: Omit<GeneratedTables['notifications']['Insert'], 'type' | 'data'> &
+    (
+      | {
+          type: 'USER_FOLLOW_REQUEST';
+          data: NotificationDataMap['USER_FOLLOW_REQUEST'];
+        }
+      | {
+          type: 'USER_FOLLOW_REQUEST_ACCEPTED';
+          data: NotificationDataMap['USER_FOLLOW_REQUEST_ACCEPTED'];
+        }
+      | {
+          type: 'USER_FOLLOW_REQUEST_REJECTED';
+          data: NotificationDataMap['USER_FOLLOW_REQUEST_REJECTED'];
+        }
+    );
+  Update: Omit<GeneratedTables['notifications']['Update'], 'type' | 'data'> &
+    (
+      | {
+          type?: 'USER_FOLLOW_REQUEST';
+          data?: Partial<NotificationDataMap['USER_FOLLOW_REQUEST']>;
+        }
+      | {
+          type?: 'USER_FOLLOW_REQUEST_ACCEPTED';
+          data?: Partial<NotificationDataMap['USER_FOLLOW_REQUEST_ACCEPTED']>;
+        }
+      | {
+          type?: 'USER_FOLLOW_REQUEST_REJECTED';
+          data?: Partial<NotificationDataMap['USER_FOLLOW_REQUEST_REJECTED']>;
+        }
+    );
+  Relationships: GeneratedTables['notifications']['Relationships'];
+};
+
 type TableOverrides = {
   activity_sessions: ActivitySessionsOverride;
   activity_heart_rate_zones: ActivityHeartRateZonesOverride;
   ingredients: IngredientsOverride;
   user_preferences: UserPreferencesOverride;
+  notifications: NotificationsOverride;
 };
 
 type ExtendedTables = Omit<GeneratedTables, keyof TableOverrides> & TableOverrides;
@@ -316,6 +448,11 @@ export type UserPreference = Row<'user_preferences'>;
 export type UserPreferenceInsert = Insert<'user_preferences'>;
 export type UserPreferenceUpdate = Update<'user_preferences'>;
 
+// --- Notifications ---
+export type Notification = Row<'notifications'>;
+export type NotificationInsert = Insert<'notifications'>;
+export type NotificationUpdate = Update<'notifications'>;
+
 // --- Biometrics ---
 export type BodyMeasurement = Row<'body_measurements'>;
 export type BodyMeasurementInsert = Insert<'body_measurements'>;
@@ -429,6 +566,9 @@ export type MeasurementType = Enum<'measurement_type_enum'>;
 // Users
 export type Sex = Enum<'users_sex'>;
 export type MaleOrFemale = Extract<Sex, 'male' | 'female'>;
+
+// Notifications
+export type NotificationType = Enum<'notification_type'>;
 
 // Localization
 export type LanguageCode = Enum<'language_code_enum'>;

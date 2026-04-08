@@ -17,9 +17,10 @@
     "format": "pnpm --prefix alzan-be format && pnpm --prefix alzan-fe format",
     "typecheck": "pnpm --prefix alzan-be typecheck && pnpm --prefix alzan-fe typecheck",
     "install:all": "pnpm --prefix alzan-be install && pnpm --prefix alzan-fe install",
-    "supabase:types:fe": "supabase gen types --local > alzan-fe/src/types/database.types.ts && pnpm --prefix alzan-fe format",
-    "supabase:types:be": "supabase gen types --local > alzan-be/src/types/database.types.ts && pnpm --prefix alzan-be format",
-    "supabase:types": "pnpm supabase:types:fe && pnpm supabase:types:be"
+    "supabase:gen": "supabase gen types --local > supabase/database.types.ts",
+    "supabase:types": "pnpm run supabase:gen && pnpm run copy:db:types && pnpm run copy:request:types && pnpm run format",
+    "copy:request:types": "cp supabase/requests.types.ts alzan-fe/src/types/requests.types.ts && cp supabase/requests.types.ts alzan-be/src/types/requests.types.ts",
+    "copy:db:types": "cp supabase/database.types.ts alzan-fe/src/types/database.types.ts && cp supabase/database.types.ts alzan-be/src/types/database.types.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

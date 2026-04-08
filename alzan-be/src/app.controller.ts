@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
-import { AppOutputDto } from './common/dtos/app.output-dto';
 import { PublicAuth } from './core/guards/auth.decorator';
+import { AppOutputDto } from './common/dtos/app.output-dto';
 
 @Controller()
 @PublicAuth()
