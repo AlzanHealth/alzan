@@ -3,12 +3,12 @@ name: Code Quality
 on:
   push:
     paths:
-      - 'alzan-be/**'
-      - 'alzan-fe/**'
+      - "alzan-be/**"
+      - "alzan-fe/**"
   pull_request:
     paths:
-      - 'alzan-be/**'
-      - 'alzan-fe/**'
+      - "alzan-be/**"
+      - "alzan-fe/**"
 
 jobs:
   be-quality:
@@ -31,8 +31,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
-          cache-dependency-path: 'alzan-be/pnpm-lock.yaml'
+          cache: "pnpm"
+          cache-dependency-path: "alzan-be/pnpm-lock.yaml"
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -63,8 +63,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
-          cache-dependency-path: 'alzan-fe/pnpm-lock.yaml'
+          cache: "pnpm"
+          cache-dependency-path: "alzan-fe/pnpm-lock.yaml"
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -73,7 +73,7 @@ jobs:
         run: pnpm run format:check
 
       - name: Generate OpenAPI
-        run: pnpm run generate-openapi
+        run: pnpm run openapi:generate
 
       - name: Lint
         run: pnpm run lint:check

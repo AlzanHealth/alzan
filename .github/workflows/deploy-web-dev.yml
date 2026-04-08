@@ -28,14 +28,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
-          cache-dependency-path: 'alzan-fe/pnpm-lock.yaml'
+          cache: "pnpm"
+          cache-dependency-path: "alzan-fe/pnpm-lock.yaml"
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Generate OpenAPI
-        run: pnpm run generate-openapi
+        run: pnpm run openapi:generate
 
       - name: Build Web App
         env:
