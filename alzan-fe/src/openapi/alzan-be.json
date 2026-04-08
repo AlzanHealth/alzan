@@ -143,7 +143,7 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FollowResponseDto" } }
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UserProfileDto" } }
               }
             }
           }
@@ -199,6 +199,37 @@
           }
         },
         "required": ["id", "username", "display_name", "avatar_url"]
+      },
+      "UserProfileDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "User ID", "example": "4424c5d6-5751-4038-aa39-bd85895ddb78" },
+          "username": { "type": "string", "nullable": true, "description": "Unique username", "example": "johndoe" },
+          "display_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display name shown publicly",
+            "example": "John Doe"
+          },
+          "avatar_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL of the user's avatar image",
+            "example": "https://cdn.alzan.com/avatars/johndoe.png"
+          },
+          "followers_count": { "type": "number", "description": "Total number of followers", "example": 42 },
+          "following_count": {
+            "type": "number",
+            "description": "Total number of accounts the user is following",
+            "example": 17
+          },
+          "is_following": {
+            "type": "boolean",
+            "description": "Whether the authenticated user is currently following this user",
+            "example": false
+          }
+        },
+        "required": ["id", "username", "followers_count", "following_count"]
       }
     }
   },

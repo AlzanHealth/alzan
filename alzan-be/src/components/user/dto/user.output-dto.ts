@@ -45,6 +45,13 @@ export class UserProfileDto {
    */
   @Expose()
   following_count!: number;
+
+  /**
+   * Whether the authenticated user is currently following this user
+   * @example false
+   */
+  @Expose()
+  is_following?: boolean;
 }
 
 /**

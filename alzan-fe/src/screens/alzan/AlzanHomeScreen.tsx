@@ -24,6 +24,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../../types/navigation.types';
 import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react-native';
+import { UserSearchSheet } from '../../components/social/UserSearchSheet';
 import { NotificationsSheet } from '../../components/social/NotificationsSheet';
 import { useNotifications } from '../../hooks/useNotifications';
 
@@ -222,6 +223,10 @@ const Header = ({ onOpenNotifications }: { onOpenNotifications: () => void }) =>
   const { styles: themeStyles, isDark } = useAlzanTheme();
   const { unreadCount } = useNotifications();
 
+  const onOpenSearch = () => {
+    console.log('TODO');
+  };
+
   return (
     <View style={styles.header}>
       {/* Avatar izquierda */}
@@ -280,7 +285,10 @@ const Header = ({ onOpenNotifications }: { onOpenNotifications: () => void }) =>
 
       {/* Iconos derecha */}
       <View style={styles.headerActions}>
-        <TouchableOpacity style={[styles.headerIcon, { backgroundColor: themeStyles.headerIconBg }]}>
+        <TouchableOpacity
+          style={[styles.headerIcon, { backgroundColor: themeStyles.headerIconBg }]}
+          onPress={onOpenSearch}
+        >
           <Search size={22} color={themeStyles.headerIconColor} />
         </TouchableOpacity>
         <TouchableOpacity

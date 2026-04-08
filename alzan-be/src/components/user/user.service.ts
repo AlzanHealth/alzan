@@ -11,21 +11,27 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 import { NotificationService } from './notification/notification.service';
 import { makeUserFollowNotificationData } from './user.helper';
 import { UserCtx } from '../../common/decorators/user-context.decorator';
+import { SupabaseAdminService } from '../../core/supabase/supabase.service';
 
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
 
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly supabaseAdminService: SupabaseAdminService,
+  ) {}
 
   async searchUsers(ctx: UserCtx, query: string, pagination: PaginationDto) {
     const { limit, offset } = pagination;
-    const { supabase } = ctx;
+    const { client: supabase } = this.supabaseAdminService;
     this.logger.debug(`UserService: Trying to search users for ${query}`);
 
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('*')
+      .select(
+        'id, username, display_name, avatar_url, followers:social_follows!id_followed(count), following:social_follows!id_follower(count)',
+      )
       .ilike('username', `%${query}%`)
       .limit(limit)
       .range(offset, offset + limit - 1);
@@ -34,7 +40,30 @@ export class UserService {
       throw new InternalServerErrorException(usersError?.message, { cause: usersError });
     }
 
-    return users;
+    // Efficiently check if current user is following the loaded users
+    let followingSet = new Set<string>();
+    if (users.length > 0) {
+      const userIds = users.map(u => u.id);
+      const { data: followsData } = await supabase
+        .from('social_follows')
+        .select('id_followed')
+        .eq('id_follower', ctx.user.id)
+        .in('id_followed', userIds);
+      
+      if (followsData) {
+        followingSet = new Set(followsData.map(f => f.id_followed));
+      }
+    }
+
+    return users.map(u => ({
+      id: u.id,
+      username: u.username,
+      display_name: u.display_name,
+      avatar_url: u.avatar_url,
+      followers_count: u.followers?.[0]?.count ?? 0,
+      following_count: u.following?.[0]?.count ?? 0,
+      is_following: followingSet.has(u.id),
+    }));
   }
 
   /**
@@ -50,31 +79,6 @@ export class UserService {
     }
 
     return user;
-  }
-
-  /**
-   * Retrieves the profile data for a given user.
-   *
-   * @param ctx - Request context containing the authenticated user and scoped client
-   * @param userId - Optional: look up a different user's profile; defaults to the requester's own profile
-   */
-  async getProfile(ctx: UserCtx, userId?: string) {
-    const { user } = ctx;
-    const user_identifier: string = userId ?? user.id;
-
-    this.logger.debug(`ProfileService: Trying to get profile for ${user_identifier}`);
-
-    const [userDto, followCount] = await Promise.all([
-      this.getUserById(ctx, user_identifier),
-      this.getSocialMediaCount(ctx),
-    ]);
-
-    if (!userDto) {
-      this.logger.warn(`ProfileService: User ${ctx.user.id} not found`);
-      throw new BadRequestException(`User ${ctx.user.id} not found`);
-    }
-
-    return { ...userDto, followers_count: followCount.followersCount, following_count: followCount.followingCount };
   }
 
   /**
@@ -301,55 +305,5 @@ export class UserService {
     }
 
     return data?.map(item => item.users) ?? [];
-  }
-
-  /**
-   * Retrieves the count of followers and following for a specified user.
-   *
-   * @param ctx - Request context containing the authenticated user and scoped client
-   */
-  public async getSocialMediaCount(ctx: UserCtx) {
-    const { user } = ctx;
-    this.logger.debug('UserService: Trying to get follow count');
-    const userId = user.id;
-    const followers = await this.getFollowersCount(ctx, userId);
-    const following = await this.getFollowingCount(ctx, userId);
-
-    return {
-      followersCount: followers,
-      followingCount: following,
-    };
-  }
-
-  /**
-   * Get followers count from user id provided
-   * @param ctx - Request context containing the authenticated user and scoped client
-   * @param userId - The user whose followers count to retrieve
-   */
-  private async getFollowersCount(ctx: UserCtx, userId: string) {
-    const { supabase } = ctx;
-    this.logger.debug(`UserService: Trying to get followers count for user ${userId}`);
-    const { data, error } = await supabase.from('social_follows').select('*').eq('id_followed', userId);
-    if (error) {
-      this.logger.warn(`UserService: Error getting followers count: ${error.message}`);
-      return 0;
-    }
-    return data?.length ?? 0;
-  }
-
-  /**
-   * Get following count from user id provided
-   * @param ctx - Request context containing the authenticated user and scoped client
-   * @param userId - The user whose following count to retrieve
-   */
-  private async getFollowingCount(ctx: UserCtx, userId: string) {
-    const { supabase } = ctx;
-    this.logger.debug(`UserService: Trying to get following count for user ${userId}`);
-    const { data, error } = await supabase.from('social_follows').select('*').eq('id_follower', userId);
-    if (error) {
-      this.logger.warn(`UserService: Error getting following count: ${error.message}`);
-      return 0;
-    }
-    return data?.length ?? 0;
   }
 }

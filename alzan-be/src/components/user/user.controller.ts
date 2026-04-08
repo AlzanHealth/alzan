@@ -1,6 +1,6 @@
 import { Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { SupabaseUserAuth } from '../../core/guards/auth.decorator';
-import { FollowResponseDto } from './dto/user.output-dto';
+import { FollowResponseDto, UserProfileDto } from './dto/user.output-dto';
 import { VoidResponse } from '../../core/interceptors/response-serializer.interceptor';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { UserService } from './user.service';
@@ -96,7 +96,7 @@ export class UserController {
     @UserContext() ctx: UserCtx,
     @Query('q') query: string,
     @Query() pagination: PaginationDto,
-  ): Promise<FollowResponseDto[]> {
+  ): Promise<UserProfileDto[]> {
     this.logger.debug(`Controller layer: trying to search users for ${query}`);
     return this.service.searchUsers(ctx, query, pagination);
   }
