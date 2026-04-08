@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import serverConfig from './config/server.config';
 import { ConfigType } from '@nestjs/config';
-import { AppOutputDto } from './common/dtos/app.output-dto';
+import { AppOutputDto } from './common/dto/app.output-dto';
 
 @Injectable()
 export class AppService {

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { HomeScreenNavigationProp, TabParamList } from '../../types/navigation.types';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Utensils, Scale, ChevronRight, CheckCircle, Flame, Dumbbell, Moon, Settings, Bell } from 'lucide-react-native';
+import { Play, Utensils, Scale, ChevronRight, CheckCircle, Flame, Dumbbell, Moon, Settings } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { spacing, borderRadius, typography } from '../../theme';
@@ -19,8 +19,6 @@ import { SPORT_COLORS } from '../../theme/sportColors';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { NotificationSettings, useSettingsNotifications } from '../../hooks/settings/useSettingsNotifications';
 import { useMediaPermissions } from '../../hooks/useMediaPermissions';
-import { useNotifications } from '../../hooks/useNotifications';
-import { NotificationsSheet } from '../../components/social/NotificationsSheet';
 
 import { useHealthInsights } from '../../modules/health/hooks/useHealthInsights';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -82,8 +80,6 @@ export const HomeScreen = () => {
 
   // UI State
   const [showWeightModal, setShowWeightModal] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const { unreadCount } = useNotifications();
 
   // Derived state for Next Meal (Dynamic)
   const [nextMealType, setNextMealType] = useState(MEAL_TYPES.BREAKFAST);
@@ -206,32 +202,22 @@ export const HomeScreen = () => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-            {/* Centered Header with Settings & Notifications */}
-            <View style={styles.header}>
-              <View style={{ width: 24 }} />
-              <View style={{ alignItems: 'center' }}>
-                <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('auth.appName')}</Text>
-                <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
-                  {formatLocalizedDate(new Date(), {
-                    en: 'EEEE, MMMM d',
-                    es: "EEEE, d 'de' MMMM",
-                  })}
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <TouchableOpacity onPress={() => setShowNotifications(true)} style={styles.notificationBtn}>
-                  <Bell size={24} color={colors.textPrimary} />
-                  {unreadCount > 0 && (
-                    <View style={styles.badgeContainer}>
-                      <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-                  <Settings size={24} color={colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
+          {/* Centered Header with Settings Icon */}
+          <View style={styles.header}>
+            <View style={{ width: 24 }} />
+            <View style={{ alignItems: 'center' }}>
+              <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('auth.appName')}</Text>
+              <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
+                {formatLocalizedDate(new Date(), {
+                  en: 'EEEE, MMMM d',
+                  es: "EEEE, d 'de' MMMM",
+                })}
+              </Text>
             </View>
+            <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+              <Settings size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
 
           {/* Daily Snapshot */}
           <Text style={[styles.sectionTitle, { marginTop: spacing.s, color: colors.textPrimary }]}>
@@ -418,7 +404,6 @@ export const HomeScreen = () => {
 
         {/* Direct Weight Log Modal */}
         <WeightLogModal visible={showWeightModal} onClose={() => setShowWeightModal(false)} />
-        <NotificationsSheet visible={showNotifications} onClose={() => setShowNotifications(false)} />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -449,28 +434,6 @@ const styles = StyleSheet.create({
   headerDate: {
     ...typography.body,
     textTransform: 'capitalize',
-  },
-  notificationBtn: {
-    position: 'relative',
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF3B30',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: '#000',
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 9,
-    fontWeight: 'bold',
   },
   sectionTitle: {
     ...typography.h3,

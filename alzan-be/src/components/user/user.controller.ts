@@ -25,6 +25,28 @@ export class UserController {
   }
 
   /**
+   * Accept a follow request
+   * @param ctx - Request context
+   * @param userId - Username of the user to accept
+   */
+  @Post(':userId/accept')
+  async acceptFollowRequest(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<void> {
+    this.logger.debug(`Controller layer: trying to accept follow request from user ${userId}`, ctx.user.id);
+    return this.service.acceptFollowRequest(ctx, userId);
+  }
+
+  /**
+   * Reject a follow request
+   * @param ctx - Request context
+   * @param userId - Username of the user to reject
+   */
+  @Post(':userId/reject')
+  async rejectFollowRequest(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<void> {
+    this.logger.debug(`Controller layer: trying to reject follow request from user ${userId}`, ctx.user.id);
+    return this.service.rejectFollowRequest(ctx, userId);
+  }
+
+  /**
    * Unfollow a user
    * @param ctx - Request context
    * @param userId - Username of the user to unfollow
@@ -67,5 +89,15 @@ export class UserController {
   ): Promise<FollowResponseDto[]> {
     this.logger.debug(`Controller layer: trying to get following for ${userId}`);
     return this.service.getFollowing(ctx, userId, pagination);
+  }
+
+  @Get('search')
+  async searchUsers(
+    @UserContext() ctx: UserCtx,
+    @Query('q') query: string,
+    @Query() pagination: PaginationDto,
+  ): Promise<FollowResponseDto[]> {
+    this.logger.debug(`Controller layer: trying to search users for ${query}`);
+    return this.service.searchUsers(ctx, query, pagination);
   }
 }

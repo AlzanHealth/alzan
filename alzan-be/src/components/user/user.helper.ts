@@ -4,7 +4,7 @@ export function makeUserFollowNotificationData(user: User) {
   return {
     follower_id: user.id,
     follower_name: user.display_name || user.email,
-    follower_avatar: user.avatar_url,
-    follower_username: user.username,
+    follower_avatar: user.avatar_url ?? undefined,
+    follower_username: user.username ?? undefined,
   };
 }

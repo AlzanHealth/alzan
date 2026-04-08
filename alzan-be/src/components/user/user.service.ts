@@ -18,6 +18,25 @@ export class UserService {
 
   constructor(private readonly notificationService: NotificationService) {}
 
+  async searchUsers(ctx: UserCtx, query: string, pagination: PaginationDto) {
+    const { limit, offset } = pagination;
+    const { supabase } = ctx;
+    this.logger.debug(`UserService: Trying to search users for ${query}`);
+
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('*')
+      .ilike('username', `%${query}%`)
+      .limit(limit)
+      .range(offset, offset + limit - 1);
+
+    if (usersError || !users) {
+      throw new InternalServerErrorException(usersError?.message, { cause: usersError });
+    }
+
+    return users;
+  }
+
   /**
    * Get user by id using the request-scoped client (RLS-enforced)
    * @param ctx - Request context containing the user-scoped Supabase client
@@ -109,6 +128,82 @@ export class UserService {
   }
 
   /**
+   * Accepts a follow request
+   *
+   * @param ctx - Request context containing the authenticated user and scoped client
+   * @param from - The username of the user to accept
+   */
+  public async acceptFollowRequest(ctx: UserCtx, from: string) {
+    const { user, supabase } = ctx;
+    this.logger.debug(`UserService: Trying to accept follow request from user ${from}`);
+
+    const { data: targetUser, error: findError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', from)
+      .single();
+
+    if (findError || !targetUser) {
+      throw new NotFoundException(`User ${from} not found`, { cause: findError });
+    }
+
+    const { error: updateError } = await supabase
+      .from('social_follows')
+      .update({
+        is_accepted: true,
+      })
+      .eq('id_follower', targetUser.id)
+      .eq('id_followed', user.id);
+
+    if (updateError) {
+      throw new InternalServerErrorException(updateError.message, { cause: updateError });
+    }
+
+    await this.notificationService.createNotification({
+      type: 'USER_FOLLOW_REQUEST_ACCEPTED',
+      data: makeUserFollowNotificationData(user),
+      user_id: targetUser.id,
+    });
+  }
+
+  /**
+   * Rejects a follow request
+   *
+   * @param ctx - Request context containing the authenticated user and scoped client
+   * @param from - The username of the user to reject
+   */
+  public async rejectFollowRequest(ctx: UserCtx, from: string) {
+    const { user, supabase } = ctx;
+    this.logger.debug(`UserService: Trying to reject follow request from user ${from}`);
+
+    const { data: targetUser, error: findError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', from)
+      .single();
+
+    if (findError || !targetUser) {
+      throw new NotFoundException(`User ${from} not found`, { cause: findError });
+    }
+
+    const { error: deleteError } = await supabase
+      .from('social_follows')
+      .delete()
+      .eq('id_follower', targetUser.id)
+      .eq('id_followed', user.id);
+
+    if (deleteError) {
+      throw new InternalServerErrorException(deleteError.message, { cause: deleteError });
+    }
+
+    await this.notificationService.createNotification({
+      type: 'USER_FOLLOW_REQUEST_REJECTED',
+      data: makeUserFollowNotificationData(user),
+      user_id: targetUser.id,
+    });
+  }
+
+  /**
    * Unfollows a user
    *
    * @param ctx - Request context containing the authenticated user and scoped client
@@ -146,6 +241,7 @@ export class UserService {
    * @param pagination - Pagination parameters
    */
   public async getFollowers(ctx: UserCtx, userId: string, pagination: PaginationDto) {
+    const { limit, offset } = pagination;
     const { supabase } = ctx;
     this.logger.debug(`UserService: Trying to get followers for user ${userId}`);
     const { data, error } = await supabase
@@ -162,7 +258,8 @@ export class UserService {
         `,
       )
       .eq('id_followed', userId)
-      .range(pagination.offset || 0, (pagination.offset || 0) + (pagination.limit || 10) - 1);
+      .limit(limit)
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new InternalServerErrorException(error.message, { cause: error });
@@ -179,6 +276,7 @@ export class UserService {
    * @param pagination - Pagination parameters
    */
   public async getFollowing(ctx: UserCtx, userId: string, pagination: PaginationDto) {
+    const { limit, offset } = pagination;
     const { supabase } = ctx;
     this.logger.debug(`UserService: Trying to get following for user ${userId}`);
     const { data, error } = await supabase
@@ -195,7 +293,8 @@ export class UserService {
         `,
       )
       .eq('id_follower', userId)
-      .range(pagination.offset || 0, (pagination.offset || 0) + (pagination.limit || 10) - 1);
+      .limit(limit)
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw new InternalServerErrorException(error.message, { cause: error });
