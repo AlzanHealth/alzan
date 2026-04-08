@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from '../../common/interfaces/authenticated-requ
 import { Reflector } from '@nestjs/core';
 import { Scope, SCOPES_KEY } from './auth.decorator';
 import { SupabaseAdminService } from '../supabase/supabase.service';
+import { UserService } from '../../components/user/user.service';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -10,6 +11,7 @@ export class AuthGuard implements CanActivate {
 
   constructor(
     private readonly supabaseAdminService: SupabaseAdminService,
+    private readonly userService: UserService,
     private readonly reflector: Reflector,
   ) {}
 
@@ -44,9 +46,10 @@ export class AuthGuard implements CanActivate {
       }
 
       // Attach user, token, and a per-request RLS-scoped client to the request
-      request.user = data.user;
       request.token = token;
       request.supabase = this.supabaseAdminService.getAuthenticatedClient(token);
+      request.supabaseUser = data.user;
+      request.user = await this.userService.getUserById(request, data.user.id);
 
       return true;
     } catch (error) {

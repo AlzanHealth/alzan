@@ -1,10 +1,10 @@
 import { Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { SupabaseUserAuth } from '../../core/guards/auth.decorator';
-import { FollowResponseDto, UserOutputDto } from './dto/user.output-dto';
+import { FollowResponseDto } from './dto/user.output-dto';
 import { VoidResponse } from '../../core/interceptors/response-serializer.interceptor';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { UserService } from './user.service';
-import { UserContext, UserCtx } from '../../common/decorators/request-context.decorator';
+import { UserContext, UserCtx } from '../../common/decorators/user-context.decorator';
 
 @Controller('users')
 @SupabaseUserAuth()
@@ -12,14 +12,6 @@ export class UserController {
   private readonly logger = new Logger(UserController.name);
 
   constructor(private readonly service: UserService) {}
-
-  /**
-   * Get current authenticated user
-   */
-  @Get()
-  getCurrentUser(@UserContext() ctx: UserCtx): UserOutputDto {
-    return ctx.user;
-  }
 
   /**
    * Follow a user

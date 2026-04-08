@@ -8,11 +8,15 @@ import {
 } from '@nestjs/common';
 
 import { PaginationDto } from '../../common/dto/pagination.dto';
-import { UserCtx } from '../../common/decorators/request-context.decorator';
+import { NotificationService } from './notification/notification.service';
+import { makeUserFollowNotificationData } from './user.helper';
+import { UserCtx } from '../../common/decorators/user-context.decorator';
 
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
+
+  constructor(private readonly notificationService: NotificationService) {}
 
   /**
    * Get user by id using the request-scoped client (RLS-enforced)
@@ -62,9 +66,10 @@ export class UserService {
    */
   public async follow(ctx: UserCtx, to: string) {
     const { user, supabase } = ctx;
+
     this.logger.debug(`UserService: Trying to follow user ${to}`);
 
-    if (user.user_metadata?.username === to) {
+    if (user.username === to) {
       throw new BadRequestException('You cannot follow yourself');
     }
 
@@ -95,6 +100,12 @@ export class UserService {
       }
       throw new InternalServerErrorException(insertError.message, { cause: insertError });
     }
+
+    await this.notificationService.createNotification({
+      type: 'USER_FOLLOW_REQUEST',
+      data: makeUserFollowNotificationData(user),
+      user_id: targetUser.id,
+    });
   }
 
   /**
