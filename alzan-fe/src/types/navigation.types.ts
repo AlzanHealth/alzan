@@ -27,6 +27,9 @@ export type RootStackParamList = {
 
   // Modal Screens
   WeightAdd: { date?: string } | undefined;
+
+  // Social Screens
+  OtherUserProfile: { userId: string };
 };
 
 // ============================================================================

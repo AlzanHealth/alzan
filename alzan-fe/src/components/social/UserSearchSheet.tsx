@@ -17,8 +17,8 @@ import { useUserSearch } from '../../hooks/useUserSearch';
 import { UserProfileDto } from '../../openapi/generated/alzan-be/types.gen';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { User } from '../../openapi/generated/alzan-be/sdk.gen';
-import { useNavigation } from '@react-navigation/native';
 import { AlzanScreenNavigationProp } from '../../types/navigation.types';
+import { useNavigation } from '@react-navigation/native';
 
 interface UserSearchSheetProps {
   visible: boolean;
@@ -63,10 +63,9 @@ export const UserSearchSheet: React.FC<UserSearchSheetProps> = ({ visible, onClo
   const navigateToProfile = useCallback(
     (user: UserProfileDto) => {
       onClose();
-      // Temporarily navigate without modifying profile screen heavily
       navigation.navigate('AlzanProfile', { userId: user.id });
     },
-    [navigation, onClose],
+    [onClose],
   );
 
   const renderUserItem = (user: UserProfileDto) => {

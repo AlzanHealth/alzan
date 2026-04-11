@@ -13,6 +13,9 @@ import { makeUserFollowNotificationData } from './user.helper';
 import { UserCtx } from '../../common/decorators/user-context.decorator';
 import { SupabaseAdminService } from '../../core/supabase/supabase.service';
 
+const PROFILE_SELECT_FIELDS =
+  'id, username, display_name, avatar_url, followers:social_follows!id_followed(count), following:social_follows!id_follower(count)';
+
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
@@ -22,6 +25,39 @@ export class UserService {
     private readonly supabaseAdminService: SupabaseAdminService,
   ) {}
 
+  /**
+   * Retrieves the profile data for a given user.
+   *
+   * @param {User} ctx - Request context containing the authenticated user and scoped client
+   * @param {string[]} userIds - The user ids to retrieve profiles for
+   */
+  async getProfiles(ctx: UserCtx, userIds: string[]) {
+    const { client: supabase } = this.supabaseAdminService;
+    this.logger.debug(`ProfileService: Trying to get profile for ${userIds}`);
+
+    const { data: userProfiles, error } = await supabase.from('users').select(PROFILE_SELECT_FIELDS).in('id', userIds);
+
+    if (error || !userProfiles) {
+      this.logger.warn(`ProfileService: User ${userIds} not found`);
+      throw new BadRequestException(`User ${userIds} not found`);
+    }
+
+    const followingSet = await this.getFollowingSet(ctx, userIds);
+    return userProfiles.map(userProfile => ({
+      ...userProfile,
+      followers_count: userProfile.followers?.[0]?.count ?? 0,
+      following_count: userProfile.following?.[0]?.count ?? 0,
+      is_following: followingSet.has(userProfile.id),
+    }));
+  }
+
+  /**
+   * Retrieves the profile data for a given user.
+   *
+   * @param {User} ctx - Request context containing the authenticated user and scoped client
+   * @param {string} query - The query to search for
+   * @param {PaginationDto} pagination - The pagination data
+   */
   async searchUsers(ctx: UserCtx, query: string, pagination: PaginationDto) {
     const { limit, offset } = pagination;
     const { client: supabase } = this.supabaseAdminService;
@@ -29,9 +65,7 @@ export class UserService {
 
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select(
-        'id, username, display_name, avatar_url, followers:social_follows!id_followed(count), following:social_follows!id_follower(count)',
-      )
+      .select('id')
       .ilike('username', `%${query}%`)
       .limit(limit)
       .range(offset, offset + limit - 1);
@@ -40,30 +74,31 @@ export class UserService {
       throw new InternalServerErrorException(usersError?.message, { cause: usersError });
     }
 
-    // Efficiently check if current user is following the loaded users
-    let followingSet = new Set<string>();
-    if (users.length > 0) {
-      const userIds = users.map(u => u.id);
-      const { data: followsData } = await supabase
-        .from('social_follows')
-        .select('id_followed')
-        .eq('id_follower', ctx.user.id)
-        .in('id_followed', userIds);
+    return this.getProfiles(
+      ctx,
+      users.map(u => u.id),
+    );
+  }
 
-      if (followsData) {
-        followingSet = new Set(followsData.map(f => f.id_followed));
-      }
+  /**
+   * Retrieves the following set for a given user.
+   *
+   * @param {User} ctx - Request context containing the authenticated user and scoped client
+   * @param {string[]} userIds - The user ids to retrieve following set for
+   */
+  private async getFollowingSet(ctx: UserCtx, userIds: string[]) {
+    const { user, supabase } = ctx;
+    const { data: followsData } = await supabase
+      .from('social_follows')
+      .select('id_followed')
+      .eq('id_follower', user.id)
+      .in('id_followed', userIds);
+
+    if (followsData) {
+      return new Set(followsData.map(f => f.id_followed));
     }
 
-    return users.map(u => ({
-      id: u.id,
-      username: u.username,
-      display_name: u.display_name,
-      avatar_url: u.avatar_url,
-      followers_count: u.followers?.[0]?.count ?? 0,
-      following_count: u.following?.[0]?.count ?? 0,
-      is_following: followingSet.has(u.id),
-    }));
+    return new Set<string>();
   }
 
   /**
@@ -250,18 +285,9 @@ export class UserService {
     this.logger.debug(`UserService: Trying to get followers for user ${userId}`);
     const { data, error } = await supabase
       .from('social_follows')
-      .select(
-        `
-            id_follower,
-            users!id_follower (
-                id,
-                username,
-                display_name,
-                avatar_url
-            )
-        `,
-      )
+      .select('id_follower')
       .eq('id_followed', userId)
+      .eq('is_accepted', true)
       .limit(limit)
       .range(offset, offset + limit - 1);
 
@@ -269,7 +295,12 @@ export class UserService {
       throw new InternalServerErrorException(error.message, { cause: error });
     }
 
-    return data?.map(item => item.users) ?? [];
+    if (!data?.length) return [];
+
+    return this.getProfiles(
+      ctx,
+      data.map(item => item.id_follower),
+    );
   }
 
   /**
@@ -285,17 +316,7 @@ export class UserService {
     this.logger.debug(`UserService: Trying to get following for user ${userId}`);
     const { data, error } = await supabase
       .from('social_follows')
-      .select(
-        `
-          id_followed,
-          users!id_followed (
-            id,
-            username,
-            display_name,
-            avatar_url
-          )
-        `,
-      )
+      .select('id_followed')
       .eq('id_follower', userId)
       .limit(limit)
       .range(offset, offset + limit - 1);
@@ -304,6 +325,11 @@ export class UserService {
       throw new InternalServerErrorException(error.message, { cause: error });
     }
 
-    return data?.map(item => item.users) ?? [];
+    if (!data?.length) return [];
+
+    return this.getProfiles(
+      ctx,
+      data.map(item => item.id_followed),
+    );
   }
 }

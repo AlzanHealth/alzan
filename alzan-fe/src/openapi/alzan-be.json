@@ -15,6 +15,20 @@
         "tags": ["App"]
       }
     },
+    "/users/{userId}": {
+      "get": {
+        "operationId": "getUserById",
+        "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserProfileDto" } } }
+          }
+        },
+        "summary": "Get user profile by id",
+        "tags": ["User"]
+      }
+    },
     "/users/{userId}/follow": {
       "post": {
         "operationId": "followUser",
@@ -79,7 +93,7 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FollowResponseDto" } }
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UserProfileDto" } }
               }
             }
           }
@@ -111,7 +125,7 @@
             "description": "",
             "content": {
               "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/FollowResponseDto" } }
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UserProfileDto" } }
               }
             }
           }
@@ -148,6 +162,7 @@
             }
           }
         },
+        "summary": "Search users",
         "tags": ["User"]
       }
     }
@@ -179,27 +194,6 @@
         },
         "required": ["status", "timestamp", "environment", "baseUrl"]
       },
-      "VoidResponse": { "type": "object", "properties": {} },
-      "FollowResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string", "description": "User ID", "example": "4424c5d6-5751-4038-aa39-bd85895ddb78" },
-          "username": { "type": "string", "nullable": true, "description": "Unique username", "example": "johndoe" },
-          "display_name": {
-            "type": "string",
-            "nullable": true,
-            "description": "Display name shown publicly",
-            "example": "John Doe"
-          },
-          "avatar_url": {
-            "type": "string",
-            "nullable": true,
-            "description": "URL of the user's avatar image",
-            "example": "https://cdn.alzan.com/avatars/johndoe.png"
-          }
-        },
-        "required": ["id", "username", "display_name", "avatar_url"]
-      },
       "UserProfileDto": {
         "type": "object",
         "properties": {
@@ -230,7 +224,8 @@
           }
         },
         "required": ["id", "username", "followers_count", "following_count"]
-      }
+      },
+      "VoidResponse": { "type": "object", "properties": {} }
     }
   },
   "security": [{ "bearer-auth": [] }]

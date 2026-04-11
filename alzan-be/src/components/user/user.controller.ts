@@ -1,6 +1,6 @@
 import { Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { SupabaseUserAuth } from '../../core/guards/auth.decorator';
-import { FollowResponseDto, UserProfileDto } from './dto/user.output-dto';
+import { UserProfileDto } from './dto/user.output-dto';
 import { VoidResponse } from '../../core/interceptors/response-serializer.interceptor';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { UserService } from './user.service';
@@ -12,6 +12,18 @@ export class UserController {
   private readonly logger = new Logger(UserController.name);
 
   constructor(private readonly service: UserService) {}
+
+  /**
+   * Get user profile by id
+   * @param ctx - Request context
+   * @param userId - Id of the user to get
+   */
+  @Get(':userId')
+  async getProfile(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<UserProfileDto> {
+    this.logger.debug(`Controller layer: trying to get user by id ${userId}`, ctx.user.id);
+    const profiles = await this.service.getProfiles(ctx, [userId]);
+    return profiles[0];
+  }
 
   /**
    * Follow a user
@@ -70,7 +82,7 @@ export class UserController {
     @UserContext() ctx: UserCtx,
     @Param('userId') userId: string,
     @Query() pagination: PaginationDto,
-  ): Promise<FollowResponseDto[]> {
+  ): Promise<UserProfileDto[]> {
     this.logger.debug(`Controller layer: trying to get followers for ${userId}`);
     return this.service.getFollowers(ctx, userId, pagination);
   }
@@ -86,11 +98,17 @@ export class UserController {
     @UserContext() ctx: UserCtx,
     @Param('userId') userId: string,
     @Query() pagination: PaginationDto,
-  ): Promise<FollowResponseDto[]> {
+  ): Promise<UserProfileDto[]> {
     this.logger.debug(`Controller layer: trying to get following for ${userId}`);
     return this.service.getFollowing(ctx, userId, pagination);
   }
 
+  /**
+   * Search users
+   * @param ctx - Request context
+   * @param query - Query to search for
+   * @param pagination - Pagination data
+   */
   @Get('search')
   async searchUsers(
     @UserContext() ctx: UserCtx,

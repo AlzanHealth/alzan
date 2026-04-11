@@ -8,6 +8,8 @@ import { LiquidGlassModal } from '../LiquidGlassModal';
 import { useNotifications } from '../../hooks/useNotifications';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { Notification, NotificationType } from '../../types/requests.types';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { User } from '../../openapi/generated/alzan-be/sdk.gen';
 
 interface NotificationsSheetProps {
   visible: boolean;
@@ -17,7 +19,22 @@ interface NotificationsSheetProps {
 export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible, onClose }) => {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
+  const queryClient = useQueryClient();
   const { notifications, isLoading, markAsRead, markAllAsRead, deleteNotification, unreadCount } = useNotifications();
+
+  const acceptMutation = useMutation({
+    mutationFn: (followerId: string) => User.acceptFollowRequest({ path: { userId: followerId } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (followerId: string) => User.rejectFollowRequest({ path: { userId: followerId } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
 
   // Mark all as read when opened? Let's leave that to the button or individual taps.
   // The user asked to take into account "mark as read".
@@ -60,6 +77,8 @@ export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible,
 
     const data = notification.data;
     const avatar = data?.follower_avatar;
+    const isFollowRequest = notification.type === 'USER_FOLLOW_REQUEST';
+    const isMutating = acceptMutation.isPending || rejectMutation.isPending;
 
     return (
       <TouchableOpacity
@@ -91,6 +110,48 @@ export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible,
             {getNotificationText(notification)}
           </Text>
           <Text style={[styles.timeText, { color: colors.textSecondary }]}>{timeAgo}</Text>
+
+          {/* Accept / Reject actions for follow requests */}
+          {isFollowRequest && (
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.actionAccept]}
+                disabled={isMutating}
+                onPress={e => {
+                  e.stopPropagation();
+                  const followerId = data?.follower_id;
+                  if (followerId) {
+                    acceptMutation.mutate(followerId);
+                    markAsRead(notification.id);
+                  }
+                }}
+              >
+                {acceptMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.actionAcceptText}>Aceptar</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.actionReject, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}
+                disabled={isMutating}
+                onPress={e => {
+                  e.stopPropagation();
+                  const followerId = data?.follower_id;
+                  if (followerId) {
+                    rejectMutation.mutate(followerId);
+                    markAsRead(notification.id);
+                  }
+                }}
+              >
+                {rejectMutation.isPending ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Text style={[styles.actionRejectText, { color: colors.textSecondary }]}>Rechazar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity
@@ -239,5 +300,32 @@ const styles = StyleSheet.create({
   deleteButton: {
     marginLeft: 12,
     padding: 4,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionAccept: {
+    backgroundColor: '#0A84FF',
+  },
+  actionAcceptText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  actionReject: {
+    // dynamic background applied inline
+  },
+  actionRejectText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

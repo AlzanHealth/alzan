@@ -18,7 +18,7 @@ import { SettingsNavigator } from './SettingsNavigator';
 import { AlzanHomeScreen } from '../screens/alzan/AlzanHomeScreen';
 import { ClipsScreen } from '../screens/alzan/ClipsScreen';
 import { MessagesScreen } from '../screens/alzan/MessagesScreen';
-import { AlzanProfileScreen } from '../screens/alzan/AlzanProfileScreen';
+import { UserProfileScreen } from '../screens/alzan/UserProfileScreen';
 import IconA from '../../assets/iconA.png';
 import { TranslationKey } from '../i18n/locales/en';
 
@@ -252,7 +252,7 @@ export const TabNavigator = () => {
             <Tab.Screen name="Clips" component={ClipsScreen} />
             <Tab.Screen name="AppToggle" component={ModeTogglePlaceholder} />
             <Tab.Screen name="Messages" component={MessagesScreen} />
-            <Tab.Screen name="AlzanProfile" component={AlzanProfileScreen} />
+            <Tab.Screen name="AlzanProfile" component={UserProfileScreen} />
           </>
         ) : (
           // === NORMAL APP TABS ===

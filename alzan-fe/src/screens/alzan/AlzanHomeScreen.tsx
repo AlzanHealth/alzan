@@ -25,6 +25,7 @@ import { TabParamList } from '../../types/navigation.types';
 import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react-native';
 import { NotificationsSheet } from '../../components/social/NotificationsSheet';
+import { UserSearchSheet } from '../../components/social/UserSearchSheet';
 import { useNotifications } from '../../hooks/useNotifications';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -216,15 +217,11 @@ const useAlzanTheme = () => {
 };
 
 // Header con Avatar, Toggle y Acciones
-const Header = ({ onOpenNotifications }: { onOpenNotifications: () => void }) => {
+const Header = ({ onOpenNotifications, onOpenSearch }: { onOpenNotifications: () => void; onOpenSearch: () => void }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'siguiendo' | 'global'>('siguiendo');
   const { styles: themeStyles, isDark } = useAlzanTheme();
   const { unreadCount } = useNotifications();
-
-  const onOpenSearch = () => {
-    console.log('TODO');
-  };
 
   return (
     <View style={styles.header}>
@@ -397,6 +394,7 @@ export const AlzanHomeScreen = () => {
   const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const scrollViewRef = useRef<ScrollView>(null);
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('tabPress', () => {
@@ -436,7 +434,7 @@ export const AlzanHomeScreen = () => {
 
         <SafeAreaView style={styles.safeArea}>
           {/* Fixed Header */}
-          <Header onOpenNotifications={() => setIsNotificationsVisible(true)} />
+          <Header onOpenNotifications={() => setIsNotificationsVisible(true)} onOpenSearch={() => setIsSearchVisible(true)} />
 
           {/* Scrollable Content with Pull-to-Refresh */}
           <ScrollView
@@ -451,6 +449,7 @@ export const AlzanHomeScreen = () => {
           </ScrollView>
 
           <NotificationsSheet visible={isNotificationsVisible} onClose={() => setIsNotificationsVisible(false)} />
+          <UserSearchSheet visible={isSearchVisible} onClose={() => setIsSearchVisible(false)} />
         </SafeAreaView>
       </View>
     </AlzanThemeContext.Provider>
