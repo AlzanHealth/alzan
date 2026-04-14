@@ -4,6 +4,8 @@ steps:
     id: build-image
     args:
       - build
+      - "--tag=$_GCR_HOSTNAME/$PROJECT_ID/$_ARTIFACT_REPO/$_SERVICE_NAME:$COMMIT_SHA"
+      - "--tag=$_GCR_HOSTNAME/$PROJECT_ID/$_ARTIFACT_REPO/$_SERVICE_NAME:latest"
       - "./alzan-be"
 
   # ─── Step 2: Push the image to Artifact Registry ─────────────────────────────
