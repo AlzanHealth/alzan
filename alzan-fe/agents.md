@@ -2,6 +2,12 @@
 
 This document provides clear instructions for AI agents working on this React Native (Expo) repository. Follow these patterns strictly to ensure code quality, type safety, and cross-platform compatibility (iOS, Android, Web).
 
+## Skills Usage (Mandatory)
+
+- Always use the repository skills when they apply to the task.
+- Prioritize frontend skills first (`fe-*`), then shared skills (`shared-*`).
+- For commit-related requests, use the commit generator skill and provide commit text only.
+
 ---
 
 ## Project Structure Overview

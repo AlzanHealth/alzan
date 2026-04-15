@@ -1,0 +1,3 @@
+display_name: "Alzan: Quality Gate (pnpm)"
+short_description: "Run the mandatory local pnpm gate, and CI parity checks when branch or GitHub readiness matters."
+default_prompt: "Run shared-pnpm-quality-gate. Use the mandatory local gate by default: root pnpm format, then root pnpm run lint:check. If the user asked to match .github/workflows/code-quality.yml or branch readiness matters, also run package-level GitHub-aligned checks for BE and FE. On FE, run format:check, generate-openapi, and lint:check by default. Only run pnpm --prefix alzan-fe run build when it is strictly necessary for the task or explicitly requested, and say clearly that it triggers Expo prebuild. Report which level you ran, what you skipped, and the final PASS/FAIL/BLOCKED status."
