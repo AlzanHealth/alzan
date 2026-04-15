@@ -3,6 +3,7 @@
 For changes under `alzan-be/`, prioritize shared skills under `.agents/skills/shared-*`.
 
 Key defaults:
+- Use `shared-nestjs-expert-developer` for strict clean architecture and AAA testing in NestJS.
 - Use `shared-nestjs-patterns` for NestJS module/controller/service work.
 - Use `shared-api-design` for endpoint contracts, status codes, and error envelopes.
 - Use `shared-backend-patterns` for architecture and service-layer patterns.
