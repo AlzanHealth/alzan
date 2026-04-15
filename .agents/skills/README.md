@@ -2,6 +2,8 @@
 
 This folder is versioned so all contributors (Codex + Antigravity) use the same team-wide skill set.
 
+Team guide: [docs/team-skills-guide.md](/Users/josep/Projects/alzan/docs/team-skills-guide.md)
+
 ## Recommended Skills
 
 ### Shared (FE + BE + DB)
