@@ -2,32 +2,47 @@
 
 This repository is a shared AI workspace for Codex and Antigravity.
 
-## MANDATORY FIRST STEP
+Use this root file to choose the correct area-specific instructions and the right skills. Keep detailed implementation rules in subtree instruction files and in `.agents/skills/`.
 
-**BEFORE taking any action, planning, or writing code, you (Codex/Antigravity) MUST:**
+## Start Here
 
-1. **CRITICAL:** If your task involves `alzan-fe/` or `alzan-be/`, you MUST read their respective `AGENTS.md` files BEFORE anything else. The `alzan-fe/AGENTS.md` file in particular contains strict rules of what to do and what not to do.
-2. Review **ALL** available skills in `.agents/skills/` equally.
-3. Select the correct skill(s) for the current task based on the **Skill Routing** section below.
-4. Use the `view_file` tool to read the `SKILL.md` of the selected skill(s).
-5. Apply the skill's instructions strictly during execution.
-   NEVER skip this step. You must consult the existing skills as heavily as any others.
+1. Identify the task scope first.
+   - If the task touches `alzan-fe/`, read `alzan-fe/agents.md` before taking action.
+   - If the task touches `alzan-be/`, read `alzan-be/AGENTS.md` before taking action.
+   - If the task spans FE and BE, read both files before taking action.
+2. Review the skill catalog in `.agents/skills/README.md`.
+3. Select only the skills that actually match the task.
+4. Read the `SKILL.md` for the selected skills.
+5. Apply those skill instructions during execution.
 
 ## Skill Routing
 
-- Frontend work in `alzan-fe/`: use `fe-*` skills first, then `shared-*`.
-- Translating FE logic to code: ALWAYS use `fe-react-native-expert-developer` to ensure strict functional components, TypeScript, and FlashList.
-- Mobile UI/UX, navigation, or visual refactors in `alzan-fe/`: use `fe-mobile-ui-ux-direction` and pair with `fe-react-native-best-practices` when diagnosing performance drops or memory leaks.
-- Backend work in `alzan-be/`: ALWAYS use `shared-nestjs-expert-developer` for coding standards, paired with `shared-nestjs-patterns`, `shared-backend-patterns`, and `shared-api-design`.
-- Database & Supabase logic: ALWAYS use `shared-supabase-expert-developer` for strict typings and SDK rules, and use `shared-supabase-postgres-best-practices` for Postgres native features.
-- Security-sensitive changes (auth, input validation, secrets, permissions): use `shared-security-review`.
+- Frontend work in `alzan-fe/`: use `fe-react-native-expert-developer` first, then the relevant `fe-*` skills, then `shared-*`.
+- Mobile UI/UX, navigation, or visual refactors in `alzan-fe/`: use `fe-mobile-ui-ux-direction`; pair with `fe-react-native-best-practices` when lists, charts, blur, animation, scrolling, or memory/performance risks are involved.
+- FE translation work: use `fe-manage-translations`.
+- Expo SDK or dependency upgrades: use `fe-upgrading-expo`.
+- Expo/EAS CI-CD workflow changes: use `fe-expo-cicd-workflows`.
+- Backend work in `alzan-be/`: use `shared-nestjs-expert-developer` together with `shared-nestjs-patterns`, `shared-backend-patterns`, and `shared-api-design`.
+- Database and Supabase work: use `shared-supabase-expert-developer`, `shared-database-schema`, and `shared-supabase-postgres-best-practices`.
+- Security-sensitive changes such as auth, permissions, secrets, or untrusted input: use `shared-security-review`.
 - User-flow and regression scenarios: use `shared-e2e-testing`.
-- Docs creation or rewrites: use `shared-technical-documentation`.
-- Docs sync requests: use `shared-alzan-local-docs-sync-from-code`.
-- If docs describe real implemented behavior, APIs, schema, commands, or architecture, use `shared-technical-documentation` together with `shared-alzan-local-docs-sync-from-code`.
-- Any code change must run `shared-pnpm-quality-gate` before closing the task. Default local gate: root `pnpm format` + `pnpm run lint:check`. If the user asks to match GitHub `code-quality.yml` or branch-readiness matters, also run the skill's CI parity checks.
-- Always apply `shared-no-commit-without-approval` for all tasks.
-- Commit requests: use `shared-commit-generator` and return only commit text (no git commit/push).
+- Documentation creation or rewrites: use `shared-technical-documentation`.
+- Documentation sync, drift review, or “make docs match the repo”: use `shared-alzan-local-docs-sync-from-code`.
+- If docs describe real implemented behavior, APIs, schema, setup, commands, or architecture: use `shared-technical-documentation` together with `shared-alzan-local-docs-sync-from-code`.
+
+## Verification
+
+- Any code change must run `shared-pnpm-quality-gate` before closing the task.
+- Default local gate:
+  - `pnpm format`
+  - `pnpm run lint:check`
+- If the user asks to match GitHub `code-quality.yml`, follow the higher-parity checks defined inside `shared-pnpm-quality-gate`.
+
+## Git Safety
+
+- Always apply `shared-no-commit-without-approval`.
+- Never commit, push, tag, rebase, reset, or delete branches from the agent unless the user explicitly changes that policy.
+- If the user asks for commit help, use `shared-commit-generator` and return commit text only.
 
 ## Skill Locations
 
@@ -35,8 +50,11 @@ This repository is a shared AI workspace for Codex and Antigravity.
 - Frontend skills: `.agents/skills/fe-*`
 - Superpowers pack: `.agents/skills/superpowers/*`
 
-## Notes
+## Maintenance Notes
 
+- Keep this root file short and high-signal.
+- Put FE-specific detail in `alzan-fe/agents.md`.
+- Put BE-specific detail in `alzan-be/AGENTS.md`.
+- Put reusable multi-step workflows in skills instead of expanding this file endlessly.
 - Keep all team skills versioned in Git.
-- Do not rely on personal machine symlinks for project-critical skills.
-- Never commit/push/tag from the agent in this repo. Provide commit text only.
+- Do not rely on personal-machine-only symlinks for project-critical instructions.
