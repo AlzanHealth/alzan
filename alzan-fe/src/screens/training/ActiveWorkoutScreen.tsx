@@ -485,6 +485,11 @@ export const ActiveWorkoutScreen = () => {
     if (!isExerciseInSuperset(exercise.exercise_id)) return true;
 
     const groupIds = getSupersetGroupIds(exercise.exercise_id);
+    const lastExerciseId = groupIds[groupIds.length - 1];
+
+    // In supersets, only the last exercise in the block can trigger timers.
+    if (exercise.exercise_id !== lastExerciseId) return false;
+
     return groupIds.every(id => {
       return completedSetsState.has(`${id}-${setNumber}`);
     });
@@ -563,6 +568,19 @@ export const ActiveWorkoutScreen = () => {
       nextCompletedSets.delete(key);
     } else {
       nextCompletedSets.add(key);
+
+      // If user completes a later exercise in a superset block,
+      // auto-complete all previous exercises for the same set number.
+      if (isExerciseInSuperset(exerciseId)) {
+        const groupIds = getSupersetGroupIds(exerciseId);
+        const currentIndex = groupIds.indexOf(exerciseId);
+        if (currentIndex > 0) {
+          const previousIds = groupIds.slice(0, currentIndex);
+          previousIds.forEach(prevId => {
+            nextCompletedSets.add(`${prevId}-${setNumber}`);
+          });
+        }
+      }
     }
     setLocalCompletedSets(nextCompletedSets);
 
@@ -1007,7 +1025,7 @@ export const ActiveWorkoutScreen = () => {
     onDismiss: () => {},
   });
 
-  const handleCompleteAll = (exerciseId: string, item: WorkoutTemplateExerciseWithDetails) => {
+  const handleCompleteAll = (exerciseId: string, _item: WorkoutTemplateExerciseWithDetails) => {
     Alert.alert(t('training.completeAllSetsConfirmTitle'), t('training.completeAllSetsConfirmMessage'), [
       {
         text: t('common.cancel'),
@@ -1017,13 +1035,28 @@ export const ActiveWorkoutScreen = () => {
         text: t('training.completeAllSetsConfirmAction'),
         style: 'default',
         onPress: () => {
-          const targetSets = Math.max(0, (item.target_sets || 3) + (extraSets[exerciseId] || 0));
-
           setLocalCompletedSets(prev => {
             const next = new Set(prev);
-            for (let setNum = 1; setNum <= targetSets; setNum++) {
-              next.add(`${exerciseId}-${setNum}`);
-            }
+
+            const groupIds = isExerciseInSuperset(exerciseId) ? getSupersetGroupIds(exerciseId) : [exerciseId];
+            const currentIndex = groupIds.indexOf(exerciseId);
+            const idsToComplete =
+              currentIndex > 0
+                ? groupIds.slice(0, currentIndex + 1) // Completing second also completes previous ones.
+                : [exerciseId];
+
+            idsToComplete.forEach(id => {
+              const linkedExercise = visibleExercises.find(ex => ex.exercise_id === id);
+              const totalSets = Math.max(
+                0,
+                (linkedExercise?.target_sets || 3) + (extraSets[linkedExercise?.exercise_id || id] || 0),
+              );
+
+              for (let setNum = 1; setNum <= totalSets; setNum++) {
+                next.add(`${id}-${setNum}`);
+              }
+            });
+
             return next;
           });
 
@@ -1787,6 +1820,13 @@ export const ActiveWorkoutScreen = () => {
                 </View>
 
                 <View style={styles.helpRow}>
+                  <Text style={[styles.helpLabel, { color: themeColors.primary }]}>i</Text>
+                  <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
+                    {t('training.onlyCompletedSetsSavedInstruction')}
+                  </Text>
+                </View>
+
+                <View style={styles.helpRow}>
                   <View style={{ width: 60, alignItems: 'flex-start' }}>
                     <View style={[styles.checkBtn, styles.checkBtnDone, { width: 20, height: 20 }]}>
                       <Check size={12} color="#FFF" />
@@ -1794,13 +1834,6 @@ export const ActiveWorkoutScreen = () => {
                   </View>
                   <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
                     {t('training.completeSetInstruction')}
-                  </Text>
-                </View>
-
-                <View style={styles.helpRow}>
-                  <Text style={[styles.helpLabel, { color: themeColors.primary }]}>i</Text>
-                  <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
-                    {t('training.onlyCompletedSetsSavedInstruction')}
                   </Text>
                 </View>
 
