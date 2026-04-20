@@ -1043,44 +1043,71 @@ export const ActiveWorkoutScreen = () => {
     onDismiss: () => {},
   });
 
-  const handleCompleteAll = async (exerciseId: string, item: WorkoutTemplateExerciseWithDetails) => {
-    const targetSets = Math.max(0, (item.target_sets || 3) + (extraSets[exerciseId] || 0));
+  const handleCompleteAll = (exerciseId: string, item: WorkoutTemplateExerciseWithDetails) => {
+    Alert.alert(t('training.completeAllSetsConfirmTitle'), t('training.completeAllSetsConfirmMessage'), [
+      {
+        text: t('common.cancel'),
+        style: 'cancel',
+      },
+      {
+        text: t('training.completeAllSetsConfirmAction'),
+        style: 'default',
+        onPress: () => {
+          const targetSets = Math.max(0, (item.target_sets || 3) + (extraSets[exerciseId] || 0));
 
-    setLocalCompletedSets(prev => {
-      const next = new Set(prev);
-      for (let setNum = 1; setNum <= targetSets; setNum++) {
-        next.add(`${exerciseId}-${setNum}`);
-      }
-      return next;
-    });
+          setLocalCompletedSets(prev => {
+            const next = new Set(prev);
+            for (let setNum = 1; setNum <= targetSets; setNum++) {
+              next.add(`${exerciseId}-${setNum}`);
+            }
+            return next;
+          });
 
-    setSuccessModal({
-      visible: true,
-      title: t('training.workoutCompleted'),
-      message: t('training.allSetsMarked'),
-      onDismiss: () => {},
-    });
+          setSuccessModal({
+            visible: true,
+            title: t('training.workoutCompleted'),
+            message: t('training.allSetsMarked'),
+            onDismiss: () => {},
+          });
+        },
+      },
+    ]);
   };
 
-  const handleCompleteAllExercises = async () => {
-    setLocalCompletedSets(prev => {
-      const next = new Set(prev);
-      for (const item of visibleExercises) {
-        const exerciseId = item?.exercise_id;
-        const totalSets = Math.max(0, (item?.target_sets || 3) + (extraSets[exerciseId!] || 0));
-        for (let i = 0; i < totalSets; i++) {
-          next.add(`${exerciseId}-${i + 1}`);
-        }
-      }
-      return next;
-    });
+  const handleCompleteAllExercises = () => {
+    Alert.alert(t('training.completeAllConfirmTitle'), t('training.completeAllConfirmMessage'), [
+      {
+        text: t('common.cancel'),
+        style: 'cancel',
+        onPress: () => setIsCompletingAll(false),
+      },
+      {
+        text: t('training.completeAllConfirmAction'),
+        style: 'default',
+        onPress: () => {
+          setIsCompletingAll(true);
 
-    setSuccessModal({
-      visible: true,
-      title: t('common.done'),
-      message: t('training.allExercisesSetsMarked'),
-      onDismiss: () => setIsCompletingAll(false),
-    });
+          setLocalCompletedSets(prev => {
+            const next = new Set(prev);
+            for (const item of visibleExercises) {
+              const exerciseId = item?.exercise_id;
+              const totalSets = Math.max(0, (item?.target_sets || 3) + (extraSets[exerciseId!] || 0));
+              for (let i = 0; i < totalSets; i++) {
+                next.add(`${exerciseId}-${i + 1}`);
+              }
+            }
+            return next;
+          });
+
+          setSuccessModal({
+            visible: true,
+            title: t('common.done'),
+            message: t('training.allExercisesSetsMarked'),
+            onDismiss: () => setIsCompletingAll(false),
+          });
+        },
+      },
+    ]);
   };
 
   const floatingFooterHeight = 75;
