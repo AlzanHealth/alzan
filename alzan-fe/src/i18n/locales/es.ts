@@ -1340,6 +1340,9 @@ export default {
     sound: 'Sonido',
     autoRestDesc: 'Inicia el descanso al completar una serie',
     autoTimer: 'Temporizador automático',
+    autoPlay: 'Reproducción automática',
+    autoPlayDesc:
+      'En ejercicios por tiempo, tras completar una serie inicia automáticamente la siguiente y la marca como completada.',
     unitMetres: '(metros)',
     editStep: 'Editar Paso',
     newStep: 'Nuevo Paso',

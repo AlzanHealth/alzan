@@ -233,6 +233,14 @@ const TrainingSettingsScreen = () => {
               />
               <View style={[styles.separator, dynamicStyles.divider]} />
               <ToggleRow
+                label={t('training.autoPlay')}
+                description={t('training.autoPlayDesc')}
+                value={settings.autoPlayEnabled}
+                onValueChange={() => toggleSetting('autoPlayEnabled')}
+                disabled={isLoadingSettings}
+              />
+              <View style={[styles.separator, dynamicStyles.divider]} />
+              <ToggleRow
                 label={t('training.sound')}
                 description={t('training.soundAlertDesc')}
                 value={settings.soundEnabled}

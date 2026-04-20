@@ -48,6 +48,10 @@ import { useTranslation } from 'react-i18next';
 import { isTimeBasedExerciseType } from '../../services/localization';
 
 export type WorkoutTemplateExerciseWithDetails = WorkoutTemplateExercise & { exercise: ExerciseWithType | null };
+type AutoPlayQueue = {
+  exerciseId: string;
+  nextSetNumber: number;
+};
 
 // ... (Rest of imports or utility functions if any)
 const buildSupersetLinksFromOrderedExercises = (orderedExercises: WorkoutTemplateExerciseWithDetails[]) => {
@@ -202,6 +206,7 @@ export const ActiveWorkoutScreen = () => {
   const [executionTimerVisible, setExecutionTimerVisible] = useState(false);
   const [executionTimerSeconds, setExecutionTimerSeconds] = useState(30);
   const [pendingRestSeconds, setPendingRestSeconds] = useState<number | null>(null);
+  const [pendingAutoPlayQueue, setPendingAutoPlayQueue] = useState<AutoPlayQueue | null>(null);
 
   // Local Completed Sets State (Batch Save Model)
   const [localCompletedSets, setLocalCompletedSets] = useState<Set<string>>(new Set());
@@ -515,6 +520,23 @@ export const ActiveWorkoutScreen = () => {
     return activeSessionData?.completedSets?.find(s => s.exercise_id === exerciseId && s.set_number === setNumber);
   };
 
+  const getExerciseTotalSets = (exerciseId: string) => {
+    const exercise = visibleExercises.find(item => item.exercise_id === exerciseId);
+    return Math.max(0, (exercise?.target_sets || 3) + (extraSets[exerciseId] || 0));
+  };
+
+  const getExecutionSecondsForSet = (
+    exercise: WorkoutTemplateExerciseWithDetails | undefined,
+    setNumber: number,
+    fallbackSeconds: number,
+  ) => {
+    if (!exercise) return fallbackSeconds;
+    const key = `${exercise.exercise_id}-${setNumber}`;
+    const typedValue = parseInt(inputs[key]?.reps || '', 10);
+    if (Number.isFinite(typedValue) && typedValue > 0) return typedValue;
+    return fallbackSeconds;
+  };
+
   const handleInput = (key: string, field: 'weight' | 'reps', value: string) => {
     if (field === 'weight') {
       const cleaned = value.replace(/[^0-9.,]/g, '');
@@ -566,6 +588,7 @@ export const ActiveWorkoutScreen = () => {
     const nextCompletedSets = new Set(localCompletedSets);
     if (nextCompletedSets.has(key)) {
       nextCompletedSets.delete(key);
+      setPendingAutoPlayQueue(null);
     } else {
       nextCompletedSets.add(key);
 
@@ -595,13 +618,28 @@ export const ActiveWorkoutScreen = () => {
         setExecutionTimerSeconds(targetRepsMin);
         setPendingRestSeconds(restVal);
         setExecutionTimerVisible(true);
+
+        if (settings.autoPlayEnabled) {
+          const totalSets = getExerciseTotalSets(exerciseId);
+          const nextSetNumber = setNumber + 1;
+          if (nextSetNumber <= totalSets && !nextCompletedSets.has(`${exerciseId}-${nextSetNumber}`)) {
+            setPendingAutoPlayQueue({ exerciseId, nextSetNumber });
+          } else {
+            setPendingAutoPlayQueue(null);
+          }
+        } else {
+          setPendingAutoPlayQueue(null);
+        }
       } else {
         // Reps-based exercise: show rest timer directly
         if (restVal > 0) {
           setTimerSeconds(restVal);
           setTimerVisible(true);
         }
+        setPendingAutoPlayQueue(null);
       }
+    } else {
+      setPendingAutoPlayQueue(null);
     }
   };
 
@@ -618,6 +656,37 @@ export const ActiveWorkoutScreen = () => {
   const handleExecutionDismiss = () => {
     setExecutionTimerVisible(false);
     setPendingRestSeconds(null);
+    setPendingAutoPlayQueue(null);
+  };
+
+  const handleRestComplete = () => {
+    setTimerVisible(false);
+
+    if (!settings.autoPlayEnabled || !pendingAutoPlayQueue) return;
+
+    const { exerciseId, nextSetNumber } = pendingAutoPlayQueue;
+    const exercise = visibleExercises.find(item => item.exercise_id === exerciseId);
+    const executionSeconds = getExecutionSecondsForSet(exercise, nextSetNumber, exercise?.target_reps_min || 30);
+    const restSeconds = exercise?.rest_seconds ?? 60;
+    const setKey = `${exerciseId}-${nextSetNumber}`;
+
+    setLocalCompletedSets(prev => {
+      const next = new Set(prev);
+      next.add(setKey);
+      return next;
+    });
+
+    const totalSets = getExerciseTotalSets(exerciseId);
+    const followingSetNumber = nextSetNumber + 1;
+    if (followingSetNumber <= totalSets) {
+      setPendingAutoPlayQueue({ exerciseId, nextSetNumber: followingSetNumber });
+    } else {
+      setPendingAutoPlayQueue(null);
+    }
+
+    setExecutionTimerSeconds(executionSeconds);
+    setPendingRestSeconds(restSeconds);
+    setExecutionTimerVisible(true);
   };
 
   // Exercise Menu Actions
@@ -1035,6 +1104,7 @@ export const ActiveWorkoutScreen = () => {
         text: t('training.completeAllSetsConfirmAction'),
         style: 'default',
         onPress: () => {
+          setPendingAutoPlayQueue(null);
           setLocalCompletedSets(prev => {
             const next = new Set(prev);
 
@@ -1083,6 +1153,7 @@ export const ActiveWorkoutScreen = () => {
         style: 'default',
         onPress: () => {
           setIsCompletingAll(true);
+          setPendingAutoPlayQueue(null);
 
           setLocalCompletedSets(prev => {
             const next = new Set(prev);
@@ -1609,8 +1680,11 @@ export const ActiveWorkoutScreen = () => {
             <RestTimer
               isVisible={timerVisible}
               initialSeconds={timerSeconds}
-              onComplete={() => setTimerVisible(false)}
-              onDismiss={() => setTimerVisible(false)}
+              onComplete={handleRestComplete}
+              onDismiss={() => {
+                setTimerVisible(false);
+                setPendingAutoPlayQueue(null);
+              }}
               soundEnabled={settings.soundEnabled}
               vibrationEnabled={settings.hapticsEnabled}
               bottomOffset={timerBottomOffset}

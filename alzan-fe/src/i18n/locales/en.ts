@@ -1304,6 +1304,9 @@ const en = {
     sound: 'Sound',
     autoRestDesc: 'Starts rest automatically after completing a set',
     autoTimer: 'Auto timer',
+    autoPlay: 'Auto-play',
+    autoPlayDesc:
+      'For time-based exercises, after completing a set it automatically starts the next one and marks it as completed.',
     unitMetres: '(meters)',
     editStep: 'Edit Step',
     newStep: 'New Step',
