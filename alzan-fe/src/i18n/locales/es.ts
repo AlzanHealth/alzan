@@ -913,6 +913,7 @@ export default {
     selectTargetPace: 'Selecciona el ritmo objetivo (min',
     selectTargetPaceObjective: 'Selecciona el ritmo objetivo (min',
     completeSetInstruction: 'Pulsa el check para completar la serie.',
+    onlyCompletedSetsSavedInstruction: 'Solo se guardan las series marcadas como completadas.',
     supersetInstruction: 'Pulse el infinito entre dos ejercicios para vincularlos como una superserie.',
     warmupSetInstruction: 'Toca el número de set para marcar o desmarcar como calentamiento (W).',
     repsOrTimeGoal: 'El objetivo de repeticiones o tiempo.',

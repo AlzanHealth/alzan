@@ -904,6 +904,7 @@ const en = {
     selectTargetPace: 'Select target pace (min',
     selectTargetPaceObjective: 'Select target pace objective (min',
     completeSetInstruction: 'Press the check to complete the set.',
+    onlyCompletedSetsSavedInstruction: 'Only sets marked as completed are saved.',
     supersetInstruction: 'Tap the infinity icon between two exercises to link them as a superset.',
     warmupSetInstruction: 'Tap a set number to mark or unmark it as warm-up (W).',
     repsOrTimeGoal: 'The repetitions or time goal.',

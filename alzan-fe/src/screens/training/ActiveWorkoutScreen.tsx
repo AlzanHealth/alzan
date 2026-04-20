@@ -109,15 +109,8 @@ export const ActiveWorkoutScreen = () => {
   const { sessionId } = route.params || {};
   const insets = useSafeAreaInsets();
 
-  const {
-    activeSessionData,
-    isLoading,
-    logSet,
-    finishSession,
-    cancelSession,
-    deleteSpecificSet,
-    saveSessionSupersetLinks,
-  } = useActiveWorkout(sessionId);
+  const { activeSessionData, isLoading, logSet, finishSession, cancelSession, saveSessionSupersetLinks } =
+    useActiveWorkout(sessionId);
 
   const { preferences, toDisplayWeight, toDbWeight } = useUserPreferences();
   const { settings } = useTrainingSettings();
@@ -613,35 +606,6 @@ export const ActiveWorkoutScreen = () => {
   const handleViewExerciseInfo = (exercise: ExerciseWithDetails) => {
     setMenuVisibleForExercise(null);
     navigation.navigate('ExerciseDetail', { exercise: exercise });
-  };
-
-  const handleDeleteLastSet = (exerciseId: string, exerciseName: string) => {
-    setMenuVisibleForExercise(null);
-
-    // Find the highest set number for this exercise
-    const exerciseSets = activeSessionData?.completedSets?.filter(s => s.exercise_id === exerciseId) || [];
-    if (exerciseSets.length === 0) {
-      Alert.alert(t('training.noSetsTitle'), t('training.noCompletedSetsDeleteMessage'));
-      return;
-    }
-
-    // Get the last set (highest set_number)
-    const lastSet = exerciseSets.reduce((max, current) => (current.set_number > max.set_number ? current : max));
-
-    Alert.alert(
-      t('training.deleteLastSetTitle'),
-      t('training.deleteLastSetQuestion', { setNumber: lastSet.set_number, exerciseName }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => {
-            deleteSpecificSet.mutate({ sessionId, exerciseId, setNumber: lastSet.set_number });
-          },
-        },
-      ],
-    );
   };
 
   const handleDeleteExercise = (exerciseId: string, exerciseName: string) => {
@@ -1735,23 +1699,6 @@ export const ActiveWorkoutScreen = () => {
                 })()}
 
                 <TouchableOpacity
-                  style={[
-                    styles.menuOption,
-                    { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                  ]}
-                  onPress={() => {
-                    const exercise = visibleExercises.find(e => e.exercise_id === menuVisibleForExercise);
-                    if (exercise)
-                      handleDeleteLastSet(exercise.exercise_id, exercise.exercise?.base_name || t('training.exercise'));
-                  }}
-                >
-                  <Trash2 size={20} color={themeColors.warning || '#FF9500'} />
-                  <Text style={[styles.menuOptionText, { color: themeColors.textPrimary }]}>
-                    {t('training.deleteSet')}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
                   style={[styles.menuOption, { borderBottomWidth: 0 }]}
                   onPress={() => {
                     const exercise = visibleExercises.find(e => e.exercise_id === menuVisibleForExercise);
@@ -1847,6 +1794,13 @@ export const ActiveWorkoutScreen = () => {
                   </View>
                   <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
                     {t('training.completeSetInstruction')}
+                  </Text>
+                </View>
+
+                <View style={styles.helpRow}>
+                  <Text style={[styles.helpLabel, { color: themeColors.primary }]}>i</Text>
+                  <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
+                    {t('training.onlyCompletedSetsSavedInstruction')}
                   </Text>
                 </View>
 
