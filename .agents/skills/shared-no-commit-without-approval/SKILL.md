@@ -1,3 +1,4 @@
+---
 name: shared-no-commit-without-approval
 description: Mandatory git safety rule for this repository. Never run git commit/push/tag/rebase/reset/branch deletion from the agent. If the user asks for commit help, provide only a commit name and description using shared-commit-generator.
 ---

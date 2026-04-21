@@ -111,6 +111,92 @@ Evita YAML frágiles, automatizaciones inconsistentes y procesos manuales difíc
 **Ejemplo real en Alzan**  
 Preparar workflows de preview build o automatizar releases internas del equipo móvil.
 
+## Frontend Design / Taste
+
+### `fe-design-taste-frontend`
+
+**Qué hace**  
+Empuja una dirección visual mucho más ambiciosa y menos genérica. Fuerza jerarquía fuerte, layouts con más intención, mejor criterio tipográfico y decisiones de diseño menos "default LLM".
+
+**Cuándo usarla**  
+Cuando queremos explorar una propuesta visual más potente, con más personalidad, o salir de soluciones demasiado neutras.
+
+**Qué evita**  
+Evita interfaces correctas pero olvidables, demasiado simétricas o con estética AI genérica.
+
+**Ejemplo real en Alzan**  
+Explorar un nuevo concepto visual para el feed social, onboarding premium o una landing interna de producto antes de aterrizarlo en componentes RN.
+
+### `fe-emil-design-eng`
+
+**Qué hace**  
+Aporta criterio fino de detalle, polish y animación. Está muy enfocada en las pequeñas decisiones invisibles que hacen que una interfaz se sienta cuidada.
+
+**Cuándo usarla**  
+Cuando una UI ya funciona, pero queremos mejorar sensaciones, feedback, timings, microinteracciones o calidad percibida.
+
+**Qué evita**  
+Evita animaciones torpes, transiciones vagas y detalles que hacen que una interfaz se sienta barata o poco refinada.
+
+**Ejemplo real en Alzan**  
+Refinar el comportamiento de botones, sheets, toasts o transiciones entre estados en pantallas de salud o social.
+
+### `fe-gpt-taste`
+
+**Qué hace**  
+Empuja composiciones muy creativas, con más riesgo visual, motion fuerte y estructura más editorial o cinematográfica.
+
+**Cuándo usarla**  
+Cuando buscamos ideas visuales rompedoras, conceptos de alto impacto o una dirección más atrevida para marketing interno, branding o exploración de nuevas superficies.
+
+**Qué evita**  
+Evita caer siempre en la misma estructura visual y en layouts demasiado previsibles.
+
+**Ejemplo real en Alzan**  
+Idear una experiencia potente para presentar visualmente logros, progreso o una futura narrativa de datos de wearables.
+
+### `fe-high-end-visual-design`
+
+**Qué hace**  
+Da una referencia de diseño “agencia premium”: espaciado amplio, motion con peso, contenedores más sofisticados y sensación visual de producto caro y pulido.
+
+**Cuándo usarla**  
+Cuando queremos subir mucho el nivel de una interfaz concreta y explorar acabados visuales de alta calidad.
+
+**Qué evita**  
+Evita layouts planos, sombras y bordes genéricos, y soluciones que parecen plantilla.
+
+**Ejemplo real en Alzan**  
+Explorar una versión más premium de profile, settings o una pantalla aspiracional de progreso personal.
+
+### `fe-minimalist-ui`
+
+**Qué hace**  
+Empuja una estética editorial, limpia y muy contenida. Prioriza claridad, aire, monocromo cálido y una interfaz más silenciosa.
+
+**Cuándo usarla**  
+Cuando buscamos una dirección más sobria, utilitaria y elegante, especialmente en zonas donde la legibilidad y la calma visual importan mucho.
+
+**Qué evita**  
+Evita recargar pantallas con adornos, gradientes o demasiado ruido visual.
+
+**Ejemplo real en Alzan**  
+Pensar una interfaz muy clara para settings, historial de salud, lectura de métricas o pantallas de configuración sensible.
+
+### `fe-ui-ux-pro-max`
+
+**Qué hace**  
+Sirve como biblioteca muy amplia de criterio UI/UX para web y móvil: estilos, tipografía, paletas, componentes, patrones de interacción y razonamiento de diseño.
+
+**Cuándo usarla**  
+Cuando hace falta explorar muchas direcciones visuales, comparar estilos o revisar una interfaz con una base más amplia de heurísticas de diseño.
+
+**Qué evita**  
+Evita diseñar a ojo sin referencias suficientes o quedarse bloqueado cuando no está claro qué lenguaje visual encaja mejor.
+
+**Ejemplo real en Alzan**  
+Explorar varias direcciones para una nueva superficie social o una experiencia de datos de salud antes de aterrizar la solución móvil final con las skills RN específicas.
+
 ## Shared FE + BE + DB
 
 ### `shared-pnpm-quality-gate`
@@ -339,7 +425,7 @@ Preparar un `feat`, `fix` o `docs` listo para usar junto a un resumen entendible
 
 ## Proceso / Superpowers
 
-### `using-superpowers`
+### `shared-using-superpowers`
 
 **Qué hace**  
 Recuerda que el sistema debe trabajar con skills y no solo improvisando.
@@ -353,7 +439,7 @@ Evita saltarse workflows importantes.
 **Ejemplo real en Alzan**  
 Detectar que antes de depurar toca usar debugging o que antes de diseñar toca usar brainstorming.
 
-### `brainstorming`
+### `shared-brainstorming`
 
 **Qué hace**  
 Ayuda a pensar bien una solución antes de implementarla.
@@ -367,7 +453,7 @@ Evita picar código demasiado pronto sobre una idea mal definida.
 **Ejemplo real en Alzan**  
 Definir cómo debe funcionar el feed social o la conexión con wearables antes de implementar nada.
 
-### `writing-plans`
+### `shared-writing-plans`
 
 **Qué hace**  
 Convierte una necesidad grande en un plan de trabajo entendible y ejecutable.
@@ -381,7 +467,7 @@ Evita empezar sin mapa y acabar mezclando pasos o dejando huecos.
 **Ejemplo real en Alzan**  
 Planear una integración externa, una gran refactorización o un módulo nuevo.
 
-### `executing-plans`
+### `shared-executing-plans`
 
 **Qué hace**  
 Sirve para ejecutar un plan ya escrito con orden y puntos de control.
@@ -395,7 +481,7 @@ Evita desviarse del plan o perder el hilo a mitad del trabajo.
 **Ejemplo real en Alzan**  
 Ejecutar una hoja de ruta para refactor de navegación o backend.
 
-### `dispatching-parallel-agents`
+### `shared-dispatching-parallel-agents`
 
 **Qué hace**  
 Ayuda a dividir trabajo independiente en paralelo.
@@ -409,7 +495,7 @@ Evita hacerlo todo en serie cuando se puede avanzar más rápido.
 **Ejemplo real en Alzan**  
 Separar revisión de FE, BE y documentación en trabajos paralelos.
 
-### `subagent-driven-development`
+### `shared-subagent-driven-development`
 
 **Qué hace**  
 Organiza mejor el trabajo con subagentes, revisiones y ownership.
@@ -423,7 +509,7 @@ Evita paralelizar sin coordinación ni criterios de revisión.
 **Ejemplo real en Alzan**  
 Dividir una implementación grande entre frontend, backend y revisión de calidad.
 
-### `test-driven-development`
+### `shared-test-driven-development`
 
 **Qué hace**  
 Empuja a pensar primero el comportamiento esperado y luego la implementación.
@@ -437,7 +523,7 @@ Evita desarrollar “a ojo” sin definir qué debería pasar.
 **Ejemplo real en Alzan**  
 Validar reglas de negocio de stats, cálculos o endpoints.
 
-### `systematic-debugging`
+### `shared-systematic-debugging`
 
 **Qué hace**  
 Da un método para depurar con causa raíz y no con parches aleatorios.
@@ -451,7 +537,7 @@ Evita arreglos superficiales que no resuelven el problema real.
 **Ejemplo real en Alzan**  
 Investigar por qué falla login, una query, una sync externa o una pantalla concreta.
 
-### `requesting-code-review`
+### `shared-requesting-code-review`
 
 **Qué hace**  
 Sirve para pedir revisión de forma útil cuando el trabajo ya está avanzado o terminado.
@@ -465,7 +551,7 @@ Evita cerrar trabajo con fallos que se podían haber detectado antes.
 **Ejemplo real en Alzan**  
 Pedir revisión antes de dar por terminado un módulo importante.
 
-### `receiving-code-review`
+### `shared-receiving-code-review`
 
 **Qué hace**  
 Ayuda a procesar feedback con criterio técnico.
@@ -479,7 +565,7 @@ Evita aceptar comentarios de forma automática sin comprobar si tienen razón.
 **Ejemplo real en Alzan**  
 Revisar una sugerencia de arquitectura o de refactor sin romper el diseño actual.
 
-### `verification-before-completion`
+### `shared-verification-before-completion`
 
 **Qué hace**  
 Obliga a verificar antes de afirmar que algo ya está bien.
@@ -493,7 +579,7 @@ Evita decir “está hecho” sin evidencia real.
 **Ejemplo real en Alzan**  
 No cerrar una tarea sin haber pasado los checks relevantes.
 
-### `using-git-worktrees`
+### `shared-using-git-worktrees`
 
 **Qué hace**  
 Ayuda a usar worktrees para aislar trabajo de forma segura.
@@ -507,7 +593,7 @@ Evita mezclar trabajos distintos en el mismo árbol.
 **Ejemplo real en Alzan**  
 Preparar un espacio separado para una feature grande o una exploración compleja.
 
-### `finishing-a-development-branch`
+### `shared-finishing-a-development-branch`
 
 **Qué hace**  
 Ayuda a cerrar una rama o una línea de trabajo con criterio.
@@ -521,7 +607,7 @@ Evita finales ambiguos o ramas que se quedan a medias.
 **Ejemplo real en Alzan**  
 Dejar una rama lista para revisión interna o siguiente paso del equipo.
 
-### `writing-skills`
+### `shared-writing-skills`
 
 **Qué hace**  
 Enseña a escribir y mantener skills bien diseñadas.
@@ -545,4 +631,3 @@ Mejorar `shared-pnpm-quality-gate` o crear una skill nueva de producto.
 - Si tocas auth o permisos: `shared-security-review`
 - Si tocas documentación: `shared-technical-documentation`, y si hay riesgo de drift también `shared-alzan-local-docs-sync-from-code`
 - Si tocas cualquier código: `shared-pnpm-quality-gate`
-

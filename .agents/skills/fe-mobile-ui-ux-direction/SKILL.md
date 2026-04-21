@@ -115,13 +115,47 @@ This skill is intentionally not a web design system. It exists to improve iOS an
 - Summaries should explain the chart in words.
 - If data is dense, split into sections rather than compressing everything onto one screen.
 
+## Additional guardrails worth enforcing
+
+These are high-value mobile rules adapted from broader UI/UX guidance and kept only because they fit Alzan well.
+
+### Icons and controls
+
+- Do not use emoji as structural UI icons.
+- Keep one icon family and one visual language per hierarchy level.
+- Prefer native or system-aligned controls over fully custom controls unless branding truly requires otherwise.
+- If an icon is visually small, expand the hit area instead of shrinking usability.
+
+### Actions and states
+
+- Each screen should have one clearly dominant primary action.
+- Pressed, disabled, loading, success, empty, error, and offline states must be visible and intentional.
+- Do not rely on gesture-only critical actions; provide a visible fallback control.
+- Destructive actions must be visually separated from normal actions.
+
+### Navigation and flow clarity
+
+- Keep back behavior predictable and preserve state where possible.
+- Core navigation should remain reachable from deep flows unless the task is intentionally immersive.
+- Do not overload bottom navigation; top-level destinations only.
+- Sheets and modals must have an obvious escape route.
+
+### Accessibility and readability
+
+- Respect dynamic type and avoid layouts that collapse when text grows.
+- Use meaningful accessibility labels for icon-only actions.
+- Make status understandable without color alone.
+- Prefer wrapping or expansion over aggressive truncation for important content.
+
 ## Anti-patterns
 
 - importing web-first assumptions such as hover states, cursor logic, desktop sidebars, or Tailwind-specific design advice
 - more than one competing primary action on the same screen
+- emoji used as structural navigation or system icons
 - hardcoded colors, shadows, spacing, or radii in screen code
 - decorative glass, blur, or animation that reduces readability
 - using color alone for status or meaning
+- hidden gesture-only critical actions with no visible fallback
 - dense dashboards with no clear first read
 - feed or detail screens that hide key actions below confusing chrome
 
