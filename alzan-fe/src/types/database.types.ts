@@ -1482,6 +1482,42 @@ export type Database = {
           },
         ];
       };
+      recipe_favorites: {
+        Row: {
+          created_at: string;
+          id: string;
+          recipe_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          recipe_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          recipe_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'recipe_favorites_recipe_id_fkey';
+            columns: ['recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'recipe_favorites_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       recipe_items: {
         Row: {
           created_at: string;
@@ -1533,35 +1569,55 @@ export type Database = {
       recipes: {
         Row: {
           created_at: string;
-          description: string | null;
+          description_en: string | null;
+          description_es: string | null;
           id: string;
           name_en: string | null;
           name_es: string;
           name_norm_es: string;
+          owner_user_id: string | null;
           quality_score: number;
+          source: string;
           updated_at: string;
+          visibility: string;
         };
         Insert: {
           created_at?: string;
-          description?: string | null;
+          description_en?: string | null;
+          description_es?: string | null;
           id?: string;
           name_en?: string | null;
           name_es: string;
           name_norm_es: string;
+          owner_user_id?: string | null;
           quality_score?: number;
+          source?: string;
           updated_at?: string;
+          visibility?: string;
         };
         Update: {
           created_at?: string;
-          description?: string | null;
+          description_en?: string | null;
+          description_es?: string | null;
           id?: string;
           name_en?: string | null;
           name_es?: string;
           name_norm_es?: string;
+          owner_user_id?: string | null;
           quality_score?: number;
+          source?: string;
           updated_at?: string;
+          visibility?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'recipes_owner_user_id_fkey';
+            columns: ['owner_user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       resting_hr_logs: {
         Row: {

@@ -555,3 +555,35 @@ INSERT INTO "public"."recipes" ("id", "name_es", "name_en", "name_norm_es", "des
 	('fd4109fd-d243-4b6d-94a2-89d4cefdda34', 'Paella Valenciana', 'Authentic Valencian Paella', 'paella valenciana', 'La receta auténtica para una persona, con el equilibrio tradicional de carnes y verduras de la huerta valenciana.', '0.70', '2026-01-05 10:54:09.389795+00', '2026-01-05 10:54:09.389795+00', 'The authentic recipe for one person, with the traditional balance of meats and vegetables from the Valencian garden.'),
 	('fdf90bbd-6355-4816-a035-8ff0e66d3105', 'Garbanzos con pisto', 'Chickpeas with Ratatouille', 'garbanzos con pisto', 'Garbanzos salteados con un pisto de calabacín, pimiento y tomate.', '0.93', '2026-01-04 13:26:38.738339+00', '2026-01-04 13:26:38.738339+00', 'Sautéed chickpeas with a zucchini, pepper and tomato ratatouille.'),
 	('fe205ff2-89f5-479f-9abf-63f01452ece4', 'Queso frito con mermelada', 'Fried cheese with jam', 'queso frito con mermelada', 'Queso fresco o de cabra rebozado y frito, servido con mermelada.', '0.20', '2025-12-14 17:27:07.990985+00', '2025-12-14 17:27:07.990985+00', 'Fresh or goat cheese breaded and fried, served with jam.');
+
+-- Align system recipes metadata with multi-tenant model
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'source'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'visibility'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'owner_user_id'
+  ) then
+    update public.recipes
+    set
+      owner_user_id = null,
+      source = 'system',
+      visibility = 'public'
+    where owner_user_id is null;
+  end if;
+end
+$$;
