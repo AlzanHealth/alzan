@@ -16,7 +16,7 @@ import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../ty
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { X, Search, ScanBarcode, Plus, Trash2, ChevronLeft, Check, Info } from 'lucide-react-native';
+import { X, Search, ScanBarcode, Plus, Trash2, ChevronLeft, Check, Info, Bookmark } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 
@@ -84,6 +84,15 @@ interface RecipeFavoriteRow {
   recipe_id: string;
 }
 
+interface EditableRecipeSignature {
+  name: string;
+  ingredients: Array<{
+    ingredientId: string;
+    quantity: number;
+    unit: string;
+  }>;
+}
+
 export const MealLogFormScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
@@ -141,6 +150,7 @@ export const MealLogFormScreen = () => {
   const [isRecipeLibraryLoading, setIsRecipeLibraryLoading] = useState(false);
   const [recipeLibraryView, setRecipeLibraryView] = useState<RecipeLibraryView>('normal');
   const [editingSavedRecipeId, setEditingSavedRecipeId] = useState<string | null>(null);
+  const [editingRecipeSignature, setEditingRecipeSignature] = useState<string | null>(null);
 
   // Manual Ingredient Form State
   const [manualIngName, setManualIngName] = useState('');
@@ -253,6 +263,25 @@ export const MealLogFormScreen = () => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return '0';
     return Number(value.toFixed(2)).toString();
   };
+
+  const buildRecipeSignature = (recipeName: string, recipeIngredients: MealComponent[]): string => {
+    const signature: EditableRecipeSignature = {
+      name: recipeName.trim().toLowerCase(),
+      ingredients: recipeIngredients.map(ingredient => ({
+        ingredientId: ingredient.external_id || ingredient.id,
+        quantity: Number((ingredient.amount_g || 0).toFixed(2)),
+        unit: 'g',
+      })),
+    };
+
+    return JSON.stringify(signature);
+  };
+
+  const currentRecipeSignature = useMemo(() => buildRecipeSignature(name, ingredients), [ingredients, name]);
+  const isEditingRecipe = editingSavedRecipeId !== null;
+  const hasRecipeChanges =
+    isEditingRecipe && editingRecipeSignature !== null && editingRecipeSignature !== currentRecipeSignature;
+  const canSubmitRecipe = name.trim().length > 0 && ingredients.length > 0 && (!isEditingRecipe || hasRecipeChanges);
 
   // Handler to show meal detail
   const handleShowMealDetail = async (item: MealComponent, prefetchedIngredients?: RecipeIngredientItem[]) => {
@@ -635,7 +664,7 @@ export const MealLogFormScreen = () => {
     try {
       const currentUserId = await getCurrentUserId();
       if (!currentUserId) {
-        Alert.alert(t('common.error'), t('common.genericError'));
+        Alert.alert(t('common.error'), t('nutrition.saveMealError'));
         return;
       }
 
@@ -706,6 +735,7 @@ export const MealLogFormScreen = () => {
       const refreshedSavedRecipes = await loadSavedRecipesFromDb();
       setSavedRecipes(refreshedSavedRecipes);
       setEditingSavedRecipeId(null);
+      setEditingRecipeSignature(null);
       setBuilderWindow('recipes');
       Alert.alert(t('nutrition.recipeSavedTitle'), t('nutrition.recipeSavedMessage'));
     } catch (error) {
@@ -716,7 +746,10 @@ export const MealLogFormScreen = () => {
 
   const handleUseSavedRecipe = (recipe: SavedRecipeDraft) => {
     setName(recipe.name);
-    setIngredients(cloneRecipeIngredientsForMeal(recipe.ingredients));
+    const clonedIngredients = cloneRecipeIngredientsForMeal(recipe.ingredients);
+    setIngredients(clonedIngredients);
+    setEditingSavedRecipeId(recipe.id);
+    setEditingRecipeSignature(buildRecipeSignature(recipe.name, clonedIngredients));
     setBuilderWindow('ingredients');
     setSearchMessage({ type: 'info', text: t('nutrition.recipeLoadedInBuilder') });
   };
@@ -766,8 +799,10 @@ export const MealLogFormScreen = () => {
 
   const handleEditSavedRecipe = (recipe: SavedRecipeDraft) => {
     setName(recipe.name);
-    setIngredients(cloneRecipeIngredientsForMeal(recipe.ingredients));
+    const clonedIngredients = cloneRecipeIngredientsForMeal(recipe.ingredients);
+    setIngredients(clonedIngredients);
     setEditingSavedRecipeId(recipe.id);
+    setEditingRecipeSignature(buildRecipeSignature(recipe.name, clonedIngredients));
     setBuilderWindow('ingredients');
     setSearchMessage({ type: 'info', text: t('nutrition.recipeReadyToEdit') });
   };
@@ -1106,6 +1141,23 @@ export const MealLogFormScreen = () => {
                     )}
                   </View>
 
+                  {isEditingRecipe && (
+                    <View
+                      style={[
+                        styles.savedRecipeIndicator,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                          borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                        },
+                      ]}
+                    >
+                      <Bookmark size={13} color={themeColors.textSecondary} strokeWidth={2.3} />
+                      <Text style={[styles.savedRecipeIndicatorText, { color: themeColors.textSecondary }]}>
+                        {t('nutrition.savedRecipeIndicator')}
+                      </Text>
+                    </View>
+                  )}
+
                   {/* Search Message / Error */}
                   {searchMessage && (
                     <View
@@ -1272,18 +1324,19 @@ export const MealLogFormScreen = () => {
                     style={[
                       styles.recipeBuilderSaveButton,
                       {
-                        backgroundColor:
-                          name.trim().length > 0 && ingredients.length > 0
-                            ? themeColors.primary
-                            : isDark
-                              ? 'rgba(255,255,255,0.14)'
-                              : 'rgba(0,0,0,0.12)',
+                        backgroundColor: canSubmitRecipe
+                          ? themeColors.primary
+                          : isDark
+                            ? 'rgba(255,255,255,0.14)'
+                            : 'rgba(0,0,0,0.12)',
                       },
                     ]}
                     onPress={handleSaveCurrentRecipe}
-                    disabled={!name.trim() || ingredients.length === 0}
+                    disabled={!canSubmitRecipe}
                   >
-                    <Text style={styles.recipeBuilderSaveButtonText}>{t('nutrition.saveRecipeAction')}</Text>
+                    <Text style={styles.recipeBuilderSaveButtonText}>
+                      {isEditingRecipe ? t('nutrition.updateRecipeAction') : t('nutrition.saveRecipeAction')}
+                    </Text>
                   </TouchableOpacity>
                   <Text style={[styles.recipeBuilderSaveHint, { color: themeColors.textSecondary }]}>
                     {t('nutrition.saveRecipeHint')}
@@ -2665,6 +2718,23 @@ const styles = StyleSheet.create({
   messageText: { fontSize: 13, fontWeight: '500' },
   messageTextError: { color: '#FF3B30' },
   messageTextInfo: { color: '#007AFF' },
+  savedRecipeIndicator: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  savedRecipeIndicatorText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.25,
+    textTransform: 'uppercase',
+  },
 
   // Section Titles
   sectionTitle: {
