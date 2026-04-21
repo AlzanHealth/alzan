@@ -45,6 +45,7 @@ import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 
 type InputMode = 'search' | 'scan' | 'manual' | 'photo';
+type MealSearchFilter = 'all' | 'recipe' | 'precooked';
 
 export const MealLogFormScreen = () => {
   const { t } = useTranslation();
@@ -163,12 +164,29 @@ export const MealLogFormScreen = () => {
   const [isSearchingRecipe, setIsSearchingRecipe] = useState(false);
   const [searchMessage, setSearchMessage] = useState<{ type: 'error' | 'info'; text: string } | null>(null);
   const [mealSearchResults, setMealSearchResults] = useState<MealComponent[]>([]);
+  const [mealSearchFilter, setMealSearchFilter] = useState<MealSearchFilter>('recipe');
 
   // Meal detail modal state
   const [showMealDetailModal, setShowMealDetailModal] = useState(false);
   const [selectedMealDetail, setSelectedMealDetail] = useState<MealComponent | null>(null);
   const [mealDetailLoading, setMealDetailLoading] = useState(false);
   const [mealDetailIngredients, setMealDetailIngredients] = useState<RecipeIngredientItem[]>([]);
+
+  const recipeSearchResults = useMemo(
+    () => mealSearchResults.filter(item => item.itemType === 'recipe'),
+    [mealSearchResults],
+  );
+
+  const precookedSearchResults = useMemo(
+    () => mealSearchResults.filter(item => item.category === 'precocinado'),
+    [mealSearchResults],
+  );
+
+  const filteredMealSearchResults = useMemo(() => {
+    if (mealSearchFilter === 'recipe') return recipeSearchResults;
+    if (mealSearchFilter === 'precooked') return precookedSearchResults;
+    return mealSearchResults;
+  }, [mealSearchFilter, mealSearchResults, precookedSearchResults, recipeSearchResults]);
 
   // Handler to show meal detail
   const handleShowMealDetail = async (item: MealComponent) => {
@@ -195,6 +213,7 @@ export const MealLogFormScreen = () => {
     if (!name || name.length < 2) {
       setMealSearchResults([]);
       setSearchMessage(null);
+      setMealSearchFilter('recipe');
     }
   }, [name]);
 
@@ -216,6 +235,13 @@ export const MealLogFormScreen = () => {
 
       if (results.length > 0) {
         setMealSearchResults(results);
+        if (results.some(item => item.itemType === 'recipe')) {
+          setMealSearchFilter('recipe');
+        } else if (results.some(item => item.category === 'precocinado')) {
+          setMealSearchFilter('precooked');
+        } else {
+          setMealSearchFilter('all');
+        }
       } else {
         setSearchMessage({
           type: 'info',
@@ -306,6 +332,27 @@ export const MealLogFormScreen = () => {
         text: t('nutrition.providerMacrosOnlyInfo', { provider }),
       });
     }
+  };
+
+  const getMealResultBadge = (item: MealComponent): { text: string; color: string } => {
+    if (item.itemType === 'recipe') {
+      return {
+        text: t('nutrition.recipe'),
+        color: '#34C759',
+      };
+    }
+
+    if (item.category === 'precocinado') {
+      return {
+        text: t('nutrition.preCooked'),
+        color: '#FF9500',
+      };
+    }
+
+    return {
+      text: t('nutrition.all'),
+      color: themeColors.primary,
+    };
   };
 
   // --- Handlers ---
@@ -577,66 +624,135 @@ export const MealLogFormScreen = () => {
               {/* Meal Search Results with Badges */}
               {mealSearchResults.length > 0 && (
                 <View style={styles.mealSearchResults}>
-                  <Text style={[styles.resultsTitle, { color: themeColors.textSecondary }]}>
-                    {t('nutrition.resultsTitleParen')}
-                    {mealSearchResults.length})
-                  </Text>
-                  {mealSearchResults.map(item => {
-                    const isRecipe = item.itemType === 'recipe';
-                    const isPrecooked = item.category === 'precocinado';
-                    let badgeText = '';
-                    let badgeColor = themeColors.primary;
+                  <View style={styles.resultsHeaderRow}>
+                    <Text style={[styles.resultsTitle, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.resultsTitleParen')}
+                      {mealSearchResults.length})
+                    </Text>
+                    <View
+                      style={[
+                        styles.resultHintBadge,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.resultHintText, { color: themeColors.textSecondary }]}>
+                        {t('nutrition.recipe')}
+                      </Text>
+                    </View>
+                  </View>
 
-                    if (isRecipe) {
-                      badgeText = t('nutrition.recipe');
-                      badgeColor = '#34C759';
-                    } else if (isPrecooked) {
-                      badgeText = t('nutrition.preCooked');
-                      badgeColor = '#FF9500';
-                    }
+                  <View style={styles.mealResultFiltersRow}>
+                    {[
+                      { key: 'recipe' as const, label: t('nutrition.recipe'), count: recipeSearchResults.length },
+                      {
+                        key: 'precooked' as const,
+                        label: t('nutrition.preCooked'),
+                        count: precookedSearchResults.length,
+                      },
+                      { key: 'all' as const, label: t('nutrition.all'), count: mealSearchResults.length },
+                    ].map(filter => {
+                      const isActive = mealSearchFilter === filter.key;
+                      return (
+                        <TouchableOpacity
+                          key={filter.key}
+                          style={[
+                            styles.mealFilterChip,
+                            {
+                              backgroundColor: isActive
+                                ? themeColors.primary + '20'
+                                : isDark
+                                  ? 'rgba(255,255,255,0.05)'
+                                  : 'rgba(0,0,0,0.04)',
+                              borderColor: isActive ? themeColors.primary + '55' : 'transparent',
+                            },
+                          ]}
+                          onPress={() => setMealSearchFilter(filter.key)}
+                        >
+                          <Text
+                            style={[
+                              styles.mealFilterChipText,
+                              {
+                                color: isActive ? themeColors.primary : themeColors.textSecondary,
+                              },
+                            ]}
+                          >
+                            {filter.label} ({filter.count})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {(mealSearchFilter === 'all'
+                    ? [
+                        { section: t('nutrition.recipe'), data: recipeSearchResults },
+                        { section: t('nutrition.preCooked'), data: precookedSearchResults },
+                      ]
+                    : [{ section: null, data: filteredMealSearchResults }]
+                  ).map((group, groupIndex) => {
+                    if (group.data.length === 0) return null;
 
                     return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[
-                          styles.mealResultItem,
-                          {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                          },
-                        ]}
-                        onPress={() => handleSelectMealResult(item)}
-                      >
-                        <View style={styles.mealResultInfo}>
-                          <Text style={[styles.mealResultName, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                            {item.name}
+                      <View key={`${group.section ?? 'mixed'}-${groupIndex}`} style={styles.mealResultSection}>
+                        {group.section ? (
+                          <Text style={[styles.mealResultSectionTitle, { color: themeColors.textSecondary }]}>
+                            {group.section} ({group.data.length})
                           </Text>
-                          <View style={styles.mealResultMeta}>
-                            <View style={[styles.mealBadge, { backgroundColor: badgeColor + '20' }]}>
-                              <Text style={[styles.mealBadgeText, { color: badgeColor }]}>{badgeText}</Text>
-                            </View>
-                            <Text style={[styles.mealResultMacros, { color: themeColors.textSecondary }]}>
-                              {item.kcal_100}
-                              {t('nutrition.kcalPer100g')}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.mealResultActions}>
-                          <TouchableOpacity
-                            style={styles.mealInfoBtn}
-                            onPress={() => handleShowMealDetail(item)}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          >
-                            <Info size={18} color={themeColors.textSecondary} />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.mealAddBtn}
-                            onPress={() => handleSelectMealResult(item)}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          >
-                            <Plus size={20} color={themeColors.primary} />
-                          </TouchableOpacity>
-                        </View>
-                      </TouchableOpacity>
+                        ) : null}
+
+                        {group.data.map(item => {
+                          const badge = getMealResultBadge(item);
+
+                          return (
+                            <TouchableOpacity
+                              key={item.id}
+                              style={[
+                                styles.mealResultItem,
+                                {
+                                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                },
+                              ]}
+                              onPress={() => handleSelectMealResult(item)}
+                            >
+                              <View style={styles.mealResultInfo}>
+                                <Text
+                                  style={[styles.mealResultName, { color: themeColors.textPrimary }]}
+                                  numberOfLines={1}
+                                >
+                                  {item.name}
+                                </Text>
+                                <View style={styles.mealResultMeta}>
+                                  <View style={[styles.mealBadge, { backgroundColor: badge.color + '20' }]}>
+                                    <Text style={[styles.mealBadgeText, { color: badge.color }]}>{badge.text}</Text>
+                                  </View>
+                                  <Text style={[styles.mealResultMacros, { color: themeColors.textSecondary }]}>
+                                    {item.kcal_100}
+                                    {t('nutrition.kcalPer100g')}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View style={styles.mealResultActions}>
+                                <TouchableOpacity
+                                  style={styles.mealInfoBtn}
+                                  onPress={() => handleShowMealDetail(item)}
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                  <Info size={18} color={themeColors.textSecondary} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.mealAddBtn}
+                                  onPress={() => handleSelectMealResult(item)}
+                                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                  <Plus size={20} color={themeColors.primary} />
+                                </TouchableOpacity>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
                     );
                   })}
                 </View>
@@ -1802,10 +1918,52 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8,
   },
+  resultsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 6,
+  },
   resultsTitle: {
     fontSize: 13,
     fontWeight: '500',
-    marginBottom: 8,
+  },
+  resultHintBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  resultHintText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  mealResultFiltersRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+  },
+  mealFilterChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mealFilterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  mealResultSection: {
+    gap: 8,
+    marginTop: 6,
+  },
+  mealResultSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
   },
   mealResultItem: {
     flexDirection: 'row',
