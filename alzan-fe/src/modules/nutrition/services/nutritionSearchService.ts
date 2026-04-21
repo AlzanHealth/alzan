@@ -34,6 +34,70 @@ interface IngredientSearchRow extends DbIngredient {
   notes_en: string | null;
 }
 
+interface RecipeMacroItemRow {
+  quantity: number | null;
+  ingredients: {
+    kcal_100: number | null;
+    protein_g_100: number | null;
+    carbs_g_100: number | null;
+    fat_g_100: number | null;
+  } | null;
+}
+
+async function mapRecipeToMealComponent(recipe: RecipeSearchRow): Promise<MealComponent> {
+  const { data: items } = await supabase
+    .from('recipe_items')
+    .select(
+      `
+        quantity,
+        ingredients (
+          kcal_100,
+          protein_g_100,
+          carbs_g_100,
+          fat_g_100
+        )
+      `,
+    )
+    .eq('recipe_id', recipe.id)
+    .returns<RecipeMacroItemRow[]>();
+
+  let totalKcal = 0;
+  let totalProtein = 0;
+  let totalCarbs = 0;
+  let totalFat = 0;
+  let totalWeight = 0;
+
+  if (items && items.length > 0) {
+    items.forEach(item => {
+      const quantity = item.quantity || 0;
+      totalWeight += quantity;
+
+      if (!item.ingredients) return;
+
+      totalKcal += ((item.ingredients.kcal_100 || 0) * quantity) / 100;
+      totalProtein += ((item.ingredients.protein_g_100 || 0) * quantity) / 100;
+      totalCarbs += ((item.ingredients.carbs_g_100 || 0) * quantity) / 100;
+      totalFat += ((item.ingredients.fat_g_100 || 0) * quantity) / 100;
+    });
+  }
+
+  const factor = totalWeight > 0 ? 100 / totalWeight : 0;
+
+  return {
+    id: `recipe_${recipe.id}`,
+    name: getLocalizedRecipeName(recipe),
+    description: getLocalizedRecipeDescription(recipe) ?? undefined,
+    source: 'database',
+    external_id: recipe.id,
+    itemType: 'recipe',
+    quality_score: recipe.quality_score,
+    kcal_100: Math.round(totalKcal * factor),
+    protein_g_100: Math.round(totalProtein * factor * 10) / 10,
+    carbs_g_100: Math.round(totalCarbs * factor * 10) / 10,
+    fat_g_100: Math.round(totalFat * factor * 10) / 10,
+  };
+}
+
 /**
  * Search for ingredients with filters (category, letter, text)
  * Used by IngredientSearchPanel - includes ALL ingredient categories
@@ -106,55 +170,8 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
       );
 
       for (const recipe of filteredRecipes) {
-        // Calculate macros from recipe_items
-        const { data: items } = await supabase
-          .from('recipe_items')
-          .select(
-            `
-                        quantity,
-                        ingredients (
-                            kcal_100,
-                            protein_g_100,
-                            carbs_g_100,
-                            fat_g_100
-                        )
-                    `,
-          )
-          .eq('recipe_id', recipe.id);
-
-        let totalKcal = 0,
-          totalProtein = 0,
-          totalCarbs = 0,
-          totalFat = 0;
-        let totalWeight = 0;
-
-        if (items && items.length > 0) {
-          items.forEach(item => {
-            const q = item.quantity || 0;
-            totalWeight += q;
-            if (item.ingredients) {
-              totalKcal += ((item.ingredients.kcal_100 || 0) * q) / 100;
-              totalProtein += ((item.ingredients.protein_g_100 || 0) * q) / 100;
-              totalCarbs += ((item.ingredients.carbs_g_100 || 0) * q) / 100;
-              totalFat += ((item.ingredients.fat_g_100 || 0) * q) / 100;
-            }
-          });
-        }
-
-        const factor = totalWeight > 0 ? 100 / totalWeight : 0;
-        results.push({
-          id: `recipe_${recipe.id}`,
-          name: getLocalizedRecipeName(recipe),
-          description: getLocalizedRecipeDescription(recipe) ?? undefined,
-          source: 'database',
-          external_id: recipe.id,
-          itemType: 'recipe',
-          quality_score: recipe.quality_score,
-          kcal_100: Math.round(totalKcal * factor),
-          protein_g_100: Math.round(totalProtein * factor * 10) / 10,
-          carbs_g_100: Math.round(totalCarbs * factor * 10) / 10,
-          fat_g_100: Math.round(totalFat * factor * 10) / 10,
-        });
+        const mappedRecipe = await mapRecipeToMealComponent(recipe);
+        results.push(mappedRecipe);
       }
     }
   } catch (err) {
@@ -235,6 +252,40 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
   });
 
   return results;
+}
+
+export async function getFeaturedRecipes(limit = 12): Promise<MealComponent[]> {
+  try {
+    const { data: recipes, error } = await supabase
+      .from('recipes')
+      .select(
+        `
+          id,
+          name_es,
+          name_en,
+          name_norm_es,
+          description_es,
+          description_en,
+          quality_score
+        `,
+      )
+      .order('quality_score', { ascending: false })
+      .limit(limit)
+      .returns<RecipeSearchRow[]>();
+
+    if (error || !recipes) return [];
+
+    const mappedRecipes: MealComponent[] = [];
+    for (const recipe of recipes) {
+      const mappedRecipe = await mapRecipeToMealComponent(recipe);
+      mappedRecipes.push(mappedRecipe);
+    }
+
+    return mappedRecipes;
+  } catch (error) {
+    console.error('[nutritionSearchService] Featured recipe fetch error:', error);
+    return [];
+  }
 }
 
 // ...
