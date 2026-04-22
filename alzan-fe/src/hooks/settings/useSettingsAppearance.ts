@@ -4,7 +4,7 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { UserPreferenceInsert } from '../../types/requests.types';
 import { useAuth } from '../../context/AuthContext';
-import { Locale } from '../../i18n';
+import { changeLanguage, Locale } from '../../i18n';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -79,7 +79,7 @@ export const useSettingsAppearance = () => {
 
       // Apply language change immediately
       if (updates.language && updates.language !== i18n.language) {
-        i18n.changeLanguage(updates.language);
+        await changeLanguage(updates.language);
       }
 
       // Prepare DB update

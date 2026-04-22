@@ -52,7 +52,12 @@ import { useTranslation } from 'react-i18next';
 import { fetchByBarcode } from '../../modules/nutrition/services/nutritionSearchService';
 import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 import { supabase } from '../../lib/supabaseClient';
-import { getLocalizedIngredientName, getLocalizedRecipeDescription, getLocalizedRecipeName } from '../../services/localization';
+import {
+  getCurrentAppLocale,
+  getLocalizedIngredientName,
+  getLocalizedRecipeDescription,
+  getLocalizedRecipeName,
+} from '../../services/localization';
 import { usePreferences } from '../../hooks/settings/usePreferences';
 import { RecipeSearchScope } from '../../types/userPreferences.types';
 
@@ -145,6 +150,7 @@ interface EditableRecipeSignature {
 export const MealLogFormScreen = () => {
   const { t } = useTranslation();
   const { preferences } = usePreferences();
+  const languageCode = getCurrentAppLocale();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
   const isScreenFocused = useIsFocused();
   const route = useRoute<RouteProp<NutritionStackParamList, 'MealLogForm'>>();
@@ -373,7 +379,8 @@ export const MealLogFormScreen = () => {
 
   const filteredDisplayedSavedRecipes = displayedSavedRecipes;
   const savedRecipesTotalPages = useMemo(() => {
-    const sourceLength = recipeLibraryView === 'favorites' ? displayedFavoriteLibraryRecipes.length : filteredDisplayedSavedRecipes.length;
+    const sourceLength =
+      recipeLibraryView === 'favorites' ? displayedFavoriteLibraryRecipes.length : filteredDisplayedSavedRecipes.length;
     return Math.max(1, Math.ceil(sourceLength / RECIPE_LIBRARY_SAVED_PAGE_SIZE));
   }, [displayedFavoriteLibraryRecipes.length, filteredDisplayedSavedRecipes.length, recipeLibraryView]);
 
@@ -459,7 +466,7 @@ export const MealLogFormScreen = () => {
     if (item.itemType === 'recipe' && item.external_id) {
       setMealDetailLoading(true);
       try {
-        const ingredients = await getRecipeIngredients(item.external_id);
+        const ingredients = await getRecipeIngredients(item.external_id, languageCode);
         setMealDetailIngredients(ingredients);
       } catch (error) {
         console.error('[MealLogForm] Error fetching recipe details:', error);
@@ -620,6 +627,7 @@ export const MealLogFormScreen = () => {
     try {
       const currentUserId = await getCurrentUserId();
       const results = await searchMealByName(name, {
+        locale: languageCode,
         recipeScope: recipeSearchScope,
         currentUserId,
         favoriteRecipeIds,
@@ -677,7 +685,7 @@ export const MealLogFormScreen = () => {
     // If it's a recipe, fetch its ingredients
     if (item.itemType === 'recipe' && item.external_id) {
       try {
-        const recipeIngredients = await getRecipeIngredients(item.external_id);
+        const recipeIngredients = await getRecipeIngredients(item.external_id, languageCode);
         if (recipeIngredients.length > 0) {
           const transformedIngredients: MealComponent[] = recipeIngredients.map((ri, index: number) => ({
             id: `recipe-${index}-${Date.now()}`,
@@ -986,10 +994,11 @@ export const MealLogFormScreen = () => {
         id: `favorite_${row.id}`,
         external_id: row.id,
         name: toRecipeDisplayName(getLocalizedRecipeName({ name_es: row.name_es, name_en: row.name_en })),
-        description: getLocalizedRecipeDescription({
-          description_es: row.description_es,
-          description_en: row.description_en,
-        }) ?? undefined,
+        description:
+          getLocalizedRecipeDescription({
+            description_es: row.description_es,
+            description_en: row.description_en,
+          }) ?? undefined,
         source: 'database',
         itemType: 'recipe',
         recipe_source: row.source,
@@ -1594,14 +1603,20 @@ export const MealLogFormScreen = () => {
         </View>
         <Text style={[styles.recipeLibraryMeta, { color: themeColors.textSecondary }]}>
           {recipe.ingredients.length} {t('nutrition.ingredientsCountLabel')} ·{' '}
-          {recipe.visibility === 'public' ? t('nutrition.recipeVisibilityPublicLabel') : t('nutrition.recipeVisibilityPrivateLabel')}
+          {recipe.visibility === 'public'
+            ? t('nutrition.recipeVisibilityPublicLabel')
+            : t('nutrition.recipeVisibilityPrivateLabel')}
         </Text>
         <View style={styles.recipeCardActions}>
           <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => handleUseSavedRecipe(recipe)}>
-            <Text style={[styles.recipeCardActionText, { color: themeColors.primary }]}>{t('nutrition.useRecipeAction')}</Text>
+            <Text style={[styles.recipeCardActionText, { color: themeColors.primary }]}>
+              {t('nutrition.useRecipeAction')}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => void handleShowSavedRecipeDetail(recipe)}>
-            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>{t('nutrition.viewDetailsAction')}</Text>
+            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
+              {t('nutrition.viewDetailsAction')}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => handleEditSavedRecipe(recipe)}>
             <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>{t('common.edit')}</Text>
@@ -1610,7 +1625,10 @@ export const MealLogFormScreen = () => {
             <Text style={[styles.recipeCardActionText, { color: themeColors.danger }]}>{t('common.delete')}</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.recipeFavoriteButton} onPress={() => void handleToggleSavedRecipeFavorite(recipe.id)}>
+        <TouchableOpacity
+          style={styles.recipeFavoriteButton}
+          onPress={() => void handleToggleSavedRecipeFavorite(recipe.id)}
+        >
           <Text style={[styles.recipeFavoriteText, { color: isFavorite ? '#FFD166' : themeColors.textSecondary }]}>
             {isFavorite ? '★' : '☆'}
           </Text>
@@ -2912,9 +2930,11 @@ export const MealLogFormScreen = () => {
                   </Text>
                 )}
                 {recipeLibraryView !== 'search' &&
-                  ((recipeLibraryView === 'favorites'
-                    ? paginatedFavoriteLibraryRecipes.length === 0
-                    : filteredDisplayedSavedRecipes.length === 0) ? (
+                  ((
+                    recipeLibraryView === 'favorites'
+                      ? paginatedFavoriteLibraryRecipes.length === 0
+                      : filteredDisplayedSavedRecipes.length === 0
+                  ) ? (
                     <View
                       style={[
                         styles.recipeEmptyState,

@@ -7,11 +7,14 @@ interface UseEnduranceSessionsOptions {
   startDate?: string; // ISO 8601 format YYYY-MM-DD
   endDate?: string; // ISO 8601 format YYYY-MM-DD
   sportType?: ActivitySession['sport_type'] | 'gym' | 'all';
+  limit?: number;
+  enabled?: boolean;
 }
 
 export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const queryEnabled = !!user && (options?.enabled ?? true);
 
   const fetchSessions = async () => {
     try {
@@ -36,7 +39,13 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
         }
       }
 
-      const { data, error } = await query.order('start_time', { ascending: false });
+      query = query.order('start_time', { ascending: false });
+
+      if (typeof options?.limit === 'number' && options.limit > 0) {
+        query = query.limit(options.limit);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('[useEnduranceSessions.fetch] Error:', error);
@@ -49,11 +58,65 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
     }
   };
 
-  const { data: sessions, isLoading } = useQuery({
-    queryKey: ['enduranceSessions', user?.id, options?.startDate, options?.endDate, options?.sportType ?? 'all'],
+  const fetchSessionsCount = async () => {
+    if (!user) return 0;
+
+    let query = supabase.from('activity_sessions').select('*', { count: 'exact', head: true }).eq('user_id', user.id);
+
+    if (options?.startDate) {
+      query = query.gte('start_time', options.startDate);
+    }
+
+    if (options?.endDate) {
+      const endDateTime = new Date(options.endDate);
+      endDateTime.setDate(endDateTime.getDate() + 1);
+      query = query.lt('start_time', endDateTime.toISOString());
+    }
+
+    if (options?.sportType && options.sportType !== 'all') {
+      if (options.sportType === 'gym') {
+        query = query.in('sport_type', ['strength', 'gym']);
+      } else {
+        query = query.eq('sport_type', options.sportType);
+      }
+    }
+
+    const { count, error } = await query;
+
+    if (error) {
+      console.error('[useEnduranceSessions.count] Error:', error);
+      throw error;
+    }
+
+    return count ?? 0;
+  };
+
+  const {
+    data: sessions = [],
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: [
+      'enduranceSessions',
+      user?.id,
+      options?.startDate,
+      options?.endDate,
+      options?.sportType ?? 'all',
+      options?.limit ?? 'all',
+    ],
     queryFn: fetchSessions,
-    enabled: !!user,
+    enabled: queryEnabled,
+    placeholderData: previousData => previousData,
   });
+
+  const { data: totalCount = sessions.length } = useQuery({
+    queryKey: ['enduranceSessions-count', user?.id, options?.startDate, options?.endDate, options?.sportType ?? 'all'],
+    queryFn: fetchSessionsCount,
+    enabled: queryEnabled && typeof options?.limit === 'number' && options.limit > 0,
+    staleTime: 1000 * 30,
+  });
+
+  const hasMore = typeof options?.limit === 'number' && options.limit > 0 ? totalCount > sessions.length : false;
 
   const createSession = useMutation({
     mutationFn: async (sessionData: ActivitySessionInsert) => {
@@ -161,6 +224,9 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
   return {
     sessions,
     isLoading,
+    isFetching,
+    hasMore,
+    totalCount,
     createSession,
     updateSession,
     deleteSession,

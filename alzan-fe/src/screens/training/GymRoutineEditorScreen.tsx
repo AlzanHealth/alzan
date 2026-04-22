@@ -694,6 +694,7 @@ export const GymRoutineEditorScreen = () => {
               const connectorActive = isConnectorActive(index);
               const exerciseKey = getExerciseRenderKey(item, index);
               const isWarmupExercise = !!item.is_warmup;
+              const exerciseCardKey = `${exerciseKey}-${isWarmupExercise ? 'warmup' : 'regular'}`;
               const deleteAnimation = getDeleteExerciseAnimation(exerciseKey);
               const isDeleting = deletingExerciseKeys.has(exerciseKey);
               if (!exerciseFillAnimations.current[index]) {
@@ -706,29 +707,33 @@ export const GymRoutineEditorScreen = () => {
               const connectorFlow = connectorFlowAnimations.current[index];
 
               return (
-                <React.Fragment key={exerciseKey}>
+                <React.Fragment key={exerciseCardKey}>
                   <Animated.View
                     pointerEvents={isDeleting ? 'none' : 'auto'}
-                    style={{
-                      opacity: deleteAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 0],
-                      }),
-                      transform: [
-                        {
-                          translateY: deleteAnimation.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0, -10],
-                          }),
-                        },
-                        {
-                          scale: deleteAnimation.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 0.98],
-                          }),
-                        },
-                      ],
-                    }}
+                    style={
+                      isDeleting
+                        ? {
+                            opacity: deleteAnimation.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [1, 0],
+                            }),
+                            transform: [
+                              {
+                                translateY: deleteAnimation.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0, -10],
+                                }),
+                              },
+                              {
+                                scale: deleteAnimation.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [1, 0.98],
+                                }),
+                              },
+                            ],
+                          }
+                        : undefined
+                    }
                   >
                     <Animated.View
                       style={[
@@ -763,14 +768,12 @@ export const GymRoutineEditorScreen = () => {
                             styles.exerciseCardWarmup,
                             {
                               borderColor: '#FF9500B3',
-                              backgroundColor: 'rgba(255,149,0,0.08)',
                             },
                           ],
                           isInSuperset && [
                             styles.exerciseCardSuperset,
                             {
                               borderColor: themeColors.primary + 'B3',
-                              backgroundColor: themeColors.primary + '10',
                             },
                           ],
                         ]}
@@ -791,11 +794,6 @@ export const GymRoutineEditorScreen = () => {
                               <Text style={[styles.exerciseName, dynamicStyles.title]}>
                                 {getExerciseDisplayName(item.exercise)}
                               </Text>
-                              {isWarmupExercise && (
-                                <View style={styles.warmupExerciseBadge}>
-                                  <Text style={styles.warmupExerciseBadgeText}>{t('training.warmup')}</Text>
-                                </View>
-                              )}
                             </View>
                             <View style={styles.actionButtonsRow}>
                               <View style={styles.moveButtons}>
@@ -1218,21 +1216,6 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  warmupExerciseBadge: {
-    marginLeft: spacing.s,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,149,0,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,149,0,0.45)',
-  },
-  warmupExerciseBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FF9500',
-    textTransform: 'uppercase',
   },
   warmupExerciseToggle: {
     borderRadius: 999,

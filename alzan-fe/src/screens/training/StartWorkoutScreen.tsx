@@ -15,7 +15,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../i18n/dateLocale';
-import { getLocalizedExerciseDescription, getLocalizedExerciseName } from '../../services/localization';
+import {
+  getCurrentAppLocale,
+  getLocalizedExerciseDescription,
+  getLocalizedExerciseName,
+} from '../../services/localization';
 import { Exercise, WorkoutTemplate, WorkoutTemplateExercise } from '../../types/requests.types';
 
 interface TemplateExerciseRow extends WorkoutTemplateExercise {
@@ -46,6 +50,7 @@ interface WorkoutTemplateWithExercises extends WorkoutTemplate {
 
 export const StartWorkoutScreen = () => {
   const { t } = useTranslation();
+  const languageCode = getCurrentAppLocale();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'StartWorkout'>>();
@@ -68,7 +73,7 @@ export const StartWorkoutScreen = () => {
 
   useEffect(() => {
     fetchTemplate();
-  }, [templateId]);
+  }, [templateId, languageCode]);
 
   const fetchTemplate = async (): Promise<WorkoutTemplateWithExercises | null> => {
     setIsLoading(true);
@@ -98,8 +103,8 @@ export const StartWorkoutScreen = () => {
               exercise: item.exercise
                 ? {
                     ...item.exercise,
-                    base_name: getLocalizedExerciseName(item.exercise),
-                    description: getLocalizedExerciseDescription(item.exercise),
+                    base_name: getLocalizedExerciseName(item.exercise, languageCode),
+                    description: getLocalizedExerciseDescription(item.exercise, languageCode),
                   }
                 : null,
             })),

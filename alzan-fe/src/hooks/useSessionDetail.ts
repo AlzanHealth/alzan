@@ -67,7 +67,9 @@ export const useSessionDetail = (sessionId?: string) => {
           const exerciseId = set.exercise_id;
           if (!acc[exerciseId]) {
             const exerciseData = set.exercise;
-            const exerciseName = exerciseData ? getLocalizedExerciseName(exerciseData) : 'Unknown Exercise';
+            const exerciseName = exerciseData
+              ? getLocalizedExerciseName(exerciseData, languageCode)
+              : 'Unknown Exercise';
 
             acc[exerciseId] = {
               exercise_id: exerciseId,

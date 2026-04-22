@@ -11,13 +11,17 @@ import {
 import { getFoodNutritionById, warmNutritionApiHeaders } from '../../../services/nutritionApi';
 import { FoodSearchResult, MealComponent } from '../types/ingredients';
 import {
+  buildTokenIlikeClauses,
   buildLooseIlikePattern,
+  getCurrentAppLocale,
   getLocalizedIngredientName,
   getLocalizedIngredientNotes,
   getLocalizedRecipeDescription,
   getLocalizedRecipeName,
+  getSearchRelevanceScore,
   matchesLoosely,
 } from '../../../services/localization';
+import { Locale } from '../../../i18n';
 
 interface RecipeSearchRow {
   id: string;
@@ -53,6 +57,7 @@ export type RecipeLibrarySourceFilter = 'all' | 'users' | 'system';
 export type RecipeSearchScope = 'source' | 'all' | 'users' | 'saved' | 'favorites';
 
 interface SearchMealByNameOptions {
+  locale?: Locale;
   recipeScope?: RecipeSearchScope;
   currentUserId?: string | null;
   favoriteRecipeIds?: string[];
@@ -211,13 +216,19 @@ async function fetchDiscoveryRecipes(
  * Search for ingredients with filters (category, letter, text)
  * Used by IngredientSearchPanel - includes ALL ingredient categories
  */
-export async function searchFoodsWithFilters(filters: IngredientSearchFilters): Promise<MealComponent[]> {
+export async function searchFoodsWithFilters(
+  filters: IngredientSearchFilters,
+  locale?: Locale,
+  options?: { maxResults?: number },
+): Promise<MealComponent[]> {
+  const languageCode = locale ?? getCurrentAppLocale();
+  const maxResults = options?.maxResults ?? 10;
   try {
-    const ingredients = await searchIngredientsWithFilters(filters);
+    const ingredients = await searchIngredientsWithFilters(filters, languageCode, maxResults);
 
     return ingredients.map(ing => ({
       id: `ingredient_${ing.id}`,
-      name: getLocalizedIngredientName(ing),
+      name: getLocalizedIngredientName(ing, languageCode),
       source: 'database' as const,
       external_id: ing.id,
       category: ing.category,
@@ -232,7 +243,7 @@ export async function searchFoodsWithFilters(filters: IngredientSearchFilters): 
       sodium_mg_100: ing.sodium_mg_100,
       salt_g_100: ing.salt_g_100,
       quality_score: ing.quality_score,
-      notes: getLocalizedIngredientNotes(ing) ?? undefined,
+      notes: getLocalizedIngredientNotes(ing, languageCode) ?? undefined,
       source_primary: ing.source_primary,
       source_secondary: ing.source_secondary,
     }));
@@ -247,10 +258,13 @@ export async function searchFoodsWithFilters(filters: IngredientSearchFilters): 
  * Used by MealLogFormScreen meal name input
  */
 export async function searchMealByName(query: string, options: SearchMealByNameOptions = {}): Promise<MealComponent[]> {
+  const languageCode = options.locale ?? getCurrentAppLocale();
   if (!query || query.length < 2) return [];
 
   const normQuery = normalizeInput(query);
   const likePattern = buildLooseIlikePattern(query);
+  const recipeTokenClauses = buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
+  const ingredientTokenClauses = buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
   const results: MealComponent[] = [];
   const recipeScope = options.recipeScope ?? 'source';
   const currentUserId = options.currentUserId ?? null;
@@ -263,7 +277,16 @@ export async function searchMealByName(query: string, options: SearchMealByNameO
       .from('recipes')
       .select(RECIPES_SELECT_FIELDS)
       .is('deleted_at', null)
-      .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`);
+      .or(
+        Array.from(
+          new Set([
+            `name_norm_es.ilike.%${normQuery}%`,
+            `name_es.ilike.%${likePattern}%`,
+            `name_en.ilike.%${likePattern}%`,
+            ...recipeTokenClauses,
+          ]),
+        ).join(','),
+      );
 
     if (recipeScope === 'source') {
       recipesQuery = recipesQuery.eq('source', 'system');
@@ -329,7 +352,16 @@ export async function searchMealByName(query: string, options: SearchMealByNameO
         `,
       )
       .eq('category', 'precocinado')
-      .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`)
+      .or(
+        Array.from(
+          new Set([
+            `name_norm_es.ilike.%${normQuery}%`,
+            `name_es.ilike.%${likePattern}%`,
+            `name_en.ilike.%${likePattern}%`,
+            ...ingredientTokenClauses,
+          ]),
+        ).join(','),
+      )
       .order('quality_score', { ascending: false })
       .limit(15)
       .returns<IngredientSearchRow[]>();
@@ -340,7 +372,7 @@ export async function searchMealByName(query: string, options: SearchMealByNameO
         .forEach(ing => {
           results.push({
             id: `ingredient_${ing.id}`,
-            name: getLocalizedIngredientName(ing),
+            name: getLocalizedIngredientName(ing, languageCode),
             source: 'database',
             external_id: ing.id,
             itemType: 'ingredient',
@@ -348,7 +380,7 @@ export async function searchMealByName(query: string, options: SearchMealByNameO
             quality_score: ing.quality_score,
             source_primary: ing.source_primary,
             source_secondary: ing.source_secondary,
-            notes: getLocalizedIngredientNotes(ing) ?? undefined,
+            notes: getLocalizedIngredientNotes(ing, languageCode) ?? undefined,
             kcal_100: Math.round(ing.kcal_100 || 0),
             protein_g_100: roundToOneDecimal(ing.protein_g_100 || 0),
             carbs_g_100: roundToOneDecimal(ing.carbs_g_100 || 0),
@@ -362,19 +394,15 @@ export async function searchMealByName(query: string, options: SearchMealByNameO
 
   // Sort: starts-with first, then recipe popularity/quality
   results.sort((a, b) => {
-    const aNorm = normalizeInput(a.name);
-    const bNorm = normalizeInput(b.name);
-    const startA = aNorm.startsWith(normQuery);
-    const startB = bNorm.startsWith(normQuery);
+    const scoreA = getSearchRelevanceScore(query, a.name, a.description ?? null);
+    const scoreB = getSearchRelevanceScore(query, b.name, b.description ?? null);
 
-    if (startA && !startB) return -1;
-    if (!startA && startB) return 1;
+    if (scoreA !== scoreB) return scoreB - scoreA;
 
     if (a.itemType === 'recipe' && b.itemType === 'recipe') {
       const popularityDiff = (b.recipe_popularity_score || 0) - (a.recipe_popularity_score || 0);
       if (popularityDiff !== 0) return popularityDiff;
     }
-
     return (b.quality_score || 0) - (a.quality_score || 0);
   });
 
