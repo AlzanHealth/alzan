@@ -27,6 +27,8 @@ interface RecipeSearchRow {
   description_es: string | null;
   description_en: string | null;
   quality_score: number;
+  source: 'system' | 'user';
+  owner_user_id: string | null;
 }
 
 interface IngredientSearchRow extends DbIngredient {
@@ -42,6 +44,20 @@ interface RecipeMacroItemRow {
     carbs_g_100: number | null;
     fat_g_100: number | null;
   } | null;
+}
+
+export type RecipeLibrarySourceFilter = 'all' | 'users' | 'system';
+
+interface RecipeLibraryPageParams {
+  query: string;
+  sourceFilter: RecipeLibrarySourceFilter;
+  page: number;
+  pageSize: number;
+}
+
+interface RecipeLibraryPageResult {
+  recipes: MealComponent[];
+  total: number;
 }
 
 async function mapRecipeToMealComponent(recipe: RecipeSearchRow): Promise<MealComponent> {
@@ -91,6 +107,8 @@ async function mapRecipeToMealComponent(recipe: RecipeSearchRow): Promise<MealCo
     external_id: recipe.id,
     itemType: 'recipe',
     quality_score: recipe.quality_score,
+    recipe_source: recipe.source,
+    recipe_owner_user_id: recipe.owner_user_id,
     kcal_100: Math.round(totalKcal * factor),
     protein_g_100: Math.round(totalProtein * factor * 10) / 10,
     carbs_g_100: Math.round(totalCarbs * factor * 10) / 10,
@@ -156,7 +174,9 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
                 name_norm_es,
                 description_es,
                 description_en,
-                quality_score
+                quality_score,
+                source,
+                owner_user_id
             `,
       )
       .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`)
@@ -266,7 +286,9 @@ export async function getFeaturedRecipes(limit = 12): Promise<MealComponent[]> {
           name_norm_es,
           description_es,
           description_en,
-          quality_score
+          quality_score,
+          source,
+          owner_user_id
         `,
       )
       .order('quality_score', { ascending: false })
@@ -285,6 +307,70 @@ export async function getFeaturedRecipes(limit = 12): Promise<MealComponent[]> {
   } catch (error) {
     console.error('[nutritionSearchService] Featured recipe fetch error:', error);
     return [];
+  }
+}
+
+export async function getRecipeLibraryPage({
+  query,
+  sourceFilter,
+  page,
+  pageSize,
+}: RecipeLibraryPageParams): Promise<RecipeLibraryPageResult> {
+  try {
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, pageSize);
+    const from = (safePage - 1) * safePageSize;
+    const to = from + safePageSize - 1;
+    const trimmedQuery = query.trim();
+    const normQuery = normalizeInput(trimmedQuery);
+    const likePattern = buildLooseIlikePattern(trimmedQuery);
+
+    let recipesQuery = supabase.from('recipes').select(
+      `
+        id,
+        name_es,
+        name_en,
+        name_norm_es,
+        description_es,
+        description_en,
+        quality_score,
+        source,
+        owner_user_id
+      `,
+      { count: 'exact' },
+    );
+
+    if (sourceFilter === 'users') {
+      recipesQuery = recipesQuery.eq('source', 'user').eq('visibility', 'public');
+    } else if (sourceFilter === 'system') {
+      recipesQuery = recipesQuery.eq('source', 'system');
+    }
+
+    if (trimmedQuery.length >= 2) {
+      recipesQuery = recipesQuery.or(
+        `name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`,
+      );
+    }
+
+    const { data: recipes, error, count } = await recipesQuery
+      .order('quality_score', { ascending: false })
+      .range(from, to)
+      .returns<RecipeSearchRow[]>();
+
+    if (error || !recipes) {
+      return { recipes: [], total: 0 };
+    }
+
+    const mappedRecipes: MealComponent[] = [];
+    for (const recipe of recipes) {
+      const mappedRecipe = await mapRecipeToMealComponent(recipe);
+      mappedRecipes.push(mappedRecipe);
+    }
+
+    return { recipes: mappedRecipes, total: count ?? 0 };
+  } catch (error) {
+    console.error('[nutritionSearchService] Recipe library page fetch error:', error);
+    return { recipes: [], total: 0 };
   }
 }
 
@@ -351,6 +437,7 @@ export async function fetchByBarcode(barcode: string): Promise<FoodSearchResult 
 export const nutritionSearchService = {
   searchFoodsWithFilters,
   searchMealByName,
+  getRecipeLibraryPage,
   fetchByBarcode,
   warmBarcodeLookup,
 };
