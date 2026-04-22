@@ -31,7 +31,7 @@ import {
 } from '../../modules/nutrition/services/dietCopyService';
 import { generateDietPDF } from '../../modules/nutrition/services/pdfExportService';
 import type { WebExportWindow } from '../../modules/nutrition/services/pdfExportService';
-import { NutritionSettingsJson } from '../../types/userPreferences.types';
+import { NutritionSettingsJson, RecipeSearchScope } from '../../types/userPreferences.types';
 import { BlurView } from 'expo-blur';
 import { LiquidGlassNativeCard } from '../../components/common/LiquidGlassNativeCard';
 import { MealType } from '../../types/requests.types';
@@ -170,6 +170,7 @@ export const NutritionSettingsScreen = () => {
   const defaultRecipeVisibility: RecipeDefaultVisibility =
     preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
   const recipesArePublicByDefault = defaultRecipeVisibility === 'public';
+  const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
 
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
@@ -400,6 +401,11 @@ export const NutritionSettingsScreen = () => {
   const setDisplayOption = (option: 'per_meal' | 'daily_total') => {
     console.log(`[NutritionSettings] Set display option: ${option}`);
     updateNutritionPrefs({ macro_display: option });
+  };
+
+  const setRecipeSearchScope = (scope: RecipeSearchScope) => {
+    if (scope === recipeSearchScope) return;
+    updateNutritionPrefs({ recipe_search_scope: scope });
   };
 
   // Export action
@@ -763,7 +769,50 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 5. Auto-copy diet */}
+          {/* 5. Recipe search scope */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
+              {t('nutrition.recipeSearchScopeTitle')}
+            </Text>
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeSourceLabel')}
+                description={t('nutrition.recipeSearchScopeSourceHint')}
+                selected={recipeSearchScope === 'source'}
+                onSelect={() => setRecipeSearchScope('source')}
+              />
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeAllLabel')}
+                description={t('nutrition.recipeSearchScopeAllHint')}
+                selected={recipeSearchScope === 'all'}
+                onSelect={() => setRecipeSearchScope('all')}
+              />
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeUsersLabel')}
+                description={t('nutrition.recipeSearchScopeUsersHint')}
+                selected={recipeSearchScope === 'users'}
+                onSelect={() => setRecipeSearchScope('users')}
+              />
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeSavedLabel')}
+                description={t('nutrition.recipeSearchScopeSavedHint')}
+                selected={recipeSearchScope === 'saved'}
+                onSelect={() => setRecipeSearchScope('saved')}
+              />
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeFavoritesLabel')}
+                description={t('nutrition.recipeSearchScopeFavoritesHint')}
+                selected={recipeSearchScope === 'favorites'}
+                onSelect={() => setRecipeSearchScope('favorites')}
+              />
+            </View>
+          </View>
+
+          {/* 6. Auto-copy diet */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
               {t('nutrition.autoPlanningTitle')}

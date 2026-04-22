@@ -47,6 +47,13 @@ interface RecipeMacroItemRow {
 }
 
 export type RecipeLibrarySourceFilter = 'all' | 'users' | 'system';
+export type RecipeSearchScope = 'source' | 'all' | 'users' | 'saved' | 'favorites';
+
+interface SearchMealByNameOptions {
+  recipeScope?: RecipeSearchScope;
+  currentUserId?: string | null;
+  favoriteRecipeIds?: string[];
+}
 
 interface RecipeLibraryPageParams {
   query: string;
@@ -155,16 +162,20 @@ export async function searchFoodsWithFilters(filters: IngredientSearchFilters): 
  * Search for meals by name - searches BOTH recipes and precooked ingredients
  * Used by MealLogFormScreen meal name input
  */
-export async function searchMealByName(query: string): Promise<MealComponent[]> {
+export async function searchMealByName(query: string, options: SearchMealByNameOptions = {}): Promise<MealComponent[]> {
   if (!query || query.length < 2) return [];
 
   const normQuery = normalizeInput(query);
   const likePattern = buildLooseIlikePattern(query);
   const results: MealComponent[] = [];
+  const recipeScope = options.recipeScope ?? 'source';
+  const currentUserId = options.currentUserId ?? null;
+  const favoriteRecipeIds = options.favoriteRecipeIds ?? [];
 
   // ===== 1. SEARCH RECIPES (partial match) =====
   try {
-    const { data: recipes, error } = await supabase
+    let shouldSearchRecipes = true;
+    let recipesQuery = supabase
       .from('recipes')
       .select(
         `
@@ -179,19 +190,41 @@ export async function searchMealByName(query: string): Promise<MealComponent[]> 
                 owner_user_id
             `,
       )
-      .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`)
-      .order('quality_score', { ascending: false })
-      .limit(15)
-      .returns<RecipeSearchRow[]>();
+      .or(`name_norm_es.ilike.%${normQuery}%,name_es.ilike.%${likePattern}%,name_en.ilike.%${likePattern}%`);
 
-    if (!error && recipes) {
-      const filteredRecipes = recipes.filter(recipe =>
-        matchesLoosely(query, recipe.name_es, recipe.name_en, recipe.description_es, recipe.description_en),
-      );
+    if (recipeScope === 'source') {
+      recipesQuery = recipesQuery.eq('source', 'system');
+    } else if (recipeScope === 'users') {
+      recipesQuery = recipesQuery.eq('source', 'user').eq('visibility', 'public');
+    } else if (recipeScope === 'saved') {
+      if (!currentUserId) {
+        shouldSearchRecipes = false;
+      } else {
+        recipesQuery = recipesQuery.eq('owner_user_id', currentUserId).eq('source', 'user').is('deleted_at', null);
+      }
+    } else if (recipeScope === 'favorites') {
+      if (favoriteRecipeIds.length === 0) {
+        shouldSearchRecipes = false;
+      } else {
+        recipesQuery = recipesQuery.in('id', favoriteRecipeIds);
+      }
+    }
 
-      for (const recipe of filteredRecipes) {
-        const mappedRecipe = await mapRecipeToMealComponent(recipe);
-        results.push(mappedRecipe);
+    if (shouldSearchRecipes) {
+      const { data: recipes, error } = await recipesQuery
+        .order('quality_score', { ascending: false })
+        .limit(15)
+        .returns<RecipeSearchRow[]>();
+
+      if (!error && recipes) {
+        const filteredRecipes = recipes.filter(recipe =>
+          matchesLoosely(query, recipe.name_es, recipe.name_en, recipe.description_es, recipe.description_en),
+        );
+
+        for (const recipe of filteredRecipes) {
+          const mappedRecipe = await mapRecipeToMealComponent(recipe);
+          results.push(mappedRecipe);
+        }
       }
     }
   } catch (err) {

@@ -44,6 +44,7 @@ import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 import { supabase } from '../../lib/supabaseClient';
 import { getLocalizedIngredientName } from '../../services/localization';
 import { usePreferences } from '../../hooks/settings/usePreferences';
+import { RecipeSearchScope } from '../../types/userPreferences.types';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 
@@ -116,6 +117,7 @@ export const MealLogFormScreen = () => {
   const date = params.date || format(new Date(), 'yyyy-MM-dd');
   const defaultRecipeVisibility =
     preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
+  const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
 
   // Dynamic bottom padding calculation
   // MacrosSummaryCard height estimate: ~120px content + padding
@@ -470,7 +472,12 @@ export const MealLogFormScreen = () => {
     setMealSearchResults([]);
 
     try {
-      const results = await searchMealByName(name);
+      const currentUserId = await getCurrentUserId();
+      const results = await searchMealByName(name, {
+        recipeScope: recipeSearchScope,
+        currentUserId,
+        favoriteRecipeIds,
+      });
       console.log('[MealLogForm] Search results:', results.length);
 
       if (results.length > 0) {
