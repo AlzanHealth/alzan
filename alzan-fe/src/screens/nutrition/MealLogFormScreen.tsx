@@ -53,7 +53,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchByBarcode } from '../../modules/nutrition/services/nutritionSearchService';
 import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 import { supabase } from '../../lib/supabaseClient';
-import { getLocalizedIngredientName } from '../../services/localization';
+import { getLocalizedIngredientName, getLocalizedRecipeDescription, getLocalizedRecipeName } from '../../services/localization';
 import { usePreferences } from '../../hooks/settings/usePreferences';
 import { RecipeSearchScope } from '../../types/userPreferences.types';
 
@@ -65,6 +65,7 @@ type BuilderWindow = 'ingredients' | 'recipes';
 type RecipeLibraryView = 'normal' | 'favorites' | 'search';
 type RecipeOriginFilter = 'all' | 'users' | 'system';
 const RECIPE_LIBRARY_PAGE_SIZE = 10;
+const RECIPE_LIBRARY_SAVED_PAGE_SIZE = 10;
 const MEAL_RECIPE_PAGE_SIZE = 5;
 
 interface SavedRecipeDraft {
@@ -110,6 +111,27 @@ interface SavedRecipeItemRow {
 
 interface RecipeFavoriteRow {
   recipe_id: string;
+}
+
+interface FavoriteRecipeLibraryRow {
+  id: string;
+  name_es: string;
+  name_en: string | null;
+  description_es: string | null;
+  description_en: string | null;
+  source: 'system' | 'user';
+  owner_user_id: string | null;
+  visibility: 'private' | 'public';
+  kcal_100: number | null;
+  protein_g_100: number | null;
+  carbs_g_100: number | null;
+  fat_g_100: number | null;
+  popularity_score: number | null;
+  favorites_total: number | null;
+  saves_total: number | null;
+  uses_7d: number | null;
+  uses_30d: number | null;
+  uses_total: number | null;
 }
 
 interface EditableRecipeSignature {
@@ -179,6 +201,7 @@ export const MealLogFormScreen = () => {
   const [isBarcodeLookupPending, setIsBarcodeLookupPending] = useState(false);
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipeDraft[]>([]);
   const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<string[]>([]);
+  const [favoriteLibraryRecipes, setFavoriteLibraryRecipes] = useState<MealComponent[]>([]);
   const [trendingRecipes, setTrendingRecipes] = useState<MealComponent[]>([]);
   const [mostUsedRecipes, setMostUsedRecipes] = useState<MealComponent[]>([]);
   const [topHistoricalRecipes, setTopHistoricalRecipes] = useState<MealComponent[]>([]);
@@ -190,6 +213,7 @@ export const MealLogFormScreen = () => {
   const [isRecipeLibrarySearching, setIsRecipeLibrarySearching] = useState(false);
   const [recipeLibrarySearchPage, setRecipeLibrarySearchPage] = useState(1);
   const [recipeLibrarySearchTotal, setRecipeLibrarySearchTotal] = useState(0);
+  const [recipeLibrarySavedPage, setRecipeLibrarySavedPage] = useState(1);
   const [recipeLibraryReloadToken, setRecipeLibraryReloadToken] = useState(0);
   const [editingSavedRecipeId, setEditingSavedRecipeId] = useState<string | null>(null);
   const [editingSavedRecipeUpdatedAt, setEditingSavedRecipeUpdatedAt] = useState<string | null>(null);
@@ -319,15 +343,20 @@ export const MealLogFormScreen = () => {
     [favoriteSavedRecipes, recipeLibraryView, savedRecipes, recipeLibraryOriginFilter],
   );
 
+  const displayedFavoriteLibraryRecipes = useMemo(
+    () => favoriteLibraryRecipes.filter(recipe => sourceMatchesOriginFilter(recipe.recipe_source)),
+    [favoriteLibraryRecipes, recipeLibraryOriginFilter],
+  );
+
   const filterDiscoverySection = (recipes: MealComponent[]): MealComponent[] => {
     const filteredByScope = recipes.filter(recipe => sourceMatchesOriginFilter(recipe.recipe_source));
     if (recipeLibraryView !== 'favorites') {
       return filteredByScope;
     }
 
-    return filteredByScope.filter(recipe =>
-      Boolean(recipe.external_id && favoriteRecipeIds.includes(recipe.external_id)),
-    );
+    return filteredByScope
+      .filter(recipe => Boolean(recipe.external_id && favoriteRecipeIds.includes(recipe.external_id)))
+      .sort((a, b) => (b.recipe_popularity_score || 0) - (a.recipe_popularity_score || 0));
   };
 
   const displayedTrendingRecipes = useMemo(
@@ -344,6 +373,30 @@ export const MealLogFormScreen = () => {
   );
 
   const filteredDisplayedSavedRecipes = displayedSavedRecipes;
+  const savedRecipesTotalPages = useMemo(() => {
+    const sourceLength = recipeLibraryView === 'favorites' ? displayedFavoriteLibraryRecipes.length : filteredDisplayedSavedRecipes.length;
+    return Math.max(1, Math.ceil(sourceLength / RECIPE_LIBRARY_SAVED_PAGE_SIZE));
+  }, [displayedFavoriteLibraryRecipes.length, filteredDisplayedSavedRecipes.length, recipeLibraryView]);
+
+  const paginatedSavedRecipes = useMemo(() => {
+    if (recipeLibraryView === 'favorites') {
+      const from = (recipeLibrarySavedPage - 1) * RECIPE_LIBRARY_SAVED_PAGE_SIZE;
+      const to = from + RECIPE_LIBRARY_SAVED_PAGE_SIZE;
+      return displayedFavoriteLibraryRecipes
+        .slice()
+        .sort((a, b) => (b.recipe_popularity_score || 0) - (a.recipe_popularity_score || 0))
+        .slice(from, to);
+    }
+
+    const from = (recipeLibrarySavedPage - 1) * RECIPE_LIBRARY_SAVED_PAGE_SIZE;
+    const to = from + RECIPE_LIBRARY_SAVED_PAGE_SIZE;
+    return filteredDisplayedSavedRecipes.slice(from, to);
+  }, [
+    displayedFavoriteLibraryRecipes,
+    filteredDisplayedSavedRecipes,
+    recipeLibrarySavedPage,
+    recipeLibraryView,
+  ]);
   const displayedRecipeLibrarySearchResults = useMemo(
     () => recipeLibrarySearchResults.filter(item => item.itemType === 'recipe'),
     [recipeLibrarySearchResults],
@@ -467,12 +520,14 @@ export const MealLogFormScreen = () => {
           loadSavedRecipesFromDb(),
           loadFavoriteRecipeIdsFromDb(),
         ]);
+        const favoriteLibrary = await loadFavoriteRecipesFromDb(favorites);
         if (isMounted) {
           setTrendingRecipes(trending);
           setMostUsedRecipes(mostUsed);
           setTopHistoricalRecipes(topHistorical);
           setSavedRecipes(saved);
           setFavoriteRecipeIds(favorites);
+          setFavoriteLibraryRecipes(favoriteLibrary);
         }
       } catch (error) {
         console.error('[MealLogForm] Error loading recipe library:', error);
@@ -501,6 +556,17 @@ export const MealLogFormScreen = () => {
       setRecipeLibrarySearchPage(1);
     }
   }, [recipeLibraryOriginFilter, recipeLibrarySearchQuery, recipeLibraryView]);
+
+  useEffect(() => {
+    if (recipeLibraryView !== 'search') {
+      setRecipeLibrarySavedPage(1);
+    }
+  }, [recipeLibraryOriginFilter, recipeLibraryView]);
+
+  useEffect(() => {
+    if (recipeLibraryView === 'search') return;
+    setRecipeLibrarySavedPage(prev => Math.min(prev, savedRecipesTotalPages));
+  }, [recipeLibraryView, savedRecipesTotalPages]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -901,6 +967,59 @@ export const MealLogFormScreen = () => {
     return data.map(row => row.recipe_id);
   };
 
+  const loadFavoriteRecipesFromDb = async (favoriteIds: string[]): Promise<MealComponent[]> => {
+    if (favoriteIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('recipes')
+      .select(
+        'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total',
+      )
+      .in('id', favoriteIds)
+      .is('deleted_at', null)
+      .returns<FavoriteRecipeLibraryRow[]>();
+
+    if (error || !data) {
+      if (error) {
+        console.error('[MealLogForm] Error loading favorite recipe library:', error);
+      }
+      return [];
+    }
+
+    const byId = new Map<string, FavoriteRecipeLibraryRow>();
+    data.forEach(row => {
+      byId.set(row.id, row);
+    });
+
+    return favoriteIds
+      .map(id => byId.get(id))
+      .filter((row): row is FavoriteRecipeLibraryRow => Boolean(row))
+      .map(row => ({
+        id: `favorite_${row.id}`,
+        external_id: row.id,
+        name: toRecipeDisplayName(getLocalizedRecipeName({ name_es: row.name_es, name_en: row.name_en })),
+        description: getLocalizedRecipeDescription({
+          description_es: row.description_es,
+          description_en: row.description_en,
+        }) ?? undefined,
+        source: 'database',
+        itemType: 'recipe',
+        recipe_source: row.source,
+        recipe_owner_user_id: row.owner_user_id,
+        recipe_visibility: row.visibility,
+        recipe_popularity_score: row.popularity_score || 0,
+        recipe_favorites_total: row.favorites_total || 0,
+        recipe_saves_total: row.saves_total || 0,
+        recipe_uses_7d: row.uses_7d || 0,
+        recipe_uses_30d: row.uses_30d || 0,
+        recipe_uses_total: row.uses_total || 0,
+        kcal_100: Math.round(row.kcal_100 || 0),
+        protein_g_100: Number((row.protein_g_100 || 0).toFixed(1)),
+        carbs_g_100: Number((row.carbs_g_100 || 0).toFixed(1)),
+        fat_g_100: Number((row.fat_g_100 || 0).toFixed(1)),
+      }));
+  };
+
   const toggleRecipeFavorite = async (recipeId?: string): Promise<void> => {
     if (!recipeId) return;
 
@@ -921,6 +1040,7 @@ export const MealLogFormScreen = () => {
       }
       const refreshedFavorites = await loadFavoriteRecipeIdsFromDb();
       setFavoriteRecipeIds(refreshedFavorites);
+      setFavoriteLibraryRecipes(await loadFavoriteRecipesFromDb(refreshedFavorites));
       await maybeRefreshRecipeAggregates(true);
       queueRecipeLibraryReload();
       return;
@@ -937,6 +1057,7 @@ export const MealLogFormScreen = () => {
     }
     const refreshedFavorites = await loadFavoriteRecipeIdsFromDb();
     setFavoriteRecipeIds(refreshedFavorites);
+    setFavoriteLibraryRecipes(await loadFavoriteRecipesFromDb(refreshedFavorites));
     await maybeRefreshRecipeAggregates(true);
     queueRecipeLibraryReload();
   };
@@ -1192,6 +1313,7 @@ export const MealLogFormScreen = () => {
     }
 
     setFavoriteRecipeIds(prev => prev.filter(id => id !== recipeId));
+    setFavoriteLibraryRecipes(prev => prev.filter(recipe => recipe.external_id !== recipeId));
     setSavedRecipes(prev => prev.filter(recipe => recipe.id !== recipeId));
     await maybeRefreshRecipeAggregates(true);
     queueRecipeLibraryReload();
@@ -1492,10 +1614,55 @@ export const MealLogFormScreen = () => {
     );
   };
 
+  const renderSavedRecipeCard = (recipe: SavedRecipeDraft, forceFavorite = false) => {
+    const isFavorite = forceFavorite || favoriteRecipeIds.includes(recipe.id);
+
+    return (
+      <View
+        key={recipe.id}
+        style={[styles.recipeLibraryCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)' }]}
+      >
+        <View style={styles.recipeLibraryCardHeader}>
+          <Text style={[styles.recipeLibraryCardTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
+            {recipe.name}
+          </Text>
+        </View>
+        <Text style={[styles.recipeLibraryMeta, { color: themeColors.textSecondary }]}>
+          {recipe.ingredients.length} {t('nutrition.ingredientsCountLabel')} ·{' '}
+          {recipe.visibility === 'public' ? t('nutrition.recipeVisibilityPublicLabel') : t('nutrition.recipeVisibilityPrivateLabel')}
+        </Text>
+        <View style={styles.recipeCardActions}>
+          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => handleUseSavedRecipe(recipe)}>
+            <Text style={[styles.recipeCardActionText, { color: themeColors.primary }]}>{t('nutrition.useRecipeAction')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => void handleShowSavedRecipeDetail(recipe)}>
+            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>{t('nutrition.viewDetailsAction')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => void handleToggleSavedRecipeVisibility(recipe)}>
+            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
+              {recipe.visibility === 'public' ? t('nutrition.unpublishRecipeAction') : t('nutrition.publishRecipeAction')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => handleEditSavedRecipe(recipe)}>
+            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>{t('common.edit')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => void handleDeleteSavedRecipe(recipe.id)}>
+            <Text style={[styles.recipeCardActionText, { color: themeColors.danger }]}>{t('common.delete')}</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.recipeFavoriteButton} onPress={() => void handleToggleSavedRecipeFavorite(recipe.id)}>
+          <Text style={[styles.recipeFavoriteText, { color: isFavorite ? '#FFD166' : themeColors.textSecondary }]}>
+            {isFavorite ? '★' : '☆'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderDiscoveryRecipeCard = (recipe: MealComponent) => {
     const isFavorite = recipe.external_id ? favoriteRecipeIds.includes(recipe.external_id) : false;
     const uses7d = Math.max(0, Math.round(recipe.recipe_uses_7d ?? 0));
-    const favoritesTotal = Math.max(0, Math.round(recipe.recipe_favorites_total ?? 0));
+    const favoritesTotal = Math.max(0, Math.round(recipe.recipe_favorites_total ?? 0), isFavorite ? 1 : 0);
     const savesTotal = Math.max(0, Math.round(recipe.recipe_saves_total ?? 0));
     const sourceLabel =
       recipe.recipe_source === 'system' ? t('nutrition.recipeOriginSystem') : t('nutrition.recipeOriginUsers');
@@ -1632,7 +1799,70 @@ export const MealLogFormScreen = () => {
         recipeMap.set(key, recipe);
       }
     });
-    return Array.from(recipeMap.values()).slice(0, 12);
+
+    const bestRecipeByExactName = new Map<string, MealComponent>();
+    Array.from(recipeMap.values()).forEach(recipe => {
+      const exactNameKey = recipe.name.trim();
+      const currentBest = bestRecipeByExactName.get(exactNameKey);
+
+      if (!currentBest) {
+        bestRecipeByExactName.set(exactNameKey, recipe);
+        return;
+      }
+
+      const recipeFavorites = recipe.recipe_favorites_total ?? 0;
+      const currentBestFavorites = currentBest.recipe_favorites_total ?? 0;
+
+      if (recipeFavorites > currentBestFavorites) {
+        bestRecipeByExactName.set(exactNameKey, recipe);
+        return;
+      }
+
+      if (recipeFavorites === currentBestFavorites) {
+        const recipeSaves = recipe.recipe_saves_total ?? 0;
+        const currentBestSaves = currentBest.recipe_saves_total ?? 0;
+
+        if (recipeSaves > currentBestSaves) {
+          bestRecipeByExactName.set(exactNameKey, recipe);
+          return;
+        }
+
+        if (recipeSaves < currentBestSaves) {
+          return;
+        }
+
+        const recipeUsageScore =
+          (recipe.recipe_uses_30d ?? 0) * 1000 + (recipe.recipe_uses_7d ?? 0) * 100 + (recipe.recipe_uses_total ?? 0);
+        const currentBestUsageScore =
+          (currentBest.recipe_uses_30d ?? 0) * 1000 +
+          (currentBest.recipe_uses_7d ?? 0) * 100 +
+          (currentBest.recipe_uses_total ?? 0);
+
+        if (recipeUsageScore > currentBestUsageScore) {
+          bestRecipeByExactName.set(exactNameKey, recipe);
+          return;
+        }
+
+        if (recipeUsageScore < currentBestUsageScore) {
+          return;
+        }
+
+        const recipeIsSystem = recipe.recipe_source === 'system';
+        const currentBestIsSystem = currentBest.recipe_source === 'system';
+        if (recipeIsSystem && !currentBestIsSystem) {
+          bestRecipeByExactName.set(exactNameKey, recipe);
+          return;
+        }
+
+        const recipePopularity = recipe.recipe_popularity_score ?? 0;
+        const currentBestPopularity = currentBest.recipe_popularity_score ?? 0;
+        if (recipePopularity > currentBestPopularity) {
+          bestRecipeByExactName.set(exactNameKey, recipe);
+        }
+      }
+    });
+
+    return Array.from(bestRecipeByExactName.values()).slice(0, 12);
   }, [displayedMostUsedRecipes, displayedTopHistoricalRecipes, displayedTrendingRecipes]);
 
   const displayedDiscoverySections = useMemo(() => {
@@ -2722,7 +2952,9 @@ export const MealLogFormScreen = () => {
                   </Text>
                 )}
                 {recipeLibraryView !== 'search' &&
-                  (filteredDisplayedSavedRecipes.length === 0 ? (
+                  ((recipeLibraryView === 'favorites'
+                    ? paginatedSavedRecipes.length === 0
+                    : filteredDisplayedSavedRecipes.length === 0) ? (
                     <View
                       style={[
                         styles.recipeEmptyState,
@@ -2738,174 +2970,27 @@ export const MealLogFormScreen = () => {
                     </View>
                   ) : (
                     <>
-                      {filteredDisplayedSavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) &&
-                        recipeLibraryView === 'normal' && (
-                          <View style={styles.recipeSubsection}>
-                            <Text style={[styles.recipeSubsectionTitle, { color: themeColors.textSecondary }]}>
-                              {t('nutrition.favoriteRecipesLabel')}
-                            </Text>
-                            {filteredDisplayedSavedRecipes
-                              .filter(recipe => favoriteRecipeIds.includes(recipe.id))
-                              .map(recipe => (
-                                <View
-                                  key={recipe.id}
-                                  style={[
-                                    styles.recipeLibraryCard,
-                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)' },
-                                  ]}
-                                >
-                                  <View style={styles.recipeLibraryCardHeader}>
-                                    <Text
-                                      style={[styles.recipeLibraryCardTitle, { color: themeColors.textPrimary }]}
-                                      numberOfLines={1}
-                                    >
-                                      {recipe.name}
-                                    </Text>
-                                  </View>
-                                  <Text style={[styles.recipeLibraryMeta, { color: themeColors.textSecondary }]}>
-                                    {recipe.ingredients.length} {t('nutrition.ingredientsCountLabel')} ·{' '}
-                                    {recipe.visibility === 'public'
-                                      ? t('nutrition.recipeVisibilityPublicLabel')
-                                      : t('nutrition.recipeVisibilityPrivateLabel')}
-                                  </Text>
-                                  <View style={styles.recipeCardActions}>
-                                    <TouchableOpacity
-                                      style={styles.recipeCardActionBtn}
-                                      onPress={() => handleUseSavedRecipe(recipe)}
-                                    >
-                                      <Text style={[styles.recipeCardActionText, { color: themeColors.primary }]}>
-                                        {t('nutrition.useRecipeAction')}
-                                      </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      style={styles.recipeCardActionBtn}
-                                      onPress={() => void handleShowSavedRecipeDetail(recipe)}
-                                    >
-                                      <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-                                        {t('nutrition.viewDetailsAction')}
-                                      </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      style={styles.recipeCardActionBtn}
-                                      onPress={() => void handleToggleSavedRecipeVisibility(recipe)}
-                                    >
-                                      <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-                                        {recipe.visibility === 'public'
-                                          ? t('nutrition.unpublishRecipeAction')
-                                          : t('nutrition.publishRecipeAction')}
-                                      </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      style={styles.recipeCardActionBtn}
-                                      onPress={() => handleEditSavedRecipe(recipe)}
-                                    >
-                                      <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-                                        {t('common.edit')}
-                                      </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      style={styles.recipeCardActionBtn}
-                                      onPress={() => void handleDeleteSavedRecipe(recipe.id)}
-                                    >
-                                      <Text style={[styles.recipeCardActionText, { color: themeColors.danger }]}>
-                                        {t('common.delete')}
-                                      </Text>
-                                    </TouchableOpacity>
-                                  </View>
-                                  <TouchableOpacity
-                                    style={styles.recipeFavoriteButton}
-                                    onPress={() => void handleToggleSavedRecipeFavorite(recipe.id)}
-                                  >
-                                    <Text style={[styles.recipeFavoriteText, { color: '#FFD166' }]}>★</Text>
-                                  </TouchableOpacity>
-                                </View>
-                              ))}
-                          </View>
-                        )}
+                      {recipeLibraryView === 'favorites' ? (
+                        <View style={styles.recipeSubsection}>{paginatedSavedRecipes.map(renderPublicRecipeCard)}</View>
+                      ) : (
+                        <>
+                          {paginatedSavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) && (
+                            <View style={styles.recipeSubsection}>
+                              <Text style={[styles.recipeSubsectionTitle, { color: themeColors.textSecondary }]}>
+                                {t('nutrition.favoriteRecipesLabel')}
+                              </Text>
+                              {paginatedSavedRecipes
+                                .filter(recipe => favoriteRecipeIds.includes(recipe.id))
+                                .map(recipe => renderSavedRecipeCard(recipe, true))}
+                            </View>
+                          )}
 
-                      {filteredDisplayedSavedRecipes.length > 0 && (
-                        <View style={styles.recipeSubsection}>
-                          {filteredDisplayedSavedRecipes
-                            .filter(
-                              recipe => recipeLibraryView === 'favorites' || !favoriteRecipeIds.includes(recipe.id),
-                            )
-                            .map(recipe => (
-                              <View
-                                key={recipe.id}
-                                style={[
-                                  styles.recipeLibraryCard,
-                                  { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)' },
-                                ]}
-                              >
-                                <View style={styles.recipeLibraryCardHeader}>
-                                  <Text
-                                    style={[styles.recipeLibraryCardTitle, { color: themeColors.textPrimary }]}
-                                    numberOfLines={1}
-                                  >
-                                    {recipe.name}
-                                  </Text>
-                                </View>
-                                <Text style={[styles.recipeLibraryMeta, { color: themeColors.textSecondary }]}>
-                                  {recipe.ingredients.length} {t('nutrition.ingredientsCountLabel')} ·{' '}
-                                  {recipe.visibility === 'public'
-                                    ? t('nutrition.recipeVisibilityPublicLabel')
-                                    : t('nutrition.recipeVisibilityPrivateLabel')}
-                                </Text>
-                                <View style={styles.recipeCardActions}>
-                                  <TouchableOpacity
-                                    style={styles.recipeCardActionBtn}
-                                    onPress={() => handleUseSavedRecipe(recipe)}
-                                  >
-                                    <Text style={[styles.recipeCardActionText, { color: themeColors.primary }]}>
-                                      {t('nutrition.useRecipeAction')}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={styles.recipeCardActionBtn}
-                                    onPress={() => void handleShowSavedRecipeDetail(recipe)}
-                                  >
-                                    <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-                                      {t('nutrition.viewDetailsAction')}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={styles.recipeCardActionBtn}
-                                    onPress={() => void handleToggleSavedRecipeVisibility(recipe)}
-                                  >
-                                    <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-                                      {recipe.visibility === 'public'
-                                        ? t('nutrition.unpublishRecipeAction')
-                                        : t('nutrition.publishRecipeAction')}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={styles.recipeCardActionBtn}
-                                    onPress={() => handleEditSavedRecipe(recipe)}
-                                  >
-                                    <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-                                      {t('common.edit')}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={styles.recipeCardActionBtn}
-                                    onPress={() => void handleDeleteSavedRecipe(recipe.id)}
-                                  >
-                                    <Text style={[styles.recipeCardActionText, { color: themeColors.danger }]}>
-                                      {t('common.delete')}
-                                    </Text>
-                                  </TouchableOpacity>
-                                </View>
-                                <TouchableOpacity
-                                  style={styles.recipeFavoriteButton}
-                                  onPress={() => void handleToggleSavedRecipeFavorite(recipe.id)}
-                                >
-                                  <Text style={[styles.recipeFavoriteText, { color: themeColors.textSecondary }]}>
-                                    ☆
-                                  </Text>
-                                </TouchableOpacity>
-                              </View>
-                            ))}
-                        </View>
+                          <View style={styles.recipeSubsection}>
+                            {paginatedSavedRecipes
+                              .filter(recipe => !favoriteRecipeIds.includes(recipe.id))
+                              .map(recipe => renderSavedRecipeCard(recipe))}
+                          </View>
+                        </>
                       )}
                     </>
                   ))}
@@ -2980,6 +3065,59 @@ export const MealLogFormScreen = () => {
                       })
                     )}
                   </>
+                )}
+                {recipeLibraryView !== 'search' && savedRecipesTotalPages > 1 && (
+                  <View style={styles.recipePaginationRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.recipePaginationButton,
+                        recipeLibrarySavedPage === 1 && styles.recipePaginationButtonDisabled,
+                        { borderColor: themeColors.border },
+                      ]}
+                      onPress={() => setRecipeLibrarySavedPage(prev => Math.max(1, prev - 1))}
+                      disabled={recipeLibrarySavedPage === 1}
+                    >
+                      <Text
+                        style={[
+                          styles.recipePaginationButtonText,
+                          {
+                            color: recipeLibrarySavedPage === 1 ? themeColors.textSecondary : themeColors.textPrimary,
+                          },
+                        ]}
+                      >
+                        {t('nutrition.recipeLibraryPagePrev')}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.recipePaginationLabel, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.recipeLibraryPageIndicator', {
+                        current: recipeLibrarySavedPage,
+                        total: savedRecipesTotalPages,
+                      })}
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.recipePaginationButton,
+                        recipeLibrarySavedPage >= savedRecipesTotalPages && styles.recipePaginationButtonDisabled,
+                        { borderColor: themeColors.border },
+                      ]}
+                      onPress={() => setRecipeLibrarySavedPage(prev => Math.min(savedRecipesTotalPages, prev + 1))}
+                      disabled={recipeLibrarySavedPage >= savedRecipesTotalPages}
+                    >
+                      <Text
+                        style={[
+                          styles.recipePaginationButtonText,
+                          {
+                            color:
+                              recipeLibrarySavedPage >= savedRecipesTotalPages
+                                ? themeColors.textSecondary
+                                : themeColors.textPrimary,
+                          },
+                        ]}
+                      >
+                        {t('nutrition.recipeLibraryPageNext')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
                 {recipeLibraryView === 'search' && recipeLibrarySearchTotalPages > 1 && (
                   <View style={styles.recipePaginationRow}>
