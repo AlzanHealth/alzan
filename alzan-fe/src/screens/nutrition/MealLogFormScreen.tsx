@@ -46,7 +46,6 @@ import {
   publishRecipe,
   refreshRecipeAggregates,
   searchMealByName,
-  unpublishRecipe,
 } from '../../modules/nutrition/services/nutritionSearchService';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
@@ -1328,29 +1327,6 @@ export const MealLogFormScreen = () => {
     await toggleRecipeFavorite(recipeExternalId);
   };
 
-  const handleToggleSavedRecipeVisibility = async (recipe: SavedRecipeDraft) => {
-    try {
-      if (recipe.visibility === 'public') {
-        await unpublishRecipe(recipe.id);
-      } else {
-        await publishRecipe(recipe.id);
-      }
-
-      const refreshedSavedRecipes = await loadSavedRecipesFromDb();
-      setSavedRecipes(refreshedSavedRecipes);
-      await maybeRefreshRecipeAggregates(true);
-      queueRecipeLibraryReload();
-
-      Alert.alert(
-        t('nutrition.recipeSavedTitle'),
-        recipe.visibility === 'public' ? t('nutrition.recipeNowPrivateMessage') : t('nutrition.recipeNowPublicMessage'),
-      );
-    } catch (error) {
-      console.error('[MealLogForm] Error toggling recipe visibility:', error);
-      Alert.alert(t('common.error'), t('nutrition.recipeVisibilityActionError'));
-    }
-  };
-
   const handleDuplicateRecipeFromLibrary = async (recipe: MealComponent) => {
     if (!recipe.external_id) {
       Alert.alert(t('common.error'), t('nutrition.saveMealError'));
@@ -1637,11 +1613,6 @@ export const MealLogFormScreen = () => {
           </TouchableOpacity>
           <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => void handleShowSavedRecipeDetail(recipe)}>
             <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>{t('nutrition.viewDetailsAction')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => void handleToggleSavedRecipeVisibility(recipe)}>
-            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-              {recipe.visibility === 'public' ? t('nutrition.unpublishRecipeAction') : t('nutrition.publishRecipeAction')}
-            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => handleEditSavedRecipe(recipe)}>
             <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>{t('common.edit')}</Text>
