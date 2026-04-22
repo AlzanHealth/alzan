@@ -3,11 +3,13 @@ import { supabase } from '../../../lib/supabaseClient';
 import { RecipeItemsUnit } from '../../../types/requests.types';
 import {
   buildLooseIlikePattern,
+  getCurrentAppLocale,
   getLocalizedIngredientName,
   getLocalizedRecipeDescription,
   getLocalizedRecipeName,
   matchesLoosely,
 } from '../../../services/localization';
+import { Locale } from '../../../i18n';
 
 /**
  * Normalize a string for matching: lowercase, trim, remove accents
@@ -77,13 +79,13 @@ interface RecipeIngredientRow {
   } | null;
 }
 
-function mapRecipeMatch(recipe: RecipeRow): RecipeMatch {
+function mapRecipeMatch(recipe: RecipeRow, languageCode: Locale): RecipeMatch {
   return {
     id: recipe.id,
-    name: getLocalizedRecipeName(recipe),
+    name: getLocalizedRecipeName(recipe, languageCode),
     name_es: recipe.name_es,
     name_en: recipe.name_en,
-    description: getLocalizedRecipeDescription(recipe),
+    description: getLocalizedRecipeDescription(recipe, languageCode),
     description_es: recipe.description_es,
     description_en: recipe.description_en,
   };
@@ -93,7 +95,8 @@ function mapRecipeMatch(recipe: RecipeRow): RecipeMatch {
  * Search for a recipe by name (normalized matching)
  * Returns the best match if found
  */
-export async function searchRecipeByName(name: string): Promise<RecipeMatch | null> {
+export async function searchRecipeByName(name: string, locale?: Locale): Promise<RecipeMatch | null> {
+  const languageCode = locale ?? getCurrentAppLocale();
   const normalized = normalizeString(name);
   const likePattern = buildLooseIlikePattern(name);
   console.log(`[recipeService] Searching for: "${name}" -> Normalized: "${normalized}"`);
@@ -122,7 +125,7 @@ export async function searchRecipeByName(name: string): Promise<RecipeMatch | nu
     const exactMatch = exactMatches?.[0];
     if (exactMatch) {
       console.log('[recipeService] Exact match found:', exactMatch);
-      return mapRecipeMatch(exactMatch);
+      return mapRecipeMatch(exactMatch, languageCode);
     } else {
       console.log('[recipeService] No exact match found');
     }
@@ -144,7 +147,7 @@ export async function searchRecipeByName(name: string): Promise<RecipeMatch | nu
     if (aliasMatch && aliasMatch.recipes) {
       console.log('[recipeService] Alias match found:', aliasMatch);
       const recipe = Array.isArray(aliasMatch.recipes) ? aliasMatch.recipes[0] : aliasMatch.recipes;
-      return recipe ? mapRecipeMatch(recipe) : null;
+      return recipe ? mapRecipeMatch(recipe, languageCode) : null;
     } else {
       console.log('[recipeService] No alias match found');
     }
@@ -168,7 +171,7 @@ export async function searchRecipeByName(name: string): Promise<RecipeMatch | nu
 
     if (bestPartialMatch) {
       console.log('[recipeService] Partial match found:', bestPartialMatch);
-      return mapRecipeMatch(bestPartialMatch);
+      return mapRecipeMatch(bestPartialMatch, languageCode);
     } else {
       console.log('[recipeService] No partial match found');
     }
@@ -184,7 +187,8 @@ export async function searchRecipeByName(name: string): Promise<RecipeMatch | nu
 /**
  * Get all ingredients for a recipe
  */
-export async function getRecipeIngredients(recipeId: string) {
+export async function getRecipeIngredients(recipeId: string, locale?: Locale) {
+  const languageCode = locale ?? getCurrentAppLocale();
   console.log('[recipeService] Fetching ingredients for recipeId:', recipeId);
   try {
     const { data, error } = await supabase
@@ -230,10 +234,13 @@ export async function getRecipeIngredients(recipeId: string) {
     return data.map(item => ({
       id: item.id,
       ingredient_id: item.ingredient_id,
-      ingredient_name: getLocalizedIngredientName({
-        name_es: item.ingredients?.name_es || '',
-        name_en: item.ingredients?.name_en || null,
-      }),
+      ingredient_name: getLocalizedIngredientName(
+        {
+          name_es: item.ingredients?.name_es || '',
+          name_en: item.ingredients?.name_en || null,
+        },
+        languageCode,
+      ),
       ingredient_name_es: item.ingredients?.name_es || 'Unknown',
       ingredient_name_en: item.ingredients?.name_en || '',
       quantity: item.quantity,

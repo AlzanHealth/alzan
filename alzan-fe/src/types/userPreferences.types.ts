@@ -12,6 +12,8 @@ export type MergeDeep<S, D> = {
       : never;
 };
 
+export type RecipeSearchScope = 'source' | 'all' | 'users' | 'saved' | 'favorites';
+
 // 1. Appearance
 export interface AppearanceSettingsJson {
   theme: 'light' | 'dark' | 'system';
@@ -66,6 +68,8 @@ export interface NutritionSettingsJson {
   };
   macro_display: 'per_meal' | 'daily_total';
   copy_mode: 'none' | 'sequential' | 'alternating' | null;
+  default_recipe_visibility?: 'private' | 'public';
+  recipe_search_scope?: RecipeSearchScope;
   show_diet_calories_only?: boolean;
   show_training_calories_only?: boolean;
   last_visible_week?: string;

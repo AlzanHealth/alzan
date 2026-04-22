@@ -12,14 +12,18 @@ import { FoodSearchResult } from '../types/ingredients';
 import { IngredientDetailModal } from './IngredientDetailModal';
 import { IngredientsCategory } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
+import { getCurrentAppLocale } from '../../../services/localization';
 
 interface IngredientSearchPanelProps {
   onSelect: (food: FoodSearchResult) => void;
   onGoToManual: () => void;
 }
 
+const INGREDIENT_PAGE_SIZE = 10;
+
 export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ onSelect, onGoToManual }) => {
   const { t } = useTranslation();
+  const languageCode = getCurrentAppLocale();
   const { colors: themeColors, isDark } = useNutritionStyles();
 
   // Filter states
@@ -32,6 +36,8 @@ export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ on
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(INGREDIENT_PAGE_SIZE);
+  const [canLoadMore, setCanLoadMore] = useState(false);
 
   // Detail modal state
   const [detailIngredient, setDetailIngredient] = useState<FoodSearchResult | null>(null);
@@ -39,12 +45,16 @@ export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ on
 
   // Debounced search
   useEffect(() => {
+    setVisibleLimit(INGREDIENT_PAGE_SIZE);
+  }, [query, selectedCategory, selectedLetter, languageCode]);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       performSearch();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, selectedCategory, selectedLetter]);
+  }, [query, selectedCategory, selectedLetter, languageCode, visibleLimit]);
 
   const performSearch = useCallback(async () => {
     // Only require filters OR a query to search
@@ -54,6 +64,7 @@ export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ on
     if (!hasFilters && !hasQuery) {
       setResults([]);
       setHasSearched(false);
+      setCanLoadMore(false);
       return;
     }
 
@@ -61,19 +72,27 @@ export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ on
     setHasSearched(true);
 
     try {
-      const foods = await searchFoodsWithFilters({
-        query: query.length >= 2 ? query : undefined,
-        category: selectedCategory !== 'todas' ? selectedCategory : undefined,
-        letter: selectedLetter !== 'todas' ? selectedLetter : undefined,
-      });
+      const foods = await searchFoodsWithFilters(
+        {
+          query: query.length >= 2 ? query : undefined,
+          category: selectedCategory !== 'todas' ? selectedCategory : undefined,
+          letter: selectedLetter !== 'todas' ? selectedLetter : undefined,
+        },
+        languageCode,
+        {
+          maxResults: visibleLimit,
+        },
+      );
       setResults(foods);
+      setCanLoadMore(foods.length >= visibleLimit);
     } catch (error) {
       console.error('Search failed:', error);
       setResults([]);
+      setCanLoadMore(false);
     } finally {
       setIsLoading(false);
     }
-  }, [query, selectedCategory, selectedLetter]);
+  }, [query, selectedCategory, selectedLetter, languageCode, visibleLimit]);
 
   const handleClear = () => {
     setQuery('');
@@ -85,6 +104,8 @@ export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ on
     setSelectedLetter('todas');
     setResults([]);
     setHasSearched(false);
+    setCanLoadMore(false);
+    setVisibleLimit(INGREDIENT_PAGE_SIZE);
   };
 
   const handleSelectFood = (food: FoodSearchResult) => {
@@ -202,7 +223,7 @@ export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ on
 
       {/* Results */}
       <View style={styles.resultsSection}>
-        {isLoading ? (
+        {isLoading && results.length === 0 ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={themeColors.primary} size="small" />
             <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>{t('common.loading')}</Text>
@@ -274,6 +295,19 @@ export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ on
                 </TouchableOpacity>
               );
             })}
+            {canLoadMore && (
+              <TouchableOpacity
+                style={[styles.loadMoreButton, { borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' }]}
+                onPress={() => setVisibleLimit(previous => previous + INGREDIENT_PAGE_SIZE)}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={themeColors.primary} />
+                ) : (
+                  <Text style={[styles.loadMoreText, { color: themeColors.primary }]}>{t('common.loadMore')}</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           ListEmptyComponent
@@ -404,6 +438,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  loadMoreButton: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   infoBtn: {
     padding: 6,

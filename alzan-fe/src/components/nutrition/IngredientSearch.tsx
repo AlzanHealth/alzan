@@ -4,34 +4,46 @@ import { BlurView } from 'expo-blur';
 import { searchIngredients, calculateMacros, IngredientSearchResult } from '../../services/ingredientsService';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { getCurrentAppLocale } from '../../services/localization';
 
 interface IngredientSearchProps {
   onSelect: (ingredient: IngredientSearchResult, amount: number) => void;
   onCancel: () => void;
 }
 
+const INGREDIENT_PAGE_SIZE = 10;
+
 export const IngredientSearch: React.FC<IngredientSearchProps> = ({ onSelect, onCancel }) => {
   const { t } = useTranslation();
+  const languageCode = getCurrentAppLocale();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<IngredientSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<IngredientSearchResult | null>(null);
   const [amount, setAmount] = useState('100'); // Default 100g
+  const [visibleLimit, setVisibleLimit] = useState(INGREDIENT_PAGE_SIZE);
+  const [canLoadMore, setCanLoadMore] = useState(false);
+
+  useEffect(() => {
+    setVisibleLimit(INGREDIENT_PAGE_SIZE);
+  }, [query, languageCode]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (query.length > 2) {
         setLoading(true);
-        const res = await searchIngredients(query);
+        const res = await searchIngredients(query, languageCode, visibleLimit);
         setResults(res);
+        setCanLoadMore(res.length >= visibleLimit);
         setLoading(false);
       } else {
         setResults([]);
+        setCanLoadMore(false);
       }
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [query]);
+  }, [query, languageCode, visibleLimit]);
 
   const handleConfirm = () => {
     if (selectedIngredient && amount) {
@@ -96,7 +108,7 @@ export const IngredientSearch: React.FC<IngredientSearchProps> = ({ onSelect, on
         />
       </View>
 
-      {loading ? (
+      {loading && results.length === 0 ? (
         <ActivityIndicator size="large" color="#fff" style={{ marginTop: 20 }} />
       ) : (
         <FlatList
@@ -120,6 +132,21 @@ export const IngredientSearch: React.FC<IngredientSearchProps> = ({ onSelect, on
                 <Text style={styles.emptyText}>{t('nutrition.notFound')}</Text>
                 <Text style={styles.emptySubText}>{t('nutrition.tryGenericTerms')}</Text>
               </View>
+            ) : null
+          }
+          ListFooterComponent={
+            canLoadMore ? (
+              <TouchableOpacity
+                style={styles.loadMoreButton}
+                onPress={() => setVisibleLimit(previous => previous + INGREDIENT_PAGE_SIZE)}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#4ADE80" />
+                ) : (
+                  <Text style={styles.loadMoreText}>{t('common.loadMore')}</Text>
+                )}
+              </TouchableOpacity>
             ) : null
           }
         />
@@ -246,5 +273,19 @@ const styles = StyleSheet.create({
   emptySubText: {
     color: '#aaa',
     marginTop: 8,
+  },
+  loadMoreButton: {
+    marginTop: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 10,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    color: '#4ADE80',
+    fontWeight: '600',
   },
 });

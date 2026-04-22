@@ -5,12 +5,14 @@ const STORAGE_KEY = '@training_settings';
 
 export interface TrainingSettings {
   autoTimer: boolean;
+  autoPlayEnabled: boolean;
   soundEnabled: boolean;
   hapticsEnabled: boolean;
 }
 
 const DEFAULT_SETTINGS: TrainingSettings = {
   autoTimer: true,
+  autoPlayEnabled: false,
   soundEnabled: true,
   hapticsEnabled: true,
 };

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,6 @@ import { Search, ArrowLeft, Dumbbell, Info, ChevronDown, Check } from 'lucide-re
 import { ExerciseWithDetails } from '../../types/training';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTranslation } from 'react-i18next';
-import { matchesLoosely } from '../../services/localization';
 
 export type MuscleGroupOrEquipment = {
   id: number;
@@ -32,18 +31,27 @@ export type MuscleGroupOrEquipment = {
   code: string;
 };
 
+const EXERCISE_PAGE_SIZE = 15;
+
 export const ExerciseSearchScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'ExerciseSearch'>>();
-  const { exercises, isLoading } = useExercises();
-  const { muscleGroups } = useMuscleGroups();
-  const { equipment } = useEquipment();
-
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscleId, setSelectedMuscleId] = useState<number | null>(null);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
+  const [visibleLimit, setVisibleLimit] = useState(EXERCISE_PAGE_SIZE);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  const { exercises, isLoading, isFetching, hasMore } = useExercises({
+    searchQuery: debouncedSearchQuery,
+    selectedMuscleId,
+    selectedEquipmentId,
+    limit: visibleLimit,
+  });
+  const { muscleGroups } = useMuscleGroups();
+  const { equipment } = useEquipment();
 
   // Modal states
   const [showMuscleModal, setShowMuscleModal] = useState(false);
@@ -57,40 +65,18 @@ export const ExerciseSearchScreen = () => {
     ? equipment.find(e => e.id === selectedEquipmentId)?.name
     : t('training.allEquipment');
 
-  const filteredExercises = useMemo(() => {
-    let filtered = exercises;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 250);
 
-    // Filter by search query
-    if (searchQuery) {
-      filtered = filtered.filter(ex => {
-        return matchesLoosely(
-          searchQuery,
-          ex.name,
-          ex.base_name,
-          ex.base_name_es,
-          ex.base_name_en,
-          ex.description,
-          ex.description_es,
-          ex.description_en,
-          ex.muscle_name,
-          ex.secondary_muscle_name,
-          ex.equipment_name,
-        );
-      });
-    }
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    // Filter by muscle group
-    if (selectedMuscleId !== null) {
-      filtered = filtered.filter(ex => ex.primary_muscle?.id === selectedMuscleId);
-    }
-
-    // Filter by equipment
-    if (selectedEquipmentId !== null) {
-      filtered = filtered.filter(ex => ex.equipment?.id === selectedEquipmentId);
-    }
-
-    return filtered;
-  }, [exercises, searchQuery, selectedMuscleId, selectedEquipmentId]);
+  useEffect(() => {
+    setVisibleLimit(EXERCISE_PAGE_SIZE);
+  }, [debouncedSearchQuery, selectedMuscleId, selectedEquipmentId]);
+  const showInitialLoading = isLoading && exercises.length === 0;
 
   const handleSelectExercise = (exercise: ExerciseWithDetails) => {
     const { fromScreen, onExerciseSelected } = route.params || {};
@@ -297,17 +283,32 @@ export const ExerciseSearchScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {isLoading ? (
+        {showInitialLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <FlatList
-            data={filteredExercises}
+            data={exercises}
             renderItem={renderItem}
             keyExtractor={item => item.id}
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
+            ListFooterComponent={
+              hasMore ? (
+                <TouchableOpacity
+                  style={[styles.loadMoreButton, dynamicStyles.secondaryButton]}
+                  onPress={() => setVisibleLimit(previous => previous + EXERCISE_PAGE_SIZE)}
+                  disabled={isFetching}
+                >
+                  {isFetching ? (
+                    <ActivityIndicator size="small" color={themeColors.primary} />
+                  ) : (
+                    <Text style={[styles.loadMoreText, { color: themeColors.primary }]}>{t('common.loadMore')}</Text>
+                  )}
+                </TouchableOpacity>
+              ) : null
+            }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
@@ -498,6 +499,19 @@ const styles = StyleSheet.create({
   emptyText: {
     ...typography.body,
     color: colors.textSecondary,
+  },
+  loadMoreButton: {
+    marginTop: spacing.s,
+    marginBottom: spacing.l,
+    marginHorizontal: spacing.m,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.m,
+  },
+  loadMoreText: {
+    ...typography.body,
+    fontWeight: '600',
   },
 
   // Compact Centered Modal Styles

@@ -1,3 +1,27 @@
+-- When multi-tenant columns exist, ensure legacy seed inserts remain valid
+-- with recipes_source_visibility_owner_check (owner NULL requires system/public).
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'source'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'visibility'
+  ) then
+    alter table public.recipes
+      alter column source set default 'system'::public.recipe_source_enum,
+      alter column visibility set default 'public'::public.recipe_visibility_enum;
+  end if;
+end
+$$;
+
 INSERT INTO "public"."recipes" ("id", "name_es", "name_en", "name_norm_es", "description_es", "quality_score", "created_at", "updated_at", "description_en") VALUES
 	('0058b922-3156-4caf-b4e4-ab693cfa24e2', 'Claras con espinacas y ajo', 'Egg whites with spinach and garlic', 'claras con espinacas y ajo', 'Revuelto bajo en grasa con claras de huevo, espinacas y ajo.', '0.97', '2025-12-15 20:12:05.396619+00', '2025-12-15 20:12:05.396619+00', 'Low-fat scramble with egg whites, spinach and garlic.'),
 	('00df3a53-0f95-44c7-9fad-efbd902ecbd9', 'Tortilla de alcachofas', 'Artichoke omelette', 'tortilla de alcachofas', 'Tortilla de huevos con corazones de alcachofa cocidos.', '0.95', '2025-12-16 11:48:53.478479+00', '2025-12-16 11:48:53.478479+00', 'Egg omelette with cooked artichoke hearts.'),
@@ -555,3 +579,58 @@ INSERT INTO "public"."recipes" ("id", "name_es", "name_en", "name_norm_es", "des
 	('fd4109fd-d243-4b6d-94a2-89d4cefdda34', 'Paella Valenciana', 'Authentic Valencian Paella', 'paella valenciana', 'La receta auténtica para una persona, con el equilibrio tradicional de carnes y verduras de la huerta valenciana.', '0.70', '2026-01-05 10:54:09.389795+00', '2026-01-05 10:54:09.389795+00', 'The authentic recipe for one person, with the traditional balance of meats and vegetables from the Valencian garden.'),
 	('fdf90bbd-6355-4816-a035-8ff0e66d3105', 'Garbanzos con pisto', 'Chickpeas with Ratatouille', 'garbanzos con pisto', 'Garbanzos salteados con un pisto de calabacín, pimiento y tomate.', '0.93', '2026-01-04 13:26:38.738339+00', '2026-01-04 13:26:38.738339+00', 'Sautéed chickpeas with a zucchini, pepper and tomato ratatouille.'),
 	('fe205ff2-89f5-479f-9abf-63f01452ece4', 'Queso frito con mermelada', 'Fried cheese with jam', 'queso frito con mermelada', 'Queso fresco o de cabra rebozado y frito, servido con mermelada.', '0.20', '2025-12-14 17:27:07.990985+00', '2025-12-14 17:27:07.990985+00', 'Fresh or goat cheese breaded and fried, served with jam.');
+
+-- Align system recipes metadata with multi-tenant model
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'source'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'visibility'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'owner_user_id'
+  ) then
+    update public.recipes
+    set
+      owner_user_id = null,
+      source = 'system',
+      visibility = 'public'
+    where owner_user_id is null;
+  end if;
+end
+$$;
+
+-- Restore app defaults for user-created recipes after seed load
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'source'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'visibility'
+  ) then
+    alter table public.recipes
+      alter column source set default 'user'::public.recipe_source_enum,
+      alter column visibility set default 'private'::public.recipe_visibility_enum;
+  end if;
+end
+$$;

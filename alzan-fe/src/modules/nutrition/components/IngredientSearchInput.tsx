@@ -9,28 +9,35 @@ import { FoodSearchResult } from '../types/ingredients';
 import { GlassCard } from '../../../components/GlassCard';
 import { useTranslation } from 'react-i18next';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
+import { getCurrentAppLocale } from '../../../services/localization';
 
 interface IngredientSearchInputProps {
   onSelect: (food: FoodSearchResult) => void;
   placeholder?: string;
 }
 
+const INGREDIENT_PAGE_SIZE = 10;
+
 export const IngredientSearchInput: React.FC<IngredientSearchInputProps> = ({
   onSelect,
   placeholder = 'Buscar alimento (ej: arroz, pollo...)',
 }) => {
   const { t } = useTranslation();
+  const languageCode = getCurrentAppLocale();
   const { colors: themeColors, isDark } = useNutritionStyles();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(INGREDIENT_PAGE_SIZE);
+  const [canLoadMore, setCanLoadMore] = useState(false);
 
   // Debounced search with useEffect
   useEffect(() => {
     if (query.length < 2) {
       setResults([]);
       setHasSearched(false);
+      setCanLoadMore(false);
       return;
     }
 
@@ -39,11 +46,16 @@ export const IngredientSearchInput: React.FC<IngredientSearchInputProps> = ({
     }, 600); // 600ms debounce
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, languageCode, visibleLimit]);
+
+  useEffect(() => {
+    setVisibleLimit(INGREDIENT_PAGE_SIZE);
+  }, [query, languageCode]);
 
   const handleSearch = useCallback(async () => {
     if (query.length < 2) {
       setResults([]);
+      setCanLoadMore(false);
       return;
     }
 
@@ -51,21 +63,27 @@ export const IngredientSearchInput: React.FC<IngredientSearchInputProps> = ({
     setHasSearched(true);
 
     try {
-      const foods = await nutritionSearchService.searchFoodsWithFilters({ query });
+      const foods = await nutritionSearchService.searchFoodsWithFilters({ query }, languageCode, {
+        maxResults: visibleLimit,
+      });
       setResults(foods);
+      setCanLoadMore(foods.length >= visibleLimit);
     } catch (error) {
       console.error('Search failed:', error);
       setResults([]);
+      setCanLoadMore(false);
     } finally {
       setIsSearching(false);
     }
-  }, [query]);
+  }, [query, languageCode, visibleLimit]);
 
   const handleSelectFood = (food: FoodSearchResult) => {
     onSelect(food);
     setQuery('');
     setResults([]);
     setHasSearched(false);
+    setCanLoadMore(false);
+    setVisibleLimit(INGREDIENT_PAGE_SIZE);
   };
 
   const handleClear = () => {
@@ -145,6 +163,19 @@ export const IngredientSearchInput: React.FC<IngredientSearchInputProps> = ({
                   <Plus size={20} color="#007AFF" />
                 </TouchableOpacity>
               ))}
+              {canLoadMore && (
+                <TouchableOpacity
+                  style={[styles.loadMoreButton, { borderColor: themeColors.primary }]}
+                  onPress={() => setVisibleLimit(previous => previous + INGREDIENT_PAGE_SIZE)}
+                  disabled={isSearching}
+                >
+                  {isSearching ? (
+                    <ActivityIndicator size="small" color={themeColors.primary} />
+                  ) : (
+                    <Text style={[styles.loadMoreText, { color: themeColors.primary }]}>{t('common.loadMore')}</Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </ScrollView>
           )}
         </GlassCard>
@@ -224,5 +255,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#999',
     padding: 20,
+  },
+  loadMoreButton: {
+    marginTop: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
