@@ -55,6 +55,8 @@ const DEFAULT_SNACK_OPTS = {
   show_only_if_content: false,
 };
 
+type RecipeDefaultVisibility = 'private' | 'public';
+
 // Radio Option Component
 const RadioOption = ({
   label,
@@ -165,6 +167,9 @@ export const NutritionSettingsScreen = () => {
   const enabledMeals = preferences?.nutrition_prefs?.enabled_meals || DEFAULT_ENABLED_MEALS;
   const snackOpts = preferences?.nutrition_prefs?.snack_behavior || DEFAULT_SNACK_OPTS;
   const macroDisplay = preferences?.nutrition_prefs?.macro_display || 'per_meal';
+  const defaultRecipeVisibility: RecipeDefaultVisibility =
+    preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
+  const recipesArePublicByDefault = defaultRecipeVisibility === 'public';
 
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
@@ -186,6 +191,7 @@ export const NutritionSettingsScreen = () => {
 
   // UI Loading states
   const [isLoadingCopy, setIsLoadingCopy] = useState(false);
+  const [isRecipeVisibilityUpdating, setIsRecipeVisibilityUpdating] = useState(false);
 
   // Modal states for copy info
   const [showSequentialInfo, setShowSequentialInfo] = useState(false);
@@ -251,12 +257,71 @@ export const NutritionSettingsScreen = () => {
 
   // Helper to update preferences
   const updateNutritionPrefs = (updates: Partial<NutritionSettingsJson>) => {
-    updatePreferences({
+    return updatePreferences({
       nutrition_prefs: {
         ...preferences?.nutrition_prefs,
         ...updates,
       } as NutritionSettingsJson,
     });
+  };
+
+  const applyRecipeVisibilityForUserRecipes = async (makePublic: boolean) => {
+    if (!user) return;
+
+    setIsRecipeVisibilityUpdating(true);
+    const nextVisibility: RecipeDefaultVisibility = makePublic ? 'public' : 'private';
+
+    try {
+      const { error: recipeUpdateError } = await supabase
+        .from('recipes')
+        .update({
+          visibility: nextVisibility,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('owner_user_id', user.id)
+        .eq('source', 'user')
+        .is('deleted_at', null);
+
+      if (recipeUpdateError) {
+        console.error('[NutritionSettings] Error updating recipe visibility:', recipeUpdateError);
+        Alert.alert(t('common.error'), t('nutrition.recipeVisibilityUpdateErrorMessage'));
+        return;
+      }
+
+      await updateNutritionPrefs({ default_recipe_visibility: nextVisibility });
+
+      Alert.alert(
+        t('nutrition.recipeVisibilityUpdatedTitle'),
+        makePublic
+          ? t('nutrition.recipeVisibilityUpdatedPublicMessage')
+          : t('nutrition.recipeVisibilityUpdatedPrivateMessage'),
+      );
+    } catch (error) {
+      console.error('[NutritionSettings] Error applying recipe visibility setting:', error);
+      Alert.alert(t('common.error'), t('nutrition.recipeVisibilityUpdateErrorMessage'));
+    } finally {
+      setIsRecipeVisibilityUpdating(false);
+    }
+  };
+
+  const handleRecipeVisibilityToggle = (nextValue: boolean) => {
+    if (isRecipeVisibilityUpdating || nextValue === recipesArePublicByDefault) return;
+
+    Alert.alert(
+      t('nutrition.recipeVisibilityConfirmTitle'),
+      nextValue
+        ? t('nutrition.recipeVisibilityConfirmPublicMessage')
+        : t('nutrition.recipeVisibilityConfirmPrivateMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('nutrition.confirmAction'),
+          onPress: () => {
+            void applyRecipeVisibilityForUserRecipes(nextValue);
+          },
+        },
+      ],
+    );
   };
 
   // Delete future meal logs for a specific meal type (from TODAY onwards)
@@ -682,7 +747,23 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 4. Auto-copy diet */}
+          {/* 4. Recipe privacy */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
+              {t('nutrition.recipePrivacyTitle')}
+            </Text>
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <ToggleRow
+                label={t('nutrition.recipeDefaultPublicLabel')}
+                description={t('nutrition.recipeDefaultPublicHint')}
+                value={recipesArePublicByDefault}
+                onValueChange={handleRecipeVisibilityToggle}
+                isLoading={isRecipeVisibilityUpdating}
+              />
+            </View>
+          </View>
+
+          {/* 5. Auto-copy diet */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
               {t('nutrition.autoPlanningTitle')}

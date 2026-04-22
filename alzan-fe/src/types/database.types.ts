@@ -1568,42 +1568,57 @@ export type Database = {
       };
       recipes: {
         Row: {
+          carbs_g_100: number;
           created_at: string;
+          deleted_at: string | null;
           description_en: string | null;
           description_es: string | null;
+          fat_g_100: number;
           id: string;
+          kcal_100: number;
           name_en: string | null;
           name_es: string;
           name_norm_es: string;
           owner_user_id: string | null;
+          protein_g_100: number;
           quality_score: number;
           source: string;
           updated_at: string;
           visibility: string;
         };
         Insert: {
+          carbs_g_100?: number;
           created_at?: string;
+          deleted_at?: string | null;
           description_en?: string | null;
           description_es?: string | null;
+          fat_g_100?: number;
           id?: string;
+          kcal_100?: number;
           name_en?: string | null;
           name_es: string;
           name_norm_es: string;
           owner_user_id?: string | null;
+          protein_g_100?: number;
           quality_score?: number;
           source?: string;
           updated_at?: string;
           visibility?: string;
         };
         Update: {
+          carbs_g_100?: number;
           created_at?: string;
+          deleted_at?: string | null;
           description_en?: string | null;
           description_es?: string | null;
+          fat_g_100?: number;
           id?: string;
+          kcal_100?: number;
           name_en?: string | null;
           name_es?: string;
           name_norm_es?: string;
           owner_user_id?: string | null;
+          protein_g_100?: number;
           quality_score?: number;
           source?: string;
           updated_at?: string;

@@ -1,3 +1,27 @@
+-- When multi-tenant columns exist, ensure legacy seed inserts remain valid
+-- with recipes_source_visibility_owner_check (owner NULL requires system/public).
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'source'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'visibility'
+  ) then
+    alter table public.recipes
+      alter column source set default 'system'::public.recipe_source_enum,
+      alter column visibility set default 'public'::public.recipe_visibility_enum;
+  end if;
+end
+$$;
+
 INSERT INTO "public"."recipes" ("id", "name_es", "name_en", "name_norm_es", "description_es", "quality_score", "created_at", "updated_at", "description_en") VALUES
 	('0058b922-3156-4caf-b4e4-ab693cfa24e2', 'Claras con espinacas y ajo', 'Egg whites with spinach and garlic', 'claras con espinacas y ajo', 'Revuelto bajo en grasa con claras de huevo, espinacas y ajo.', '0.97', '2025-12-15 20:12:05.396619+00', '2025-12-15 20:12:05.396619+00', 'Low-fat scramble with egg whites, spinach and garlic.'),
 	('00df3a53-0f95-44c7-9fad-efbd902ecbd9', 'Tortilla de alcachofas', 'Artichoke omelette', 'tortilla de alcachofas', 'Tortilla de huevos con corazones de alcachofa cocidos.', '0.95', '2025-12-16 11:48:53.478479+00', '2025-12-16 11:48:53.478479+00', 'Egg omelette with cooked artichoke hearts.'),
@@ -584,6 +608,29 @@ begin
       source = 'system',
       visibility = 'public'
     where owner_user_id is null;
+  end if;
+end
+$$;
+
+-- Restore app defaults for user-created recipes after seed load
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'source'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'visibility'
+  ) then
+    alter table public.recipes
+      alter column source set default 'user'::public.recipe_source_enum,
+      alter column visibility set default 'private'::public.recipe_visibility_enum;
   end if;
 end
 $$;

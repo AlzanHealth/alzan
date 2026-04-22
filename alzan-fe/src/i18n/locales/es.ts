@@ -137,6 +137,7 @@ export default {
     existingDataDetected: 'Datos existentes detectados',
     deleteAll: 'Eliminar todo',
     backButton: 'Volver',
+    confirmAction: 'Confirmar',
     deleteAllNutritionWarning:
       'Esta acción eliminará TODOS tus registros de nutrición de forma permanente. No se puede deshacer.',
     confirmTotalDeletion: '⚠️ Confirmar eliminación total',
@@ -157,6 +158,19 @@ export default {
     autoPlanningTitle: 'PLANIFICACIÓN AUTOMÁTICA',
     visualizationTitle: 'VISUALIZACIÓN',
     dailyMealsTitle: 'COMIDAS DEL DÍA',
+    recipePrivacyTitle: 'PRIVACIDAD DE RECETAS',
+    recipeDefaultPublicLabel: 'Recetas públicas por defecto',
+    recipeDefaultPublicHint:
+      'Al activar este ajuste, todas tus recetas guardadas pasan a públicas y las nuevas se crean públicas. Al desactivar, pasan a privadas.',
+    recipeVisibilityConfirmTitle: 'Actualizar privacidad de recetas',
+    recipeVisibilityConfirmPublicMessage:
+      'Se harán públicas todas tus recetas guardadas y las nuevas también se crearán públicas. ¿Quieres continuar?',
+    recipeVisibilityConfirmPrivateMessage:
+      'Se harán privadas todas tus recetas guardadas y las nuevas también se crearán privadas. ¿Quieres continuar?',
+    recipeVisibilityUpdatedTitle: 'Privacidad actualizada',
+    recipeVisibilityUpdatedPublicMessage: 'Tus recetas ahora son públicas por defecto.',
+    recipeVisibilityUpdatedPrivateMessage: 'Tus recetas ahora son privadas por defecto.',
+    recipeVisibilityUpdateErrorMessage: 'No se pudo actualizar la privacidad de tus recetas. Inténtalo de nuevo.',
 
     searchPlaceholder: 'Buscar ingrediente (ej. Pollo, Arroz)',
     ingredientsWindow: 'RECETAS',
@@ -186,6 +200,7 @@ export default {
       'Por ahora solo puedes guardar recetas con ingredientes de la base de datos.',
     recipeSavedTitle: 'Receta guardada',
     recipeSavedMessage: 'Tu receta se guardó correctamente.',
+    recipeUpdateConflictMessage: 'La receta fue actualizada en otro dispositivo. Recarga y vuelve a intentarlo.',
     saveRecipeHint: 'Crea una receta y guárdala para verla en Guardados.',
     addFavoriteAction: 'Guardar en favoritas',
     removeFavoriteAction: 'Quitar de favoritas',

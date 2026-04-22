@@ -135,6 +135,7 @@ const en = {
     existingDataDetected: 'Existing data detected',
     deleteAll: 'Delete all',
     backButton: 'Go back',
+    confirmAction: 'Confirm',
     deleteAllNutritionWarning: 'This action will PERMANENTLY delete ALL your nutrition records. This cannot be undone.',
     confirmTotalDeletion: '⚠️ Confirm total deletion',
     deleteDateRange: 'Delete Date Range',
@@ -154,6 +155,19 @@ const en = {
     autoPlanningTitle: 'AUTOMATIC PLANNING',
     visualizationTitle: 'VISUALIZATION',
     dailyMealsTitle: 'DAILY MEALS',
+    recipePrivacyTitle: 'RECIPE PRIVACY',
+    recipeDefaultPublicLabel: 'Public recipes by default',
+    recipeDefaultPublicHint:
+      'When enabled, all your saved recipes become public and new ones are created as public. When disabled, they become private.',
+    recipeVisibilityConfirmTitle: 'Update recipe privacy',
+    recipeVisibilityConfirmPublicMessage:
+      'All your saved recipes will become public and new ones will also be created as public. Do you want to continue?',
+    recipeVisibilityConfirmPrivateMessage:
+      'All your saved recipes will become private and new ones will also be created as private. Do you want to continue?',
+    recipeVisibilityUpdatedTitle: 'Privacy updated',
+    recipeVisibilityUpdatedPublicMessage: 'Your recipes are now public by default.',
+    recipeVisibilityUpdatedPrivateMessage: 'Your recipes are now private by default.',
+    recipeVisibilityUpdateErrorMessage: 'Could not update your recipe privacy. Please try again.',
 
     searchPlaceholder: 'Search ingredient (e.g. Chicken, Rice)',
     ingredientsWindow: 'RECIPES',
@@ -182,6 +196,7 @@ const en = {
     saveRecipeNeedsDatabaseIngredientsMessage: 'For now, you can only save recipes with database ingredients.',
     recipeSavedTitle: 'Recipe saved',
     recipeSavedMessage: 'Your recipe was saved successfully.',
+    recipeUpdateConflictMessage: 'This recipe changed on another device. Reload and try again.',
     saveRecipeHint: 'Create a recipe and save it to see it in Saved.',
     addFavoriteAction: 'Save to favorites',
     removeFavoriteAction: 'Remove from favorites',

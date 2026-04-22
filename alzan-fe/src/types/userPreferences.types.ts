@@ -66,6 +66,7 @@ export interface NutritionSettingsJson {
   };
   macro_display: 'per_meal' | 'daily_total';
   copy_mode: 'none' | 'sequential' | 'alternating' | null;
+  default_recipe_visibility?: 'private' | 'public';
   show_diet_calories_only?: boolean;
   show_training_calories_only?: boolean;
   last_visible_week?: string;

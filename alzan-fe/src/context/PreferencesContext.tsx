@@ -65,6 +65,7 @@ const DEFAULT_NUTRITION_PREFS: NutritionSettingsJson = {
   },
   macro_display: 'per_meal',
   copy_mode: 'none',
+  default_recipe_visibility: 'private',
 };
 
 const DEFAULT_PRIVACY_SETTINGS: PrivacySettingsJson = {
