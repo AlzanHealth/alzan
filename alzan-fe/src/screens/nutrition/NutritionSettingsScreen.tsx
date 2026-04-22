@@ -56,7 +56,14 @@ const DEFAULT_SNACK_OPTS = {
 };
 
 type RecipeDefaultVisibility = 'private' | 'public';
-type NutritionSectionInfoKey = 'dailyMeals' | 'snacks' | 'visualization' | 'recipePrivacy' | 'recipeSearch' | 'autoPlanning' | 'data';
+type NutritionSectionInfoKey =
+  | 'dailyMeals'
+  | 'snacks'
+  | 'visualization'
+  | 'recipePrivacy'
+  | 'recipeSearch'
+  | 'autoPlanning'
+  | 'data';
 
 // Radio Option Component
 const RadioOption = ({
@@ -676,10 +683,7 @@ export const NutritionSettingsScreen = () => {
     setSelectedMeal(null);
   };
 
-  const sectionInfoTextKeys: Record<
-    NutritionSectionInfoKey,
-    { titleKey: string; bodyKey: string }
-  > = {
+  const sectionInfoTextKeys: Record<NutritionSectionInfoKey, { titleKey: string; bodyKey: string }> = {
     dailyMeals: {
       titleKey: 'nutrition.dailyMealsInfoModalTitle',
       bodyKey: 'nutrition.dailyMealsInfoModalBody',

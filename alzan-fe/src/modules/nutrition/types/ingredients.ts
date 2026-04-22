@@ -46,6 +46,15 @@ export interface MealComponent extends Omit<Partial<DbIngredient>, 'source_prima
   barcode?: string;
   recipe_source?: 'system' | 'user';
   recipe_owner_user_id?: string | null;
+  recipe_visibility?: 'private' | 'public';
+  recipe_public_slug?: string | null;
+  recipe_origin_id?: string | null;
+  recipe_popularity_score?: number;
+  recipe_favorites_total?: number;
+  recipe_saves_total?: number;
+  recipe_uses_7d?: number;
+  recipe_uses_30d?: number;
+  recipe_uses_total?: number;
 
   // Flattened macros (from DbIngredient) are:
   // kcal_100, protein_g_100, carbs_g_100, fat_g_100 (Note: DB uses fat_g_100 not fats_g_100 check types!)
