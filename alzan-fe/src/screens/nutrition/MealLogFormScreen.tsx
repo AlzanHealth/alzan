@@ -377,25 +377,20 @@ export const MealLogFormScreen = () => {
     return Math.max(1, Math.ceil(sourceLength / RECIPE_LIBRARY_SAVED_PAGE_SIZE));
   }, [displayedFavoriteLibraryRecipes.length, filteredDisplayedSavedRecipes.length, recipeLibraryView]);
 
-  const paginatedSavedRecipes = useMemo(() => {
-    if (recipeLibraryView === 'favorites') {
-      const from = (recipeLibrarySavedPage - 1) * RECIPE_LIBRARY_SAVED_PAGE_SIZE;
-      const to = from + RECIPE_LIBRARY_SAVED_PAGE_SIZE;
-      return displayedFavoriteLibraryRecipes
-        .slice()
-        .sort((a, b) => (b.recipe_popularity_score || 0) - (a.recipe_popularity_score || 0))
-        .slice(from, to);
-    }
+  const paginatedFavoriteLibraryRecipes = useMemo(() => {
+    const from = (recipeLibrarySavedPage - 1) * RECIPE_LIBRARY_SAVED_PAGE_SIZE;
+    const to = from + RECIPE_LIBRARY_SAVED_PAGE_SIZE;
+    return displayedFavoriteLibraryRecipes
+      .slice()
+      .sort((a, b) => (b.recipe_popularity_score || 0) - (a.recipe_popularity_score || 0))
+      .slice(from, to);
+  }, [displayedFavoriteLibraryRecipes, recipeLibrarySavedPage]);
 
+  const paginatedMySavedRecipes = useMemo(() => {
     const from = (recipeLibrarySavedPage - 1) * RECIPE_LIBRARY_SAVED_PAGE_SIZE;
     const to = from + RECIPE_LIBRARY_SAVED_PAGE_SIZE;
     return filteredDisplayedSavedRecipes.slice(from, to);
-  }, [
-    displayedFavoriteLibraryRecipes,
-    filteredDisplayedSavedRecipes,
-    recipeLibrarySavedPage,
-    recipeLibraryView,
-  ]);
+  }, [filteredDisplayedSavedRecipes, recipeLibrarySavedPage]);
   const displayedRecipeLibrarySearchResults = useMemo(
     () => recipeLibrarySearchResults.filter(item => item.itemType === 'recipe'),
     [recipeLibrarySearchResults],
@@ -815,12 +810,6 @@ export const MealLogFormScreen = () => {
         return;
       }
 
-      const currentUserId = await getCurrentUserId();
-      if (currentUserId && recipeRow.owner_user_id === currentUserId) {
-        setRecipeDetailSourceLabel(t('nutrition.recipeSourceYou'));
-        return;
-      }
-
       const fallbackName = recipeRow.owner_user_id.slice(0, 8);
       const { data: ownerRow } = await supabase
         .from('users')
@@ -829,8 +818,8 @@ export const MealLogFormScreen = () => {
         .maybeSingle<{ display_name: string | null; username: string | null }>();
 
       const ownerName =
-        ownerRow?.display_name?.trim() ||
         ownerRow?.username?.trim() ||
+        ownerRow?.display_name?.trim() ||
         t('nutrition.recipeSourceUserFallback', { id: fallbackName });
 
       setRecipeDetailSourceLabel(t('nutrition.recipeSourceUserBy', { user: ownerName }));
@@ -2924,7 +2913,7 @@ export const MealLogFormScreen = () => {
                 )}
                 {recipeLibraryView !== 'search' &&
                   ((recipeLibraryView === 'favorites'
-                    ? paginatedSavedRecipes.length === 0
+                    ? paginatedFavoriteLibraryRecipes.length === 0
                     : filteredDisplayedSavedRecipes.length === 0) ? (
                     <View
                       style={[
@@ -2933,31 +2922,37 @@ export const MealLogFormScreen = () => {
                       ]}
                     >
                       <Text style={[styles.recipeEmptyStateTitle, { color: themeColors.textPrimary }]}>
-                        {t('nutrition.savedRecipesEmptyTitle')}
+                        {recipeLibraryView === 'favorites'
+                          ? t('nutrition.favoriteRecipesEmptyTitle')
+                          : t('nutrition.savedRecipesEmptyTitle')}
                       </Text>
                       <Text style={[styles.recipeEmptyStateText, { color: themeColors.textSecondary }]}>
-                        {t('nutrition.savedRecipesEmptyMessage')}
+                        {recipeLibraryView === 'favorites'
+                          ? t('nutrition.favoriteRecipesEmptyMessage')
+                          : t('nutrition.savedRecipesEmptyMessage')}
                       </Text>
                     </View>
                   ) : (
                     <>
                       {recipeLibraryView === 'favorites' ? (
-                        <View style={styles.recipeSubsection}>{paginatedSavedRecipes.map(renderPublicRecipeCard)}</View>
+                        <View style={styles.recipeSubsection}>
+                          {paginatedFavoriteLibraryRecipes.map(renderPublicRecipeCard)}
+                        </View>
                       ) : (
                         <>
-                          {paginatedSavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) && (
+                          {paginatedMySavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) && (
                             <View style={styles.recipeSubsection}>
                               <Text style={[styles.recipeSubsectionTitle, { color: themeColors.textSecondary }]}>
                                 {t('nutrition.favoriteRecipesLabel')}
                               </Text>
-                              {paginatedSavedRecipes
+                              {paginatedMySavedRecipes
                                 .filter(recipe => favoriteRecipeIds.includes(recipe.id))
                                 .map(recipe => renderSavedRecipeCard(recipe, true))}
                             </View>
                           )}
 
                           <View style={styles.recipeSubsection}>
-                            {paginatedSavedRecipes
+                            {paginatedMySavedRecipes
                               .filter(recipe => !favoriteRecipeIds.includes(recipe.id))
                               .map(recipe => renderSavedRecipeCard(recipe))}
                           </View>

@@ -215,6 +215,8 @@ const en = {
     mySavedRecipes: 'My saved recipes',
     savedRecipesEmptyTitle: 'You have no saved recipes yet',
     savedRecipesEmptyMessage: 'Create a meal in ingredients and save it here for later reuse.',
+    favoriteRecipesEmptyTitle: 'You have no favorite recipes yet',
+    favoriteRecipesEmptyMessage: 'Mark recipes with the star to see them here.',
     favoriteRecipesLabel: 'Favorites',
     recipeLibraryViewNormal: 'ALL',
     recipeLibraryViewFavorites: 'FAVORITES',

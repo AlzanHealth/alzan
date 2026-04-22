@@ -81,7 +81,7 @@ const TrainingSettingsScreen = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeSectionInfo, setActiveSectionInfo] = useState<TrainingSectionInfoKey | null>(null);
 
-  const sectionInfoTextKeys: Record<TrainingSectionInfoKey, { titleKey: string; bodyKey: string }> = {
+  const sectionInfoTextKeys = {
     general: {
       titleKey: 'training.generalInfoModalTitle',
       bodyKey: 'training.generalInfoModalBody',
@@ -94,7 +94,7 @@ const TrainingSettingsScreen = () => {
       titleKey: 'training.dangerInfoModalTitle',
       bodyKey: 'training.dangerInfoModalBody',
     },
-  };
+  } as const satisfies Record<TrainingSectionInfoKey, { titleKey: string; bodyKey: string }>;
 
   const renderSectionTitle = (label: string, key: TrainingSectionInfoKey) => (
     <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveSectionInfo(key)}>

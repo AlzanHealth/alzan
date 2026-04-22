@@ -267,7 +267,7 @@ type FunctionOverrides = {
   };
 };
 
-type ExtendedFunctions = GeneratedFunctions & FunctionOverrides;
+type ExtendedFunctions = Omit<GeneratedFunctions, keyof FunctionOverrides> & FunctionOverrides;
 
 export type Database = Omit<DatabaseGenerated, 'public'> & {
   public: Omit<PublicSchema, 'Tables' | 'Functions'> & {

@@ -683,7 +683,7 @@ export const NutritionSettingsScreen = () => {
     setSelectedMeal(null);
   };
 
-  const sectionInfoTextKeys: Record<NutritionSectionInfoKey, { titleKey: string; bodyKey: string }> = {
+  const sectionInfoTextKeys = {
     dailyMeals: {
       titleKey: 'nutrition.dailyMealsInfoModalTitle',
       bodyKey: 'nutrition.dailyMealsInfoModalBody',
@@ -712,7 +712,7 @@ export const NutritionSettingsScreen = () => {
       titleKey: 'nutrition.dataInfoModalTitle',
       bodyKey: 'nutrition.dataInfoModalBody',
     },
-  };
+  } as const satisfies Record<NutritionSectionInfoKey, { titleKey: string; bodyKey: string }>;
 
   const renderSectionTitle = (label: string, sectionKey: NutritionSectionInfoKey) => (
     <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveSectionInfo(sectionKey)}>

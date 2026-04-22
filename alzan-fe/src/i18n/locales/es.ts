@@ -218,6 +218,8 @@ export default {
     mySavedRecipes: 'Mis recetas guardadas',
     savedRecipesEmptyTitle: 'Todavía no tienes recetas guardadas',
     savedRecipesEmptyMessage: 'Crea una comida en ingredientes y guárdala para reutilizarla aquí.',
+    favoriteRecipesEmptyTitle: 'Todavía no tienes recetas favoritas',
+    favoriteRecipesEmptyMessage: 'Marca recetas con la estrella para verlas aquí.',
     favoriteRecipesLabel: 'Favoritas',
     recipeLibraryViewNormal: 'Todas',
     recipeLibraryViewFavorites: 'Favoritas',
