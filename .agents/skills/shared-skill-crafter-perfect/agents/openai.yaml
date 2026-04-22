@@ -1,3 +1,0 @@
-display_name: "Skill Crafter (Best Practices)"
-short_description: "Create/update skills with lean SKILL.md, progressive disclosure, scripts/references, and validation."
-default_prompt: "Create or update a skill folder following best practices: write effective SKILL.md metadata, keep the body lean, move details into references, add scripts/assets when useful, and provide a validation + iteration plan."

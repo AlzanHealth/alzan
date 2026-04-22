@@ -1,3 +1,0 @@
-display_name: "Alzan: Docs Sync (code-first)"
-short_description: "Sync local Markdown docs with code + recent commits, detect drift, update/cleanup."
-default_prompt: "Sync the project's local docs with the current codebase. Always scan recent git commits and the code first, then update docs to match reality. Output a doc_pack, drift_map, commit_summary, and cleanup_plan."
