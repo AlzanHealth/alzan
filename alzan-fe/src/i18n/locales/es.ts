@@ -161,9 +161,24 @@ export default {
     evenOddWeeksIndependent: 'Semanas pares e impares independientes',
     copyWeeklyShortDesc: 'Cada nueva semana recibe la anterior',
     autoPlanningTitle: 'PLANIFICACIÓN AUTOMÁTICA',
+    autoPlanningInfoModalTitle: 'Planificación automática',
+    autoPlanningInfoModalBody:
+      'Configura cómo se replica tu dieta entre semanas: secuencial, alterna o desactivada.\n\nSe aplica al crear nuevas semanas de planificación y al comportamiento de copia automática de comidas.',
     visualizationTitle: 'VISUALIZACIÓN',
+    visualizationInfoModalTitle: 'Visualización',
+    visualizationInfoModalBody:
+      'Elige cómo quieres ver tus comidas: detalladas por ingredientes o resumidas por totales.\n\nSe aplica al diseño de las tarjetas de comida y al resumen nutricional del día.',
     dailyMealsTitle: 'COMIDAS DEL DÍA',
+    dailyMealsInfoModalTitle: 'Comidas del día',
+    dailyMealsInfoModalBody:
+      'Define qué comidas principales quieres usar en tu plan diario y en qué horario se te recuerdan.\n\nSe aplica en Nutrición Home, en el registro de comidas y en los recordatorios automáticos.',
     recipePrivacyTitle: 'PRIVACIDAD DE RECETAS',
+    recipePrivacyInfoModalTitle: 'Privacidad de recetas',
+    recipePrivacyInfoModalBody:
+      'Define la visibilidad por defecto de las recetas que creas y actualiza la visibilidad de tus recetas ya guardadas.\n\nSe aplica en Guardados, Buscador y en lo que otros usuarios pueden ver de tus recetas.',
+    snacksInfoModalTitle: 'Snacks',
+    snacksInfoModalBody:
+      'Controla si los snacks están activos y cómo se muestran dentro del día.\n\nSe aplica en la vista diaria de nutrición y en el flujo de registro cuando añades o editas snacks.',
     recipeDefaultPublicLabel: 'Recetas públicas por defecto',
     recipeDefaultPublicHint:
       'Al activar este ajuste, todas tus recetas guardadas pasan a públicas y las nuevas se crean públicas. Al desactivar, pasan a privadas.',
@@ -177,6 +192,9 @@ export default {
     recipeVisibilityUpdatedPrivateMessage: 'Tus recetas ahora son privadas por defecto.',
     recipeVisibilityUpdateErrorMessage: 'No se pudo actualizar la privacidad de tus recetas. Inténtalo de nuevo.',
     recipeSearchScopeTitle: 'BÚSQUEDA DE RECETAS',
+    recipeSearchInfoModalTitle: 'Búsqueda de recetas',
+    recipeSearchInfoModalBody:
+      'Define desde qué origen se buscan recetas cuando usas el buscador por nombre de comida.\n\nEste ajuste cambia cómo funciona el buscador al añadir una comida: Alzan, Todas, Comunidad, Mis recetas o Favoritas.',
     recipeSearchScopeSourceLabel: 'Alzan',
     recipeSearchScopeSourceHint: 'Busca solo en recetas oficiales de Alzan.',
     recipeSearchScopeAllLabel: 'Todas',
@@ -258,6 +276,9 @@ export default {
     enableSnacks: 'Activar snacks',
     filters: 'Filtros',
     dataAllCaps: 'DATOS',
+    dataInfoModalTitle: 'Datos',
+    dataInfoModalBody:
+      'Gestiona acciones de mantenimiento: borrar datos futuros, exportar historial y eliminar registros.\n\nSe aplica sobre tus datos de nutrición guardados en la cuenta y en los documentos exportados.',
     snacksAllCaps: 'SNACKS',
     pdfTitle: 'Alzan Health',
     pdfSubtitle: 'Plan de Nutrición',
@@ -1311,6 +1332,15 @@ export default {
     bodyweight: 'Bodyweight',
     general: 'General',
     generalAllCaps: 'GENERAL',
+    generalInfoModalTitle: 'General',
+    generalInfoModalBody:
+      'Aquí configuras cómo se comporta la sesión mientras entrenas: temporizador automático, reproducción automática, sonido y vibración.\n\nEstos ajustes afectan al flujo en la pantalla de entrenamiento activo y a los avisos durante descansos y cambios de serie.',
+    dataInfoModalTitle: 'Datos',
+    dataInfoModalBody:
+      'Desde este bloque puedes exportar tu historial de entrenamientos en PDF para revisarlo o compartirlo.\n\nEl archivo incluye las sesiones del rango de fechas que elijas.',
+    dangerInfoModalTitle: 'Zona de peligro',
+    dangerInfoModalBody:
+      'Este apartado sirve para borrar entrenamientos planificados del calendario.\n\nEs útil para limpiar planificación, pero no elimina automáticamente el historial completado.',
     allMuscles: 'Todos Músculos',
     allEquipment: 'Todo Equipamiento',
     distance: 'Distancia',

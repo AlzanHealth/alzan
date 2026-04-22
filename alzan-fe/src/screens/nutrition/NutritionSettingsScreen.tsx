@@ -56,6 +56,7 @@ const DEFAULT_SNACK_OPTS = {
 };
 
 type RecipeDefaultVisibility = 'private' | 'public';
+type NutritionSectionInfoKey = 'dailyMeals' | 'snacks' | 'visualization' | 'recipePrivacy' | 'recipeSearch' | 'autoPlanning' | 'data';
 
 // Radio Option Component
 const RadioOption = ({
@@ -197,6 +198,7 @@ export const NutritionSettingsScreen = () => {
   // Modal states for copy info
   const [showSequentialInfo, setShowSequentialInfo] = useState(false);
   const [showAlternatingInfo, setShowAlternatingInfo] = useState(false);
+  const [activeSectionInfo, setActiveSectionInfo] = useState<NutritionSectionInfoKey | null>(null);
 
   // New states for overwrite protection
   const [showOverwriteModal, setShowOverwriteModal] = useState(false);
@@ -674,6 +676,46 @@ export const NutritionSettingsScreen = () => {
     setSelectedMeal(null);
   };
 
+  const sectionInfoTextKeys: Record<
+    NutritionSectionInfoKey,
+    { titleKey: string; bodyKey: string }
+  > = {
+    dailyMeals: {
+      titleKey: 'nutrition.dailyMealsInfoModalTitle',
+      bodyKey: 'nutrition.dailyMealsInfoModalBody',
+    },
+    snacks: {
+      titleKey: 'nutrition.snacksInfoModalTitle',
+      bodyKey: 'nutrition.snacksInfoModalBody',
+    },
+    visualization: {
+      titleKey: 'nutrition.visualizationInfoModalTitle',
+      bodyKey: 'nutrition.visualizationInfoModalBody',
+    },
+    recipePrivacy: {
+      titleKey: 'nutrition.recipePrivacyInfoModalTitle',
+      bodyKey: 'nutrition.recipePrivacyInfoModalBody',
+    },
+    recipeSearch: {
+      titleKey: 'nutrition.recipeSearchInfoModalTitle',
+      bodyKey: 'nutrition.recipeSearchInfoModalBody',
+    },
+    autoPlanning: {
+      titleKey: 'nutrition.autoPlanningInfoModalTitle',
+      bodyKey: 'nutrition.autoPlanningInfoModalBody',
+    },
+    data: {
+      titleKey: 'nutrition.dataInfoModalTitle',
+      bodyKey: 'nutrition.dataInfoModalBody',
+    },
+  };
+
+  const renderSectionTitle = (label: string, sectionKey: NutritionSectionInfoKey) => (
+    <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveSectionInfo(sectionKey)}>
+      <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
       <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -684,9 +726,7 @@ export const NutritionSettingsScreen = () => {
         >
           {/* 1. Comidas del día */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.dailyMealsTitle')}
-            </Text>
+            {renderSectionTitle(t('nutrition.dailyMealsTitle'), 'dailyMeals')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               {MEAL_TYPES.filter(meal => meal !== 'snack').map((meal, index) => {
                 const mealKey = meal as keyof NotificationSettings['meals'];
@@ -711,9 +751,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 2. Snacks */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.snacksAllCaps')}
-            </Text>
+            {renderSectionTitle(t('nutrition.snacksAllCaps'), 'snacks')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               <ToggleRow
                 label={t('nutrition.enableSnacks')}
@@ -733,9 +771,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 3. Visualización nutricional */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.visualizationTitle')}
-            </Text>
+            {renderSectionTitle(t('nutrition.visualizationTitle'), 'visualization')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               <RadioOption
                 label={t('nutrition.detailedView')}
@@ -755,9 +791,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 4. Recipe privacy */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.recipePrivacyTitle')}
-            </Text>
+            {renderSectionTitle(t('nutrition.recipePrivacyTitle'), 'recipePrivacy')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               <ToggleRow
                 label={t('nutrition.recipeDefaultPublicLabel')}
@@ -771,9 +805,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 5. Recipe search scope */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.recipeSearchScopeTitle')}
-            </Text>
+            {renderSectionTitle(t('nutrition.recipeSearchScopeTitle'), 'recipeSearch')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               <RadioOption
                 label={t('nutrition.recipeSearchScopeSourceLabel')}
@@ -814,9 +846,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 6. Auto-copy diet */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.autoPlanningTitle')}
-            </Text>
+            {renderSectionTitle(t('nutrition.autoPlanningTitle'), 'autoPlanning')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               <TouchableOpacity
                 style={styles.copyModeRow}
@@ -950,9 +980,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 5. Datos */}
           <View style={[styles.section, { marginBottom: spacing.xl * 2 }]}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.dataAllCaps')}
-            </Text>
+            {renderSectionTitle(t('nutrition.dataAllCaps'), 'data')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               {/* Borrar datos futuros */}
               <TouchableOpacity
@@ -988,6 +1016,47 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
         </ScrollView>
+
+        {/* Section Info Modal */}
+        <Modal visible={activeSectionInfo !== null} animationType="fade" transparent>
+          <View style={styles.modalOverlayBlur}>
+            <BlurView intensity={isDark ? 40 : 30} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setActiveSectionInfo(null)}
+            />
+            <LiquidGlassNativeCard style={styles.glassModalCard}>
+              <View style={styles.glassModalContent}>
+                <View
+                  style={[
+                    styles.infoIconContainer,
+                    { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)' },
+                  ]}
+                >
+                  <Info size={32} color={themeColors.primary} />
+                </View>
+                {activeSectionInfo && (
+                  <>
+                    <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                      {t(sectionInfoTextKeys[activeSectionInfo].titleKey)}
+                    </Text>
+                    <Text style={[styles.infoModalText, { color: themeColors.textSecondary }]}>
+                      {t(sectionInfoTextKeys[activeSectionInfo].bodyKey)}
+                    </Text>
+                  </>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => setActiveSectionInfo(null)}
+                  style={[styles.glassModalButton, { backgroundColor: themeColors.primary }]}
+                >
+                  <Text style={styles.glassModalButtonText}>{t('common.gotIt')}</Text>
+                </TouchableOpacity>
+              </View>
+            </LiquidGlassNativeCard>
+          </View>
+        </Modal>
 
         {/* Export Modal */}
         <Modal visible={showExportModal} animationType="fade" transparent>

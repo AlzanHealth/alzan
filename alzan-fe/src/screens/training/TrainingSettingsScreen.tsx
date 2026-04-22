@@ -27,6 +27,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 
+type TrainingSectionInfoKey = 'general' | 'data' | 'danger';
+
 const TrainingSettingsScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
@@ -77,6 +79,28 @@ const TrainingSettingsScreen = () => {
   const [deleteStart, setDeleteStart] = useState(new Date());
   const [deleteEnd, setDeleteEnd] = useState(new Date());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeSectionInfo, setActiveSectionInfo] = useState<TrainingSectionInfoKey | null>(null);
+
+  const sectionInfoTextKeys: Record<TrainingSectionInfoKey, { titleKey: string; bodyKey: string }> = {
+    general: {
+      titleKey: 'training.generalInfoModalTitle',
+      bodyKey: 'training.generalInfoModalBody',
+    },
+    data: {
+      titleKey: 'training.dataInfoModalTitle',
+      bodyKey: 'training.dataInfoModalBody',
+    },
+    danger: {
+      titleKey: 'training.dangerInfoModalTitle',
+      bodyKey: 'training.dangerInfoModalBody',
+    },
+  };
+
+  const renderSectionTitle = (label: string, key: TrainingSectionInfoKey) => (
+    <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveSectionInfo(key)}>
+      <Text style={[styles.sectionTitle, dynamicStyles.sublabel]}>{label}</Text>
+    </TouchableOpacity>
+  );
 
   const parseWebDateInput = (value: string): Date | null => {
     const normalized = value.trim();
@@ -222,7 +246,7 @@ const TrainingSettingsScreen = () => {
         >
           {/* 1. General Settings */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, dynamicStyles.sublabel]}>{t('training.generalAllCaps')}</Text>
+            {renderSectionTitle(t('training.generalAllCaps'), 'general')}
             <View style={[styles.card, dynamicStyles.card]}>
               <ToggleRow
                 label={t('training.autoTimer')}
@@ -260,7 +284,7 @@ const TrainingSettingsScreen = () => {
 
           {/* 2. Data Export */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, dynamicStyles.sublabel]}>{t('nutrition.dataAllCaps')}</Text>
+            {renderSectionTitle(t('nutrition.dataAllCaps'), 'data')}
             <View style={[styles.card, dynamicStyles.card]}>
               <TouchableOpacity style={styles.actionRow} onPress={() => setShowExportModal(true)} activeOpacity={0.7}>
                 <Download size={20} color={themeColors.primary} />
@@ -273,7 +297,7 @@ const TrainingSettingsScreen = () => {
 
           {/* 3. Danger Zone */}
           <View style={[styles.section, { marginBottom: spacing.xl * 2 }]}>
-            <Text style={[styles.sectionTitle, dynamicStyles.sublabel]}>{t('training.dangerZoneCaps')}</Text>
+            {renderSectionTitle(t('training.dangerZoneCaps'), 'danger')}
             <TouchableOpacity
               style={[styles.dangerCard, dynamicStyles.dangerButton, { borderColor: themeColors.danger + '30' }]}
               onPress={() => setShowDeleteModal(true)}
@@ -286,6 +310,29 @@ const TrainingSettingsScreen = () => {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        {/* Section Info Modal */}
+        <Modal visible={activeSectionInfo !== null} animationType="fade" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, dynamicStyles.modalContent]}>
+              {activeSectionInfo && (
+                <>
+                  <Text style={[styles.modalTitle, dynamicStyles.title]}>
+                    {t(sectionInfoTextKeys[activeSectionInfo].titleKey)}
+                  </Text>
+                  <Text style={[styles.sectionInfoBody, dynamicStyles.subtitle]}>
+                    {t(sectionInfoTextKeys[activeSectionInfo].bodyKey)}
+                  </Text>
+                </>
+              )}
+              <View style={styles.modalButtons}>
+                <TouchableOpacity onPress={() => setActiveSectionInfo(null)} style={styles.modalBtnConfirm}>
+                  <Text style={styles.modalBtnTextConfirm}>{t('common.gotIt')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Export Modal */}
         <Modal visible={showExportModal} animationType="fade" transparent>
@@ -600,6 +647,13 @@ const styles = StyleSheet.create({
     ...typography.body,
     textAlign: 'center',
     marginBottom: spacing.l,
+  },
+  sectionInfoBody: {
+    ...typography.body,
+    textAlign: 'left',
+    lineHeight: 22,
+    marginTop: spacing.s,
+    marginBottom: spacing.s,
   },
   label: {
     ...typography.caption,

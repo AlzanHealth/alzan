@@ -158,9 +158,24 @@ const en = {
     evenOddWeeksIndependent: 'Even and odd weeks independent',
     copyWeeklyShortDesc: 'Each new week receives the previous one',
     autoPlanningTitle: 'AUTOMATIC PLANNING',
+    autoPlanningInfoModalTitle: 'Automatic planning',
+    autoPlanningInfoModalBody:
+      'Configure how your diet is replicated between weeks: sequential, alternating, or disabled.\n\nIt applies when creating new planning weeks and to automatic meal copy behavior.',
     visualizationTitle: 'VISUALIZATION',
+    visualizationInfoModalTitle: 'Visualization',
+    visualizationInfoModalBody:
+      'Choose how meals are displayed: detailed by ingredients or summarized by totals.\n\nIt applies to meal cards and daily nutrition summary presentation.',
     dailyMealsTitle: 'DAILY MEALS',
+    dailyMealsInfoModalTitle: 'Daily meals',
+    dailyMealsInfoModalBody:
+      'Define which main meals are enabled in your day and the reminder time for each one.\n\nIt applies in Nutrition Home, meal logging, and automatic reminders.',
     recipePrivacyTitle: 'RECIPE PRIVACY',
+    recipePrivacyInfoModalTitle: 'Recipe privacy',
+    recipePrivacyInfoModalBody:
+      'Set the default visibility for recipes you create and update visibility for recipes you already saved.\n\nIt applies in Saved, Search, and to what other users can see from your recipes.',
+    snacksInfoModalTitle: 'Snacks',
+    snacksInfoModalBody:
+      'Control whether snacks are enabled and how they are shown during the day.\n\nIt applies in daily nutrition view and in meal logging when adding or editing snacks.',
     recipeDefaultPublicLabel: 'Public recipes by default',
     recipeDefaultPublicHint:
       'When enabled, all your saved recipes become public and new ones are created as public. When disabled, they become private.',
@@ -174,6 +189,9 @@ const en = {
     recipeVisibilityUpdatedPrivateMessage: 'Your recipes are now private by default.',
     recipeVisibilityUpdateErrorMessage: 'Could not update your recipe privacy. Please try again.',
     recipeSearchScopeTitle: 'RECIPE SEARCH',
+    recipeSearchInfoModalTitle: 'Recipe search',
+    recipeSearchInfoModalBody:
+      'Choose where recipes are searched when using the meal-name search box.\n\nThis setting changes how recipe search works while adding a meal: Alzan, All, Community, My recipes, or Favorites.',
     recipeSearchScopeSourceLabel: 'Alzan',
     recipeSearchScopeSourceHint: 'Search only in official Alzan recipes.',
     recipeSearchScopeAllLabel: 'All',
@@ -254,6 +272,9 @@ const en = {
     enableSnacks: 'Enable snacks',
     filters: 'Filters',
     dataAllCaps: 'DATA',
+    dataInfoModalTitle: 'Data',
+    dataInfoModalBody:
+      'Manage maintenance actions: delete future data, export history, and remove records.\n\nIt applies to nutrition data stored in your account and exported documents.',
     snacksAllCaps: 'SNACKS',
     pdfTitle: 'Alzan Health',
     pdfSubtitle: 'Nutrition Plan',
@@ -1274,6 +1295,15 @@ const en = {
     bodyweight: 'Bodyweight',
     general: 'General',
     generalAllCaps: 'GENERAL',
+    generalInfoModalTitle: 'General',
+    generalInfoModalBody:
+      'Configure how sessions behave while you train: auto timer, auto-play, sound, and vibration.\n\nThese settings affect the active workout flow and feedback during rest and set transitions.',
+    dataInfoModalTitle: 'Data',
+    dataInfoModalBody:
+      'From this section you can export your workout history to PDF for review or sharing.\n\nThe file includes sessions within the date range you choose.',
+    dangerInfoModalTitle: 'Danger zone',
+    dangerInfoModalBody:
+      'This section is for deleting planned workouts from the calendar.\n\nIt is useful for cleaning up planning, but it does not automatically remove completed history.',
     allMuscles: 'All Muscles',
     allEquipment: 'All Equipment',
     distance: 'Distance',

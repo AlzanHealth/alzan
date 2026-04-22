@@ -54,6 +54,7 @@ type BuilderWindow = 'ingredients' | 'recipes';
 type RecipeLibraryView = 'normal' | 'favorites' | 'search';
 type RecipeOriginFilter = 'all' | 'users' | 'system';
 const RECIPE_LIBRARY_PAGE_SIZE = 10;
+const MEAL_RECIPE_PAGE_SIZE = 5;
 
 interface SavedRecipeDraft {
   id: string;
@@ -237,6 +238,7 @@ export const MealLogFormScreen = () => {
   const [searchMessage, setSearchMessage] = useState<{ type: 'error' | 'info'; text: string } | null>(null);
   const [mealSearchResults, setMealSearchResults] = useState<MealComponent[]>([]);
   const [mealSearchFilter, setMealSearchFilter] = useState<MealSearchFilter>('recipe');
+  const [mealRecipePage, setMealRecipePage] = useState(1);
 
   // Meal detail modal state
   const [showMealDetailModal, setShowMealDetailModal] = useState(false);
@@ -261,6 +263,15 @@ export const MealLogFormScreen = () => {
     if (mealSearchFilter === 'precooked') return precookedSearchResults;
     return mealSearchResults;
   }, [mealSearchFilter, mealSearchResults, precookedSearchResults, recipeSearchResults]);
+  const mealRecipeTotalPages = Math.max(1, Math.ceil(recipeSearchResults.length / MEAL_RECIPE_PAGE_SIZE));
+  const paginatedRecipeSearchResults = useMemo(() => {
+    const safePage = Math.min(Math.max(1, mealRecipePage), mealRecipeTotalPages);
+    const from = (safePage - 1) * MEAL_RECIPE_PAGE_SIZE;
+    const to = from + MEAL_RECIPE_PAGE_SIZE;
+    return recipeSearchResults.slice(from, to);
+  }, [mealRecipePage, mealRecipeTotalPages, recipeSearchResults]);
+  const showMealRecipePagination =
+    recipeSearchResults.length > MEAL_RECIPE_PAGE_SIZE && (mealSearchFilter === 'recipe' || mealSearchFilter === 'all');
 
   const favoriteSavedRecipes = useMemo(
     () => savedRecipes.filter(recipe => favoriteRecipeIds.includes(recipe.id)),
@@ -375,8 +386,13 @@ export const MealLogFormScreen = () => {
       setMealSearchResults([]);
       setSearchMessage(null);
       setMealSearchFilter('recipe');
+      setMealRecipePage(1);
     }
   }, [name]);
+
+  useEffect(() => {
+    setMealRecipePage(1);
+  }, [mealSearchFilter, recipeSearchResults.length]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1596,10 +1612,15 @@ export const MealLogFormScreen = () => {
 
                       {(mealSearchFilter === 'all'
                         ? [
-                            { section: t('nutrition.recipe'), data: recipeSearchResults },
+                            { section: t('nutrition.recipe'), data: paginatedRecipeSearchResults },
                             { section: t('nutrition.preCooked'), data: precookedSearchResults },
                           ]
-                        : [{ section: null, data: filteredMealSearchResults }]
+                        : [
+                            {
+                              section: null,
+                              data: mealSearchFilter === 'recipe' ? paginatedRecipeSearchResults : filteredMealSearchResults,
+                            },
+                          ]
                       ).map((group, groupIndex) => {
                         if (group.data.length === 0) return null;
 
@@ -1664,6 +1685,57 @@ export const MealLogFormScreen = () => {
                           </View>
                         );
                       })}
+                      {showMealRecipePagination && (
+                        <View style={styles.recipePaginationRow}>
+                          <TouchableOpacity
+                            style={[
+                              styles.recipePaginationButton,
+                              mealRecipePage === 1 && styles.recipePaginationButtonDisabled,
+                              { borderColor: themeColors.border },
+                            ]}
+                            onPress={() => setMealRecipePage(prev => Math.max(1, prev - 1))}
+                            disabled={mealRecipePage === 1}
+                          >
+                            <Text
+                              style={[
+                                styles.recipePaginationButtonText,
+                                { color: mealRecipePage === 1 ? themeColors.textSecondary : themeColors.textPrimary },
+                              ]}
+                            >
+                              {t('nutrition.recipeLibraryPagePrev')}
+                            </Text>
+                          </TouchableOpacity>
+                          <Text style={[styles.recipePaginationLabel, { color: themeColors.textSecondary }]}>
+                            {t('nutrition.recipeLibraryPageIndicator', {
+                              current: mealRecipePage,
+                              total: mealRecipeTotalPages,
+                            })}
+                          </Text>
+                          <TouchableOpacity
+                            style={[
+                              styles.recipePaginationButton,
+                              mealRecipePage >= mealRecipeTotalPages && styles.recipePaginationButtonDisabled,
+                              { borderColor: themeColors.border },
+                            ]}
+                            onPress={() => setMealRecipePage(prev => Math.min(mealRecipeTotalPages, prev + 1))}
+                            disabled={mealRecipePage >= mealRecipeTotalPages}
+                          >
+                            <Text
+                              style={[
+                                styles.recipePaginationButtonText,
+                                {
+                                  color:
+                                    mealRecipePage >= mealRecipeTotalPages
+                                      ? themeColors.textSecondary
+                                      : themeColors.textPrimary,
+                                },
+                              ]}
+                            >
+                              {t('nutrition.recipeLibraryPageNext')}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>
