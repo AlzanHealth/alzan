@@ -35,11 +35,11 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _GCR_HOSTNAME: europe-southwest1-docker.pkg.dev
+  _GCR_HOSTNAME: europe-west1-docker.pkg.dev
   _PLATFORM: managed
   _SERVICE_NAME: alzan-backend
   _ARTIFACT_REPO: cloud-run-source-deploy
-  _DEPLOY_REGION: europe-southwest1
+  _DEPLOY_REGION: europe-west1
 
 tags:
   - gcp-cloud-build-deploy-cloud-run
