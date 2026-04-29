@@ -9,7 +9,7 @@ import {
   NotificationSettingsJson,
   NutritionSettingsJson,
   PrivacySettingsJson,
-} from '../types/userPreferences.types';
+} from '../types/requests.types';
 
 const PREFERENCES_STORAGE_KEY = 'user_preferences_cache';
 

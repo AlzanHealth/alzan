@@ -31,10 +31,9 @@ import {
 } from '../../modules/nutrition/services/dietCopyService';
 import { generateDietPDF } from '../../modules/nutrition/services/pdfExportService';
 import type { WebExportWindow } from '../../modules/nutrition/services/pdfExportService';
-import { NutritionSettingsJson, RecipeSearchScope } from '../../types/userPreferences.types';
 import { BlurView } from 'expo-blur';
 import { LiquidGlassNativeCard } from '../../components/common/LiquidGlassNativeCard';
-import { MealType } from '../../types/requests.types';
+import { MealType, NutritionSettingsJson, RecipeSearchScope } from '../../types/requests.types';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 

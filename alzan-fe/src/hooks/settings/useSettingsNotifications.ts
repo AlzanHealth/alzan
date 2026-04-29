@@ -4,7 +4,7 @@ import { Alert } from '../../components/common/Alert';
 import { NotificationService } from '../../services/NotificationService';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import type { NotificationSettingsJson } from '../../types/userPreferences.types';
+import { NotificationSettingsJson } from '../../types/requests.types';
 
 export interface MealReminder {
   enabled: boolean;

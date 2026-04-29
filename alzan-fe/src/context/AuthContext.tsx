@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import { checkAndCopyNewWeek } from '../modules/nutrition/services/dietCopyService';
 import { checkAndPlanNewWeeks } from '../modules/training/services/trainingPlanService';
-import type { NutritionSettingsJson } from '../types/userPreferences.types';
+import { NutritionSettingsJson } from '../types/requests.types';
 
 interface AuthContextType {
   session: Session | null;
