@@ -20,8 +20,8 @@ export interface CalculatedMacros {
 }
 
 interface IngredientRuntimeFields extends DbIngredient {
-  notes_es?: string | null;
-  notes_en?: string | null;
+  notes_es: string | null;
+  notes_en: string | null;
 }
 
 export interface IngredientSearchResult extends IngredientRuntimeFields {

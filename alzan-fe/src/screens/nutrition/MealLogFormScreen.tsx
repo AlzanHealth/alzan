@@ -1242,7 +1242,8 @@ export const MealLogFormScreen = () => {
         carbs_g: totalMacros.carbs_g,
         fats_g: totalMacros.fats_g,
       },
-      notes: null,
+      notes_en: null,
+      notes_es: null,
     };
 
     const syntheticIngredients: RecipeIngredientItem[] = recipe.ingredients.map((ingredient, index) => ({

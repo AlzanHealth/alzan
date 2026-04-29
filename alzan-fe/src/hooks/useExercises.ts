@@ -273,7 +273,6 @@ export const useExercises = (options?: UseExercisesOptions) => {
           matchesLoosely(
             trimmedSearchQuery,
             exercise.name,
-            exercise.base_name,
             exercise.base_name_es,
             exercise.base_name_en,
             exercise.description,
@@ -288,7 +287,6 @@ export const useExercises = (options?: UseExercisesOptions) => {
           const scoreA = getSearchRelevanceScore(
             trimmedSearchQuery,
             a.name,
-            a.base_name,
             a.base_name_es,
             a.base_name_en,
             a.description,
@@ -301,7 +299,6 @@ export const useExercises = (options?: UseExercisesOptions) => {
           const scoreB = getSearchRelevanceScore(
             trimmedSearchQuery,
             b.name,
-            b.base_name,
             b.base_name_es,
             b.base_name_en,
             b.description,
