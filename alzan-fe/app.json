@@ -3,7 +3,7 @@
     "name": "Alzan Health",
     "slug": "alzan-health",
     "scheme": "alzan",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -29,10 +29,7 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.alzanhealth.app",
       "versionCode": 1,
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
-      ]
+      "permissions": ["android.permission.RECORD_AUDIO", "android.permission.MODIFY_AUDIO_SETTINGS"]
     },
     "web": {
       "favicon": "./assets/favicon.png"

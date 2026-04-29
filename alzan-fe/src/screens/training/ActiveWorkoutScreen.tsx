@@ -48,6 +48,10 @@ import { useTranslation } from 'react-i18next';
 import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
 
 export type WorkoutTemplateExerciseWithDetails = WorkoutTemplateExercise & { exercise: ExerciseWithType | null };
+type AutoPlayQueue = {
+  exerciseId: string;
+  nextSetNumber: number;
+};
 
 // ... (Rest of imports or utility functions if any)
 const buildSupersetLinksFromOrderedExercises = (orderedExercises: WorkoutTemplateExerciseWithDetails[]) => {
@@ -109,15 +113,8 @@ export const ActiveWorkoutScreen = () => {
   const { sessionId } = route.params || {};
   const insets = useSafeAreaInsets();
 
-  const {
-    activeSessionData,
-    isLoading,
-    logSet,
-    finishSession,
-    cancelSession,
-    deleteSpecificSet,
-    saveSessionSupersetLinks,
-  } = useActiveWorkout(sessionId);
+  const { activeSessionData, isLoading, logSet, finishSession, cancelSession, saveSessionSupersetLinks } =
+    useActiveWorkout(sessionId);
 
   const { preferences, toDisplayWeight, toDbWeight } = useUserPreferences();
   const { settings } = useTrainingSettings();
@@ -209,6 +206,7 @@ export const ActiveWorkoutScreen = () => {
   const [executionTimerVisible, setExecutionTimerVisible] = useState(false);
   const [executionTimerSeconds, setExecutionTimerSeconds] = useState(30);
   const [pendingRestSeconds, setPendingRestSeconds] = useState<number | null>(null);
+  const [pendingAutoPlayQueue, setPendingAutoPlayQueue] = useState<AutoPlayQueue | null>(null);
 
   // Local Completed Sets State (Batch Save Model)
   const [localCompletedSets, setLocalCompletedSets] = useState<Set<string>>(new Set());
@@ -492,6 +490,11 @@ export const ActiveWorkoutScreen = () => {
     if (!isExerciseInSuperset(exercise.exercise_id)) return true;
 
     const groupIds = getSupersetGroupIds(exercise.exercise_id);
+    const lastExerciseId = groupIds[groupIds.length - 1];
+
+    // In supersets, only the last exercise in the block can trigger timers.
+    if (exercise.exercise_id !== lastExerciseId) return false;
+
     return groupIds.every(id => {
       return completedSetsState.has(`${id}-${setNumber}`);
     });
@@ -515,6 +518,23 @@ export const ActiveWorkoutScreen = () => {
 
   const getCompletedSet = (exerciseId: string, setNumber: number) => {
     return activeSessionData?.completedSets?.find(s => s.exercise_id === exerciseId && s.set_number === setNumber);
+  };
+
+  const getExerciseTotalSets = (exerciseId: string) => {
+    const exercise = visibleExercises.find(item => item.exercise_id === exerciseId);
+    return Math.max(0, (exercise?.target_sets || 3) + (extraSets[exerciseId] || 0));
+  };
+
+  const getExecutionSecondsForSet = (
+    exercise: WorkoutTemplateExerciseWithDetails | undefined,
+    setNumber: number,
+    fallbackSeconds: number,
+  ) => {
+    if (!exercise) return fallbackSeconds;
+    const key = `${exercise.exercise_id}-${setNumber}`;
+    const typedValue = parseInt(inputs[key]?.reps || '', 10);
+    if (Number.isFinite(typedValue) && typedValue > 0) return typedValue;
+    return fallbackSeconds;
   };
 
   const handleInput = (key: string, field: 'weight' | 'reps', value: string) => {
@@ -568,8 +588,22 @@ export const ActiveWorkoutScreen = () => {
     const nextCompletedSets = new Set(localCompletedSets);
     if (nextCompletedSets.has(key)) {
       nextCompletedSets.delete(key);
+      setPendingAutoPlayQueue(null);
     } else {
       nextCompletedSets.add(key);
+
+      // If user completes a later exercise in a superset block,
+      // auto-complete all previous exercises for the same set number.
+      if (isExerciseInSuperset(exerciseId)) {
+        const groupIds = getSupersetGroupIds(exerciseId);
+        const currentIndex = groupIds.indexOf(exerciseId);
+        if (currentIndex > 0) {
+          const previousIds = groupIds.slice(0, currentIndex);
+          previousIds.forEach(prevId => {
+            nextCompletedSets.add(`${prevId}-${setNumber}`);
+          });
+        }
+      }
     }
     setLocalCompletedSets(nextCompletedSets);
 
@@ -584,13 +618,28 @@ export const ActiveWorkoutScreen = () => {
         setExecutionTimerSeconds(targetRepsMin);
         setPendingRestSeconds(restVal);
         setExecutionTimerVisible(true);
+
+        if (settings.autoPlayEnabled) {
+          const totalSets = getExerciseTotalSets(exerciseId);
+          const nextSetNumber = setNumber + 1;
+          if (nextSetNumber <= totalSets && !nextCompletedSets.has(`${exerciseId}-${nextSetNumber}`)) {
+            setPendingAutoPlayQueue({ exerciseId, nextSetNumber });
+          } else {
+            setPendingAutoPlayQueue(null);
+          }
+        } else {
+          setPendingAutoPlayQueue(null);
+        }
       } else {
         // Reps-based exercise: show rest timer directly
         if (restVal > 0) {
           setTimerSeconds(restVal);
           setTimerVisible(true);
         }
+        setPendingAutoPlayQueue(null);
       }
+    } else {
+      setPendingAutoPlayQueue(null);
     }
   };
 
@@ -607,41 +656,43 @@ export const ActiveWorkoutScreen = () => {
   const handleExecutionDismiss = () => {
     setExecutionTimerVisible(false);
     setPendingRestSeconds(null);
+    setPendingAutoPlayQueue(null);
+  };
+
+  const handleRestComplete = () => {
+    setTimerVisible(false);
+
+    if (!settings.autoPlayEnabled || !pendingAutoPlayQueue) return;
+
+    const { exerciseId, nextSetNumber } = pendingAutoPlayQueue;
+    const exercise = visibleExercises.find(item => item.exercise_id === exerciseId);
+    const executionSeconds = getExecutionSecondsForSet(exercise, nextSetNumber, exercise?.target_reps_min || 30);
+    const restSeconds = exercise?.rest_seconds ?? 60;
+    const setKey = `${exerciseId}-${nextSetNumber}`;
+
+    setLocalCompletedSets(prev => {
+      const next = new Set(prev);
+      next.add(setKey);
+      return next;
+    });
+
+    const totalSets = getExerciseTotalSets(exerciseId);
+    const followingSetNumber = nextSetNumber + 1;
+    if (followingSetNumber <= totalSets) {
+      setPendingAutoPlayQueue({ exerciseId, nextSetNumber: followingSetNumber });
+    } else {
+      setPendingAutoPlayQueue(null);
+    }
+
+    setExecutionTimerSeconds(executionSeconds);
+    setPendingRestSeconds(restSeconds);
+    setExecutionTimerVisible(true);
   };
 
   // Exercise Menu Actions
   const handleViewExerciseInfo = (exercise: ExerciseWithDetails) => {
     setMenuVisibleForExercise(null);
     navigation.navigate('ExerciseDetail', { exercise: exercise });
-  };
-
-  const handleDeleteLastSet = (exerciseId: string, exerciseName: string) => {
-    setMenuVisibleForExercise(null);
-
-    // Find the highest set number for this exercise
-    const exerciseSets = activeSessionData?.completedSets?.filter(s => s.exercise_id === exerciseId) || [];
-    if (exerciseSets.length === 0) {
-      Alert.alert(t('training.noSetsTitle'), t('training.noCompletedSetsDeleteMessage'));
-      return;
-    }
-
-    // Get the last set (highest set_number)
-    const lastSet = exerciseSets.reduce((max, current) => (current.set_number > max.set_number ? current : max));
-
-    Alert.alert(
-      t('training.deleteLastSetTitle'),
-      t('training.deleteLastSetQuestion', { setNumber: lastSet.set_number, exerciseName }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => {
-            deleteSpecificSet.mutate({ sessionId, exerciseId, setNumber: lastSet.set_number });
-          },
-        },
-      ],
-    );
   };
 
   const handleDeleteExercise = (exerciseId: string, exerciseName: string) => {
@@ -1043,44 +1094,88 @@ export const ActiveWorkoutScreen = () => {
     onDismiss: () => {},
   });
 
-  const handleCompleteAll = async (exerciseId: string, item: WorkoutTemplateExerciseWithDetails) => {
-    const targetSets = Math.max(0, (item.target_sets || 3) + (extraSets[exerciseId] || 0));
+  const handleCompleteAll = (exerciseId: string, _item: WorkoutTemplateExerciseWithDetails) => {
+    Alert.alert(t('training.completeAllSetsConfirmTitle'), t('training.completeAllSetsConfirmMessage'), [
+      {
+        text: t('common.cancel'),
+        style: 'cancel',
+      },
+      {
+        text: t('training.completeAllSetsConfirmAction'),
+        style: 'default',
+        onPress: () => {
+          setPendingAutoPlayQueue(null);
+          setLocalCompletedSets(prev => {
+            const next = new Set(prev);
 
-    setLocalCompletedSets(prev => {
-      const next = new Set(prev);
-      for (let setNum = 1; setNum <= targetSets; setNum++) {
-        next.add(`${exerciseId}-${setNum}`);
-      }
-      return next;
-    });
+            const groupIds = isExerciseInSuperset(exerciseId) ? getSupersetGroupIds(exerciseId) : [exerciseId];
+            const currentIndex = groupIds.indexOf(exerciseId);
+            const idsToComplete =
+              currentIndex > 0
+                ? groupIds.slice(0, currentIndex + 1) // Completing second also completes previous ones.
+                : [exerciseId];
 
-    setSuccessModal({
-      visible: true,
-      title: t('training.workoutCompleted'),
-      message: t('training.allSetsMarked'),
-      onDismiss: () => {},
-    });
+            idsToComplete.forEach(id => {
+              const linkedExercise = visibleExercises.find(ex => ex.exercise_id === id);
+              const totalSets = Math.max(
+                0,
+                (linkedExercise?.target_sets || 3) + (extraSets[linkedExercise?.exercise_id || id] || 0),
+              );
+
+              for (let setNum = 1; setNum <= totalSets; setNum++) {
+                next.add(`${id}-${setNum}`);
+              }
+            });
+
+            return next;
+          });
+
+          setSuccessModal({
+            visible: true,
+            title: t('training.workoutCompleted'),
+            message: t('training.allSetsMarked'),
+            onDismiss: () => {},
+          });
+        },
+      },
+    ]);
   };
 
-  const handleCompleteAllExercises = async () => {
-    setLocalCompletedSets(prev => {
-      const next = new Set(prev);
-      for (const item of visibleExercises) {
-        const exerciseId = item?.exercise_id;
-        const totalSets = Math.max(0, (item?.target_sets || 3) + (extraSets[exerciseId!] || 0));
-        for (let i = 0; i < totalSets; i++) {
-          next.add(`${exerciseId}-${i + 1}`);
-        }
-      }
-      return next;
-    });
+  const handleCompleteAllExercises = () => {
+    Alert.alert(t('training.completeAllConfirmTitle'), t('training.completeAllConfirmMessage'), [
+      {
+        text: t('common.cancel'),
+        style: 'cancel',
+        onPress: () => setIsCompletingAll(false),
+      },
+      {
+        text: t('training.completeAllConfirmAction'),
+        style: 'default',
+        onPress: () => {
+          setIsCompletingAll(true);
+          setPendingAutoPlayQueue(null);
 
-    setSuccessModal({
-      visible: true,
-      title: t('common.done'),
-      message: t('training.allExercisesSetsMarked'),
-      onDismiss: () => setIsCompletingAll(false),
-    });
+          setLocalCompletedSets(prev => {
+            const next = new Set(prev);
+            for (const item of visibleExercises) {
+              const exerciseId = item?.exercise_id;
+              const totalSets = Math.max(0, (item?.target_sets || 3) + (extraSets[exerciseId!] || 0));
+              for (let i = 0; i < totalSets; i++) {
+                next.add(`${exerciseId}-${i + 1}`);
+              }
+            }
+            return next;
+          });
+
+          setSuccessModal({
+            visible: true,
+            title: t('common.done'),
+            message: t('training.allExercisesSetsMarked'),
+            onDismiss: () => setIsCompletingAll(false),
+          });
+        },
+      },
+    ]);
   };
 
   const floatingFooterHeight = 75;
@@ -1587,8 +1682,11 @@ export const ActiveWorkoutScreen = () => {
             <RestTimer
               isVisible={timerVisible}
               initialSeconds={timerSeconds}
-              onComplete={() => setTimerVisible(false)}
-              onDismiss={() => setTimerVisible(false)}
+              onComplete={handleRestComplete}
+              onDismiss={() => {
+                setTimerVisible(false);
+                setPendingAutoPlayQueue(null);
+              }}
               soundEnabled={settings.soundEnabled}
               vibrationEnabled={settings.hapticsEnabled}
               bottomOffset={timerBottomOffset}
@@ -1710,27 +1808,6 @@ export const ActiveWorkoutScreen = () => {
                 })()}
 
                 <TouchableOpacity
-                  style={[
-                    styles.menuOption,
-                    { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                  ]}
-                  onPress={() => {
-                    const exercise = visibleExercises.find(e => e.exercise_id === menuVisibleForExercise);
-                    if (exercise)
-                      handleDeleteLastSet(
-                        exercise.exercise_id,
-                        (exercise.exercise ? getLocalizedExerciseName(exercise.exercise) : undefined) ||
-                          t('training.exercise'),
-                      );
-                  }}
-                >
-                  <Trash2 size={20} color={themeColors.warning || '#FF9500'} />
-                  <Text style={[styles.menuOptionText, { color: themeColors.textPrimary }]}>
-                    {t('training.deleteSet')}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
                   style={[styles.menuOption, { borderBottomWidth: 0 }]}
                   onPress={() => {
                     const exercise = visibleExercises.find(e => e.exercise_id === menuVisibleForExercise);
@@ -1816,6 +1893,13 @@ export const ActiveWorkoutScreen = () => {
                   </View>
                   <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
                     {t('training.supersetInstruction')}
+                  </Text>
+                </View>
+
+                <View style={styles.helpRow}>
+                  <Text style={[styles.helpLabel, { color: themeColors.primary }]}>i</Text>
+                  <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
+                    {t('training.onlyCompletedSetsSavedInstruction')}
                   </Text>
                 </View>
 

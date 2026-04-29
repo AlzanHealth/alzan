@@ -1576,6 +1576,42 @@ export type Database = {
           },
         ];
       };
+      recipe_favorites: {
+        Row: {
+          created_at: string;
+          id: string;
+          recipe_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          recipe_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          recipe_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'recipe_favorites_recipe_id_fkey';
+            columns: ['recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'recipe_favorites_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       recipe_items: {
         Row: {
           created_at: string;
@@ -1626,39 +1662,71 @@ export type Database = {
       };
       recipes: {
         Row: {
+          carbs_g_100: number;
           created_at: string;
+          deleted_at: string | null;
           description_en: string | null;
           description_es: string | null;
+          fat_g_100: number;
           id: string;
+          kcal_100: number;
           name_en: string | null;
           name_es: string;
           name_norm_es: string;
+          owner_user_id: string | null;
+          protein_g_100: number;
           quality_score: number;
+          source: string;
           updated_at: string;
+          visibility: string;
         };
         Insert: {
+          carbs_g_100?: number;
           created_at?: string;
+          deleted_at?: string | null;
           description_en?: string | null;
           description_es?: string | null;
+          fat_g_100?: number;
           id?: string;
+          kcal_100?: number;
           name_en?: string | null;
           name_es: string;
           name_norm_es: string;
+          owner_user_id?: string | null;
+          protein_g_100?: number;
           quality_score?: number;
+          source?: string;
           updated_at?: string;
+          visibility?: string;
         };
         Update: {
+          carbs_g_100?: number;
           created_at?: string;
+          deleted_at?: string | null;
           description_en?: string | null;
           description_es?: string | null;
+          fat_g_100?: number;
           id?: string;
+          kcal_100?: number;
           name_en?: string | null;
           name_es?: string;
           name_norm_es?: string;
+          owner_user_id?: string | null;
+          protein_g_100?: number;
           quality_score?: number;
+          source?: string;
           updated_at?: string;
+          visibility?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'recipes_owner_user_id_fkey';
+            columns: ['owner_user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       resting_hr_logs: {
         Row: {

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Animated,
   Modal,
   TouchableWithoutFeedback,
@@ -36,9 +35,11 @@ import { TrainingScreenNavigationProp, TabParamList } from '../../types/navigati
 import { DaySwitcherRef } from '../../components/common/DaySwitcher';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
+import { Alert } from '../../components/common/Alert';
 
 interface DailyEntry {
   id: string;
+  status?: 'planned' | 'completed' | 'skipped' | 'rescheduled';
   isExtraSession?: boolean;
   activity_session_id?: string | null;
   gym_template_id?: string | null;
@@ -130,6 +131,24 @@ export const TrainingHomeScreen = () => {
     }
   };
 
+  // Mark a single recurring occurrence as skipped so propagation doesn't recreate it.
+  const skipSinglePlannedOccurrence = async (planId: string) => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.from('workout_plans').update({ status: 'skipped' }).eq('id', planId);
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    } catch (err) {
+      console.error('Error skipping single planned occurrence:', err);
+      Alert.alert(t('common.error'), t('training.deleteWorkoutError'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Delete with future occurrences
   const deleteWithFuture = async (planId: string, templateId: string, isGym: boolean, dayOfWeek: number) => {
     if (!user) return;
@@ -141,7 +160,7 @@ export const TrainingHomeScreen = () => {
       const templateColumn = isGym ? 'gym_template_id' : 'endurance_template_id';
       const { data: futurePlans, error: fetchError } = await supabase
         .from('workout_plans')
-        .select('id, planned_date, completed_at')
+        .select('id, planned_date, completed_at, status')
         .eq(templateColumn, templateId)
         .eq('user_id', user?.id)
         .gte('planned_date', today)
@@ -152,6 +171,7 @@ export const TrainingHomeScreen = () => {
       // Filter to only those matching the same day of week
       const plansToDelete =
         futurePlans?.filter(plan => {
+          if (plan.status === 'skipped') return false;
           const planDate = new Date(plan.planned_date + 'T00:00:00');
           return planDate.getDay() === dayOfWeek;
         }) || [];
@@ -186,7 +206,7 @@ export const TrainingHomeScreen = () => {
     const templateColumn = isGym ? 'gym_template_id' : 'endurance_template_id';
     const { data: futurePlans } = await supabase
       .from('workout_plans')
-      .select('id, planned_date, completed_at')
+      .select('id, planned_date, completed_at, status')
       .eq(templateColumn, templateId)
       .eq('user_id', user?.id)
       .gt('planned_date', planDateStr) // After THIS plan's date
@@ -197,6 +217,7 @@ export const TrainingHomeScreen = () => {
     // Filter to same day of week
     const futureOnSameDay =
       futurePlans?.filter(fp => {
+        if (fp.status === 'skipped') return false;
         const fpDate = new Date((fp.planned_date || '') + 'T00:00:00');
         return fpDate.getDay() === planDayOfWeek;
       }) || [];
@@ -213,7 +234,7 @@ export const TrainingHomeScreen = () => {
           {
             text: t('training.deleteWorkoutOnlyThis'),
             style: 'destructive',
-            onPress: () => deletePlan(planId),
+            onPress: () => skipSinglePlannedOccurrence(planId),
           },
           {
             text: t('training.deleteWorkoutAllFuture'),
@@ -226,7 +247,7 @@ export const TrainingHomeScreen = () => {
       // Recurring but no future plans yet
       Alert.alert(t('training.recurringTemplateTitle'), t('training.recurringTemplateWarning'), [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('common.delete'), style: 'destructive', onPress: () => deletePlan(planId) },
+        { text: t('common.delete'), style: 'destructive', onPress: () => skipSinglePlannedOccurrence(planId) },
       ]);
     } else {
       // Simple one-off plan
@@ -308,10 +329,11 @@ export const TrainingHomeScreen = () => {
       // 1. Get Scheduled Plans
       const { data: plans } = await supabase
         .from('workout_plans')
-        .select('planned_date')
+        .select('planned_date, status')
         .eq('user_id', user.id)
         .gte('planned_date', startStr)
-        .lte('planned_date', endStr);
+        .lte('planned_date', endStr)
+        .neq('status', 'skipped');
 
       // 2. Get Completed Sessions
       const { data: sessions } = await supabase
@@ -381,7 +403,8 @@ export const TrainingHomeScreen = () => {
                 `,
         )
         .eq('user_id', user.id)
-        .eq('planned_date', formattedDate);
+        .eq('planned_date', formattedDate)
+        .neq('status', 'skipped');
 
       if (error) throw error;
       return (data as DailyEntry[]) || [];

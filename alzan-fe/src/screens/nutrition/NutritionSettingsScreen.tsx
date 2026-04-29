@@ -31,7 +31,7 @@ import {
 } from '../../modules/nutrition/services/dietCopyService';
 import { generateDietPDF } from '../../modules/nutrition/services/pdfExportService';
 import type { WebExportWindow } from '../../modules/nutrition/services/pdfExportService';
-import { NutritionSettingsJson } from '../../types/userPreferences.types';
+import { NutritionSettingsJson, RecipeSearchScope } from '../../types/userPreferences.types';
 import { BlurView } from 'expo-blur';
 import { LiquidGlassNativeCard } from '../../components/common/LiquidGlassNativeCard';
 import { MealType } from '../../types/requests.types';
@@ -54,6 +54,16 @@ const DEFAULT_SNACK_OPTS = {
   treat_as_meal: true,
   show_only_if_content: false,
 };
+
+type RecipeDefaultVisibility = 'private' | 'public';
+type NutritionSectionInfoKey =
+  | 'dailyMeals'
+  | 'snacks'
+  | 'visualization'
+  | 'recipePrivacy'
+  | 'recipeSearch'
+  | 'autoPlanning'
+  | 'data';
 
 // Radio Option Component
 const RadioOption = ({
@@ -165,6 +175,10 @@ export const NutritionSettingsScreen = () => {
   const enabledMeals = preferences?.nutrition_prefs?.enabled_meals || DEFAULT_ENABLED_MEALS;
   const snackOpts = preferences?.nutrition_prefs?.snack_behavior || DEFAULT_SNACK_OPTS;
   const macroDisplay = preferences?.nutrition_prefs?.macro_display || 'per_meal';
+  const defaultRecipeVisibility: RecipeDefaultVisibility =
+    preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
+  const recipesArePublicByDefault = defaultRecipeVisibility === 'public';
+  const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
 
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
@@ -186,10 +200,12 @@ export const NutritionSettingsScreen = () => {
 
   // UI Loading states
   const [isLoadingCopy, setIsLoadingCopy] = useState(false);
+  const [isRecipeVisibilityUpdating, setIsRecipeVisibilityUpdating] = useState(false);
 
   // Modal states for copy info
   const [showSequentialInfo, setShowSequentialInfo] = useState(false);
   const [showAlternatingInfo, setShowAlternatingInfo] = useState(false);
+  const [activeSectionInfo, setActiveSectionInfo] = useState<NutritionSectionInfoKey | null>(null);
 
   // New states for overwrite protection
   const [showOverwriteModal, setShowOverwriteModal] = useState(false);
@@ -251,12 +267,71 @@ export const NutritionSettingsScreen = () => {
 
   // Helper to update preferences
   const updateNutritionPrefs = (updates: Partial<NutritionSettingsJson>) => {
-    updatePreferences({
+    return updatePreferences({
       nutrition_prefs: {
         ...preferences?.nutrition_prefs,
         ...updates,
       } as NutritionSettingsJson,
     });
+  };
+
+  const applyRecipeVisibilityForUserRecipes = async (makePublic: boolean) => {
+    if (!user) return;
+
+    setIsRecipeVisibilityUpdating(true);
+    const nextVisibility: RecipeDefaultVisibility = makePublic ? 'public' : 'private';
+
+    try {
+      const { error: recipeUpdateError } = await supabase
+        .from('recipes')
+        .update({
+          visibility: nextVisibility,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('owner_user_id', user.id)
+        .eq('source', 'user')
+        .is('deleted_at', null);
+
+      if (recipeUpdateError) {
+        console.error('[NutritionSettings] Error updating recipe visibility:', recipeUpdateError);
+        Alert.alert(t('common.error'), t('nutrition.recipeVisibilityUpdateErrorMessage'));
+        return;
+      }
+
+      await updateNutritionPrefs({ default_recipe_visibility: nextVisibility });
+
+      Alert.alert(
+        t('nutrition.recipeVisibilityUpdatedTitle'),
+        makePublic
+          ? t('nutrition.recipeVisibilityUpdatedPublicMessage')
+          : t('nutrition.recipeVisibilityUpdatedPrivateMessage'),
+      );
+    } catch (error) {
+      console.error('[NutritionSettings] Error applying recipe visibility setting:', error);
+      Alert.alert(t('common.error'), t('nutrition.recipeVisibilityUpdateErrorMessage'));
+    } finally {
+      setIsRecipeVisibilityUpdating(false);
+    }
+  };
+
+  const handleRecipeVisibilityToggle = (nextValue: boolean) => {
+    if (isRecipeVisibilityUpdating || nextValue === recipesArePublicByDefault) return;
+
+    Alert.alert(
+      t('nutrition.recipeVisibilityConfirmTitle'),
+      nextValue
+        ? t('nutrition.recipeVisibilityConfirmPublicMessage')
+        : t('nutrition.recipeVisibilityConfirmPrivateMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('nutrition.confirmAction'),
+          onPress: () => {
+            void applyRecipeVisibilityForUserRecipes(nextValue);
+          },
+        },
+      ],
+    );
   };
 
   // Delete future meal logs for a specific meal type (from TODAY onwards)
@@ -335,6 +410,11 @@ export const NutritionSettingsScreen = () => {
   const setDisplayOption = (option: 'per_meal' | 'daily_total') => {
     console.log(`[NutritionSettings] Set display option: ${option}`);
     updateNutritionPrefs({ macro_display: option });
+  };
+
+  const setRecipeSearchScope = (scope: RecipeSearchScope) => {
+    if (scope === recipeSearchScope) return;
+    updateNutritionPrefs({ recipe_search_scope: scope });
   };
 
   // Export action
@@ -603,6 +683,43 @@ export const NutritionSettingsScreen = () => {
     setSelectedMeal(null);
   };
 
+  const sectionInfoTextKeys = {
+    dailyMeals: {
+      titleKey: 'nutrition.dailyMealsInfoModalTitle',
+      bodyKey: 'nutrition.dailyMealsInfoModalBody',
+    },
+    snacks: {
+      titleKey: 'nutrition.snacksInfoModalTitle',
+      bodyKey: 'nutrition.snacksInfoModalBody',
+    },
+    visualization: {
+      titleKey: 'nutrition.visualizationInfoModalTitle',
+      bodyKey: 'nutrition.visualizationInfoModalBody',
+    },
+    recipePrivacy: {
+      titleKey: 'nutrition.recipePrivacyInfoModalTitle',
+      bodyKey: 'nutrition.recipePrivacyInfoModalBody',
+    },
+    recipeSearch: {
+      titleKey: 'nutrition.recipeSearchInfoModalTitle',
+      bodyKey: 'nutrition.recipeSearchInfoModalBody',
+    },
+    autoPlanning: {
+      titleKey: 'nutrition.autoPlanningInfoModalTitle',
+      bodyKey: 'nutrition.autoPlanningInfoModalBody',
+    },
+    data: {
+      titleKey: 'nutrition.dataInfoModalTitle',
+      bodyKey: 'nutrition.dataInfoModalBody',
+    },
+  } as const satisfies Record<NutritionSectionInfoKey, { titleKey: string; bodyKey: string }>;
+
+  const renderSectionTitle = (label: string, sectionKey: NutritionSectionInfoKey) => (
+    <TouchableOpacity activeOpacity={0.8} onPress={() => setActiveSectionInfo(sectionKey)}>
+      <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
       <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -613,9 +730,7 @@ export const NutritionSettingsScreen = () => {
         >
           {/* 1. Comidas del día */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.dailyMealsTitle')}
-            </Text>
+            {renderSectionTitle(t('nutrition.dailyMealsTitle'), 'dailyMeals')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               {MEAL_TYPES.filter(meal => meal !== 'snack').map((meal, index) => {
                 const mealKey = meal as keyof NotificationSettings['meals'];
@@ -640,9 +755,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 2. Snacks */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.snacksAllCaps')}
-            </Text>
+            {renderSectionTitle(t('nutrition.snacksAllCaps'), 'snacks')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               <ToggleRow
                 label={t('nutrition.enableSnacks')}
@@ -662,9 +775,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 3. Visualización nutricional */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.visualizationTitle')}
-            </Text>
+            {renderSectionTitle(t('nutrition.visualizationTitle'), 'visualization')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               <RadioOption
                 label={t('nutrition.detailedView')}
@@ -682,11 +793,64 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 4. Auto-copy diet */}
+          {/* 4. Recipe privacy */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.autoPlanningTitle')}
-            </Text>
+            {renderSectionTitle(t('nutrition.recipePrivacyTitle'), 'recipePrivacy')}
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <ToggleRow
+                label={t('nutrition.recipeDefaultPublicLabel')}
+                description={t('nutrition.recipeDefaultPublicHint')}
+                value={recipesArePublicByDefault}
+                onValueChange={handleRecipeVisibilityToggle}
+                isLoading={isRecipeVisibilityUpdating}
+              />
+            </View>
+          </View>
+
+          {/* 5. Recipe search scope */}
+          <View style={styles.section}>
+            {renderSectionTitle(t('nutrition.recipeSearchScopeTitle'), 'recipeSearch')}
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeSourceLabel')}
+                description={t('nutrition.recipeSearchScopeSourceHint')}
+                selected={recipeSearchScope === 'source'}
+                onSelect={() => setRecipeSearchScope('source')}
+              />
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeAllLabel')}
+                description={t('nutrition.recipeSearchScopeAllHint')}
+                selected={recipeSearchScope === 'all'}
+                onSelect={() => setRecipeSearchScope('all')}
+              />
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeUsersLabel')}
+                description={t('nutrition.recipeSearchScopeUsersHint')}
+                selected={recipeSearchScope === 'users'}
+                onSelect={() => setRecipeSearchScope('users')}
+              />
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeSavedLabel')}
+                description={t('nutrition.recipeSearchScopeSavedHint')}
+                selected={recipeSearchScope === 'saved'}
+                onSelect={() => setRecipeSearchScope('saved')}
+              />
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+              <RadioOption
+                label={t('nutrition.recipeSearchScopeFavoritesLabel')}
+                description={t('nutrition.recipeSearchScopeFavoritesHint')}
+                selected={recipeSearchScope === 'favorites'}
+                onSelect={() => setRecipeSearchScope('favorites')}
+              />
+            </View>
+          </View>
+
+          {/* 6. Auto-copy diet */}
+          <View style={styles.section}>
+            {renderSectionTitle(t('nutrition.autoPlanningTitle'), 'autoPlanning')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               <TouchableOpacity
                 style={styles.copyModeRow}
@@ -820,9 +984,7 @@ export const NutritionSettingsScreen = () => {
 
           {/* 5. Datos */}
           <View style={[styles.section, { marginBottom: spacing.xl * 2 }]}>
-            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
-              {t('nutrition.dataAllCaps')}
-            </Text>
+            {renderSectionTitle(t('nutrition.dataAllCaps'), 'data')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               {/* Borrar datos futuros */}
               <TouchableOpacity
@@ -858,6 +1020,47 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
         </ScrollView>
+
+        {/* Section Info Modal */}
+        <Modal visible={activeSectionInfo !== null} animationType="fade" transparent>
+          <View style={styles.modalOverlayBlur}>
+            <BlurView intensity={isDark ? 40 : 30} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setActiveSectionInfo(null)}
+            />
+            <LiquidGlassNativeCard style={styles.glassModalCard}>
+              <View style={styles.glassModalContent}>
+                <View
+                  style={[
+                    styles.infoIconContainer,
+                    { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)' },
+                  ]}
+                >
+                  <Info size={32} color={themeColors.primary} />
+                </View>
+                {activeSectionInfo && (
+                  <>
+                    <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                      {t(sectionInfoTextKeys[activeSectionInfo].titleKey)}
+                    </Text>
+                    <Text style={[styles.infoModalText, { color: themeColors.textSecondary }]}>
+                      {t(sectionInfoTextKeys[activeSectionInfo].bodyKey)}
+                    </Text>
+                  </>
+                )}
+
+                <TouchableOpacity
+                  onPress={() => setActiveSectionInfo(null)}
+                  style={[styles.glassModalButton, { backgroundColor: themeColors.primary }]}
+                >
+                  <Text style={styles.glassModalButtonText}>{t('common.gotIt')}</Text>
+                </TouchableOpacity>
+              </View>
+            </LiquidGlassNativeCard>
+          </View>
+        </Modal>
 
         {/* Export Modal */}
         <Modal visible={showExportModal} animationType="fade" transparent>

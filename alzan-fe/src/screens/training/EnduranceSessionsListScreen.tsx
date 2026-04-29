@@ -1,5 +1,15 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Modal, Platform } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  Modal,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { TrainingScreenNavigationProp } from '../../types/navigation.types';
@@ -32,6 +42,7 @@ interface DateFilter {
 
 type ActivityView = 'calendar' | 'history';
 type HistorySportFilter = 'all' | 'gym' | ActivitySession['sport_type'];
+const HISTORY_PAGE_SIZE = 10;
 
 interface HistorySummaryTotals {
   totalDurationSeconds: number;
@@ -127,6 +138,7 @@ export const EnduranceSessionsListScreen = () => {
   const [historySportFilter, setHistorySportFilter] = useState<HistorySportFilter>('all');
   const [historySportLabel, setHistorySportLabel] = useState<string>('');
   const [isCalendarDrilldownActive, setIsCalendarDrilldownActive] = useState(false);
+  const [historyVisibleLimit, setHistoryVisibleLimit] = useState(HISTORY_PAGE_SIZE);
   const [calendarViewState, setCalendarViewState] = useState<ActivityCalendarViewState>(() => ({
     mode: 'month',
     monthAnchorTimestamp: startOfDay(new Date()).getTime(),
@@ -190,10 +202,17 @@ export const EnduranceSessionsListScreen = () => {
     () => ({
       ...currentDateRange,
       sportType: isHistoryView ? historySportFilter : ('all' as const),
+      limit: isHistoryView ? historyVisibleLimit : undefined,
+      enabled: isHistoryView,
     }),
-    [currentDateRange.endDate, currentDateRange.startDate, historySportFilter, isHistoryView],
+    [currentDateRange.endDate, currentDateRange.startDate, historySportFilter, historyVisibleLimit, isHistoryView],
   );
-  const { sessions, isLoading, deleteSession } = useEnduranceSessions(historyQueryOptions);
+  const { sessions, isLoading, isFetching, hasMore, deleteSession } = useEnduranceSessions(historyQueryOptions);
+
+  useEffect(() => {
+    if (!isHistoryView) return;
+    setHistoryVisibleLimit(HISTORY_PAGE_SIZE);
+  }, [currentDateRange.endDate, currentDateRange.startDate, historySportFilter, isHistoryView]);
 
   const getSportFilterLabel = (sport: HistorySportFilter): string => {
     if (sport === 'all') {
@@ -1024,6 +1043,28 @@ export const EnduranceSessionsListScreen = () => {
                   </TouchableOpacity>
                 );
               })}
+
+              {hasMore && sessionsForHistory.length > 0 && (
+                <TouchableOpacity
+                  style={[
+                    styles.loadMoreButton,
+                    {
+                      borderColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.08)',
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.75)',
+                    },
+                  ]}
+                  onPress={() => setHistoryVisibleLimit(previous => previous + HISTORY_PAGE_SIZE)}
+                  disabled={isFetching}
+                >
+                  {isFetching ? (
+                    <ActivityIndicator size="small" color={themeColors.primary} />
+                  ) : (
+                    <Text style={[styles.loadMoreButtonText, { color: themeColors.primary }]}>
+                      {t('common.loadMore')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </ScrollView>
           </>
         ) : (
@@ -1088,6 +1129,19 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: spacing.l,
+  },
+  loadMoreButton: {
+    marginTop: spacing.s,
+    marginBottom: spacing.l,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadMoreButtonText: {
+    ...typography.body,
+    fontWeight: '600',
   },
   card: {
     marginBottom: spacing.m,

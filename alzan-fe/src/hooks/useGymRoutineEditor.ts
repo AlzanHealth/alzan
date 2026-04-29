@@ -79,8 +79,8 @@ export const useGymRoutineEditor = (routineId?: string) => {
           exercise: te.exercise
             ? {
                 ...te.exercise,
-                base_name: getLocalizedExerciseName(te.exercise),
-                description: getLocalizedExerciseDescription(te.exercise),
+                base_name: getLocalizedExerciseName(te.exercise, languageCode),
+                description: getLocalizedExerciseDescription(te.exercise, languageCode),
                 exercise_type_code: te.exercise.exercise_type?.code || null,
               }
             : null,

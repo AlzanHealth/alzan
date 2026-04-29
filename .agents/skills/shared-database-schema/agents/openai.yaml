@@ -1,0 +1,3 @@
+display_name: "Alzan: Database Schema"
+short_description: "Provides access to the full SQL schema for data modeling and query writing."
+default_prompt: "Read the database schema from references/schema.md and use it to answer questions or write queries."

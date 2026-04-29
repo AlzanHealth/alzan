@@ -1,6 +1,21 @@
+# Frontend AI Reference
+
+This file is the detailed frontend reference for AI agents working in `alzan-fe/`.
+
+- Entry point: use `alzan-fe/AGENTS.md` first.
+- Purpose: keep concrete frontend examples, patterns, and anti-patterns out of the short routing files.
+- Scope: use this reference when you need deeper implementation detail after selecting the correct skills.
+
 # Development Guidelines for AI Agents
 
 This document provides clear instructions for AI agents working on this React Native (Expo) repository. Follow these patterns strictly to ensure code quality, type safety, and cross-platform compatibility (iOS, Android, Web).
+
+## Skills Usage (Mandatory)
+
+- Always use the repository skills when they apply to the task.
+- Prioritize frontend skills first (`fe-*`), then shared skills (`shared-*`).
+- For visual exploration, premium polish, motion taste, or art direction, you may also use the frontend design skills (`fe-design-taste-frontend`, `fe-emil-design-eng`, `fe-gpt-taste`, `fe-high-end-visual-design`, `fe-minimalist-ui`), but keep final implementation grounded in the RN/Expo skills.
+- For commit-related requests, use the commit generator skill and provide commit text only.
 
 ---
 
