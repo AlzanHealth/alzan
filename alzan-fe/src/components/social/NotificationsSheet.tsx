@@ -129,7 +129,7 @@ export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible,
                 {acceptMutation.isPending ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.actionAcceptText}>Aceptar</Text>
+                  <Text style={styles.actionAcceptText}>{t('common.accept')}</Text>
                 )}
               </TouchableOpacity>
               <TouchableOpacity
@@ -151,7 +151,7 @@ export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible,
                 {rejectMutation.isPending ? (
                   <ActivityIndicator size="small" color={colors.textSecondary} />
                 ) : (
-                  <Text style={[styles.actionRejectText, { color: colors.textSecondary }]}>Rechazar</Text>
+                  <Text style={[styles.actionRejectText, { color: colors.textSecondary }]}>{t('common.reject')}</Text>
                 )}
               </TouchableOpacity>
             </View>

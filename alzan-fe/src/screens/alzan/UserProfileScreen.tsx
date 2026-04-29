@@ -1,15 +1,3 @@
-/**
- * UserProfileScreen — THE single profile screen for the entire Alzan social module.
- *
- * Used in two navigation contexts:
- *  - AlzanProfile tab  → no route params → reads own userId from auth
- *  - OtherUserProfile stack push → route params.userId → another user's profile
- *
- * isOwnProfile is computed: userId === auth.user.id
- *
- * Privacy gate: if !isOwnProfile && !is_following → show locked view
- * (tabs/content hidden until following)
- */
 import React, { useState, createContext, useContext } from 'react';
 import {
   View,
@@ -80,7 +68,14 @@ const MOCK_WEEKLY_STATS = {
   cycling: { activities: 3, distance: 7, time: '1h 05m', calories: 300, avgPace: '25.0', longestRun: '7km' },
 };
 
-const MOCK_ACTIVITIES = [
+interface Activity {
+  id: string;
+  type: 'running' | 'gym' | 'challenge';
+  distance?: string;
+  exercises?: string;
+}
+
+const MOCK_ACTIVITIES: Activity[] = [
   { id: '1', type: 'running', distance: '5k' },
   { id: '2', type: 'gym', exercises: '8' },
   { id: '3', type: 'challenge' },
@@ -409,7 +404,7 @@ const GridItem = ({ item, index }: { item: (typeof MOCK_ACTIVITIES)[0]; index: n
           <MapPin size={10} color="#fff" />
         </View>
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.gridOverlay}>
-          <Text style={styles.gridOverlayText}>{'distance' in item ? (item as any).distance : ''}</Text>
+          <Text style={styles.gridOverlayText}>{item.distance}</Text>
         </LinearGradient>
       </View>
     );
@@ -425,7 +420,7 @@ const GridItem = ({ item, index }: { item: (typeof MOCK_ACTIVITIES)[0]; index: n
         </View>
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.gridOverlay}>
           <Text style={styles.gridOverlayText}>
-            {'exercises' in item ? `${(item as any).exercises}${t('alzan.previousRecordAbbr')}` : ''}
+            {item?.exercises ? `${item.exercises}${t('alzan.previousRecordAbbr')}` : ''}
           </Text>
         </LinearGradient>
       </View>
@@ -498,14 +493,15 @@ const LogrosTab = () => {
 
 const PrivateGate = ({ displayName }: { displayName: string }) => {
   const { styles: themeStyles, colors } = useAlzanTheme();
+  const { t } = useTranslation();
   return (
     <View style={styles.gateContainer}>
       <View style={[styles.gateLockCircle, { backgroundColor: colors.primary + '1A' }]}>
         <Lock size={32} color={colors.primary} />
       </View>
-      <Text style={[styles.gateTitle, themeStyles.profileName]}>Perfil privado</Text>
+      <Text style={[styles.gateTitle, themeStyles.profileName]}>{t('alzan.privateProfile')}</Text>
       <Text style={[styles.gateSubtitle, themeStyles.profileBio]}>
-        Sigue a {displayName} para ver sus publicaciones y actividad.
+        {t('alzan.followPrivateProfile', { displayName })}
       </Text>
     </View>
   );

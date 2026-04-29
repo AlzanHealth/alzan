@@ -2,6 +2,8 @@ import en from './en';
 
 export default {
   common: {
+    accept: 'Aceptar',
+    reject: 'Rechazar',
     loading: 'Cargando...',
     error: 'Ocurrió un error',
     save: 'Guardar',
@@ -400,6 +402,8 @@ export default {
     searchConversationsPlaceholder: 'Buscar conversaciones...',
     youPrefix: 'Tú',
     newMessagesCount: '{{count}} mensajes nuevos',
+    privateProfile: 'Perfil privado',
+    followPrivateProfile: 'Sigue a {displayName} para ver sus publicaciones y actividad.',
     timeNow: 'Ahora',
     timeYesterday: 'Ayer',
   },

@@ -1,5 +1,7 @@
 const en = {
   common: {
+    accept: 'Accept',
+    reject: 'Reject',
     loading: 'Loading...',
     error: 'An error occurred',
     save: 'Save',
@@ -397,6 +399,8 @@ const en = {
     newMessagesCount: '{{count}} new messages',
     timeNow: 'Now',
     timeYesterday: 'Yesterday',
+    followPrivateProfile: 'Follow {{displayName}} to see their posts and activity.',
+    privateProfile: 'Private profile',
   },
   health: {
     last: 'Last',
