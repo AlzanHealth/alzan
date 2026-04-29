@@ -217,7 +217,13 @@ const useAlzanTheme = () => {
 };
 
 // Header con Avatar, Toggle y Acciones
-const Header = ({ onOpenNotifications, onOpenSearch }: { onOpenNotifications: () => void; onOpenSearch: () => void }) => {
+const Header = ({
+  onOpenNotifications,
+  onOpenSearch,
+}: {
+  onOpenNotifications: () => void;
+  onOpenSearch: () => void;
+}) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'siguiendo' | 'global'>('siguiendo');
   const { styles: themeStyles, isDark } = useAlzanTheme();
@@ -434,7 +440,10 @@ export const AlzanHomeScreen = () => {
 
         <SafeAreaView style={styles.safeArea}>
           {/* Fixed Header */}
-          <Header onOpenNotifications={() => setIsNotificationsVisible(true)} onOpenSearch={() => setIsSearchVisible(true)} />
+          <Header
+            onOpenNotifications={() => setIsNotificationsVisible(true)}
+            onOpenSearch={() => setIsSearchVisible(true)}
+          />
 
           {/* Scrollable Content with Pull-to-Refresh */}
           <ScrollView

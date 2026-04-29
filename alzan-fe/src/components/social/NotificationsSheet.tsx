@@ -133,7 +133,11 @@ export const NotificationsSheet: React.FC<NotificationsSheetProps> = ({ visible,
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, styles.actionReject, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }]}
+                style={[
+                  styles.actionButton,
+                  styles.actionReject,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' },
+                ]}
                 disabled={isMutating}
                 onPress={e => {
                   e.stopPropagation();

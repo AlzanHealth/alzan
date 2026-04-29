@@ -118,13 +118,7 @@ const MOCK_PRS = [
 // HEADER
 // ============================================================================
 
-const ProfileHeader = ({
-  isOwnProfile,
-  username,
-}: {
-  isOwnProfile: boolean;
-  username?: string | null;
-}) => {
+const ProfileHeader = ({ isOwnProfile, username }: { isOwnProfile: boolean; username?: string | null }) => {
   const { styles: themeStyles } = useAlzanTheme();
   const { t } = useTranslation();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -256,7 +250,11 @@ const ProfileHero = ({
           <Text style={[styles.statLabel, themeStyles.statLabel]}>{t('alzan.followers')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.statCard, themeStyles.statCard, isWeeklyExpanded && [styles.statCardActive, themeStyles.statCardActive]]}
+          style={[
+            styles.statCard,
+            themeStyles.statCard,
+            isWeeklyExpanded && [styles.statCardActive, themeStyles.statCardActive],
+          ]}
           onPress={onWeeklyPress}
         >
           <Text style={[styles.statValue, themeStyles.statValue, isWeeklyExpanded && themeStyles.statValueActive]}>
@@ -282,13 +280,33 @@ const WeeklySummary = () => {
   const { preferences } = useUserPreferences();
   const stats = MOCK_WEEKLY_STATS[selected];
 
-  const Pill = ({ id, label, icon: Icon }: { id: keyof typeof MOCK_WEEKLY_STATS; label: string; icon?: LucideIcon }) => (
+  const Pill = ({
+    id,
+    label,
+    icon: Icon,
+  }: {
+    id: keyof typeof MOCK_WEEKLY_STATS;
+    label: string;
+    icon?: LucideIcon;
+  }) => (
     <TouchableOpacity
       onPress={() => setSelected(id)}
-      style={[styles.pill, selected === id && { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)', borderColor: colors.primary }]}
+      style={[
+        styles.pill,
+        selected === id && {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)',
+          borderColor: colors.primary,
+        },
+      ]}
     >
       {Icon && <Icon size={14} color={selected === id ? colors.primary : colors.textSecondary} />}
-      <Text style={[styles.pillText, { color: selected === id ? colors.primary : colors.textSecondary }, selected === id && { fontWeight: '600' }]}>
+      <Text
+        style={[
+          styles.pillText,
+          { color: selected === id ? colors.primary : colors.textSecondary },
+          selected === id && { fontWeight: '600' },
+        ]}
+      >
         {label}
       </Text>
     </TouchableOpacity>
@@ -328,7 +346,9 @@ const WeeklySummary = () => {
         </View>
         <View style={[styles.weeklyExtra, themeStyles.inlineExtraRow]}>
           <Text style={[styles.weeklyExtraLabel, themeStyles.inlineExtraLabel]}>{t('alzan.avgPace')}</Text>
-          <Text style={[styles.weeklyExtraValue, themeStyles.inlineExtraValue]}>{stats.avgPace}/{preferences.distance_unit}</Text>
+          <Text style={[styles.weeklyExtraValue, themeStyles.inlineExtraValue]}>
+            {stats.avgPace}/{preferences.distance_unit}
+          </Text>
         </View>
         <View style={[styles.weeklyExtra, themeStyles.inlineExtraRow]}>
           <Text style={[styles.weeklyExtraLabel, themeStyles.inlineExtraLabel]}>{t('alzan.longestRun')}</Text>
@@ -355,7 +375,10 @@ const TabSelector = ({ active, onChange }: { active: TabType; onChange: (t: TabT
           return (
             <TouchableOpacity
               key={tab}
-              style={[styles.tabBtn, active === tab && [styles.tabBtnActive, { backgroundColor: themeStyles.tabButtonActiveBg }]]}
+              style={[
+                styles.tabBtn,
+                active === tab && [styles.tabBtnActive, { backgroundColor: themeStyles.tabButtonActiveBg }],
+              ]}
               onPress={() => onChange(tab)}
             >
               <Icon size={18} color={active === tab ? themeStyles.tabIconActiveColor : themeStyles.tabIconColor} />
@@ -378,9 +401,13 @@ const GridItem = ({ item, index }: { item: (typeof MOCK_ACTIVITIES)[0]; index: n
       <View style={styles.gridItem}>
         <View style={styles.gridMapBg}>
           <View style={[styles.gridRoute, { transform: [{ rotate: `${index * 45}deg` }] }]} />
-          <View style={styles.gridPin}><Navigation size={12} color="#fff" fill="#fff" /></View>
+          <View style={styles.gridPin}>
+            <Navigation size={12} color="#fff" fill="#fff" />
+          </View>
         </View>
-        <View style={styles.gridTypeIcon}><MapPin size={10} color="#fff" /></View>
+        <View style={styles.gridTypeIcon}>
+          <MapPin size={10} color="#fff" />
+        </View>
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.gridOverlay}>
           <Text style={styles.gridOverlayText}>{'distance' in item ? (item as any).distance : ''}</Text>
         </LinearGradient>
@@ -393,9 +420,13 @@ const GridItem = ({ item, index }: { item: (typeof MOCK_ACTIVITIES)[0]; index: n
         <View style={[styles.gridGymBg, { backgroundColor: index % 2 === 0 ? '#2a2a2a' : '#1a1a2e' }]}>
           <Activity size={32} color="#ffffff50" />
         </View>
-        <View style={styles.gridTypeIcon}><Dumbbell size={10} color="#fff" /></View>
+        <View style={styles.gridTypeIcon}>
+          <Dumbbell size={10} color="#fff" />
+        </View>
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.gridOverlay}>
-          <Text style={styles.gridOverlayText}>{'exercises' in item ? `${(item as any).exercises}${t('alzan.previousRecordAbbr')}` : ''}</Text>
+          <Text style={styles.gridOverlayText}>
+            {'exercises' in item ? `${(item as any).exercises}${t('alzan.previousRecordAbbr')}` : ''}
+          </Text>
         </LinearGradient>
       </View>
     );
@@ -403,14 +434,18 @@ const GridItem = ({ item, index }: { item: (typeof MOCK_ACTIVITIES)[0]; index: n
   return (
     <View style={[styles.gridItem, { backgroundColor: '#000' }]}>
       <Image source={{ uri: `https://picsum.photos/200?random=${index}` }} style={{ width: '100%', height: '100%' }} />
-      <View style={styles.challengeBadge}><Text style={styles.challengeBadgeText}>{t('alzan.challengeAllCaps')}</Text></View>
+      <View style={styles.challengeBadge}>
+        <Text style={styles.challengeBadgeText}>{t('alzan.challengeAllCaps')}</Text>
+      </View>
     </View>
   );
 };
 
 const PostsGrid = () => (
   <View style={styles.gridContainer}>
-    {MOCK_ACTIVITIES.map((item, i) => <GridItem key={item.id} item={item} index={i} />)}
+    {MOCK_ACTIVITIES.map((item, i) => (
+      <GridItem key={item.id} item={item} index={i} />
+    ))}
   </View>
 );
 
@@ -511,9 +546,12 @@ export const UserProfileScreen: React.FC = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'posts': return <PostsGrid />;
-      case 'clips': return <ClipsTab />;
-      case 'saved': return <LogrosTab />;
+      case 'posts':
+        return <PostsGrid />;
+      case 'clips':
+        return <ClipsTab />;
+      case 'saved':
+        return <LogrosTab />;
     }
   };
 
@@ -523,10 +561,20 @@ export const UserProfileScreen: React.FC = () => {
         {/* Aurora background */}
         <View style={[styles.bg, { backgroundColor: themeStyles.baseBackground }]} />
         <View style={styles.topOrb}>
-          <LinearGradient colors={themeStyles.topOrbColors} style={StyleSheet.absoluteFill} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} />
+          <LinearGradient
+            colors={themeStyles.topOrbColors}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+          />
         </View>
         <View style={styles.bottomOrb}>
-          <LinearGradient colors={themeStyles.bottomOrbColors} style={StyleSheet.absoluteFill} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} />
+          <LinearGradient
+            colors={themeStyles.bottomOrbColors}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+          />
         </View>
 
         <SafeAreaView style={styles.safeArea}>
@@ -580,14 +628,24 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   bg: { ...StyleSheet.absoluteFillObject },
   topOrb: {
-    position: 'absolute', top: -100, left: -50,
-    width: SCREEN_WIDTH * 1.5, height: 400,
-    borderRadius: SCREEN_WIDTH, transform: [{ rotate: '-20deg' }], overflow: 'hidden',
+    position: 'absolute',
+    top: -100,
+    left: -50,
+    width: SCREEN_WIDTH * 1.5,
+    height: 400,
+    borderRadius: SCREEN_WIDTH,
+    transform: [{ rotate: '-20deg' }],
+    overflow: 'hidden',
   },
   bottomOrb: {
-    position: 'absolute', bottom: -100, right: -50,
-    width: SCREEN_WIDTH * 1.5, height: 500,
-    borderRadius: SCREEN_WIDTH, transform: [{ rotate: '20deg' }], overflow: 'hidden',
+    position: 'absolute',
+    bottom: -100,
+    right: -50,
+    width: SCREEN_WIDTH * 1.5,
+    height: 500,
+    borderRadius: SCREEN_WIDTH,
+    transform: [{ rotate: '20deg' }],
+    overflow: 'hidden',
   },
   safeArea: { flex: 1 },
   scrollView: { flex: 1 },
@@ -596,13 +654,18 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: '700', textAlign: 'center', marginHorizontal: 8 },
   headerIconBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerSpacer: { width: 40 },
 
@@ -610,10 +673,17 @@ const styles = StyleSheet.create({
   heroWrapper: { alignItems: 'center', paddingHorizontal: 16, paddingTop: 12 },
   avatarContainer: { alignItems: 'center', marginBottom: 16 },
   avatarRing: {
-    width: 100, height: 100, borderRadius: 50, padding: 3,
-    backgroundColor: '#fff', marginBottom: 12,
-    shadowColor: '#4A90D9', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4, shadowRadius: 10, elevation: 5,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    padding: 3,
+    backgroundColor: '#fff',
+    marginBottom: 12,
+    shadowColor: '#4A90D9',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 5,
   },
   avatarImage: { width: '100%', height: '100%', borderRadius: 50 },
   avatarFallback: { width: '100%', height: '100%', borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
@@ -621,17 +691,30 @@ const styles = StyleSheet.create({
   displayName: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
   usernameText: { fontSize: 13 },
   followBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 24, paddingVertical: 10,
-    borderRadius: 20, minWidth: 140, justifyContent: 'center', marginTop: 16, marginBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+    minWidth: 140,
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 4,
   },
   followBtnText: { fontSize: 15, fontWeight: '600' },
   statsRow: { flexDirection: 'row', width: '100%', gap: 12, marginTop: 16 },
   statCard: {
-    flex: 1, borderRadius: 16, paddingVertical: 16,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05, shadowRadius: 12, elevation: 3,
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
   },
   statCardActive: {},
   statValue: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
@@ -640,9 +723,13 @@ const styles = StyleSheet.create({
   // Weekly summary
   weeklySummaryWrapper: { paddingHorizontal: 16, marginTop: 16 },
   weeklySummaryCard: {
-    borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   weeklyHeader: { marginBottom: 16, gap: 12 },
   weeklyTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -652,12 +739,24 @@ const styles = StyleSheet.create({
   weeklyStatValue: { fontSize: 16, fontWeight: '700' },
   weeklyStatLabel: { fontSize: 11, fontWeight: '500' },
   weeklyDivider: { width: 1, height: 30, backgroundColor: '#eee' },
-  weeklyExtra: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
+  weeklyExtra: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
   weeklyExtraLabel: { fontSize: 13 },
   weeklyExtraValue: { fontSize: 13, fontWeight: '600' },
   pill: {
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-    borderWidth: 1, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   pillText: { fontSize: 12, fontWeight: '500' },
 
@@ -666,30 +765,50 @@ const styles = StyleSheet.create({
   tabsBackground: { flexDirection: 'row', borderRadius: 30, padding: 4 },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 24 },
   tabBtnActive: {
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   contentArea: { paddingHorizontal: 16, minHeight: 400 },
 
   // Grid
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   gridItem: {
-    width: (SCREEN_WIDTH - 32 - 24) / 3, aspectRatio: 1,
-    borderRadius: 16, backgroundColor: '#fff', overflow: 'hidden', position: 'relative',
+    width: (SCREEN_WIDTH - 32 - 24) / 3,
+    aspectRatio: 1,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    position: 'relative',
   },
   gridMapBg: { flex: 1, backgroundColor: '#A8C8E8', alignItems: 'center', justifyContent: 'center' },
   gridGymBg: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   gridRoute: { width: 40, height: 3, backgroundColor: '#fff', borderRadius: 2 },
   gridPin: { position: 'absolute', backgroundColor: '#4A90D9', padding: 4, borderRadius: 10 },
   gridTypeIcon: {
-    position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.3)',
-    width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gridOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8, paddingTop: 16 },
   gridOverlayText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   challengeBadge: {
-    position: 'absolute', bottom: 8, left: 8, right: 8,
-    backgroundColor: '#4A90D9', paddingVertical: 4, borderRadius: 8, alignItems: 'center',
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: '#4A90D9',
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   challengeBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
 
@@ -702,9 +821,16 @@ const styles = StyleSheet.create({
   sectionHeader: { fontSize: 16, fontWeight: '700', color: '#1a1a2e', marginBottom: 12 },
   badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
   badgeItem: {
-    width: 50, height: 50, backgroundColor: '#fff', borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4,
+    width: 50,
+    height: 50,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   prList: { backgroundColor: '#fff', borderRadius: 16, padding: 16 },
   prRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
@@ -718,8 +844,12 @@ const styles = StyleSheet.create({
   // Private gate
   gateContainer: { alignItems: 'center', paddingHorizontal: 40, paddingTop: 48, paddingBottom: 24 },
   gateLockCircle: {
-    width: 72, height: 72, borderRadius: 36,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   gateTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
   gateSubtitle: { fontSize: 14, textAlign: 'center', lineHeight: 20 },

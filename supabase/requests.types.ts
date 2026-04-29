@@ -93,7 +93,7 @@ export interface NutritionSettingsJson {
 }
 
 // --- Ingredients & Imports ---
-import { Json } from './database.types';
+import { Json } from "./database.types";
 export type IngredientSource = {
   provider: string;
   retrieved_at: string;
@@ -101,6 +101,10 @@ export type IngredientSource = {
   original_id?: string;
   [key: string]: Json | undefined;
 };
+
+export type RecipeSource = "system" | "user";
+export type RecipeVisibility = "private" | "public";
+export type RecipeUsageContext = "meal_log" | "planner" | "quick_add";
 
 type PublicSchema = DatabaseGenerated["public"];
 type GeneratedTables = PublicSchema["Tables"];
@@ -277,20 +281,157 @@ type NotificationsOverride = {
   Relationships: GeneratedTables["notifications"]["Relationships"];
 };
 
+type RecipesOverride = {
+  Row: Omit<GeneratedTables["recipes"]["Row"], "source" | "visibility"> & {
+    source: RecipeSource;
+    visibility: RecipeVisibility;
+    published_at: string | null;
+    public_slug: string | null;
+    origin_recipe_id: string | null;
+    uses_total: number;
+    uses_30d: number;
+    uses_7d: number;
+    users_unique_30d: number;
+    saves_total: number;
+    favorites_total: number;
+    popularity_score: number;
+  };
+  Insert: Omit<
+    GeneratedTables["recipes"]["Insert"],
+    "source" | "visibility"
+  > & {
+    source?: RecipeSource;
+    visibility?: RecipeVisibility;
+    published_at?: string | null;
+    public_slug?: string | null;
+    origin_recipe_id?: string | null;
+    uses_total?: number;
+    uses_30d?: number;
+    uses_7d?: number;
+    users_unique_30d?: number;
+    saves_total?: number;
+    favorites_total?: number;
+    popularity_score?: number;
+  };
+  Update: Omit<
+    GeneratedTables["recipes"]["Update"],
+    "source" | "visibility"
+  > & {
+    source?: RecipeSource;
+    visibility?: RecipeVisibility;
+    published_at?: string | null;
+    public_slug?: string | null;
+    origin_recipe_id?: string | null;
+    uses_total?: number;
+    uses_30d?: number;
+    uses_7d?: number;
+    users_unique_30d?: number;
+    saves_total?: number;
+    favorites_total?: number;
+    popularity_score?: number;
+  };
+  Relationships: GeneratedTables["recipes"]["Relationships"];
+};
+
+type RecipeUsageEventsOverride = {
+  Row: {
+    id: string;
+    recipe_id: string;
+    user_id: string;
+    context: RecipeUsageContext;
+    used_at: string;
+    event_bucket_10m: string;
+    is_public_eligible: boolean;
+  };
+  Insert: {
+    id?: string;
+    recipe_id: string;
+    user_id: string;
+    context: RecipeUsageContext;
+    used_at?: string;
+    event_bucket_10m: string;
+    is_public_eligible?: boolean;
+  };
+  Update: {
+    id?: string;
+    recipe_id?: string;
+    user_id?: string;
+    context?: RecipeUsageContext;
+    used_at?: string;
+    event_bucket_10m?: string;
+    is_public_eligible?: boolean;
+  };
+  Relationships: [
+    {
+      foreignKeyName: "recipe_usage_events_recipe_id_fkey";
+      columns: ["recipe_id"];
+      isOneToOne: false;
+      referencedRelation: "recipes";
+      referencedColumns: ["id"];
+    },
+    {
+      foreignKeyName: "recipe_usage_events_user_id_fkey";
+      columns: ["user_id"];
+      isOneToOne: false;
+      referencedRelation: "users";
+      referencedColumns: ["id"];
+    },
+  ];
+};
+
 type TableOverrides = {
   activity_sessions: ActivitySessionsOverride;
   activity_heart_rate_zones: ActivityHeartRateZonesOverride;
   ingredients: IngredientsOverride;
   user_preferences: UserPreferencesOverride;
   notifications: NotificationsOverride;
+  recipes: RecipesOverride;
+  recipe_usage_events: RecipeUsageEventsOverride;
 };
 
 type ExtendedTables = Omit<GeneratedTables, keyof TableOverrides> &
   TableOverrides;
 
+type GeneratedFunctions = PublicSchema["Functions"];
+
+type FunctionOverrides = {
+  log_recipe_usage: {
+    Args: { p_recipe_id: string; p_context: RecipeUsageContext };
+    Returns: undefined;
+  };
+  publish_recipe: {
+    Args: { p_recipe_id: string };
+    Returns: undefined;
+  };
+  unpublish_recipe: {
+    Args: { p_recipe_id: string };
+    Returns: undefined;
+  };
+  duplicate_recipe: {
+    Args: { p_recipe_id: string };
+    Returns: string;
+  };
+  refresh_recipe_popularity_aggregates: {
+    Args: Record<string, never>;
+    Returns: undefined;
+  };
+  ensure_recipe_public_slug: {
+    Args: { p_recipe_id: string };
+    Returns: string;
+  };
+  slugify_recipe_name: {
+    Args: { p_name: string };
+    Returns: string;
+  };
+};
+
+type ExtendedFunctions = Omit<GeneratedFunctions, keyof FunctionOverrides> &
+  FunctionOverrides;
+
 export type Database = Omit<DatabaseGenerated, "public"> & {
-  public: Omit<PublicSchema, "Tables"> & {
+  public: Omit<PublicSchema, "Tables" | "Functions"> & {
     Tables: ExtendedTables;
+    Functions: ExtendedFunctions;
   };
 };
 
@@ -452,6 +593,9 @@ export type RecipeItemUpdate = Update<"recipe_items">;
 export type RecipeAlias = Row<"recipe_aliases">;
 export type RecipeAliasInsert = Insert<"recipe_aliases">;
 export type RecipeAliasUpdate = Update<"recipe_aliases">;
+export type RecipeUsageEvent = Row<"recipe_usage_events">;
+export type RecipeUsageEventInsert = Insert<"recipe_usage_events">;
+export type RecipeUsageEventUpdate = Update<"recipe_usage_events">;
 
 // --- Feedback ---
 export type SessionFeedback = Row<"session_feedback">;

@@ -1600,6 +1600,42 @@ export type Database = {
           },
         ]
       }
+      recipe_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          recipe_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          recipe_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          recipe_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_favorites_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_items: {
         Row: {
           created_at: string
@@ -1648,41 +1684,155 @@ export type Database = {
           },
         ]
       }
+      recipe_usage_events: {
+        Row: {
+          context: Database["public"]["Enums"]["recipe_usage_context_enum"]
+          event_bucket_10m: string
+          id: string
+          is_public_eligible: boolean
+          recipe_id: string
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          context: Database["public"]["Enums"]["recipe_usage_context_enum"]
+          event_bucket_10m: string
+          id?: string
+          is_public_eligible?: boolean
+          recipe_id: string
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          context?: Database["public"]["Enums"]["recipe_usage_context_enum"]
+          event_bucket_10m?: string
+          id?: string
+          is_public_eligible?: boolean
+          recipe_id?: string
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_usage_events_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_usage_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
+          carbs_g_100: number
           created_at: string
+          deleted_at: string | null
           description_en: string | null
           description_es: string | null
+          fat_g_100: number
+          favorites_total: number
           id: string
+          kcal_100: number
           name_en: string | null
           name_es: string
           name_norm_es: string
+          origin_recipe_id: string | null
+          owner_user_id: string | null
+          popularity_score: number
+          protein_g_100: number
+          public_slug: string | null
+          published_at: string | null
           quality_score: number
+          saves_total: number
+          source: Database["public"]["Enums"]["recipe_source_enum"]
           updated_at: string
+          users_unique_30d: number
+          uses_30d: number
+          uses_7d: number
+          uses_total: number
+          visibility: Database["public"]["Enums"]["recipe_visibility_enum"]
         }
         Insert: {
+          carbs_g_100?: number
           created_at?: string
+          deleted_at?: string | null
           description_en?: string | null
           description_es?: string | null
+          fat_g_100?: number
+          favorites_total?: number
           id?: string
+          kcal_100?: number
           name_en?: string | null
           name_es: string
           name_norm_es: string
+          origin_recipe_id?: string | null
+          owner_user_id?: string | null
+          popularity_score?: number
+          protein_g_100?: number
+          public_slug?: string | null
+          published_at?: string | null
           quality_score?: number
+          saves_total?: number
+          source?: Database["public"]["Enums"]["recipe_source_enum"]
           updated_at?: string
+          users_unique_30d?: number
+          uses_30d?: number
+          uses_7d?: number
+          uses_total?: number
+          visibility?: Database["public"]["Enums"]["recipe_visibility_enum"]
         }
         Update: {
+          carbs_g_100?: number
           created_at?: string
+          deleted_at?: string | null
           description_en?: string | null
           description_es?: string | null
+          fat_g_100?: number
+          favorites_total?: number
           id?: string
+          kcal_100?: number
           name_en?: string | null
           name_es?: string
           name_norm_es?: string
+          origin_recipe_id?: string | null
+          owner_user_id?: string | null
+          popularity_score?: number
+          protein_g_100?: number
+          public_slug?: string | null
+          published_at?: string | null
           quality_score?: number
+          saves_total?: number
+          source?: Database["public"]["Enums"]["recipe_source_enum"]
           updated_at?: string
+          users_unique_30d?: number
+          uses_30d?: number
+          uses_7d?: number
+          uses_total?: number
+          visibility?: Database["public"]["Enums"]["recipe_visibility_enum"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "recipes_origin_recipe_id_fkey"
+            columns: ["origin_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipes_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       resting_hr_logs: {
         Row: {
@@ -2484,9 +2634,29 @@ export type Database = {
     Functions: {
       check_username: { Args: { username_input: string }; Returns: boolean }
       delete_user_account: { Args: never; Returns: undefined }
+      duplicate_recipe: { Args: { p_recipe_id: string }; Returns: string }
+      ensure_recipe_public_slug: {
+        Args: { p_recipe_id: string }
+        Returns: string
+      }
       import_ingredients_batch: { Args: { payload: Json }; Returns: number }
       import_recipes_batch: { Args: { payload: Json }; Returns: number }
+      log_recipe_usage: {
+        Args: {
+          p_context: Database["public"]["Enums"]["recipe_usage_context_enum"]
+          p_recipe_id: string
+        }
+        Returns: undefined
+      }
+      publish_recipe: { Args: { p_recipe_id: string }; Returns: undefined }
+      refresh_recipe_popularity_aggregates: { Args: never; Returns: undefined }
+      refresh_recipe_snapshot: {
+        Args: { p_recipe_id: string }
+        Returns: undefined
+      }
       reset_user_data: { Args: never; Returns: undefined }
+      slugify_recipe_name: { Args: { p_name: string }; Returns: string }
+      unpublish_recipe: { Args: { p_recipe_id: string }; Returns: undefined }
     }
     Enums: {
       activity_source_enum:
@@ -2557,6 +2727,9 @@ export type Database = {
         | "fitbit"
         | "other"
       recipe_items_unit: "g" | "ml"
+      recipe_source_enum: "system" | "user"
+      recipe_usage_context_enum: "meal_log" | "planner" | "quick_add"
+      recipe_visibility_enum: "private" | "public"
       sport_subtype_enum:
         | "road"
         | "trail"
@@ -2820,6 +2993,9 @@ export const Constants = {
       phase_type_enum: ["warmup", "interval", "recovery", "cooldown", "relax"],
       provider_enum: ["manual", "strava", "garmin", "polar", "fitbit", "other"],
       recipe_items_unit: ["g", "ml"],
+      recipe_source_enum: ["system", "user"],
+      recipe_usage_context_enum: ["meal_log", "planner", "quick_add"],
+      recipe_visibility_enum: ["private", "public"],
       sport_subtype_enum: [
         "road",
         "trail",
