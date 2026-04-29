@@ -19,7 +19,12 @@ export interface CalculatedMacros {
   fats_g: number;
 }
 
-export interface IngredientSearchResult extends DbIngredient {
+interface IngredientRuntimeFields extends DbIngredient {
+  notes_es?: string | null;
+  notes_en?: string | null;
+}
+
+export interface IngredientSearchResult extends IngredientRuntimeFields {
   name: string;
   notes: string | null;
 }

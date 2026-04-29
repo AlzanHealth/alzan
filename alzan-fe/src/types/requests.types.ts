@@ -4,6 +4,7 @@
  */
 
 import { Database as DatabaseGenerated } from './database.types';
+import { Json } from './database.types';
 
 export type UserFollowNotificationData = {
   follower_id: string;
@@ -93,7 +94,6 @@ export interface NutritionSettingsJson {
 }
 
 // --- Ingredients & Imports ---
-import { Json } from './database.types';
 export type IngredientSource = {
   provider: string;
   retrieved_at: string;
