@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 
 import { PaginationDto } from '../../common/dto/pagination.dto';
-import { NotificationService } from './notification/notification.service';
+import { NotificationService } from '../notification/notification.service';
 import { makeUserFollowNotificationData } from './user.helper';
 import { UserCtx } from '../../common/decorators/user-context.decorator';
 import { SupabaseAdminService } from '../../core/supabase/supabase.service';
@@ -33,13 +33,13 @@ export class UserService {
    */
   async getProfiles(ctx: UserCtx, userIds: string[]) {
     const { client: supabase } = this.supabaseAdminService;
-    this.logger.debug(`ProfileService: Trying to get profile for ${userIds}`);
+    this.logger.debug(`ProfileService: Trying to get profile for ${userIds.join(',')}`);
 
     const { data: userProfiles, error } = await supabase.from('users').select(PROFILE_SELECT_FIELDS).in('id', userIds);
 
     if (error || !userProfiles) {
-      this.logger.warn(`ProfileService: User ${userIds} not found`);
-      throw new BadRequestException(`User ${userIds} not found`);
+      this.logger.warn({ error }, `ProfileService: User ${userIds.join(',')} not found`);
+      throw new BadRequestException(`User ${userIds.join(',')} not found`);
     }
 
     const followingSet = await this.getFollowingSet(ctx, userIds);
@@ -59,6 +59,7 @@ export class UserService {
    * @param {PaginationDto} pagination - The pagination data
    */
   async searchUsers(ctx: UserCtx, query: string, pagination: PaginationDto) {
+    const { user } = ctx;
     const { limit, offset } = pagination;
     const { client: supabase } = this.supabaseAdminService;
     this.logger.debug(`UserService: Trying to search users for ${query}`);
@@ -67,6 +68,7 @@ export class UserService {
       .from('users')
       .select('id')
       .ilike('username', `%${query}%`)
+      .neq('id', user.id)
       .limit(limit)
       .range(offset, offset + limit - 1);
 
@@ -120,25 +122,26 @@ export class UserService {
    * Follows a user
    *
    * @param ctx - Request context containing the authenticated user and scoped client
-   * @param to - The username of the user to follow
+   * @param userId - The username of the user to follow
    */
-  public async follow(ctx: UserCtx, to: string) {
+  public async follow(ctx: UserCtx, userId: string) {
+    const { client: supabaseAdmin } = this.supabaseAdminService;
     const { user, supabase } = ctx;
 
-    this.logger.debug(`UserService: Trying to follow user ${to}`);
+    this.logger.debug(`UserService: Trying to follow user ${userId}`);
 
-    if (user.username === to) {
+    if (user.id === userId) {
       throw new BadRequestException('You cannot follow yourself');
     }
 
-    const { data: targetUser, error: findError } = await supabase
+    const { data: targetUser, error: findError } = await supabaseAdmin
       .from('users')
       .select('id')
-      .eq('username', to)
+      .eq('id', userId)
       .single();
 
     if (findError || !targetUser) {
-      throw new NotFoundException(`User ${to} not found`, { cause: findError });
+      throw new NotFoundException(`User ${userId} not found`, { cause: findError });
     }
 
     if (targetUser.id === user.id) {
@@ -154,7 +157,7 @@ export class UserService {
     if (insertError) {
       if (insertError.code === '23505') {
         // Unique violation
-        throw new ConflictException(`You are already following ${to}`);
+        throw new ConflictException(`You are already following ${userId}`);
       }
       throw new InternalServerErrorException(insertError.message, { cause: insertError });
     }
@@ -170,20 +173,21 @@ export class UserService {
    * Accepts a follow request
    *
    * @param ctx - Request context containing the authenticated user and scoped client
-   * @param from - The username of the user to accept
+   * @param userId - The id of the user to accept
    */
-  public async acceptFollowRequest(ctx: UserCtx, from: string) {
+  public async acceptFollowRequest(ctx: UserCtx, userId: string) {
+    const { client: supabaseAdmin } = this.supabaseAdminService;
     const { user, supabase } = ctx;
-    this.logger.debug(`UserService: Trying to accept follow request from user ${from}`);
+    this.logger.debug(`UserService: Trying to accept follow request from user ${userId}`);
 
-    const { data: targetUser, error: findError } = await supabase
+    const { data: targetUser, error: findError } = await supabaseAdmin
       .from('users')
       .select('id')
-      .eq('username', from)
+      .eq('id', userId)
       .single();
 
     if (findError || !targetUser) {
-      throw new NotFoundException(`User ${from} not found`, { cause: findError });
+      throw new NotFoundException(`User ${userId} not found`, { cause: findError });
     }
 
     const { error: updateError } = await supabase
@@ -209,20 +213,21 @@ export class UserService {
    * Rejects a follow request
    *
    * @param ctx - Request context containing the authenticated user and scoped client
-   * @param from - The username of the user to reject
+   * @param userId - The id of the user to reject
    */
-  public async rejectFollowRequest(ctx: UserCtx, from: string) {
+  public async rejectFollowRequest(ctx: UserCtx, userId: string) {
+    const { client: supabaseAdmin } = this.supabaseAdminService;
     const { user, supabase } = ctx;
-    this.logger.debug(`UserService: Trying to reject follow request from user ${from}`);
+    this.logger.debug(`UserService: Trying to reject follow request from user ${userId}`);
 
-    const { data: targetUser, error: findError } = await supabase
+    const { data: targetUser, error: findError } = await supabaseAdmin
       .from('users')
       .select('id')
-      .eq('username', from)
+      .eq('id', userId)
       .single();
 
     if (findError || !targetUser) {
-      throw new NotFoundException(`User ${from} not found`, { cause: findError });
+      throw new NotFoundException(`User ${userId} not found`, { cause: findError });
     }
 
     const { error: deleteError } = await supabase

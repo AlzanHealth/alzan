@@ -12,10 +12,11 @@ export const SWAGGER_CONFIGURATIONS: Record<SwaggerApi, ISwaggerConfiguration> =
     title: 'Alzan API',
     description: 'Alzan Backend API',
   },
-  [SwaggerApi.SOCIAL_API]: {
-    endpoint: 'social',
-    title: 'Social API',
-    description: 'Social interactions API',
+
+  [SwaggerApi.NOTIFICATION_API]: {
+    endpoint: 'notification',
+    title: 'Notification API',
+    description: 'Notification API',
   },
 };
 

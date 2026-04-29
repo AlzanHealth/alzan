@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
-import { Notification, NotificationDataMap } from '../../../types/requests.types';
+import { SupabaseAdminService } from '../../core/supabase/supabase.service';
+import { Notification, NotificationDataMap } from '../../types/requests.types';
 
 export type CreateNotificationDto = Omit<Notification, 'id' | 'created_at' | 'read_at' | 'data'> & {
   data: NotificationDataMap[Notification['type']];

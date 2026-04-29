@@ -2,27 +2,27 @@
 -- user-seeder.sql — 20 test users (onboarding completed)
 -- Password for ALL users: AlzanTest1!
 --
--- | # | Name              | Email                           | Password     |
--- | 1  | Alice Johnson     | alice.johnson@testmail.com      | AlzanTest1! |
--- | 2  | Bob Smith         | bob.smith@testmail.com          | AlzanTest1! |
--- | 3  | Carol White       | carol.white@testmail.com        | AlzanTest1! |
--- | 4  | David Brown       | david.brown@testmail.com        | AlzanTest1! |
--- | 5  | Emma Davis        | emma.davis@testmail.com         | AlzanTest1! |
--- | 6  | Frank Miller      | frank.miller@testmail.com       | AlzanTest1! |
--- | 7  | Grace Wilson      | grace.wilson@testmail.com       | AlzanTest1! |
--- | 8  | Henry Moore       | henry.moore@testmail.com        | AlzanTest1! |
--- | 9  | Isabella Taylor   | isabella.taylor@testmail.com    | AlzanTest1! |
--- | 10 | Jack Anderson     | jack.anderson@testmail.com      | AlzanTest1! |
--- | 11 | Kate Thomas       | kate.thomas@testmail.com        | AlzanTest1! |
--- | 12 | Liam Jackson      | liam.jackson@testmail.com       | AlzanTest1! |
--- | 13 | Mia Harris        | mia.harris@testmail.com         | AlzanTest1! |
--- | 14 | Noah Martin       | noah.martin@testmail.com        | AlzanTest1! |
--- | 15 | Olivia Garcia     | olivia.garcia@testmail.com      | AlzanTest1! |
--- | 16 | Peter Martinez    | peter.martinez@testmail.com     | AlzanTest1! |
--- | 17 | Quinn Robinson    | quinn.robinson@testmail.com     | AlzanTest1! |
--- | 18 | Rachel Clark      | rachel.clark@testmail.com       | AlzanTest1! |
--- | 19 | Samuel Lewis      | samuel.lewis@testmail.com       | AlzanTest1! |
--- | 20 | Tina Rodriguez    | tina.rodriguez@testmail.com     | AlzanTest1! |
+-- | # | Name              | Email                           | Password     | Username
+-- | 1  | Alice Johnson     | alice.johnson@testmail.com      | AlzanTest1! | alice_johnson_1995
+-- | 2  | Bob Smith         | bob.smith@testmail.com          | AlzanTest1! | bob_smith_1995
+-- | 3  | Carol White       | carol.white@testmail.com        | AlzanTest1! | carol_white_1995
+-- | 4  | David Brown       | david.brown@testmail.com        | AlzanTest1! | david_brown_1995
+-- | 5  | Emma Davis        | emma.davis@testmail.com         | AlzanTest1! | emma_davis_1995
+-- | 6  | Frank Miller      | frank.miller@testmail.com       | AlzanTest1! | frank_miller_1995
+-- | 7  | Grace Wilson      | grace.wilson@testmail.com       | AlzanTest1! | grace_wilson_1995
+-- | 8  | Henry Moore       | henry.moore@testmail.com        | AlzanTest1! | henry_moore_1995
+-- | 9  | Isabella Taylor   | isabella.taylor@testmail.com    | AlzanTest1! | isabella_taylor_1995
+-- | 10 | Jack Anderson     | jack.anderson@testmail.com      | AlzanTest1! | jack_anderson_1995
+-- | 11 | Kate Thomas       | kate.thomas@testmail.com        | AlzanTest1! | kate_thomas_1995
+-- | 12 | Liam Jackson      | liam.jackson@testmail.com       | AlzanTest1! | liam_jackson_1995
+-- | 13 | Mia Harris        | mia.harris@testmail.com         | AlzanTest1! | mia_harris_1995
+-- | 14 | Noah Martin       | noah.martin@testmail.com        | AlzanTest1! | noah_martin_1995
+-- | 15 | Olivia Garcia     | olivia.garcia@testmail.com      | AlzanTest1! | olivia_garcia_1995
+-- | 16 | Peter Martinez    | peter.martinez@testmail.com     | AlzanTest1! | peter_martinez_1995
+-- | 17 | Quinn Robinson    | quinn.robinson@testmail.com     | AlzanTest1! | quinn_robinson_1995
+-- | 18 | Rachel Clark      | rachel.clark@testmail.com       | AlzanTest1! | rachel_clark_1995
+-- | 19 | Samuel Lewis      | samuel.lewis@testmail.com       | AlzanTest1! | samuel_lewis_1995
+-- | 20 | Tina Rodriguez    | tina.rodriguez@testmail.com     | AlzanTest1! | tina_rodriguez_1995
 -- ============================================================
 
 SET session_replication_role = replica;

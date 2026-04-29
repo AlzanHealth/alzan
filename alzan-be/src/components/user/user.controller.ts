@@ -5,6 +5,7 @@ import { VoidResponse } from '../../core/interceptors/response-serializer.interc
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { UserService } from './user.service';
 import { UserContext, UserCtx } from '../../common/decorators/user-context.decorator';
+import { UserSearchDto } from './dto/user.dto';
 
 @Controller('users')
 @SupabaseUserAuth()
@@ -14,15 +15,15 @@ export class UserController {
   constructor(private readonly service: UserService) {}
 
   /**
-   * Get user profile by id
+   * Search users
    * @param ctx - Request context
-   * @param userId - Id of the user to get
+   * @param query - Query to search for
+   * @param pagination - Pagination data
    */
-  @Get(':userId')
-  async getProfile(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<UserProfileDto> {
-    this.logger.debug(`Controller layer: trying to get user by id ${userId}`, ctx.user.id);
-    const profiles = await this.service.getProfiles(ctx, [userId]);
-    return profiles[0];
+  @Get('search')
+  async searchUsers(@UserContext() ctx: UserCtx, @Query() pagination: UserSearchDto): Promise<UserProfileDto[]> {
+    this.logger.debug(`Controller layer: trying to search users for ${pagination.q}`);
+    return this.service.searchUsers(ctx, pagination.q, pagination);
   }
 
   /**
@@ -31,9 +32,10 @@ export class UserController {
    * @param userId - Username of the user to follow
    */
   @Post(':userId/follow')
-  async followUser(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<void> {
+  async followUser(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<VoidResponse> {
     this.logger.debug(`Controller layer: trying to follow user ${userId}`, ctx.user.id);
-    return this.service.follow(ctx, userId);
+    await this.service.follow(ctx, userId);
+    return VoidResponse;
   }
 
   /**
@@ -42,9 +44,10 @@ export class UserController {
    * @param userId - Username of the user to accept
    */
   @Post(':userId/accept')
-  async acceptFollowRequest(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<void> {
+  async acceptFollowRequest(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<VoidResponse> {
     this.logger.debug(`Controller layer: trying to accept follow request from user ${userId}`, ctx.user.id);
-    return this.service.acceptFollowRequest(ctx, userId);
+    await this.service.acceptFollowRequest(ctx, userId);
+    return VoidResponse;
   }
 
   /**
@@ -53,9 +56,10 @@ export class UserController {
    * @param userId - Username of the user to reject
    */
   @Post(':userId/reject')
-  async rejectFollowRequest(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<void> {
+  async rejectFollowRequest(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<VoidResponse> {
     this.logger.debug(`Controller layer: trying to reject follow request from user ${userId}`, ctx.user.id);
-    return this.service.rejectFollowRequest(ctx, userId);
+    await this.service.rejectFollowRequest(ctx, userId);
+    return VoidResponse;
   }
 
   /**
@@ -67,7 +71,6 @@ export class UserController {
   async unfollowUser(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<VoidResponse> {
     this.logger.debug(`Controller layer: trying to unfollow user ${userId}`, ctx.user.id);
     await this.service.unfollow(ctx, userId);
-
     return VoidResponse;
   }
 
@@ -104,18 +107,14 @@ export class UserController {
   }
 
   /**
-   * Search users
+   * Get user profile by id
    * @param ctx - Request context
-   * @param query - Query to search for
-   * @param pagination - Pagination data
+   * @param userId - Id of the user to get
    */
-  @Get('search')
-  async searchUsers(
-    @UserContext() ctx: UserCtx,
-    @Query('q') query: string,
-    @Query() pagination: PaginationDto,
-  ): Promise<UserProfileDto[]> {
-    this.logger.debug(`Controller layer: trying to search users for ${query}`);
-    return this.service.searchUsers(ctx, query, pagination);
+  @Get(':userId')
+  async getProfile(@UserContext() ctx: UserCtx, @Param('userId') userId: string): Promise<UserProfileDto> {
+    this.logger.debug(`Controller layer: trying to get user by id ${userId}`, ctx.user.id);
+    const profiles = await this.service.getProfiles(ctx, [userId]);
+    return profiles[0];
   }
 }
