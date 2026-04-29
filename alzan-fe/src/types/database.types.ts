@@ -28,6 +28,41 @@ export type Database = {
   };
   public: {
     Tables: {
+      activity_heart_rate_zones: {
+        Row: {
+          created_at: string;
+          duration_s: number;
+          id: string;
+          percentage: number;
+          session_id: string;
+          zone: number;
+        };
+        Insert: {
+          created_at?: string;
+          duration_s: number;
+          id?: string;
+          percentage: number;
+          session_id: string;
+          zone: number;
+        };
+        Update: {
+          created_at?: string;
+          duration_s?: number;
+          id?: string;
+          percentage?: number;
+          session_id?: string;
+          zone?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'activity_heart_rate_zones_session_id_fkey';
+            columns: ['session_id'];
+            isOneToOne: false;
+            referencedRelation: 'activity_sessions';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       activity_laps: {
         Row: {
           avg_heart_rate: number | null;
@@ -189,6 +224,7 @@ export type Database = {
           distance_m: number | null;
           duration_s: number | null;
           elev_gain_m: number | null;
+          elev_loss_m: number | null;
           end_time: string | null;
           ended_at_local: string | null;
           endurance_template_id: string | null;
@@ -201,6 +237,7 @@ export type Database = {
           name: string | null;
           provider: Database['public']['Enums']['provider_enum'];
           provider_activity_id: string | null;
+          recovery_time_s: number | null;
           route_polyline: string | null;
           rpe: number | null;
           source: Database['public']['Enums']['activity_source_enum'];
@@ -212,10 +249,12 @@ export type Database = {
           timezone: string | null;
           total_reps: number | null;
           total_sets: number | null;
+          total_steps: number | null;
           total_volume_kg: number | null;
           updated_at: string;
           user_id: string;
           visibility: Database['public']['Enums']['visibility_enum'] | null;
+          vo2_max: number | null;
           workout_template_id: string | null;
         };
         Insert: {
@@ -231,6 +270,7 @@ export type Database = {
           distance_m?: number | null;
           duration_s?: number | null;
           elev_gain_m?: number | null;
+          elev_loss_m?: number | null;
           end_time?: string | null;
           ended_at_local?: string | null;
           endurance_template_id?: string | null;
@@ -243,6 +283,7 @@ export type Database = {
           name?: string | null;
           provider?: Database['public']['Enums']['provider_enum'];
           provider_activity_id?: string | null;
+          recovery_time_s?: number | null;
           route_polyline?: string | null;
           rpe?: number | null;
           source?: Database['public']['Enums']['activity_source_enum'];
@@ -254,10 +295,12 @@ export type Database = {
           timezone?: string | null;
           total_reps?: number | null;
           total_sets?: number | null;
+          total_steps?: number | null;
           total_volume_kg?: number | null;
           updated_at?: string;
           user_id: string;
           visibility?: Database['public']['Enums']['visibility_enum'] | null;
+          vo2_max?: number | null;
           workout_template_id?: string | null;
         };
         Update: {
@@ -273,6 +316,7 @@ export type Database = {
           distance_m?: number | null;
           duration_s?: number | null;
           elev_gain_m?: number | null;
+          elev_loss_m?: number | null;
           end_time?: string | null;
           ended_at_local?: string | null;
           endurance_template_id?: string | null;
@@ -285,6 +329,7 @@ export type Database = {
           name?: string | null;
           provider?: Database['public']['Enums']['provider_enum'];
           provider_activity_id?: string | null;
+          recovery_time_s?: number | null;
           route_polyline?: string | null;
           rpe?: number | null;
           source?: Database['public']['Enums']['activity_source_enum'];
@@ -296,10 +341,12 @@ export type Database = {
           timezone?: string | null;
           total_reps?: number | null;
           total_sets?: number | null;
+          total_steps?: number | null;
           total_volume_kg?: number | null;
           updated_at?: string;
           user_id?: string;
           visibility?: Database['public']['Enums']['visibility_enum'] | null;
+          vo2_max?: number | null;
           workout_template_id?: string | null;
         };
         Relationships: [
@@ -887,40 +934,49 @@ export type Database = {
       };
       exercises: {
         Row: {
-          base_name: string;
+          base_name_en: string | null;
+          base_name_es: string;
           created_at: string;
-          description: string | null;
+          description_en: string | null;
+          description_es: string | null;
           difficulty: string | null;
           equipment_id: number | null;
           exercise_type_id: number | null;
           id: string;
           is_custom: boolean;
+          load_type: Database['public']['Enums']['exercise_load_type'] | null;
           owner_user_id: string | null;
           primary_muscle_id: number | null;
           secondary_muscle_id: number | null;
         };
         Insert: {
-          base_name: string;
+          base_name_en?: string | null;
+          base_name_es: string;
           created_at?: string;
-          description?: string | null;
+          description_en?: string | null;
+          description_es?: string | null;
           difficulty?: string | null;
           equipment_id?: number | null;
           exercise_type_id?: number | null;
           id?: string;
           is_custom?: boolean;
+          load_type?: Database['public']['Enums']['exercise_load_type'] | null;
           owner_user_id?: string | null;
           primary_muscle_id?: number | null;
           secondary_muscle_id?: number | null;
         };
         Update: {
-          base_name?: string;
+          base_name_en?: string | null;
+          base_name_es?: string;
           created_at?: string;
-          description?: string | null;
+          description_en?: string | null;
+          description_es?: string | null;
           difficulty?: string | null;
           equipment_id?: number | null;
           exercise_type_id?: number | null;
           id?: string;
           is_custom?: boolean;
+          load_type?: Database['public']['Enums']['exercise_load_type'] | null;
           owner_user_id?: string | null;
           primary_muscle_id?: number | null;
           secondary_muscle_id?: number | null;
@@ -1183,7 +1239,8 @@ export type Database = {
           name_en: string;
           name_es: string;
           name_norm_es: string;
-          notes: string | null;
+          notes_en: string | null;
+          notes_es: string | null;
           protein_g_100: number | null;
           quality_score: number;
           salt_g_100: number | null;
@@ -1205,7 +1262,8 @@ export type Database = {
           name_en: string;
           name_es: string;
           name_norm_es: string;
-          notes?: string | null;
+          notes_en?: string | null;
+          notes_es?: string | null;
           protein_g_100?: number | null;
           quality_score: number;
           salt_g_100?: number | null;
@@ -1227,7 +1285,8 @@ export type Database = {
           name_en?: string;
           name_es?: string;
           name_norm_es?: string;
-          notes?: string | null;
+          notes_en?: string | null;
+          notes_es?: string | null;
           protein_g_100?: number | null;
           quality_score?: number;
           salt_g_100?: number | null;
@@ -1601,6 +1660,51 @@ export type Database = {
           },
         ];
       };
+      recipe_usage_events: {
+        Row: {
+          context: Database['public']['Enums']['recipe_usage_context_enum'];
+          event_bucket_10m: string;
+          id: string;
+          is_public_eligible: boolean;
+          recipe_id: string;
+          used_at: string;
+          user_id: string;
+        };
+        Insert: {
+          context: Database['public']['Enums']['recipe_usage_context_enum'];
+          event_bucket_10m: string;
+          id?: string;
+          is_public_eligible?: boolean;
+          recipe_id: string;
+          used_at?: string;
+          user_id: string;
+        };
+        Update: {
+          context?: Database['public']['Enums']['recipe_usage_context_enum'];
+          event_bucket_10m?: string;
+          id?: string;
+          is_public_eligible?: boolean;
+          recipe_id?: string;
+          used_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'recipe_usage_events_recipe_id_fkey';
+            columns: ['recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'recipe_usage_events_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       recipes: {
         Row: {
           carbs_g_100: number;
@@ -1609,17 +1713,27 @@ export type Database = {
           description_en: string | null;
           description_es: string | null;
           fat_g_100: number;
+          favorites_total: number;
           id: string;
           kcal_100: number;
           name_en: string | null;
           name_es: string;
           name_norm_es: string;
+          origin_recipe_id: string | null;
           owner_user_id: string | null;
+          popularity_score: number;
           protein_g_100: number;
+          public_slug: string | null;
+          published_at: string | null;
           quality_score: number;
-          source: string;
+          saves_total: number;
+          source: Database['public']['Enums']['recipe_source_enum'];
           updated_at: string;
-          visibility: string;
+          users_unique_30d: number;
+          uses_30d: number;
+          uses_7d: number;
+          uses_total: number;
+          visibility: Database['public']['Enums']['recipe_visibility_enum'];
         };
         Insert: {
           carbs_g_100?: number;
@@ -1628,17 +1742,27 @@ export type Database = {
           description_en?: string | null;
           description_es?: string | null;
           fat_g_100?: number;
+          favorites_total?: number;
           id?: string;
           kcal_100?: number;
           name_en?: string | null;
           name_es: string;
           name_norm_es: string;
+          origin_recipe_id?: string | null;
           owner_user_id?: string | null;
+          popularity_score?: number;
           protein_g_100?: number;
+          public_slug?: string | null;
+          published_at?: string | null;
           quality_score?: number;
-          source?: string;
+          saves_total?: number;
+          source?: Database['public']['Enums']['recipe_source_enum'];
           updated_at?: string;
-          visibility?: string;
+          users_unique_30d?: number;
+          uses_30d?: number;
+          uses_7d?: number;
+          uses_total?: number;
+          visibility?: Database['public']['Enums']['recipe_visibility_enum'];
         };
         Update: {
           carbs_g_100?: number;
@@ -1647,19 +1771,36 @@ export type Database = {
           description_en?: string | null;
           description_es?: string | null;
           fat_g_100?: number;
+          favorites_total?: number;
           id?: string;
           kcal_100?: number;
           name_en?: string | null;
           name_es?: string;
           name_norm_es?: string;
+          origin_recipe_id?: string | null;
           owner_user_id?: string | null;
+          popularity_score?: number;
           protein_g_100?: number;
+          public_slug?: string | null;
+          published_at?: string | null;
           quality_score?: number;
-          source?: string;
+          saves_total?: number;
+          source?: Database['public']['Enums']['recipe_source_enum'];
           updated_at?: string;
-          visibility?: string;
+          users_unique_30d?: number;
+          uses_30d?: number;
+          uses_7d?: number;
+          uses_total?: number;
+          visibility?: Database['public']['Enums']['recipe_visibility_enum'];
         };
         Relationships: [
+          {
+            foreignKeyName: 'recipes_origin_recipe_id_fkey';
+            columns: ['origin_recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'recipes_owner_user_id_fkey';
             columns: ['owner_user_id'];
@@ -2457,9 +2598,29 @@ export type Database = {
     Functions: {
       check_username: { Args: { username_input: string }; Returns: boolean };
       delete_user_account: { Args: never; Returns: undefined };
+      duplicate_recipe: { Args: { p_recipe_id: string }; Returns: string };
+      ensure_recipe_public_slug: {
+        Args: { p_recipe_id: string };
+        Returns: string;
+      };
       import_ingredients_batch: { Args: { payload: Json }; Returns: number };
       import_recipes_batch: { Args: { payload: Json }; Returns: number };
+      log_recipe_usage: {
+        Args: {
+          p_context: Database['public']['Enums']['recipe_usage_context_enum'];
+          p_recipe_id: string;
+        };
+        Returns: undefined;
+      };
+      publish_recipe: { Args: { p_recipe_id: string }; Returns: undefined };
+      refresh_recipe_popularity_aggregates: { Args: never; Returns: undefined };
+      refresh_recipe_snapshot: {
+        Args: { p_recipe_id: string };
+        Returns: undefined;
+      };
       reset_user_data: { Args: never; Returns: undefined };
+      slugify_recipe_name: { Args: { p_name: string }; Returns: string };
+      unpublish_recipe: { Args: { p_recipe_id: string }; Returns: undefined };
     };
     Enums: {
       activity_source_enum: 'manual' | 'imported' | 'strava' | 'garmin' | 'polar' | 'gym_session';
@@ -2467,6 +2628,7 @@ export type Database = {
       daily_activity_enum: 'sedentary' | 'active' | 'physical';
       daily_hydration_source: 'manual' | 'imported' | 'ai';
       duration_type_enum: 'time' | 'distance' | 'lap_button';
+      exercise_load_type: 'assisted' | 'bodyweight' | 'external' | 'mixed';
       ingredients_category:
         | 'proteina_animal'
         | 'proteina_vegetal'
@@ -2499,6 +2661,9 @@ export type Database = {
       phase_type_enum: 'warmup' | 'interval' | 'recovery' | 'cooldown' | 'relax';
       provider_enum: 'manual' | 'strava' | 'garmin' | 'polar' | 'fitbit' | 'other';
       recipe_items_unit: 'g' | 'ml';
+      recipe_source_enum: 'system' | 'user';
+      recipe_usage_context_enum: 'meal_log' | 'planner' | 'quick_add';
+      recipe_visibility_enum: 'private' | 'public';
       sport_subtype_enum: 'road' | 'trail' | 'track' | 'indoor' | 'outdoor' | 'pool' | 'open_water';
       sport_type_enum:
         | 'basketball'
@@ -2660,6 +2825,7 @@ export const Constants = {
       daily_activity_enum: ['sedentary', 'active', 'physical'],
       daily_hydration_source: ['manual', 'imported', 'ai'],
       duration_type_enum: ['time', 'distance', 'lap_button'],
+      exercise_load_type: ['assisted', 'bodyweight', 'external', 'mixed'],
       ingredients_category: [
         'proteina_animal',
         'proteina_vegetal',
@@ -2689,9 +2855,13 @@ export const Constants = {
       meal_logs_origin: ['user', 'ai_name', 'ai_photo', 'imported'],
       meal_type_enum: ['breakfast', 'lunch', 'dinner', 'snack', 'merienda', 'almuerzo'],
       measurement_type_enum: ['waist', 'chest', 'hips', 'thigh', 'arm', 'calf', 'neck', 'shoulders', 'abdomen'],
+      notification_type: ['USER_FOLLOW_REQUEST', 'USER_FOLLOW_REQUEST_ACCEPTED', 'USER_FOLLOW_REQUEST_REJECTED'],
       phase_type_enum: ['warmup', 'interval', 'recovery', 'cooldown', 'relax'],
       provider_enum: ['manual', 'strava', 'garmin', 'polar', 'fitbit', 'other'],
       recipe_items_unit: ['g', 'ml'],
+      recipe_source_enum: ['system', 'user'],
+      recipe_usage_context_enum: ['meal_log', 'planner', 'quick_add'],
+      recipe_visibility_enum: ['private', 'public'],
       sport_subtype_enum: ['road', 'trail', 'track', 'indoor', 'outdoor', 'pool', 'open_water'],
       sport_type_enum: [
         'basketball',

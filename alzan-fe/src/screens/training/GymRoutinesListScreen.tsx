@@ -143,7 +143,10 @@ export const GymRoutinesListScreen = () => {
       const ids = template.exercises.map(e => e.exercise_id);
       const uniqueIds = Array.from(new Set(ids));
 
-      const { data, error } = await supabase.from('exercises').select('id, base_name').in('id', uniqueIds);
+      const { data, error } = await supabase
+        .from('exercises')
+        .select('id, base_name_es, base_name_en')
+        .in('id', uniqueIds);
 
       if (data) {
         const nameMap = new Map<string, string>();

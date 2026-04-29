@@ -169,7 +169,7 @@ export async function getStrengthExerciseStats(
 
     const { data: sets, error } = await supabase
       .from('workout_sets')
-      .select('*, exercises(base_name)')
+      .select('*, exercises(base_name_es, base_name_en)')
       .in('session_id', sessionIds)
       .order('created_at', { ascending: true });
 
