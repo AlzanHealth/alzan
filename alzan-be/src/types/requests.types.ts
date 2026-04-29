@@ -4,7 +4,6 @@
  */
 
 import { Database as DatabaseGenerated } from './database.types';
-
 export type UserFollowNotificationData = {
   follower_id: string;
   follower_name?: string;
@@ -31,6 +30,8 @@ export type MergeDeep<S, D> = {
       ? S[K]
       : never;
 };
+
+export type RecipeSearchScope = 'source' | 'all' | 'users' | 'saved' | 'favorites';
 
 // 1. Appearance
 export interface AppearanceSettingsJson {
@@ -86,6 +87,8 @@ export interface NutritionSettingsJson {
   };
   macro_display: 'per_meal' | 'daily_total';
   copy_mode: 'none' | 'sequential' | 'alternating' | null;
+  default_recipe_visibility?: 'private' | 'public';
+  recipe_search_scope?: RecipeSearchScope;
   show_diet_calories_only?: boolean;
   show_training_calories_only?: boolean;
   last_visible_week?: string;
@@ -93,14 +96,13 @@ export interface NutritionSettingsJson {
 }
 
 // --- Ingredients & Imports ---
-import { Json } from './database.types';
-export type IngredientSource = {
+export interface IngredientSource {
   provider: string;
   retrieved_at: string;
   url?: string;
   original_id?: string;
-  [key: string]: Json | undefined;
-};
+  [key: string]: unknown;
+}
 
 export type RecipeSource = 'system' | 'user';
 export type RecipeVisibility = 'private' | 'public';

@@ -45,6 +45,7 @@ import {
   getTrendingRecipes,
   logRecipeUsage,
   publishRecipe,
+  RecipeSearchScope,
   refreshRecipeAggregates,
   searchMealByName,
 } from '../../modules/nutrition/services/nutritionSearchService';
@@ -60,7 +61,6 @@ import {
   getLocalizedRecipeName,
 } from '../../services/localization';
 import { usePreferences } from '../../hooks/settings/usePreferences';
-import { RecipeSearchScope } from '../../types/userPreferences.types';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 
