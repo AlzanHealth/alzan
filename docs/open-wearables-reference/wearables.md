@@ -9,6 +9,7 @@ El objetivo es que Alzan pueda importar actividad, salud y entrenamiento de mult
 Documentos complementarios:
 
 - `docs/wearables-simple-summary.md`: resumen muy simple para entender la idea general antes de entrar en la arquitectura.
+- `docs/wearables-workout-import-resolution.md`: reglas propuestas para decidir que hacer cuando entra un entreno externo, incluyendo duplicados, fusion, estados y prioridad de fuentes.
 - `docs/open-wearables-reference/wearable-integration-architecture.mdx`: arquitectura de referencia tomada del repo Open Wearables.
 - `docs/open-wearables-reference/how-to-add-new-provider.mdx`: guia de referencia para entender como estructurar un proveedor nuevo.
 
@@ -555,6 +556,8 @@ Cuando hay datos duplicados o solapados:
 5. Agregadores de terceros.
 
 Ejemplo: si el usuario introduce peso manualmente y Apple Health envia otro peso el mismo dia, no se debe sobrescribir el manual sin confirmacion. Si `import_health_metrics = false`, los datos importados pueden guardarse como raw/canonico, pero no deben alimentar calculos de composicion corporal.
+
+Para actividades de entrenamiento, la prioridad necesita mas detalle porque el mismo entreno puede llegar desde Garmin, Strava, Apple Health y Health Connect. La regla operativa propuesta esta en `docs/wearables-workout-import-resolution.md`.
 
 ## Frontend propuesto
 

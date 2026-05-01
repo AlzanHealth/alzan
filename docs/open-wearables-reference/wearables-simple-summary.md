@@ -237,6 +237,19 @@ manual
 → agregador externo
 ```
 
+Ejemplo:
+
+```text
+Garmin graba una carrera
+Strava recibe copia de Garmin
+Apple Health recibe otra copia
+
+Alzan debe guardar el origen de todas,
+pero mostrar una sola carrera principal.
+```
+
+La version detallada de esta decision esta en `docs/wearables-workout-import-resolution.md`.
+
 ## Orden recomendado de implementacion
 
 ### Paso 1: Strava
@@ -329,4 +342,3 @@ El backend protege y ordena.
 Supabase guarda.
 Alzan muestra valor al usuario.
 ```
-
