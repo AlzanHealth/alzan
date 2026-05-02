@@ -275,6 +275,7 @@ export default {
     popularRecipesTitle: 'Recetas populares',
     discoveryRecipesEmpty: 'No hay recetas públicas para mostrar ahora mismo.',
     discoveryMacroSummary: '{{kcal}}kcal/100g · P {{protein}} · C {{carbs}} · G {{fat}}',
+    recipeMacroSummaryDetailed: '{{kcal}} kcal/100g · Proteína {{protein}}g · Carboh {{carbs}}g · Grasas {{fat}}g',
     unitG: 'g',
     all: 'Todas',
     unavailable: 'No disponible',

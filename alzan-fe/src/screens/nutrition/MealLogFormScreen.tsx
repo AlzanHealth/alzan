@@ -1596,6 +1596,12 @@ export const MealLogFormScreen = () => {
 
   const renderPublicRecipeCard = (recipe: MealComponent) => {
     const isFavorite = recipe.external_id ? favoriteRecipeIds.includes(recipe.external_id) : false;
+    const macroSummary = t('nutrition.recipeMacroSummaryDetailed', {
+      kcal: Math.round(recipe.kcal_100 || 0),
+      protein: Number((recipe.protein_g_100 || 0).toFixed(1)),
+      carbs: Number((recipe.carbs_g_100 || 0).toFixed(1)),
+      fat: Number((recipe.fat_g_100 || 0).toFixed(1)),
+    });
 
     return (
       <View
@@ -1607,11 +1613,9 @@ export const MealLogFormScreen = () => {
             {recipe.name}
           </Text>
         </View>
-        {typeof recipe.description === 'string' && recipe.description.trim().length > 0 && (
-          <Text style={[styles.recipeLibraryDescription, { color: themeColors.textSecondary }]} numberOfLines={2}>
-            {recipe.description}
-          </Text>
-        )}
+        <Text style={[styles.recipeLibraryMacroText, { color: themeColors.textSecondary }]} numberOfLines={1}>
+          {macroSummary}
+        </Text>
         <View style={styles.recipeCardActions}>
           <TouchableOpacity
             style={styles.recipeCardActionBtn}
@@ -3848,6 +3852,11 @@ const styles = StyleSheet.create({
   },
   recipeLibraryDescription: {
     fontSize: 12,
+    lineHeight: 17,
+  },
+  recipeLibraryMacroText: {
+    fontSize: 12,
+    fontWeight: '600',
     lineHeight: 17,
   },
   recipeCardActions: {

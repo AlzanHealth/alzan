@@ -271,6 +271,7 @@ const en = {
     popularRecipesTitle: 'Popular recipes',
     discoveryRecipesEmpty: 'There are no public recipes to show right now.',
     discoveryMacroSummary: '{{kcal}}kcal/100g · P {{protein}} · C {{carbs}} · G {{fat}}',
+    recipeMacroSummaryDetailed: '{{kcal}} kcal/100g · Protein {{protein}}g · Carbs {{carbs}}g · Fats {{fat}}g',
     unitG: 'g',
     all: 'all',
     unavailable: 'Unavailable',
