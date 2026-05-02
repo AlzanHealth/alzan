@@ -2388,11 +2388,12 @@ export const MealLogFormScreen = () => {
                     style={[
                       styles.recipeBuilderSaveButton,
                       {
-                        backgroundColor: canSubmitRecipe && !isSaving
-                          ? themeColors.primary
-                          : isDark
-                            ? 'rgba(255,255,255,0.14)'
-                            : 'rgba(0,0,0,0.12)',
+                        backgroundColor:
+                          canSubmitRecipe && !isSaving
+                            ? themeColors.primary
+                            : isDark
+                              ? 'rgba(255,255,255,0.14)'
+                              : 'rgba(0,0,0,0.12)',
                       },
                     ]}
                     onPress={handleSaveCurrentRecipe}
@@ -2403,9 +2404,7 @@ export const MealLogFormScreen = () => {
                         <>
                           <ActivityIndicator size="small" color="#FFFFFF" />
                           <Text style={styles.recipeBuilderSaveButtonText}>
-                            {isEditingRecipe
-                              ? t('nutrition.updatingRecipeAction')
-                              : t('nutrition.savingRecipeAction')}
+                            {isEditingRecipe ? t('nutrition.updatingRecipeAction') : t('nutrition.savingRecipeAction')}
                           </Text>
                         </>
                       ) : (
@@ -3005,55 +3004,64 @@ export const MealLogFormScreen = () => {
                   </Text>
                 )}
                 {recipeLibraryView !== 'search' &&
-                  ((
-                    recipeLibraryView === 'favorites'
-                      ? paginatedFavoriteLibraryRecipes.length === 0
-                      : filteredDisplayedSavedRecipes.length === 0
-                  ) ? (
-                    <View
-                      style={[
-                        styles.recipeEmptyState,
-                        { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
-                      ]}
-                    >
-                      <Text style={[styles.recipeEmptyStateTitle, { color: themeColors.textPrimary }]}>
-                        {recipeLibraryView === 'favorites'
-                          ? t('nutrition.favoriteRecipesEmptyTitle')
-                          : t('nutrition.savedRecipesEmptyTitle')}
-                      </Text>
-                      <Text style={[styles.recipeEmptyStateText, { color: themeColors.textSecondary }]}>
-                        {recipeLibraryView === 'favorites'
-                          ? t('nutrition.favoriteRecipesEmptyMessage')
-                          : t('nutrition.savedRecipesEmptyMessage')}
+                  (isRecipeLibraryLoading ? (
+                    <View style={styles.recipesLoadingRow}>
+                      <ActivityIndicator size="small" color={themeColors.primary} />
+                      <Text style={[styles.recipesLoadingText, { color: themeColors.textSecondary }]}>
+                        {t('common.loading')}
                       </Text>
                     </View>
                   ) : (
-                    <>
-                      {recipeLibraryView === 'favorites' ? (
-                        <View style={styles.recipeSubsection}>
-                          {paginatedFavoriteLibraryRecipes.map(renderPublicRecipeCard)}
-                        </View>
-                      ) : (
-                        <>
-                          {paginatedMySavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) && (
-                            <View style={styles.recipeSubsection}>
-                              <Text style={[styles.recipeSubsectionTitle, { color: themeColors.textSecondary }]}>
-                                {t('nutrition.favoriteRecipesLabel')}
-                              </Text>
-                              {paginatedMySavedRecipes
-                                .filter(recipe => favoriteRecipeIds.includes(recipe.id))
-                                .map(recipe => renderSavedRecipeCard(recipe, true))}
-                            </View>
-                          )}
-
+                    (
+                      recipeLibraryView === 'favorites'
+                        ? paginatedFavoriteLibraryRecipes.length === 0
+                        : filteredDisplayedSavedRecipes.length === 0
+                    ) ? (
+                      <View
+                        style={[
+                          styles.recipeEmptyState,
+                          { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
+                        ]}
+                      >
+                        <Text style={[styles.recipeEmptyStateTitle, { color: themeColors.textPrimary }]}>
+                          {recipeLibraryView === 'favorites'
+                            ? t('nutrition.favoriteRecipesEmptyTitle')
+                            : t('nutrition.savedRecipesEmptyTitle')}
+                        </Text>
+                        <Text style={[styles.recipeEmptyStateText, { color: themeColors.textSecondary }]}>
+                          {recipeLibraryView === 'favorites'
+                            ? t('nutrition.favoriteRecipesEmptyMessage')
+                            : t('nutrition.savedRecipesEmptyMessage')}
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        {recipeLibraryView === 'favorites' ? (
                           <View style={styles.recipeSubsection}>
-                            {paginatedMySavedRecipes
-                              .filter(recipe => !favoriteRecipeIds.includes(recipe.id))
-                              .map(recipe => renderSavedRecipeCard(recipe))}
+                            {paginatedFavoriteLibraryRecipes.map(renderPublicRecipeCard)}
                           </View>
-                        </>
-                      )}
-                    </>
+                        ) : (
+                          <>
+                            {paginatedMySavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) && (
+                              <View style={styles.recipeSubsection}>
+                                <Text style={[styles.recipeSubsectionTitle, { color: themeColors.textSecondary }]}>
+                                  {t('nutrition.favoriteRecipesLabel')}
+                                </Text>
+                                {paginatedMySavedRecipes
+                                  .filter(recipe => favoriteRecipeIds.includes(recipe.id))
+                                  .map(recipe => renderSavedRecipeCard(recipe, true))}
+                              </View>
+                            )}
+
+                            <View style={styles.recipeSubsection}>
+                              {paginatedMySavedRecipes
+                                .filter(recipe => !favoriteRecipeIds.includes(recipe.id))
+                                .map(recipe => renderSavedRecipeCard(recipe))}
+                            </View>
+                          </>
+                        )}
+                      </>
+                    )
                   ))}
 
                 {recipeLibraryView === 'search' ? (
@@ -3085,14 +3093,7 @@ export const MealLogFormScreen = () => {
                   </>
                 ) : (
                   <>
-                    {isRecipeLibraryLoading ? (
-                      <View style={styles.recipesLoadingRow}>
-                        <ActivityIndicator size="small" color={themeColors.primary} />
-                        <Text style={[styles.recipesLoadingText, { color: themeColors.textSecondary }]}>
-                          {t('common.loading')}
-                        </Text>
-                      </View>
-                    ) : !hasDiscoveryResults ? (
+                    {!isRecipeLibraryLoading && !hasDiscoveryResults ? (
                       <View
                         style={[
                           styles.recipeEmptyState,
@@ -3103,7 +3104,7 @@ export const MealLogFormScreen = () => {
                           {t('nutrition.discoveryRecipesEmpty')}
                         </Text>
                       </View>
-                    ) : (
+                    ) : !isRecipeLibraryLoading ? (
                       displayedDiscoverySections.map(section => {
                         if (section.recipes.length === 0) {
                           return null;
@@ -3124,7 +3125,7 @@ export const MealLogFormScreen = () => {
                           </View>
                         );
                       })
-                    )}
+                    ) : null}
                   </>
                 )}
                 {recipeLibraryView !== 'search' && savedRecipesTotalPages > 1 && (
