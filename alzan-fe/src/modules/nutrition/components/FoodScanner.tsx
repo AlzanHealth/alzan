@@ -2,7 +2,7 @@
 // Barcode scanner component using expo-camera
 
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { X, Flashlight, FlashlightOff, ScanBarcode } from 'lucide-react-native';
 import { warmBarcodeLookup } from '../services/nutritionSearchService';
@@ -21,12 +21,21 @@ type PendingScanState = {
   timestamp: number;
 };
 
+type WebBarcodeDetector = {
+  detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string; format?: string }>>;
+};
+
 function normalizeBarcode(value: string): string {
   return value.replace(/\s+/g, '').trim();
 }
 
-function isSupportedBarcodeType(value: string): value is SupportedBarcodeType {
-  return value === 'ean13' || value === 'ean8' || value === 'upc_a' || value === 'upc_e';
+function normalizeBarcodeType(value: string): SupportedBarcodeType | null {
+  const normalized = value.toLowerCase().replace(/[-_\s]/g, '');
+  if (normalized === 'ean13') return 'ean13';
+  if (normalized === 'ean8') return 'ean8';
+  if (normalized === 'upca') return 'upc_a';
+  if (normalized === 'upce') return 'upc_e';
+  return null;
 }
 
 function isValidBarcodeForType(type: SupportedBarcodeType, barcode: string): boolean {
@@ -56,10 +65,20 @@ interface FoodScannerProps {
 export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onClose }) => {
   const { t } = useTranslation();
   const { colors: themeColors, isDark } = useNutritionStyles();
+  const isWeb = Platform.OS === 'web';
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [flashOn, setFlashOn] = useState(false);
+  const [webBarcodeDetectorSupported, setWebBarcodeDetectorSupported] = useState<boolean | null>(null);
+  const [webError, setWebError] = useState<string | null>(null);
+  const [webInitializing, setWebInitializing] = useState(false);
   const pendingScanRef = useRef<PendingScanState | null>(null);
+  const scannedRef = useRef(false);
+  const webVideoRef = useRef<HTMLVideoElement | null>(null);
+  const webStreamRef = useRef<MediaStream | null>(null);
+  const webDetectorRef = useRef<WebBarcodeDetector | null>(null);
+  const webAnimationFrameRef = useRef<number | null>(null);
+  const lastWebDetectAtRef = useRef(0);
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -68,20 +87,27 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
   }, [permission]);
 
   useEffect(() => {
+    scannedRef.current = scanned;
+  }, [scanned]);
+
+  useEffect(() => {
     warmBarcodeLookup();
   }, []);
 
-  const handleBarCodeScanned = (result: BarcodeScanningResult) => {
-    if (scanned) return;
+  useEffect(() => {
+    if (!isWeb) return;
+    const BarcodeDetectorCtor = (globalThis as { BarcodeDetector?: unknown }).BarcodeDetector;
+    setWebBarcodeDetectorSupported(Boolean(BarcodeDetectorCtor));
+  }, [isWeb]);
 
-    const { data, type } = result;
-    const normalizedType = type.toLowerCase();
-
-    if (!isSupportedBarcodeType(normalizedType)) {
+  const processDetectedBarcode = (rawType: string, rawData: string) => {
+    if (scannedRef.current) return;
+    const normalizedType = normalizeBarcodeType(rawType);
+    if (!normalizedType) {
       return;
     }
 
-    const normalizedBarcode = normalizeBarcode(data);
+    const normalizedBarcode = normalizeBarcode(rawData);
     if (!isValidBarcodeForType(normalizedType, normalizedBarcode)) {
       return;
     }
@@ -103,6 +129,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
 
       if (nextMatches >= 2) {
         setScanned(true);
+        scannedRef.current = true;
         onBarcodeDetected(normalizedBarcode);
       }
       return;
@@ -114,6 +141,129 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
       timestamp: now,
     };
   };
+
+  const handleBarCodeScanned = (result: BarcodeScanningResult) => {
+    processDetectedBarcode(result.type, result.data);
+  };
+
+  useEffect(() => {
+    if (!isWeb || !permission?.granted || webBarcodeDetectorSupported !== true) {
+      return;
+    }
+
+    let canceled = false;
+    setWebError(null);
+    setWebInitializing(true);
+
+    const stopWebScanner = () => {
+      if (webAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(webAnimationFrameRef.current);
+        webAnimationFrameRef.current = null;
+      }
+
+      const stream = webStreamRef.current;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      webStreamRef.current = null;
+
+      const video = webVideoRef.current;
+      if (video) {
+        video.srcObject = null;
+      }
+    };
+
+    const scanLoop = async (timestamp: number) => {
+      if (canceled || scannedRef.current) return;
+
+      if (timestamp - lastWebDetectAtRef.current < 240) {
+        webAnimationFrameRef.current = requestAnimationFrame(scanLoop);
+        return;
+      }
+      lastWebDetectAtRef.current = timestamp;
+
+      const detector = webDetectorRef.current;
+      const video = webVideoRef.current;
+      if (detector && video && video.readyState >= 2) {
+        try {
+          const detections = await detector.detect(video);
+          for (const detection of detections) {
+            if (detection.rawValue && detection.format) {
+              processDetectedBarcode(detection.format, detection.rawValue);
+              if (scannedRef.current) {
+                return;
+              }
+            }
+          }
+        } catch (_error) {
+          // ignore frame-level detection errors
+        }
+      }
+
+      webAnimationFrameRef.current = requestAnimationFrame(scanLoop);
+    };
+
+    const initWebScanner = async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          setWebError(t('nutrition.webBarcodeUnsupported'));
+          setWebInitializing(false);
+          return;
+        }
+
+        const BarcodeDetectorCtor = (globalThis as {
+          BarcodeDetector?: new (options: { formats: string[] }) => WebBarcodeDetector;
+        }).BarcodeDetector;
+
+        if (!BarcodeDetectorCtor) {
+          setWebInitializing(false);
+          return;
+        }
+
+        webDetectorRef.current = new BarcodeDetectorCtor({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'],
+        });
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+          },
+          audio: false,
+        });
+
+        if (canceled) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        webStreamRef.current = stream;
+
+        const video = webVideoRef.current;
+        if (!video) {
+          setWebError(t('nutrition.webBarcodeCameraError'));
+          setWebInitializing(false);
+          return;
+        }
+
+        video.srcObject = stream;
+        await video.play();
+
+        if (canceled) return;
+        setWebInitializing(false);
+        webAnimationFrameRef.current = requestAnimationFrame(scanLoop);
+      } catch (_error) {
+        setWebError(t('nutrition.webBarcodeCameraError'));
+        setWebInitializing(false);
+      }
+    };
+
+    void initWebScanner();
+
+    return () => {
+      canceled = true;
+      stopWebScanner();
+    };
+  }, [isWeb, permission?.granted, t, webBarcodeDetectorSupported]);
 
   // Permission not determined yet
   if (!permission) {
@@ -147,17 +297,50 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
     );
   }
 
+  if (isWeb && webBarcodeDetectorSupported === false) {
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? themeColors.surfaceSolid : '#F5F5F5' }]}>
+        <ScanBarcode size={64} color="#CCC" />
+        <Text style={[styles.permissionTitle, { color: themeColors.textPrimary }]}>
+          {t('nutrition.webBarcodeUnsupportedTitle')}
+        </Text>
+        <Text style={[styles.permissionText, { color: themeColors.textSecondary }]}>
+          {t('nutrition.webBarcodeUnsupported')}
+        </Text>
+        <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+          <Text style={[styles.cancelBtnText, { color: themeColors.textSecondary }]}>{t('common.close')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.scannerContainer}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        enableTorch={flashOn}
-        barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'],
-        }}
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-      />
+      {isWeb && webBarcodeDetectorSupported === true ? (
+        <View style={StyleSheet.absoluteFill}>
+          <video
+            ref={webVideoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+          />
+        </View>
+      ) : (
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          enableTorch={flashOn}
+          barcodeScannerSettings={{
+            barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'],
+          }}
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        />
+      )}
 
       {/* Overlay */}
       <View style={styles.overlay}>
@@ -179,7 +362,13 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
 
         {/* Bottom dark area */}
         <View style={styles.overlayBottom}>
-          <Text style={styles.instructionText}>{t('nutrition.scanBarcodeInstruction')}</Text>
+          {webInitializing ? (
+            <Text style={styles.instructionText}>{t('nutrition.loadingCamera')}</Text>
+          ) : webError ? (
+            <Text style={styles.instructionText}>{webError}</Text>
+          ) : (
+            <Text style={styles.instructionText}>{t('nutrition.scanBarcodeInstruction')}</Text>
+          )}
         </View>
       </View>
 
@@ -189,9 +378,11 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
           <X size={24} color="#FFF" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.controlBtn} onPress={() => setFlashOn(!flashOn)}>
-          {flashOn ? <FlashlightOff size={24} color="#FFF" /> : <Flashlight size={24} color="#FFF" />}
-        </TouchableOpacity>
+        {!isWeb && (
+          <TouchableOpacity style={styles.controlBtn} onPress={() => setFlashOn(!flashOn)}>
+            {flashOn ? <FlashlightOff size={24} color="#FFF" /> : <Flashlight size={24} color="#FFF" />}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

@@ -91,6 +91,10 @@ export default {
     missingMealNameMessage: 'Por favor escribe un nombre para la comida',
     saveMealError: 'No se pudo guardar la comida',
     loadingCamera: 'Cargando cámara...',
+    webBarcodeUnsupportedTitle: 'Escáner no disponible en este navegador',
+    webBarcodeUnsupported:
+      'El escaneo de códigos en web depende del navegador y Safari no lo soporta de forma fiable. Usa la app en iOS o Android para escanear productos.',
+    webBarcodeCameraError: 'No se pudo iniciar la cámara para escanear.',
     incompleteDataWarning: '⚠️ Algunos datos pueden estar incompletos',
     proteinCaps: 'Proteína',
     mealWith: 'Comida con',
