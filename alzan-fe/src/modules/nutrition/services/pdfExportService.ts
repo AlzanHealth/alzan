@@ -126,6 +126,16 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
 
     const energyUnit: EnergyUnit = prefsData?.energy_unit === 'kj' ? 'kj' : 'kcal';
 
+    const { data: nutritionGoal } = await supabase
+      .from('user_goals')
+      .select('target_calories_kcal, target_protein_g, target_carbs_g, target_fats_g, description')
+      .eq('user_id', userId)
+      .eq('goal_type', 'nutrition')
+      .eq('is_active', true)
+      .order('valid_from', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     let finalDisplayName = user.display_name;
     if (!finalDisplayName) {
       const { data: profile } = await supabase.from('users').select('display_name').eq('id', userId).single();
@@ -209,6 +219,85 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     const dateLocale = getDateFnsLocale();
     const datePattern = getPdfDatePattern();
     const dayDatePattern = getPdfDayDatePattern();
+
+    const formatGoalDelta = (actual: number, target: number | null | undefined): string => {
+      if (target == null || target <= 0) return '';
+      const delta = Math.round(actual - target);
+      if (delta === 0) return '0';
+      return delta > 0 ? `+${delta}` : `${delta}`;
+    };
+
+    const renderGoalComparison = (): string => {
+      const targetKcal = nutritionGoal?.target_calories_kcal ?? null;
+      const targetProtein = nutritionGoal?.target_protein_g ?? null;
+      const targetCarbs = nutritionGoal?.target_carbs_g ?? null;
+      const targetFats = nutritionGoal?.target_fats_g ?? null;
+
+      const hasTargets = [targetKcal, targetProtein, targetCarbs, targetFats].some(value => value != null && value > 0);
+      if (!hasTargets) return '';
+
+      const rows = [
+        {
+          label: energyUnit === 'kj' ? 'kJ' : 'kcal',
+          current: convertEnergyToUi(averages.kcal, energyUnit).value,
+          target: targetKcal != null ? convertEnergyToUi(targetKcal, energyUnit).value : null,
+          delta: targetKcal != null ? convertEnergyToUi(averages.kcal - targetKcal, energyUnit).value : null,
+          unit: convertEnergyToUi(averages.kcal, energyUnit).unit,
+        },
+        {
+          label: t('nutrition.proteins'),
+          current: averages.protein,
+          target: targetProtein,
+          delta: targetProtein != null ? Number(formatGoalDelta(averages.protein, targetProtein)) : null,
+          unit: 'g',
+        },
+        {
+          label: t('nutrition.carbs'),
+          current: averages.carbs,
+          target: targetCarbs,
+          delta: targetCarbs != null ? Number(formatGoalDelta(averages.carbs, targetCarbs)) : null,
+          unit: 'g',
+        },
+        {
+          label: t('nutrition.fats'),
+          current: averages.fats,
+          target: targetFats,
+          delta: targetFats != null ? Number(formatGoalDelta(averages.fats, targetFats)) : null,
+          unit: 'g',
+        },
+      ];
+
+      return `
+        <div class="section-subtitle">${escapeHtml(t('nutrition.pdfGoalComparison'))}</div>
+        <table class="target-table">
+          <thead>
+            <tr>
+              <th>${escapeHtml(t('nutrition.pdfMetric'))}</th>
+              <th class="col-num">${escapeHtml(t('nutrition.pdfDailyAverage'))}</th>
+              <th class="col-num">${escapeHtml(t('nutrition.pdfGoal'))}</th>
+              <th class="col-num">${escapeHtml(t('nutrition.pdfDelta'))}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map(row => {
+                const targetLabel = row.target == null ? '-' : `${Math.round(row.target)}${row.unit}`;
+                const deltaLabel =
+                  row.delta == null ? '-' : `${row.delta > 0 ? '+' : ''}${Math.round(row.delta)}${row.unit}`;
+                return `
+                  <tr>
+                    <td>${escapeHtml(row.label)}</td>
+                    <td class="col-num">${Math.round(row.current)}${escapeHtml(row.unit)}</td>
+                    <td class="col-num">${escapeHtml(targetLabel)}</td>
+                    <td class="col-num">${escapeHtml(deltaLabel)}</td>
+                  </tr>
+                `;
+              })
+              .join('')}
+          </tbody>
+        </table>
+      `;
+    };
 
     const html = `
         <!DOCTYPE html>
@@ -362,6 +451,23 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                     font-size: 14px;
                     color: var(--text-secondary);
                 }
+                .macro-line {
+                    font-size: 12px;
+                    color: var(--text-secondary);
+                    margin: 6px 0 10px;
+                    line-height: 1.5;
+                }
+                .section-subtitle {
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: var(--text);
+                    margin: 20px 0 8px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.6px;
+                }
+                .target-table {
+                    margin-bottom: 20px;
+                }
 
                 /* Table */
                 table {
@@ -456,6 +562,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             <div class="disclaimer">
                 ${escapeHtml(t('nutrition.pdfEstimateNote'))}
             </div>
+            ${renderGoalComparison()}
 
             </div> <!-- end summary-page -->
 
@@ -472,6 +579,9 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                         <span class="day-date">${escapeHtml(format(parseISO(day.date), dayDatePattern, { locale: dateLocale }))}</span>
                         <span class="day-total">${escapeHtml(convertEnergyToUi(day.totals.kcal, energyUnit).label)}</span>
                     </div>
+                    <div class="macro-line">
+                        ${escapeHtml(`${t('nutrition.proteins')}: ${Math.round(day.totals.protein)}g · ${t('nutrition.carbs')}: ${Math.round(day.totals.carbs)}g · ${t('nutrition.fats')}: ${Math.round(day.totals.fats)}g`)}
+                    </div>
                     
                     ${day.logs
                       .map(
@@ -483,6 +593,9 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                                     ${normalizeText(meal.name) ? `— <span style="font-weight:400">${escapeHtml(normalizeText(meal.name) || '')}</span>` : ''}
                                 </div>
                                 <div class="meal-total">${escapeHtml(convertEnergyToUi(meal.kcal, energyUnit).label)}</div>
+                            </div>
+                            <div class="macro-line">
+                                ${escapeHtml(`${t('nutrition.proteins')}: ${Math.round(meal.protein_g ?? 0)}g · ${t('nutrition.carbs')}: ${Math.round(meal.carbs_g ?? 0)}g · ${t('nutrition.fats')}: ${Math.round(meal.fats_g ?? 0)}g`)}
                             </div>
                             
                             ${

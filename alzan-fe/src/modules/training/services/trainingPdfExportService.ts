@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { format, parseISO } from 'date-fns';
 import { convertDistanceToUi, convertSpeedToUi, convertWeightToUi } from '../../../utils/unitConversionUtils';
 import {
+  ActivityHeartRateZone,
   ActivityLap,
   DistanceUnit,
   EnduranceWorkoutStep,
@@ -260,6 +261,24 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
     if (sessionsError) throw new Error(getErrorMessage(sessionsError));
     if (!sessions?.length) throw new Error(t('training.pdfNoWorkoutsInRange'));
 
+    const sessionIds = sessions.map(session => session.id);
+    const heartRateZonesBySessionId: Record<string, ActivityHeartRateZone[]> = {};
+    if (sessionIds.length > 0) {
+      const { data: heartRateZones, error: heartRateZonesError } = await supabase
+        .from('activity_heart_rate_zones')
+        .select('*')
+        .in('session_id', sessionIds)
+        .order('zone', { ascending: false });
+
+      if (heartRateZonesError) throw new Error(getErrorMessage(heartRateZonesError));
+
+      (heartRateZones ?? []).forEach(zone => {
+        const bucket = heartRateZonesBySessionId[zone.session_id] ?? [];
+        bucket.push(zone);
+        heartRateZonesBySessionId[zone.session_id] = bucket;
+      });
+    }
+
     const templateIdSet = new Set<string>();
     sessions.forEach(session => {
       if (session.endurance_template_id) {
@@ -287,6 +306,11 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
     let totalVolume = 0;
     let totalDurationSeconds = 0;
     let totalDistanceM = 0;
+    let totalCalories = 0;
+    let totalSteps = 0;
+    let totalElevGainM = 0;
+    let totalElevLossM = 0;
+    const avgHrSamples: number[] = [];
 
     const processedSessions = sessions.map(session => {
       let sessionVolume = 0;
@@ -315,6 +339,13 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       totalVolume += sessionVolume;
       totalDurationSeconds += session.duration_s || 0;
       totalDistanceM += session.distance_m || 0;
+      totalCalories += session.calories_kcal || 0;
+      totalSteps += session.total_steps || 0;
+      totalElevGainM += session.elev_gain_m || 0;
+      totalElevLossM += session.elev_loss_m || 0;
+      if (session.avg_heart_rate != null && session.avg_heart_rate > 0) {
+        avgHrSamples.push(session.avg_heart_rate);
+      }
 
       const templateSteps = session.endurance_template_id ? templateStepsMap[session.endurance_template_id] || [] : [];
 
@@ -329,6 +360,7 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
         })),
         laps: sessionLaps,
         templateSteps,
+        heartRateZones: heartRateZonesBySessionId[session.id] ?? [],
       };
     });
 
@@ -343,6 +375,47 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
     const dateLocale = getDateFnsLocale();
     const datePattern = getPdfDatePattern();
     const dateTimePattern = getPdfDateTimePattern();
+    const averageHeartRate =
+      avgHrSamples.length > 0
+        ? Math.round(avgHrSamples.reduce((sum, value) => sum + value, 0) / avgHrSamples.length)
+        : null;
+
+    const renderOptionalSummaryCards = (): string => {
+      const cards: Array<{ value: string; label: string }> = [];
+
+      if (totalCalories > 0) {
+        cards.push({ value: `${Math.round(totalCalories)}`, label: `${t('training.pdfMetricCalories')} (kcal)` });
+      }
+      if (averageHeartRate != null) {
+        cards.push({ value: `${averageHeartRate}`, label: `${t('training.pdfAvgHr')} (bpm)` });
+      }
+      if (totalSteps > 0) {
+        cards.push({ value: `${Math.round(totalSteps)}`, label: t('training.pdfMetricSteps') });
+      }
+      if (totalElevGainM > 0 || totalElevLossM > 0) {
+        cards.push({
+          value: `+${formatElevation(totalElevGainM, distanceUnit)} / -${formatElevation(totalElevLossM, distanceUnit)}`,
+          label: t('training.pdfElevationBalance'),
+        });
+      }
+
+      if (cards.length === 0) return '';
+
+      return `
+        <div class="summary-grid summary-grid-secondary">
+          ${cards
+            .map(
+              card => `
+                <div class="summary-card summary-card-secondary">
+                  <div class="summary-val">${escapeHtml(card.value)}</div>
+                  <div class="summary-label">${escapeHtml(card.label)}</div>
+                </div>
+              `,
+            )
+            .join('')}
+        </div>
+      `;
+    };
 
     const formatStepTarget = (step: EnduranceWorkoutStep, sportType: SportType): string => {
       if (!step.target_type || step.target_type === 'none') return '';
@@ -466,6 +539,9 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       if (session.elev_gain_m != null && session.elev_gain_m > 0) {
         stats.push(`${t('training.pdfMetricElevation')}: ${formatElevation(session.elev_gain_m, distanceUnit)}`);
       }
+      if (session.elev_loss_m != null && session.elev_loss_m > 0) {
+        stats.push(`${t('training.pdfMetricElevationLoss')}: ${formatElevation(session.elev_loss_m, distanceUnit)}`);
+      }
       if (session.calories_kcal != null && session.calories_kcal > 0) {
         stats.push(`${t('training.pdfMetricCalories')}: ${Math.round(session.calories_kcal)} kcal`);
       }
@@ -489,6 +565,32 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       }
       if (session.max_power_w != null && session.max_power_w > 0) {
         stats.push(`${t('training.pdfMaxPower')}: ${Math.round(session.max_power_w)}W`);
+      }
+      if (session.total_steps != null && session.total_steps > 0) {
+        stats.push(`${t('training.pdfMetricSteps')}: ${Math.round(session.total_steps)}`);
+      }
+      if (session.vo2_max != null && session.vo2_max > 0) {
+        stats.push(`${t('training.pdfVo2Max')}: ${Number(session.vo2_max).toFixed(1)}`);
+      }
+      if (session.recovery_time_s != null && session.recovery_time_s > 0) {
+        stats.push(`${t('training.pdfRecoveryTime')}: ${formatDuration(session.recovery_time_s)}`);
+      }
+      if (session.avg_temp_c != null) {
+        stats.push(`${t('training.pdfAvgTemperature')}: ${Math.round(session.avg_temp_c)}°C`);
+      }
+      if (session.max_temp_c != null) {
+        stats.push(`${t('training.pdfMaxTemperature')}: ${Math.round(session.max_temp_c)}°C`);
+      }
+      if (session.total_sets != null && session.total_sets > 0) {
+        stats.push(`${t('training.pdfTotalSets')}: ${Math.round(session.total_sets)}`);
+      }
+      if (session.total_reps != null && session.total_reps > 0) {
+        stats.push(`${t('training.pdfTotalReps')}: ${Math.round(session.total_reps)}`);
+      }
+      if (session.total_volume_kg != null && session.total_volume_kg > 0) {
+        stats.push(
+          `${t('training.pdfStoredVolume')}: ${convertWeightToUi(session.total_volume_kg, weightUnit, 0).label}`,
+        );
       }
 
       return stats.map(stat => escapeHtml(stat)).join(' · ');
@@ -547,6 +649,7 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
             <div class="lap-cell-right">${escapeHtml(t('settings.distance'))}</div>
             <div class="lap-cell-right">${escapeHtml(t('training.time'))}</div>
             <div class="lap-cell-right">${escapeHtml(t('training.pdfAvgHr'))}</div>
+            <div class="lap-cell-right">${escapeHtml(t('training.pdfMaxHr'))}</div>
           </div>
           ${laps
             .map(lap => {
@@ -561,6 +664,8 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
               const durationLabel = lap.duration_s != null && lap.duration_s > 0 ? formatDuration(lap.duration_s) : '-';
               const avgHrLabel =
                 lap.avg_heart_rate != null && lap.avg_heart_rate > 0 ? `${Math.round(lap.avg_heart_rate)} bpm` : '-';
+              const maxHrLabel =
+                lap.max_heart_rate != null && lap.max_heart_rate > 0 ? `${Math.round(lap.max_heart_rate)} bpm` : '-';
 
               return `
                 <div class="laps-grid-row">
@@ -569,9 +674,36 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
                   <div class="lap-cell-right">${escapeHtml(distanceLabel)}</div>
                   <div class="lap-cell-right">${escapeHtml(durationLabel)}</div>
                   <div class="lap-cell-right">${escapeHtml(avgHrLabel)}</div>
+                  <div class="lap-cell-right">${escapeHtml(maxHrLabel)}</div>
                 </div>
               `;
             })
+            .join('')}
+        </div>
+      `;
+    };
+
+    const renderHeartRateZones = (zones: ActivityHeartRateZone[]): string => {
+      if (zones.length === 0) return '';
+
+      return `
+        <div class="template-section">
+          <div class="template-title">${escapeHtml(t('training.pdfHeartRateZones'))}</div>
+          <div class="zone-grid-header">
+            <div>${escapeHtml(t('training.hrZone'))}</div>
+            <div class="lap-cell-right">%</div>
+            <div class="lap-cell-right">${escapeHtml(t('training.time'))}</div>
+          </div>
+          ${zones
+            .map(
+              zone => `
+                <div class="zone-grid-row">
+                  <div>${escapeHtml(`${t('training.hrZone')} ${zone.zone}`)}</div>
+                  <div class="lap-cell-right">${Math.round(zone.percentage)}%</div>
+                  <div class="lap-cell-right">${escapeHtml(formatDuration(zone.duration_s))}</div>
+                </div>
+              `,
+            )
             .join('')}
         </div>
       `;
@@ -801,7 +933,7 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
           .laps-grid-header,
           .laps-grid-row {
             display: grid;
-            grid-template-columns: 24px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-columns: 24px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
             gap: 8px;
             align-items: center;
           }
@@ -820,6 +952,32 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
           }
           .lap-cell-right {
             text-align: right;
+          }
+          .summary-grid-secondary {
+            margin-top: -15px;
+          }
+          .summary-card-secondary {
+            padding: 14px;
+          }
+          .zone-grid-header,
+          .zone-grid-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr);
+            gap: 8px;
+            align-items: center;
+          }
+          .zone-grid-header {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 4px;
+          }
+          .zone-grid-row {
+            font-size: 12px;
+            color: var(--text);
+            padding: 6px 0;
+            border-top: 1px solid var(--border);
           }
           .empty-block {
             border: 1px dashed var(--border);
@@ -873,6 +1031,7 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
             <div class="summary-label">${escapeHtml(t('training.pdfStrengthVolume'))}</div>
           </div>
         </div>
+        ${renderOptionalSummaryCards()}
 
         <div class="section-title">${escapeHtml(t('training.pdfSessionDetails'))}</div>
         ${processedSessions
@@ -920,6 +1079,7 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
                         : `<div class="empty-block">${escapeHtml(t('training.pdfNoStrengthSets'))}</div>`
                       : ''
                   }
+                  ${renderHeartRateZones(session.heartRateZones)}
                   ${!session.isGym && session.laps.length > 0 ? renderSessionLaps(session.laps, sportType) : ''}
                   ${
                     session.templateSteps.length > 0

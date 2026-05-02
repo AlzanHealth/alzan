@@ -211,9 +211,11 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
           return;
         }
 
-        const BarcodeDetectorCtor = (globalThis as {
-          BarcodeDetector?: new (options: { formats: string[] }) => WebBarcodeDetector;
-        }).BarcodeDetector;
+        const BarcodeDetectorCtor = (
+          globalThis as {
+            BarcodeDetector?: new (options: { formats: string[] }) => WebBarcodeDetector;
+          }
+        ).BarcodeDetector;
 
         if (!BarcodeDetectorCtor) {
           setWebInitializing(false);
@@ -308,7 +310,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
           {t('nutrition.webBarcodeUnsupported')}
         </Text>
         <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-          <Text style={[styles.cancelBtnText, { color: themeColors.textSecondary }]}>{t('common.close')}</Text>
+          <Text style={[styles.cancelBtnText, { color: themeColors.textSecondary }]}>{t('training.close')}</Text>
         </TouchableOpacity>
       </View>
     );

@@ -3016,56 +3016,54 @@ export const MealLogFormScreen = () => {
                       </Text>
                     </View>
                   ) : (
-                    (
                       recipeLibraryView === 'favorites'
                         ? paginatedFavoriteLibraryRecipes.length === 0
                         : filteredDisplayedSavedRecipes.length === 0
                     ) ? (
-                      <View
-                        style={[
-                          styles.recipeEmptyState,
-                          { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
-                        ]}
-                      >
-                        <Text style={[styles.recipeEmptyStateTitle, { color: themeColors.textPrimary }]}>
-                          {recipeLibraryView === 'favorites'
-                            ? t('nutrition.favoriteRecipesEmptyTitle')
-                            : t('nutrition.savedRecipesEmptyTitle')}
-                        </Text>
-                        <Text style={[styles.recipeEmptyStateText, { color: themeColors.textSecondary }]}>
-                          {recipeLibraryView === 'favorites'
-                            ? t('nutrition.favoriteRecipesEmptyMessage')
-                            : t('nutrition.savedRecipesEmptyMessage')}
-                        </Text>
-                      </View>
-                    ) : (
-                      <>
-                        {recipeLibraryView === 'favorites' ? (
-                          <View style={styles.recipeSubsection}>
-                            {paginatedFavoriteLibraryRecipes.map(renderPublicRecipeCard)}
-                          </View>
-                        ) : (
-                          <>
-                            {paginatedMySavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) && (
-                              <View style={styles.recipeSubsection}>
-                                <Text style={[styles.recipeSubsectionTitle, { color: themeColors.textSecondary }]}>
-                                  {t('nutrition.favoriteRecipesLabel')}
-                                </Text>
-                                {paginatedMySavedRecipes
-                                  .filter(recipe => favoriteRecipeIds.includes(recipe.id))
-                                  .map(recipe => renderSavedRecipeCard(recipe, true))}
-                              </View>
-                            )}
-
+                    <View
+                      style={[
+                        styles.recipeEmptyState,
+                        { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
+                      ]}
+                    >
+                      <Text style={[styles.recipeEmptyStateTitle, { color: themeColors.textPrimary }]}>
+                        {recipeLibraryView === 'favorites'
+                          ? t('nutrition.favoriteRecipesEmptyTitle')
+                          : t('nutrition.savedRecipesEmptyTitle')}
+                      </Text>
+                      <Text style={[styles.recipeEmptyStateText, { color: themeColors.textSecondary }]}>
+                        {recipeLibraryView === 'favorites'
+                          ? t('nutrition.favoriteRecipesEmptyMessage')
+                          : t('nutrition.savedRecipesEmptyMessage')}
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      {recipeLibraryView === 'favorites' ? (
+                        <View style={styles.recipeSubsection}>
+                          {paginatedFavoriteLibraryRecipes.map(renderPublicRecipeCard)}
+                        </View>
+                      ) : (
+                        <>
+                          {paginatedMySavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) && (
                             <View style={styles.recipeSubsection}>
+                              <Text style={[styles.recipeSubsectionTitle, { color: themeColors.textSecondary }]}>
+                                {t('nutrition.favoriteRecipesLabel')}
+                              </Text>
                               {paginatedMySavedRecipes
-                                .filter(recipe => !favoriteRecipeIds.includes(recipe.id))
-                                .map(recipe => renderSavedRecipeCard(recipe))}
+                                .filter(recipe => favoriteRecipeIds.includes(recipe.id))
+                                .map(recipe => renderSavedRecipeCard(recipe, true))}
                             </View>
-                          </>
-                        )}
-                      </>
-                    )
+                          )}
+
+                          <View style={styles.recipeSubsection}>
+                            {paginatedMySavedRecipes
+                              .filter(recipe => !favoriteRecipeIds.includes(recipe.id))
+                              .map(recipe => renderSavedRecipeCard(recipe))}
+                          </View>
+                        </>
+                      )}
+                    </>
                   ))}
 
                 {recipeLibraryView === 'search' ? (
