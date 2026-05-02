@@ -102,7 +102,7 @@ const en = {
     onlyMacrosWarning: '⚠️ Only macros available.',
     noIngredientsFound: 'No ingredients found',
     nutriScoreDisclaimer:
-      'The shown Nutri-Score is a calculated value for informational purposes and does not constitute medical advice. For personalized nutrition advice, consult a health professional.',
+      'The displayed quality score is a calculated value for informational purposes and does not constitute medical advice. For personalized nutrition advice, consult a health professional.',
     addIngredient: 'Add Ingredient',
     carbsShort: 'Carbs',
     maxInputLimit1kg: 'The maximum value to enter is 1kg',

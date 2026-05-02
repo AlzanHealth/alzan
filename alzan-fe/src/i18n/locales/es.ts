@@ -104,7 +104,7 @@ export default {
     onlyMacrosWarning: '⚠️ Solo macros disponibles.',
     noIngredientsFound: 'No se encontraron ingredientes',
     nutriScoreDisclaimer:
-      'La puntuación Nutri-Score mostrada es un valor calculado con fines informativos y no constituye una recomendación médica. Para obtener asesoramiento nutricional personalizado, consulta a un profesional de la salud.',
+      'La puntuación de calidad mostrada es un valor calculado con fines informativos y no constituye una recomendación médica. Para obtener asesoramiento nutricional personalizado, consulta a un profesional de la salud.',
     addIngredient: 'Añadir Ingrediente',
     carbsShort: 'Carbos',
     maxInputLimit1kg: 'El valor máximo a introducir es 1kg',

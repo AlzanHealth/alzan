@@ -38,6 +38,11 @@ import { format } from 'date-fns';
 import { getLocalizedIngredientNotes } from '../../services/localization';
 import { getRecipeIngredients } from '../../modules/nutrition/services/recipeService';
 import {
+  FOOD_QUALITY_SCORE_VERSION,
+  calculateFoodQualityScore,
+  toFoodCategory,
+} from '../../modules/nutrition/services/foodQualityScore';
+import {
   duplicateRecipe,
   getMostUsedRecipes,
   getRecipeLibraryPage,
@@ -78,6 +83,7 @@ interface SavedRecipeDraft {
   name: string;
   created_at: string;
   updated_at: string;
+  quality_score: number;
   source: 'user';
   visibility: 'private' | 'public';
   published_at: string | null;
@@ -92,6 +98,7 @@ interface SavedRecipeRow {
   name_en: string | null;
   created_at: string;
   updated_at: string;
+  quality_score: number | null;
   source: 'user';
   visibility: 'private' | 'public';
   published_at: string | null;
@@ -105,6 +112,7 @@ interface SavedRecipeItemRow {
   quantity: number;
   ingredient_id: string;
   ingredients: {
+    category: string | null;
     name_es: string;
     name_en: string | null;
     kcal_100: number | null;
@@ -410,6 +418,11 @@ export const MealLogFormScreen = () => {
     return Number(value.toFixed(2)).toString();
   };
 
+  const logRecipeQualityDebug = (payload: Record<string, unknown>) => {
+    if (!__DEV__) return;
+    console.info('[MealLogForm] Recipe quality score debug', payload);
+  };
+
   const toRecipeDisplayName = (rawName: string): string => {
     return rawName.replace(/\s*\((?:copia|copy)(?:\s+\d+)?\)\s*$/i, '').trim();
   };
@@ -427,16 +440,50 @@ export const MealLogFormScreen = () => {
     return JSON.stringify(signature);
   };
 
-  const buildRecipeNutritionSnapshot = (recipeIngredients: MealComponent[]) => {
+  // Only used when saving/updating user recipes.
+  const buildRecipeNutritionSnapshot = (recipeIngredients: MealComponent[], recipeName: string) => {
     const totalWeight = recipeIngredients.reduce((sum, ingredient) => sum + (ingredient.amount_g || 0), 0);
     const totalMacros = calculateTotalMacros(recipeIngredients);
     const scaleTo100g = totalWeight > 0 ? 100 / totalWeight : 0;
+    const qualityInput = {
+      ingredients: recipeIngredients.map(ingredient => {
+        const computed = ingredient.calculated_macros || calculateMacros(ingredient, ingredient.amount_g || 0);
+        return {
+          category: toFoodCategory(ingredient.category),
+          weight_g: ingredient.amount_g || 0,
+          macros: {
+            energyKcal: computed.kcal,
+            protein_g: computed.protein_g,
+            carbs_g: computed.carbs_g,
+            fat_g: computed.fats_g,
+          },
+        };
+      }),
+      totalMacros: {
+        energyKcal: totalMacros.kcal,
+        protein_g: totalMacros.protein_g,
+        carbs_g: totalMacros.carbs_g,
+        fat_g: totalMacros.fats_g,
+      },
+    };
+    const qualityResult = calculateFoodQualityScore(qualityInput);
+
+    logRecipeQualityDebug({
+      recipeName,
+      algorithm: FOOD_QUALITY_SCORE_VERSION,
+      score: qualityResult.score,
+      grade: qualityResult.grade,
+      score01: qualityResult.score01,
+      breakdown: qualityResult.breakdown,
+      debug: qualityResult.debug,
+    });
 
     return {
       kcal_100: Number((totalMacros.kcal * scaleTo100g).toFixed(2)),
       protein_g_100: Number((totalMacros.protein_g * scaleTo100g).toFixed(2)),
       carbs_g_100: Number((totalMacros.carbs_g * scaleTo100g).toFixed(2)),
       fat_g_100: Number((totalMacros.fats_g * scaleTo100g).toFixed(2)),
+      quality_score: qualityResult.score01,
     };
   };
 
@@ -736,6 +783,7 @@ export const MealLogFormScreen = () => {
         amount_g: defaultAmount,
         source: item.source,
         external_id: item.external_id,
+        category: toFoodCategory(item.category),
         itemType: item.itemType,
         source_primary: item.source_primary, // Cast if needed or ensure types align
         kcal_100: item.kcal_100,
@@ -855,6 +903,7 @@ export const MealLogFormScreen = () => {
       amount_g: item.quantity,
       source: 'database',
       external_id: item.ingredient_id,
+      category: toFoodCategory(item.ingredients.category),
       itemType: 'ingredient',
       kcal_100: item.ingredients.kcal_100 || 0,
       protein_g_100: item.ingredients.protein_g_100 || 0,
@@ -879,7 +928,7 @@ export const MealLogFormScreen = () => {
     const { data: recipesData, error: recipesError } = await supabase
       .from('recipes')
       .select(
-        'id, name_es, name_en, created_at, updated_at, source, visibility, published_at, public_slug, origin_recipe_id',
+        'id, name_es, name_en, created_at, updated_at, quality_score, source, visibility, published_at, public_slug, origin_recipe_id',
       )
       .eq('owner_user_id', currentUserId)
       .eq('source', 'user')
@@ -904,6 +953,7 @@ export const MealLogFormScreen = () => {
           quantity,
           ingredient_id,
           ingredients (
+            category,
             name_es,
             name_en,
             kcal_100,
@@ -934,6 +984,7 @@ export const MealLogFormScreen = () => {
       name: toRecipeDisplayName(getLocalizedIngredientName({ name_es: recipe.name_es, name_en: recipe.name_en })),
       created_at: recipe.created_at,
       updated_at: recipe.updated_at,
+      quality_score: recipe.quality_score ?? 0.7,
       source: 'user',
       visibility: recipe.visibility,
       published_at: recipe.published_at,
@@ -1090,7 +1141,7 @@ export const MealLogFormScreen = () => {
 
       const normalizedName = normalizeName(name.trim());
       let recipeId = editingSavedRecipeId;
-      const nutritionSnapshot = buildRecipeNutritionSnapshot(ingredients);
+      const nutritionSnapshot = buildRecipeNutritionSnapshot(ingredients, name.trim());
 
       if (recipeId) {
         if (!editingSavedRecipeUpdatedAt) {
@@ -1230,6 +1281,7 @@ export const MealLogFormScreen = () => {
       source: 'database',
       itemType: 'recipe',
       recipe_source: 'user',
+      quality_score: recipe.quality_score,
       amount_g: totalRecipeAmount || 100,
       // Keep parity with recipe search service: kcal as integer, macros with 1 decimal.
       kcal_100: Math.round(totalMacros.kcal * scaleTo100g),
@@ -1429,6 +1481,7 @@ export const MealLogFormScreen = () => {
         amount_g: amount,
         source: selectedFood.source,
         external_id: selectedFood.external_id,
+        category: toFoodCategory(selectedFood.category),
         brand: selectedFood.brand,
         kcal_100: selectedFood.kcal_100,
         protein_g_100: selectedFood.protein_g_100,
