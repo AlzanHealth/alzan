@@ -1113,6 +1113,8 @@ export const MealLogFormScreen = () => {
   };
 
   const handleSaveCurrentRecipe = async () => {
+    if (isSaving) return;
+
     if (!name.trim()) {
       Alert.alert(t('nutrition.missingMealNameTitle'), t('nutrition.missingMealNameMessage'));
       return;
@@ -1131,6 +1133,8 @@ export const MealLogFormScreen = () => {
       );
       return;
     }
+
+    setIsSaving(true);
 
     try {
       const currentUserId = await getCurrentUserId();
@@ -1253,6 +1257,8 @@ export const MealLogFormScreen = () => {
     } catch (error) {
       console.error('[MealLogForm] Error saving recipe:', error);
       Alert.alert(t('common.error'), t('nutrition.saveMealError'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -2382,7 +2388,7 @@ export const MealLogFormScreen = () => {
                     style={[
                       styles.recipeBuilderSaveButton,
                       {
-                        backgroundColor: canSubmitRecipe
+                        backgroundColor: canSubmitRecipe && !isSaving
                           ? themeColors.primary
                           : isDark
                             ? 'rgba(255,255,255,0.14)'
@@ -2390,11 +2396,24 @@ export const MealLogFormScreen = () => {
                       },
                     ]}
                     onPress={handleSaveCurrentRecipe}
-                    disabled={!canSubmitRecipe}
+                    disabled={!canSubmitRecipe || isSaving}
                   >
-                    <Text style={styles.recipeBuilderSaveButtonText}>
-                      {isEditingRecipe ? t('nutrition.updateRecipeAction') : t('nutrition.saveRecipeAction')}
-                    </Text>
+                    <View style={styles.recipeBuilderSaveButtonContent}>
+                      {isSaving ? (
+                        <>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.recipeBuilderSaveButtonText}>
+                            {isEditingRecipe
+                              ? t('nutrition.updatingRecipeAction')
+                              : t('nutrition.savingRecipeAction')}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={styles.recipeBuilderSaveButtonText}>
+                          {isEditingRecipe ? t('nutrition.updateRecipeAction') : t('nutrition.saveRecipeAction')}
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                   <Text style={[styles.recipeBuilderSaveHint, { color: themeColors.textSecondary }]}>
                     {t('nutrition.saveRecipeHint')}
@@ -3678,6 +3697,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  recipeBuilderSaveButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   recipeBuilderSaveButtonText: {
     color: '#FFFFFF',

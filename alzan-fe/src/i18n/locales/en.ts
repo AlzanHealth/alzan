@@ -212,6 +212,8 @@ const en = {
     recipeLibraryTitle: 'Recipe library',
     saveRecipeAction: 'Save recipe',
     updateRecipeAction: 'Update recipe',
+    savingRecipeAction: 'Saving recipe...',
+    updatingRecipeAction: 'Updating recipe...',
     publishRecipeAction: 'Publish',
     unpublishRecipeAction: 'Unpublish',
     duplicateRecipeAction: 'Save copy',

@@ -215,6 +215,8 @@ export default {
     recipeLibraryTitle: 'Biblioteca de recetas',
     saveRecipeAction: 'Guardar receta',
     updateRecipeAction: 'Actualizar receta',
+    savingRecipeAction: 'Guardando receta...',
+    updatingRecipeAction: 'Actualizando receta...',
     publishRecipeAction: 'Publicar',
     unpublishRecipeAction: 'Despublicar',
     duplicateRecipeAction: 'Guardar copia',
