@@ -17,7 +17,7 @@ import { getLocaleTag } from '../../i18n/dateLocale';
 export const OnboardingProfile = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<OnboardingScreenNavigationProp>();
-  const { styles, colors } = useOnboardingStyles();
+  const { styles, colors, isDark } = useOnboardingStyles();
   const { data, updateData, saveAndNext, saving } = useOnboarding();
 
   const formatDateForInput = useCallback((date: Date) => {
@@ -270,7 +270,7 @@ export const OnboardingProfile = () => {
             >
               <View
                 style={{
-                  backgroundColor: 'white', // Explicitly white to match themeVariant="light"
+                  backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
                   padding: 20,
                   borderTopLeftRadius: 20,
                   borderTopRightRadius: 20,
@@ -292,8 +292,8 @@ export const OnboardingProfile = () => {
                   maximumDate={maxDate}
                   minimumDate={minDate}
                   locale={getLocaleTag()}
-                  themeVariant="light" // Keep light variant to match the modal background
-                  style={{ backgroundColor: 'white' }}
+                  themeVariant={isDark ? 'dark' : 'light'}
+                  style={{ backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }}
                 />
               </View>
             </View>

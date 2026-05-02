@@ -8,7 +8,7 @@ import { OnboardingProgress } from '../../components/OnboardingProgress';
 import { OnboardingBackButton } from '../../components/OnboardingBackButton';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { OnboardingStep, DAILY_ACTIVITY_OPTIONS, TRAINING_FREQUENCY_OPTIONS } from '../../types/onboarding.types';
-import { colors, spacing, borderRadius, shadows } from '../../theme';
+import { spacing, borderRadius, shadows } from '../../theme';
 import { DailyActivity, TrainingFrequency } from '../../types/requests.types';
 import { Nullable } from '../../types/common.types';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 export const OnboardingActivity = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<OnboardingScreenNavigationProp>();
-  const { styles, colors: themeColors } = useOnboardingStyles();
+  const { styles, colors: themeColors, isDark } = useOnboardingStyles();
   const { data, updateData, saveAndNext, saving } = useOnboarding();
 
   const [dailyActivity, setDailyActivity] = useState<Nullable<DailyActivity>>(data.dailyActivity);
@@ -72,8 +72,13 @@ export const OnboardingActivity = () => {
                     key={option.value}
                     style={[
                       localStyles.activityCard,
-                      { borderColor: isSelected ? themeColors.primary : 'transparent' },
-                      isSelected && { backgroundColor: '#E8F4FD' },
+                      {
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : themeColors.surface,
+                        borderColor: isSelected ? themeColors.primary : themeColors.border,
+                      },
+                      isSelected && {
+                        backgroundColor: isDark ? 'rgba(0, 122, 255, 0.20)' : 'rgba(0, 122, 255, 0.12)',
+                      },
                     ]}
                     onPress={() => setDailyActivity(option.value)}
                     activeOpacity={0.7}
@@ -93,7 +98,12 @@ export const OnboardingActivity = () => {
                         {t(option.descriptionKey)}
                       </Text>
                     </View>
-                    <View style={[localStyles.radioOuter, isSelected && { borderColor: themeColors.primary }]}>
+                    <View
+                      style={[
+                        localStyles.radioOuter,
+                        { borderColor: isSelected ? themeColors.primary : themeColors.border },
+                      ]}
+                    >
                       {isSelected && (
                         <View style={[localStyles.radioInner, { backgroundColor: themeColors.primary }]} />
                       )}
@@ -108,8 +118,13 @@ export const OnboardingActivity = () => {
                     key={option.value}
                     style={[
                       localStyles.activityCard,
-                      { borderColor: isSelected ? themeColors.primary : 'transparent' },
-                      isSelected && { backgroundColor: '#E8F4FD' },
+                      {
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : themeColors.surface,
+                        borderColor: isSelected ? themeColors.primary : themeColors.border,
+                      },
+                      isSelected && {
+                        backgroundColor: isDark ? 'rgba(0, 122, 255, 0.20)' : 'rgba(0, 122, 255, 0.12)',
+                      },
                     ]}
                     onPress={() => setTrainingFrequency(option.value)}
                     activeOpacity={0.7}
@@ -129,7 +144,12 @@ export const OnboardingActivity = () => {
                         {t(option.descriptionKey)}
                       </Text>
                     </View>
-                    <View style={[localStyles.radioOuter, isSelected && { borderColor: themeColors.primary }]}>
+                    <View
+                      style={[
+                        localStyles.radioOuter,
+                        { borderColor: isSelected ? themeColors.primary : themeColors.border },
+                      ]}
+                    >
                       {isSelected && (
                         <View style={[localStyles.radioInner, { backgroundColor: themeColors.primary }]} />
                       )}
@@ -157,11 +177,10 @@ const localStyles = StyleSheet.create({
   activityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
     borderRadius: borderRadius.m,
     padding: spacing.m,
     marginBottom: spacing.s,
-    borderWidth: 2,
+    borderWidth: 1,
     ...shadows.soft,
   },
   activityIcon: {
@@ -186,7 +205,6 @@ const localStyles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },

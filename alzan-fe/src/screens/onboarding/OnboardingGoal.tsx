@@ -9,14 +9,14 @@ import { OnboardingBackButton } from '../../components/OnboardingBackButton';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { OnboardingStep, GOAL_OPTIONS, GOAL_DESCRIPTIONS } from '../../types/onboarding.types';
 import { Info, X } from 'lucide-react-native';
-import { colors, spacing, borderRadius, shadows } from '../../theme';
+import { spacing, borderRadius, shadows } from '../../theme';
 import { PrimaryGoalMode } from '../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 
 export const OnboardingGoal = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<OnboardingScreenNavigationProp>();
-  const { styles, colors: themeColors } = useOnboardingStyles();
+  const { styles, colors: themeColors, isDark } = useOnboardingStyles();
   const { data, updateData, saveAndNext, saving } = useOnboarding();
 
   const [selectedGoal, setSelectedGoal] = useState<PrimaryGoalMode | null>(data.primaryGoal);
@@ -86,7 +86,12 @@ export const OnboardingGoal = () => {
         onRequestClose={() => setInfoModalGoal(null)}
       >
         <TouchableOpacity style={localStyles.modalOverlay} activeOpacity={1} onPress={() => setInfoModalGoal(null)}>
-          <View style={localStyles.infoModalContent}>
+          <View
+            style={[
+              localStyles.infoModalContent,
+              { backgroundColor: isDark ? 'rgba(28, 28, 30, 0.96)' : themeColors.surface },
+            ]}
+          >
             {infoModalGoal && (
               <>
                 {(() => {
@@ -95,13 +100,19 @@ export const OnboardingGoal = () => {
                     <>
                       <View style={localStyles.infoModalHeader}>
                         <Text style={{ fontSize: 32 }}>{goalInfo.icon}</Text>
-                        <Text style={localStyles.infoModalTitle}>{t(goalInfo.titleKey)}</Text>
+                        <Text style={[localStyles.infoModalTitle, { color: themeColors.textPrimary }]}>
+                          {t(goalInfo.titleKey)}
+                        </Text>
                         <TouchableOpacity onPress={() => setInfoModalGoal(null)} style={localStyles.infoModalClose}>
-                          <X size={20} color={colors.textSecondary} />
+                          <X size={20} color={themeColors.textSecondary} />
                         </TouchableOpacity>
                       </View>
-                      <Text style={localStyles.infoModalShort}>{t(goalInfo.shortDescriptionKey)}</Text>
-                      <Text style={localStyles.infoModalLong}>{t(goalInfo.longDescriptionKey)}</Text>
+                      <Text style={[localStyles.infoModalShort, { color: themeColors.primary }]}>
+                        {t(goalInfo.shortDescriptionKey)}
+                      </Text>
+                      <Text style={[localStyles.infoModalLong, { color: themeColors.textSecondary }]}>
+                        {t(goalInfo.longDescriptionKey)}
+                      </Text>
                     </>
                   );
                 })()}
@@ -125,7 +136,6 @@ const localStyles = StyleSheet.create({
   infoModalContent: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: colors.white,
     borderRadius: borderRadius.l,
     padding: spacing.l,
     ...shadows.soft,
@@ -140,7 +150,6 @@ const localStyles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     flex: 1,
-    color: colors.textPrimary,
   },
   infoModalClose: {
     padding: spacing.xs,
@@ -149,11 +158,9 @@ const localStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginBottom: spacing.s,
-    color: colors.primary,
   },
   infoModalLong: {
     fontSize: 14,
     lineHeight: 20,
-    color: colors.textSecondary,
   },
 });
