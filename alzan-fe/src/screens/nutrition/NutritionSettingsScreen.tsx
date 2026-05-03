@@ -16,7 +16,7 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { Download, Trash2, Calendar, Info, AlertTriangle, Clock } from 'lucide-react-native';
 import { usePreferences } from '../../hooks/settings/usePreferences';
-import { format, subDays } from 'date-fns';
+import { addDays, differenceInCalendarDays, format, subDays } from 'date-fns';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../lib/supabaseClient';
@@ -54,12 +54,18 @@ const DEFAULT_SNACK_OPTS = {
   show_only_if_content: false,
 };
 
+const MAX_EXPORT_RANGE_DAYS = 92;
+
 const getDefaultExportRange = () => {
   const end = new Date();
   return {
     start: subDays(end, 7),
     end,
   };
+};
+
+const getMinExportStartDate = (endDate: Date) => {
+  return subDays(endDate, MAX_EXPORT_RANGE_DAYS);
 };
 
 type RecipeDefaultVisibility = 'private' | 'public';
@@ -272,6 +278,16 @@ export const NutritionSettingsScreen = () => {
     setExportEndInput(format(exportEnd, 'yyyy-MM-dd'));
   }, [showExportModal, exportStart, exportEnd]);
 
+  const exportMinStartDate = getMinExportStartDate(exportEnd);
+  const exportRangeDays = differenceInCalendarDays(exportEnd, exportStart);
+  const exportRangeErrorMessage =
+    exportRangeDays < 0
+      ? t('nutrition.invalidDatesMessage')
+      : exportRangeDays > MAX_EXPORT_RANGE_DAYS
+        ? t('nutrition.exportRangeMinStartMessage', { date: format(exportMinStartDate, 'yyyy-MM-dd') })
+        : null;
+  const isExportDisabled = isExporting || !!exportRangeErrorMessage;
+
   // Helper to update preferences
   const updateNutritionPrefs = (updates: Partial<NutritionSettingsJson>) => {
     return updatePreferences({
@@ -427,6 +443,7 @@ export const NutritionSettingsScreen = () => {
   // Export action
   const handleExport = async () => {
     try {
+      if (exportRangeErrorMessage) return;
       // Validate max 3 months
       const diffMs = exportEnd.getTime() - exportStart.getTime();
       const diffDays = diffMs / (1000 * 60 * 60 * 24);
@@ -479,6 +496,14 @@ export const NutritionSettingsScreen = () => {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const applyExportStartDate = (nextStart: Date) => {
+    setExportStart(nextStart);
+  };
+
+  const applyExportEndDate = (nextEnd: Date) => {
+    setExportEnd(nextEnd);
   };
 
   const openExportModal = () => {
@@ -1104,12 +1129,8 @@ export const NutritionSettingsScreen = () => {
                         setExportStartInput(value);
                         const parsed = parseWebDateInput(value);
                         if (!parsed) return;
-                        if (parsed < subDays(new Date(), 60) || parsed > new Date()) return;
-                        setExportStart(parsed);
-                        if (parsed > exportEnd) {
-                          setExportEnd(parsed);
-                          setExportEndInput(format(parsed, 'yyyy-MM-dd'));
-                        }
+                        if (parsed > new Date()) return;
+                        applyExportStartDate(parsed);
                       }}
                       onBlur={() => {
                         if (!parseWebDateInput(exportStartInput)) {
@@ -1127,14 +1148,10 @@ export const NutritionSettingsScreen = () => {
                       mode="date"
                       display="default"
                       themeVariant={isDark ? 'dark' : 'light'}
-                      minimumDate={subDays(new Date(), 60)}
                       maximumDate={new Date()}
                       onChange={(e, d) => {
                         if (d) {
-                          setExportStart(d);
-                          if (d > exportEnd) {
-                            setExportEnd(d);
-                          }
+                          applyExportStartDate(d);
                         }
                       }}
                     />
@@ -1151,8 +1168,8 @@ export const NutritionSettingsScreen = () => {
                         setExportEndInput(value);
                         const parsed = parseWebDateInput(value);
                         if (!parsed) return;
-                        if (parsed < exportStart || parsed > new Date()) return;
-                        setExportEnd(parsed);
+                        if (parsed > new Date()) return;
+                        applyExportEndDate(parsed);
                       }}
                       onBlur={() => {
                         if (!parseWebDateInput(exportEndInput)) {
@@ -1170,13 +1187,15 @@ export const NutritionSettingsScreen = () => {
                       mode="date"
                       display="default"
                       themeVariant={isDark ? 'dark' : 'light'}
-                      minimumDate={exportStart}
                       maximumDate={new Date()}
-                      onChange={(e, d) => d && setExportEnd(d)}
+                      onChange={(e, d) => d && applyExportEndDate(d)}
                     />
                   )}
                 </View>
               </View>
+              {exportRangeErrorMessage ? (
+                <Text style={[styles.exportRangeError, { color: themeColors.danger }]}>{exportRangeErrorMessage}</Text>
+              ) : null}
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity onPress={() => setShowExportModal(false)} style={styles.modalBtnCancel}>
@@ -1184,8 +1203,8 @@ export const NutritionSettingsScreen = () => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleExport}
-                  style={[styles.modalBtnConfirm, isExporting && { opacity: 0.7 }]}
-                  disabled={isExporting}
+                  style={[styles.modalBtnConfirm, isExportDisabled && { opacity: 0.45 }]}
+                  disabled={isExportDisabled}
                 >
                   {isExporting ? (
                     <ActivityIndicator size="small" color={colors.white} />
@@ -1891,6 +1910,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.s,
     paddingHorizontal: spacing.m,
     fontSize: 16,
+  },
+  exportRangeError: {
+    ...typography.caption,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+    lineHeight: 18,
   },
   modalButtons: {
     flexDirection: 'row',

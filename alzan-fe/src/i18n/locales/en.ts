@@ -342,6 +342,8 @@ const en = {
     pdfDelta: 'Delta',
     exportRangeTooLongTitle: 'Range too long',
     exportRangeTooLongMessage: 'The maximum export range is 3 months.',
+    exportRangeMaxEndMessage: 'The maximum end date for this start date is {{date}}.',
+    exportRangeMinStartMessage: 'The minimum start date for this end date is {{date}}.',
     invalidDatesTitle: 'Invalid dates',
     invalidDatesMessage: 'Start date must be before end date.',
     pdfGenerateErrorPrefix: 'Could not generate the PDF:',

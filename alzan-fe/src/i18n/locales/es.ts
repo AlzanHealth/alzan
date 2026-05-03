@@ -346,6 +346,8 @@ export default {
     pdfDelta: 'Diferencia',
     exportRangeTooLongTitle: 'Rango demasiado largo',
     exportRangeTooLongMessage: 'El rango máximo de exportación es de 3 meses.',
+    exportRangeMaxEndMessage: 'La fecha fin máxima para esta fecha de inicio es {{date}}.',
+    exportRangeMinStartMessage: 'La fecha de inicio mínima para esta fecha de fin es {{date}}.',
     invalidDatesTitle: 'Fechas inválidas',
     invalidDatesMessage: 'La fecha de inicio debe ser anterior a la fecha de fin.',
     pdfGenerateErrorPrefix: 'No se pudo generar el PDF:',
