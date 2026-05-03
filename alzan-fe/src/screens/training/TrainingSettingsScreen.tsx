@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Download, Trash2, Calendar, AlertTriangle } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { startOfWeek, format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { AlzanSwitch } from '../../components/common/AlzanSwitch';
@@ -28,6 +28,14 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 
 type TrainingSectionInfoKey = 'general' | 'data' | 'danger';
+
+const getDefaultExportRange = () => {
+  const end = new Date();
+  return {
+    start: subDays(end, 7),
+    end,
+  };
+};
 
 const TrainingSettingsScreen = () => {
   const { t } = useTranslation();
@@ -65,12 +73,10 @@ const TrainingSettingsScreen = () => {
 
   // Export State
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportStart, setExportStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [exportEnd, setExportEnd] = useState<Date>(new Date());
-  const [exportStartInput, setExportStartInput] = useState(
-    format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-  );
-  const [exportEndInput, setExportEndInput] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [exportStart, setExportStart] = useState<Date>(() => getDefaultExportRange().start);
+  const [exportEnd, setExportEnd] = useState<Date>(() => getDefaultExportRange().end);
+  const [exportStartInput, setExportStartInput] = useState(() => format(getDefaultExportRange().start, 'yyyy-MM-dd'));
+  const [exportEndInput, setExportEndInput] = useState(() => format(getDefaultExportRange().end, 'yyyy-MM-dd'));
   const [isExporting, setIsExporting] = useState(false);
 
   // Delete State
@@ -188,6 +194,15 @@ const TrainingSettingsScreen = () => {
     }
   };
 
+  const openExportModal = () => {
+    const defaultRange = getDefaultExportRange();
+    setExportStart(defaultRange.start);
+    setExportEnd(defaultRange.end);
+    setExportStartInput(format(defaultRange.start, 'yyyy-MM-dd'));
+    setExportEndInput(format(defaultRange.end, 'yyyy-MM-dd'));
+    setShowExportModal(true);
+  };
+
   const handleDeletePlans = async (type: 'all' | 'range') => {
     if (!user) return;
 
@@ -286,7 +301,7 @@ const TrainingSettingsScreen = () => {
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.dataAllCaps'), 'data')}
             <View style={[styles.card, dynamicStyles.card]}>
-              <TouchableOpacity style={styles.actionRow} onPress={() => setShowExportModal(true)} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.actionRow} onPress={openExportModal} activeOpacity={0.7}>
                 <Download size={20} color={themeColors.primary} />
                 <Text style={[styles.actionText, { color: themeColors.primary }]}>
                   {t('training.exportWorkoutHistory')}

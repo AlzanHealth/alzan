@@ -2,11 +2,12 @@ import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { supabase } from '../../../lib/supabaseClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
-import { format, parseISO } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 import { convertEnergyToUi } from '../../../utils/unitConversionUtils';
-import { EnergyUnit, MealItem, MealLog } from '../../../types/requests.types';
+import { DietTemplateMeal, EnergyUnit, MealItem, MealLog } from '../../../types/requests.types';
 import i18n from '../../../i18n';
 import { TranslationKey } from '../../../i18n/locales/en';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
@@ -14,11 +15,29 @@ import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import iconSource from '../../../../assets/icon.png';
 
 type MealLogWithItems = MealLog & { items: MealItem[] };
+type PlannedMealWithLog = {
+  plan: DietTemplateMeal;
+  log: MealLogWithItems | null;
+};
 
 const t = (key: TranslationKey) => String(i18n.t(key));
 const isEnglish = () => i18n.language?.startsWith('en');
 const getPdfDatePattern = () => (isEnglish() ? 'MMMM d, yyyy' : 'd MMMM yyyy');
 const getPdfDayDatePattern = () => (isEnglish() ? 'EEEE, MMMM d' : 'EEEE, d MMMM');
+const ACTIVE_TEMPLATE_STORAGE_KEY = 'active_diet_template_id';
+
+const buildDateRange = (startDate: string, endDate: string): string[] => {
+  const dates: string[] = [];
+  let cursor = parseISO(startDate);
+  const end = parseISO(endDate);
+
+  while (cursor <= end) {
+    dates.push(format(cursor, 'yyyy-MM-dd'));
+    cursor = addDays(cursor, 1);
+  }
+
+  return dates;
+};
 
 // Load asset helper
 const loadAssetAsBase64 = async (module: number): Promise<string | null> => {
@@ -36,6 +55,7 @@ const loadAssetAsBase64 = async (module: number): Promise<string | null> => {
 interface DaySummary {
   date: string;
   logs: MealLogWithItems[];
+  plannedMeals: PlannedMealWithLog[];
   totals: {
     kcal: number;
     protein: number;
@@ -113,6 +133,34 @@ const openWebExportWindow = (): WebExportWindow | null => {
   return maybeGlobal.open('', '_blank');
 };
 
+const getActiveTemplateId = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(ACTIVE_TEMPLATE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const getMappedDayOfWeek = (date: string): number => {
+  const day = parseISO(date).getDay();
+  return day === 0 ? 7 : day;
+};
+
+const getAdherenceLabel = (status: string | null | undefined): string => {
+  switch (status) {
+    case 'done_as_planned':
+      return t('nutrition.pdfDoneAsPlanned');
+    case 'done_with_changes':
+      return t('nutrition.pdfDoneWithChanges');
+    case 'skipped':
+      return t('nutrition.pdfSkippedMeal');
+    case 'extra_meal':
+      return t('nutrition.pdfExtraMeal');
+    default:
+      return t('nutrition.pdfLoggedMeal');
+  }
+};
+
 export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow }: PDFExportOptions) => {
   try {
     const userId = user.id;
@@ -125,6 +173,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       .single();
 
     const energyUnit: EnergyUnit = prefsData?.energy_unit === 'kj' ? 'kj' : 'kcal';
+    const activeTemplateId = await getActiveTemplateId();
 
     const { data: nutritionGoal } = await supabase
       .from('user_goals')
@@ -157,15 +206,28 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     if (logsError) throw new Error(getErrorMessage(logsError));
     const safeLogs = logs ?? [];
 
-    if (safeLogs.length === 0) {
-      throw new Error(t('nutrition.pdfNoRecordsInRange'));
-    }
-
     const logIds = safeLogs.map(l => l.id);
-    const { data: items, error: itemsError } = await supabase.from('meal_items').select('*').in('meal_log_id', logIds);
+    const { data: items, error: itemsError } =
+      logIds.length > 0
+        ? await supabase.from('meal_items').select('*').in('meal_log_id', logIds)
+        : { data: [], error: null };
 
     if (itemsError) throw new Error(getErrorMessage(itemsError));
     const safeItems = items ?? [];
+
+    const { data: templateMeals, error: templateMealsError } = activeTemplateId
+      ? await supabase
+          .from('diet_template_meals')
+          .select('*')
+          .eq('diet_template_id', activeTemplateId)
+          .order('day_of_week', { ascending: true })
+          .order('order_index', { ascending: true })
+          .returns<DietTemplateMeal[]>()
+      : { data: [], error: null };
+
+    if (templateMealsError) throw new Error(getErrorMessage(templateMealsError));
+    const safeTemplateMeals = templateMeals ?? [];
+
     const itemsByLogId = new Map<string, MealItem[]>();
     safeItems.forEach(item => {
       const bucket = itemsByLogId.get(item.meal_log_id) ?? [];
@@ -175,12 +237,22 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
 
     const daysMap = new Map<string, DaySummary>();
 
+    buildDateRange(startDate, endDate).forEach(date => {
+      daysMap.set(date, {
+        date,
+        logs: [],
+        plannedMeals: [],
+        totals: { kcal: 0, protein: 0, carbs: 0, fats: 0 },
+      });
+    });
+
     safeLogs.forEach(log => {
       const date = log.date;
       if (!daysMap.has(date)) {
         daysMap.set(date, {
           date,
           logs: [],
+          plannedMeals: [],
           totals: { kcal: 0, protein: 0, carbs: 0, fats: 0 },
         });
       }
@@ -195,10 +267,22 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       };
 
       day.logs.push(meal);
-      day.totals.kcal += log.kcal || 0;
-      day.totals.protein += log.protein_g || 0;
-      day.totals.carbs += log.carbs_g || 0;
-      day.totals.fats += log.fats_g || 0;
+      if (log.adherence_status !== 'skipped') {
+        day.totals.kcal += log.kcal || 0;
+        day.totals.protein += log.protein_g || 0;
+        day.totals.carbs += log.carbs_g || 0;
+        day.totals.fats += log.fats_g || 0;
+      }
+    });
+
+    daysMap.forEach(day => {
+      const plannedForDay = safeTemplateMeals.filter(plan => plan.day_of_week === getMappedDayOfWeek(day.date));
+      day.plannedMeals = plannedForDay.map(plan => {
+        const log =
+          day.logs.find(item => item.diet_template_meal_id === plan.id && item.adherence_status !== 'extra_meal') ??
+          null;
+        return { plan, log };
+      });
     });
 
     const totalDays = daysMap.size;
@@ -296,6 +380,131 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
               .join('')}
           </tbody>
         </table>
+      `;
+    };
+
+    const renderMacroLine = (label: string, values: { kcal: number; protein: number; carbs: number; fats: number }) => `
+      <div class="macro-line">
+        <strong>${escapeHtml(label)}:</strong>
+        ${escapeHtml(
+          `${convertEnergyToUi(values.kcal, energyUnit).label} · ${t('nutrition.proteins')}: ${Math.round(values.protein)}g · ${t('nutrition.carbs')}: ${Math.round(values.carbs)}g · ${t('nutrition.fats')}: ${Math.round(values.fats)}g`,
+        )}
+      </div>
+    `;
+
+    const renderMealItemsTable = (meal: MealLogWithItems): string => {
+      if (!meal.items || meal.items.length === 0) {
+        return `
+          <div style="font-size: 12px; color: #999; padding-left: 8px;">
+            ${escapeHtml(t('nutrition.pdfQuickLogNoIngredients'))}
+          </div>
+        `;
+      }
+
+      return `
+        <table>
+          <thead>
+            <tr>
+              <th class="col-main">${escapeHtml(t('nutrition.pdfIngredient'))}</th>
+              <th class="col-num">${escapeHtml(t('nutrition.pdfQuantityAbbr'))}</th>
+              <th class="col-num">${energyUnit === 'kj' ? 'kJ' : 'kcal'}</th>
+              <th class="col-num">${escapeHtml(t('nutrition.pdfProteinShort'))}</th>
+              <th class="col-num">${escapeHtml(t('nutrition.pdfCarbsShort'))}</th>
+              <th class="col-num">${escapeHtml(t('nutrition.pdfFatShort'))}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${meal.items
+              .map(
+                item => `
+                <tr>
+                  <td>${escapeHtml(normalizeText(item.name) || '-')}</td>
+                  <td class="col-num">${item.quantity_g}g</td>
+                  <td class="col-num">${convertEnergyToUi(item.kcal, energyUnit).value}</td>
+                  <td class="col-num">${Math.round(item.protein_g ?? 0)}</td>
+                  <td class="col-num">${Math.round(item.carbs_g ?? 0)}</td>
+                  <td class="col-num">${Math.round(item.fats_g ?? 0)}</td>
+                </tr>
+              `,
+              )
+              .join('')}
+          </tbody>
+        </table>
+      `;
+    };
+
+    const renderLoggedMeal = (meal: MealLogWithItems, plannedMeal?: DietTemplateMeal): string => {
+      const isSkipped = meal.adherence_status === 'skipped';
+      const plannedName = normalizeText(plannedMeal?.base_name);
+      const displayName = normalizeText(meal.name) ?? plannedName;
+      const actualValues = {
+        kcal: isSkipped ? 0 : meal.kcal || 0,
+        protein: isSkipped ? 0 : meal.protein_g || 0,
+        carbs: isSkipped ? 0 : meal.carbs_g || 0,
+        fats: isSkipped ? 0 : meal.fats_g || 0,
+      };
+
+      return `
+        <div class="meal-block avoid-break">
+          <div class="meal-header">
+            <div class="meal-name">
+              ${escapeHtml(translateMealType(meal.meal_type))}
+              ${displayName ? `— <span style="font-weight:400">${escapeHtml(displayName)}</span>` : ''}
+              <span class="meal-status">${escapeHtml(getAdherenceLabel(meal.adherence_status))}</span>
+            </div>
+            <div class="meal-total">${escapeHtml(convertEnergyToUi(actualValues.kcal, energyUnit).label)}</div>
+          </div>
+          ${
+            plannedMeal
+              ? renderMacroLine(t('nutrition.pdfPlannedTarget'), {
+                  kcal: plannedMeal.target_kcal || 0,
+                  protein: plannedMeal.target_protein_g || 0,
+                  carbs: plannedMeal.target_carbs_g || 0,
+                  fats: plannedMeal.target_fats_g || 0,
+                })
+              : ''
+          }
+          ${renderMacroLine(t('nutrition.pdfActualIntake'), actualValues)}
+          ${isSkipped ? '' : renderMealItemsTable(meal)}
+        </div>
+      `;
+    };
+
+    const renderPendingPlannedMeal = (plan: DietTemplateMeal): string => `
+      <div class="meal-block meal-block-pending avoid-break">
+        <div class="meal-header">
+          <div class="meal-name">
+            ${escapeHtml(translateMealType(plan.meal_type))}
+            — <span style="font-weight:400">${escapeHtml(plan.base_name)}</span>
+            <span class="meal-status">${escapeHtml(t('nutrition.pdfPendingMeal'))}</span>
+          </div>
+          <div class="meal-total">${escapeHtml(convertEnergyToUi(plan.target_kcal || 0, energyUnit).label)}</div>
+        </div>
+        ${renderMacroLine(t('nutrition.pdfPlannedTarget'), {
+          kcal: plan.target_kcal || 0,
+          protein: plan.target_protein_g || 0,
+          carbs: plan.target_carbs_g || 0,
+          fats: plan.target_fats_g || 0,
+        })}
+      </div>
+    `;
+
+    const renderDayMeals = (day: DaySummary): string => {
+      const plannedHtml = day.plannedMeals
+        .map(({ plan, log }) => (log ? renderLoggedMeal(log, plan) : renderPendingPlannedMeal(plan)))
+        .join('');
+      const plannedLogIds = new Set(day.plannedMeals.map(({ log }) => log?.id).filter((id): id is string => !!id));
+      const extraLogs = day.logs.filter(log => !plannedLogIds.has(log.id));
+      const extraHtml = extraLogs.map(log => renderLoggedMeal(log)).join('');
+
+      if (plannedHtml || extraHtml) return `${plannedHtml}${extraHtml}`;
+
+      return `
+        <div class="meal-block avoid-break">
+          <div style="font-size: 12px; color: #999; padding-left: 8px;">
+            ${escapeHtml(t('nutrition.pdfNoMealsLoggedForDay'))}
+          </div>
+        </div>
       `;
     };
 
@@ -436,6 +645,9 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                     border-left: 3px solid var(--border);
                     padding-left: 15px;
                 }
+                .meal-block-pending {
+                    opacity: 0.72;
+                }
                 .meal-header {
                     display: flex;
                     justify-content: space-between;
@@ -450,6 +662,18 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                     font-weight: 600;
                     font-size: 14px;
                     color: var(--text-secondary);
+                }
+                .meal-status {
+                    display: inline-block;
+                    margin-left: 8px;
+                    padding: 2px 7px;
+                    border-radius: 999px;
+                    background: #EEF4FF;
+                    color: var(--primary);
+                    font-size: 10px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
                 }
                 .macro-line {
                     font-size: 12px;
@@ -583,63 +807,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                         ${escapeHtml(`${t('nutrition.proteins')}: ${Math.round(day.totals.protein)}g · ${t('nutrition.carbs')}: ${Math.round(day.totals.carbs)}g · ${t('nutrition.fats')}: ${Math.round(day.totals.fats)}g`)}
                     </div>
                     
-                    ${day.logs
-                      .map(
-                        (meal: MealLog & { items: MealItem[] }) => `
-                        <div class="meal-block avoid-break">
-                            <div class="meal-header">
-                                <div class="meal-name">
-                                    ${escapeHtml(translateMealType(meal.meal_type))}
-                                    ${normalizeText(meal.name) ? `— <span style="font-weight:400">${escapeHtml(normalizeText(meal.name) || '')}</span>` : ''}
-                                </div>
-                                <div class="meal-total">${escapeHtml(convertEnergyToUi(meal.kcal, energyUnit).label)}</div>
-                            </div>
-                            <div class="macro-line">
-                                ${escapeHtml(`${t('nutrition.proteins')}: ${Math.round(meal.protein_g ?? 0)}g · ${t('nutrition.carbs')}: ${Math.round(meal.carbs_g ?? 0)}g · ${t('nutrition.fats')}: ${Math.round(meal.fats_g ?? 0)}g`)}
-                            </div>
-                            
-                            ${
-                              meal.items && meal.items.length > 0
-                                ? `
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th class="col-main">${escapeHtml(t('nutrition.pdfIngredient'))}</th>
-                                            <th class="col-num">${escapeHtml(t('nutrition.pdfQuantityAbbr'))}</th>
-                                            <th class="col-num">${energyUnit === 'kj' ? 'kJ' : 'kcal'}</th>
-                                            <th class="col-num">${escapeHtml(t('nutrition.pdfProteinShort'))}</th>
-                                            <th class="col-num">${escapeHtml(t('nutrition.pdfCarbsShort'))}</th>
-                                            <th class="col-num">${escapeHtml(t('nutrition.pdfFatShort'))}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${meal.items
-                                          .map(
-                                            item => `
-                                            <tr>
-                                                <td>${escapeHtml(normalizeText(item.name) || '-')}</td>
-                                                <td class="col-num">${item.quantity_g}g</td>
-                                                <td class="col-num">${convertEnergyToUi(item.kcal, energyUnit).value}</td>
-                                                <td class="col-num">${Math.round(item.protein_g ?? 0)}</td>
-                                                <td class="col-num">${Math.round(item.carbs_g ?? 0)}</td>
-                                                <td class="col-num">${Math.round(item.fats_g ?? 0)}</td>
-                                            </tr>
-                                        `,
-                                          )
-                                          .join('')}
-                                    </tbody>
-                                </table>
-                            `
-                                : `
-                                <div style="font-size: 12px; color: #999; padding-left: 8px;">
-                                    ${escapeHtml(t('nutrition.pdfQuickLogNoIngredients'))}
-                                </div>
-                            `
-                            }
-                        </div>
-                    `,
-                      )
-                      .join('')}
+                    ${renderDayMeals(day)}
                 </div>
             `,
               )

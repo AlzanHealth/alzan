@@ -54,6 +54,14 @@ const DEFAULT_SNACK_OPTS = {
   show_only_if_content: false,
 };
 
+const getDefaultExportRange = () => {
+  const end = new Date();
+  return {
+    start: subDays(end, 7),
+    end,
+  };
+};
+
 type RecipeDefaultVisibility = 'private' | 'public';
 type NutritionSectionInfoKey =
   | 'dailyMeals'
@@ -181,10 +189,10 @@ export const NutritionSettingsScreen = () => {
 
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportStart, setExportStart] = useState(new Date());
-  const [exportEnd, setExportEnd] = useState(new Date());
-  const [exportStartInput, setExportStartInput] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [exportEndInput, setExportEndInput] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [exportStart, setExportStart] = useState<Date>(() => getDefaultExportRange().start);
+  const [exportEnd, setExportEnd] = useState<Date>(() => getDefaultExportRange().end);
+  const [exportStartInput, setExportStartInput] = useState(() => format(getDefaultExportRange().start, 'yyyy-MM-dd'));
+  const [exportEndInput, setExportEndInput] = useState(() => format(getDefaultExportRange().end, 'yyyy-MM-dd'));
   const [isExporting, setIsExporting] = useState(false);
 
   // Delete modal state
@@ -471,6 +479,15 @@ export const NutritionSettingsScreen = () => {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const openExportModal = () => {
+    const defaultRange = getDefaultExportRange();
+    setExportStart(defaultRange.start);
+    setExportEnd(defaultRange.end);
+    setExportStartInput(format(defaultRange.start, 'yyyy-MM-dd'));
+    setExportEndInput(format(defaultRange.end, 'yyyy-MM-dd'));
+    setShowExportModal(true);
   };
 
   // Check for conflicts before applying copy mode
@@ -1002,7 +1019,7 @@ export const NutritionSettingsScreen = () => {
               <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
 
               {/* Exportar */}
-              <TouchableOpacity style={styles.actionRow} onPress={() => setShowExportModal(true)} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.actionRow} onPress={openExportModal} activeOpacity={0.7}>
                 <Download size={20} color={themeColors.primary} />
                 <Text style={[styles.actionText, { color: themeColors.primary }]}>
                   {t('nutrition.exportDietHistory')}
