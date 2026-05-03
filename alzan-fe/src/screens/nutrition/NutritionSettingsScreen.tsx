@@ -16,7 +16,7 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { Download, Trash2, Calendar, Info, AlertTriangle, Clock } from 'lucide-react-native';
 import { usePreferences } from '../../hooks/settings/usePreferences';
-import { addDays, differenceInCalendarDays, format, subDays } from 'date-fns';
+import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../lib/supabaseClient';
