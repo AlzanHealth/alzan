@@ -540,40 +540,71 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
       <head>
         <meta charset="utf-8" />
         <style>
-          @page { margin: 40px; }
+          @page { margin: 20px; }
           :root {
             --primary: #007AFF;
-            --text: #1D1D1F;
-            --text-secondary: #6E6E73;
+            --text: #333;
+            --text-secondary: #666;
             --border: #E5E5EA;
-            --surface: #F5F5F7;
+            --bg-header: #F5F5F7;
             --green: #34C759;
             --purple: #8B5CF6;
           }
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             color: var(--text);
+            margin: 0;
+            padding: 40px;
             line-height: 1.45;
             font-size: 12px;
+            -webkit-print-color-adjust: exact;
           }
           .cover {
-            height: 90vh;
+            min-height: 500px;
+            padding: 80px 40px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
+            page-break-after: always;
           }
-          .logo { font-size: 26px; font-weight: 800; margin-bottom: 18px; }
-          .cover-title { font-size: 46px; font-weight: 800; letter-spacing: -1px; margin-bottom: 12px; }
-          .cover-user { font-size: 18px; color: var(--text-secondary); }
+          .logo {
+            font-size: 40px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 20px;
+            letter-spacing: -1px;
+          }
+          .cover-title {
+            font-size: 32px;
+            font-weight: 300;
+            margin-bottom: 40px;
+            color: var(--text);
+          }
+          .cover-details {
+            font-size: 16px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+          }
+          .cover-user {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 10px;
+          }
           .page-break { page-break-before: always; }
           .avoid-break { page-break-inside: avoid; }
           .section-title {
-            font-size: 22px;
-            font-weight: 800;
-            margin: 30px 0 14px;
-            letter-spacing: -0.3px;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            margin-top: 40px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
           }
           .section-subtitle {
             color: var(--text-secondary);
@@ -583,26 +614,27 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
           .summary-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-bottom: 18px;
+            gap: 20px;
+            margin-bottom: 30px;
           }
           .summary-card {
-            background: var(--surface);
-            border-radius: 16px;
-            padding: 16px;
-            min-height: 70px;
+            background: var(--bg-header);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
           }
-          .summary-val { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
-          .summary-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 700; }
+          .summary-val { font-size: 24px; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
+          .summary-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; }
           .summary-meta { font-size: 10px; color: var(--text-secondary); margin-top: 6px; }
-          table { width: 100%; border-collapse: collapse; margin: 8px 0 18px; }
-          th { text-align: left; font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.35px; padding: 8px; border-bottom: 1px solid var(--border); }
-          td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0 18px; }
+          th { text-align: left; color: var(--text-secondary); font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+          td { padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
+          tr:last-child td { border-bottom: none; }
           .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-          .panel { border: 1px solid var(--border); border-radius: 16px; padding: 14px; margin-bottom: 16px; }
+          .panel { border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
           .panel-title { font-size: 14px; font-weight: 800; margin-bottom: 8px; }
           .empty-block { border: 1px dashed var(--border); border-radius: 10px; padding: 12px; color: var(--text-secondary); background: #FAFAFA; }
-          .day-block { border: 1px solid var(--border); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+          .day-block { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
           .day-title { font-size: 14px; font-weight: 800; margin-bottom: 8px; }
           ul { margin: 0; padding-left: 18px; }
           li { margin-bottom: 5px; }
@@ -625,13 +657,12 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
           </div>
           <div class="cover-title">${escapeHtml(t('health.pdfSubtitle'))}</div>
           <div class="cover-user">${escapeHtml(displayName)}</div>
-          <div style="color:#666; margin-top:10px;">
-            ${escapeHtml(format(start, datePattern, { locale: dateLocale }))} - ${escapeHtml(format(end, datePattern, { locale: dateLocale }))}
+          <div class="cover-details">
+            <p>${escapeHtml(format(start, datePattern, { locale: dateLocale }))} / ${escapeHtml(format(end, datePattern, { locale: dateLocale }))}</p>
+            <p style="font-size: 12px; margin-top: 30px;">${escapeHtml(t('nutrition.pdfGeneratedAt'))}: ${escapeHtml(format(new Date(), datePattern, { locale: dateLocale }))}</p>
           </div>
-          <div style="font-size:12px; color:#888; margin-top:28px;">${escapeHtml(t('nutrition.pdfGeneratedAt'))}: ${escapeHtml(format(new Date(), datePattern, { locale: dateLocale }))}</div>
         </div>
 
-        <div class="page-break"></div>
         <div class="section-title">${escapeHtml(t('health.pdfPeriodSummary'))}</div>
         <div class="section-subtitle">${escapeHtml(t('health.pdfPeriodSummaryHint'))}</div>
         ${renderSummaryCards(summaryCards)}
@@ -699,7 +730,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
           </div>
         </div>
 
-        <div class="section-title">${escapeHtml(t('health.measurements'))}</div>
+        <div class="section-title">${escapeHtml(t('health.pdfAllMeasurements'))}</div>
         ${renderTable([t('health.recordDate'), t('health.measure'), t('health.pdfValue')], measurementRows, t('health.pdfNoMeasurements'))}
 
         <div class="section-title">${escapeHtml(t('settings.sleep'))}</div>

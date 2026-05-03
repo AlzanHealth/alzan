@@ -9,11 +9,14 @@ import { HealthInteractiveChart } from '../components/HealthInteractiveChart';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import { HealthExportModal } from '../components/HealthExportModal';
+import { useHealthPdfExport } from '../hooks/useHealthPdfExport';
 
 export const HealthStatisticsScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const { styles: dynamicStyles, colors: themeColors } = useHealthStyles();
+  const healthExport = useHealthPdfExport();
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.container}>
@@ -26,8 +29,9 @@ export const HealthStatisticsScreen = () => {
         </View>
 
         <ScrollView contentContainerStyle={styles.content}>
-          <HealthInteractiveChart />
+          <HealthInteractiveChart onExportPress={healthExport.openModal} isExporting={healthExport.isExporting} />
         </ScrollView>
+        <HealthExportModal controller={healthExport} />
       </SafeAreaView>
     </LinearGradient>
   );

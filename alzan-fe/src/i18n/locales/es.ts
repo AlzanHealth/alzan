@@ -460,6 +460,7 @@ export default {
     pdfFatMass: 'Masa grasa',
     pdfNoWeightData: 'No hay registros de peso o composición corporal en este rango',
     pdfLatestMeasurements: 'Últimas medidas',
+    pdfAllMeasurements: 'Todas las medidas registradas',
     pdfLatestValue: 'Último valor',
     pdfSleepAndRecovery: 'Sueño y recuperación',
     pdfNoMeasurements: 'No hay medidas corporales en este rango',

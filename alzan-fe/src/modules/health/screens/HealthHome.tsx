@@ -1,21 +1,10 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Modal,
-  ActivityIndicator,
-  Platform,
-  TextInput,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { HealthScreenNavigationProp, TabParamList } from '../../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Scale, Ruler, Moon, Plus, BarChart2, ChevronRight, Activity, Download } from 'lucide-react-native';
+import { Scale, Ruler, Moon, Plus, BarChart2, ChevronRight, Activity } from 'lucide-react-native';
 import { colors, typography } from '../../../theme';
 
 import { useHealthInsights } from '../hooks/useHealthInsights';
@@ -26,29 +15,10 @@ import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../../i18n/dateLocale';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { differenceInCalendarDays, format, subDays } from 'date-fns';
-import { generateHealthPDF } from '../services/healthPdfExportService';
-import type { WebExportWindow } from '../services/healthPdfExportService';
-import { useAuth } from '../../../context/AuthContext';
-import { Alert } from '../../../components/common/Alert';
-
-const MAX_EXPORT_RANGE_DAYS = 92;
-
-const getDefaultExportRange = () => {
-  const end = new Date();
-  return {
-    start: subDays(end, 7),
-    end,
-  };
-};
-
-const getMinExportStartDate = (endDate: Date) => subDays(endDate, MAX_EXPORT_RANGE_DAYS);
 
 export const HealthHome = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<HealthScreenNavigationProp>();
-  const { user } = useAuth();
   const { latestWeight, weightDelta, avgSleepMinutes, bodyComposition, latestSleep } = useHealthInsights();
 
   const { convertWeightToUi } = useUnitConversion();
@@ -56,14 +26,6 @@ export const HealthHome = () => {
 
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = React.useState(false);
-  const [showExportModal, setShowExportModal] = React.useState(false);
-  const [exportStart, setExportStart] = React.useState<Date>(() => getDefaultExportRange().start);
-  const [exportEnd, setExportEnd] = React.useState<Date>(() => getDefaultExportRange().end);
-  const [exportStartInput, setExportStartInput] = React.useState(() =>
-    format(getDefaultExportRange().start, 'yyyy-MM-dd'),
-  );
-  const [exportEndInput, setExportEndInput] = React.useState(() => format(getDefaultExportRange().end, 'yyyy-MM-dd'));
-  const [isExporting, setIsExporting] = React.useState(false);
   const scrollViewRef = React.useRef<ScrollView>(null);
 
   const onRefresh = React.useCallback(async () => {
@@ -83,88 +45,6 @@ export const HealthHome = () => {
       return unsubscribe;
     }
   }, [navigation]);
-
-  React.useEffect(() => {
-    if (!showExportModal) return;
-    setExportStartInput(format(exportStart, 'yyyy-MM-dd'));
-    setExportEndInput(format(exportEnd, 'yyyy-MM-dd'));
-  }, [showExportModal, exportStart, exportEnd]);
-
-  const exportMinStartDate = getMinExportStartDate(exportEnd);
-  const exportRangeDays = differenceInCalendarDays(exportEnd, exportStart);
-  const exportRangeErrorMessage =
-    exportRangeDays < 0
-      ? t('nutrition.invalidDatesMessage')
-      : exportRangeDays > MAX_EXPORT_RANGE_DAYS
-        ? t('nutrition.exportRangeMinStartMessage', { date: format(exportMinStartDate, 'yyyy-MM-dd') })
-        : null;
-  const isExportDisabled = isExporting || !!exportRangeErrorMessage;
-
-  const parseWebDateInput = (value: string): Date | null => {
-    const normalized = value.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
-    const parsed = new Date(`${normalized}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return format(parsed, 'yyyy-MM-dd') === normalized ? parsed : null;
-  };
-
-  const getErrorMessage = (error: unknown): string => {
-    if (error instanceof Error && error.message.trim()) return error.message;
-    if (typeof error === 'string' && error.trim()) return error;
-    return t('health.pdfGenerateRetry');
-  };
-
-  const openExportModal = () => {
-    const defaultRange = getDefaultExportRange();
-    setExportStart(defaultRange.start);
-    setExportEnd(defaultRange.end);
-    setExportStartInput(format(defaultRange.start, 'yyyy-MM-dd'));
-    setExportEndInput(format(defaultRange.end, 'yyyy-MM-dd'));
-    setShowExportModal(true);
-  };
-
-  const handleExport = async () => {
-    if (!user || exportRangeErrorMessage) return;
-
-    const exportStartDate = format(exportStart, 'yyyy-MM-dd');
-    const exportEndDate = format(exportEnd, 'yyyy-MM-dd');
-    const webPrintWindow: WebExportWindow | null =
-      Platform.OS === 'web'
-        ? ((
-            globalThis as {
-              open?: (url?: string, target?: string) => WebExportWindow | null;
-            }
-          ).open?.('', '_blank') ?? null)
-        : null;
-
-    setShowExportModal(false);
-
-    try {
-      setIsExporting(true);
-      await generateHealthPDF({
-        startDate: exportStartDate,
-        endDate: exportEndDate,
-        user: {
-          id: user.id,
-          display_name: user.user_metadata?.display_name,
-          email: user.email,
-        },
-        webPrintWindow,
-      });
-    } catch (error: unknown) {
-      const message = getErrorMessage(error);
-      const isNoDataError =
-        message.includes(t('health.pdfNoRecordsInRange')) ||
-        message.includes('No records') ||
-        message.includes('No hay registros');
-      if (!isNoDataError) {
-        console.error('Health export error:', message);
-      }
-      Alert.alert(t('common.error'), isNoDataError ? t('health.pdfNoRecordsInRange') : message);
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   const getBmiLabel = (cat: string) => {
     switch (cat) {
@@ -193,23 +73,9 @@ export const HealthHome = () => {
         {/* Top Bar - EXACT COPY FROM NUTRITION */}
         <View style={styles.topBar}>
           <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>{t('health.summary')}</Text>
-          <View style={styles.topActions}>
-            <TouchableOpacity
-              onPress={openExportModal}
-              style={[styles.headerIconButton, dynamicStyles.iconContainer]}
-              accessibilityRole="button"
-              accessibilityLabel={t('health.exportHealthHistory')}
-            >
-              {isExporting ? (
-                <ActivityIndicator size="small" color={themeColors.primary} />
-              ) : (
-                <Download size={20} color={themeColors.primary} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('HealthStatistics')}>
-              <BarChart2 size={24} color={themeColors.textPrimary} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('HealthStatistics')} style={styles.topActions}>
+            <BarChart2 size={24} color={themeColors.textPrimary} />
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -413,116 +279,6 @@ export const HealthHome = () => {
 
           {/* Shortcuts Floating or Bottom? User didn't specify but removed from prominent view to focus on Weight */}
         </ScrollView>
-
-        <Modal visible={showExportModal} animationType="fade" transparent>
-          <View style={styles.modalOverlay}>
-            <View
-              style={[styles.modalContent, dynamicStyles.modalContent, Platform.OS === 'web' && styles.webModalContent]}
-            >
-              <Text style={[styles.modalTitle, dynamicStyles.title]}>{t('health.exportHealthHistory')}</Text>
-              <Text style={[styles.modalSubtitle, dynamicStyles.subtitle]}>{t('health.generatePdfHistory')}</Text>
-
-              <View style={styles.exportDateRow}>
-                <View style={styles.exportDateField}>
-                  <Text style={[styles.label, dynamicStyles.sublabel]}>{t('nutrition.startDate')}</Text>
-                  {Platform.OS === 'web' ? (
-                    <TextInput
-                      style={[styles.webDateInput, dynamicStyles.input]}
-                      value={exportStartInput}
-                      onChangeText={value => {
-                        setExportStartInput(value);
-                        const parsed = parseWebDateInput(value);
-                        if (!parsed || parsed > new Date()) return;
-                        setExportStart(parsed);
-                      }}
-                      onBlur={() => {
-                        if (!parseWebDateInput(exportStartInput)) {
-                          setExportStartInput(format(exportStart, 'yyyy-MM-dd'));
-                        }
-                      }}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor={themeColors.textSecondary}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  ) : (
-                    <DateTimePicker
-                      value={exportStart}
-                      mode="date"
-                      display="default"
-                      maximumDate={new Date()}
-                      themeVariant={isDark ? 'dark' : 'light'}
-                      onChange={(_, date) => {
-                        if (date) setExportStart(date);
-                      }}
-                    />
-                  )}
-                </View>
-
-                <View style={styles.exportDateField}>
-                  <Text style={[styles.label, dynamicStyles.sublabel]}>{t('nutrition.endDate')}</Text>
-                  {Platform.OS === 'web' ? (
-                    <TextInput
-                      style={[styles.webDateInput, dynamicStyles.input]}
-                      value={exportEndInput}
-                      onChangeText={value => {
-                        setExportEndInput(value);
-                        const parsed = parseWebDateInput(value);
-                        if (!parsed || parsed > new Date()) return;
-                        setExportEnd(parsed);
-                      }}
-                      onBlur={() => {
-                        if (!parseWebDateInput(exportEndInput)) {
-                          setExportEndInput(format(exportEnd, 'yyyy-MM-dd'));
-                        }
-                      }}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor={themeColors.textSecondary}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  ) : (
-                    <DateTimePicker
-                      value={exportEnd}
-                      mode="date"
-                      display="default"
-                      maximumDate={new Date()}
-                      themeVariant={isDark ? 'dark' : 'light'}
-                      onChange={(_, date) => {
-                        if (date) setExportEnd(date);
-                      }}
-                    />
-                  )}
-                </View>
-              </View>
-
-              {exportRangeErrorMessage ? (
-                <Text style={[styles.exportRangeError, { color: themeColors.danger }]}>{exportRangeErrorMessage}</Text>
-              ) : null}
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity onPress={() => setShowExportModal(false)} style={styles.modalBtnCancel}>
-                  <Text style={[styles.modalBtnTextCancel, dynamicStyles.subtitle]}>{t('common.cancel')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleExport}
-                  style={[
-                    styles.modalBtnConfirm,
-                    { backgroundColor: themeColors.primary },
-                    isExportDisabled && { opacity: 0.45 },
-                  ]}
-                  disabled={isExportDisabled}
-                >
-                  {isExporting ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.modalBtnTextConfirm}>{t('training.exportPdf')}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -546,11 +302,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     top: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerIconButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -753,86 +504,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginHorizontal: 8,
     opacity: 0.7,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalContent: {
-    borderRadius: 24,
-    padding: 24,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  webModalContent: {
-    maxWidth: 560,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  modalTitle: {
-    ...typography.h2,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    ...typography.caption,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  exportDateRow: {
-    flexDirection: 'row',
-    gap: 14,
-    marginBottom: 12,
-  },
-  exportDateField: {
-    flex: 1,
-  },
-  label: {
-    ...typography.caption,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  webDateInput: {
-    minHeight: 54,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  exportRangeError: {
-    ...typography.caption,
-    fontWeight: '700',
-    marginTop: 2,
-    marginBottom: 14,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 16,
-    marginTop: 18,
-  },
-  modalBtnCancel: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  modalBtnConfirm: {
-    minWidth: 132,
-    minHeight: 52,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  modalBtnTextCancel: {
-    ...typography.button,
-  },
-  modalBtnTextConfirm: {
-    ...typography.button,
-    color: colors.white,
   },
 });

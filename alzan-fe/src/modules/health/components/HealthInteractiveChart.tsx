@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Download } from 'lucide-react-native';
 import { HealthScreenNavigationProp } from '../../../types/navigation.types';
 import {
   ChartAxisTick,
@@ -33,6 +34,11 @@ import { getDateFnsLocale } from '../../../i18n/dateLocale';
 type TimeRange = 'S' | 'M' | '6M' | 'A';
 export type MetricType = 'weight' | 'bmi' | 'bodyFat' | 'muscle' | MeasurementType;
 
+type HealthInteractiveChartProps = {
+  onExportPress?: () => void;
+  isExporting?: boolean;
+};
+
 const RANGES: { label: string; value: TimeRange }[] = [
   { label: 'S', value: 'S' },
   { label: 'M', value: 'M' },
@@ -40,7 +46,7 @@ const RANGES: { label: string; value: TimeRange }[] = [
   { label: 'A', value: 'A' },
 ];
 
-export const HealthInteractiveChart = () => {
+export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: HealthInteractiveChartProps) => {
   const { t } = useTranslation();
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const [range, setRange] = useState<TimeRange>('M');
@@ -408,17 +414,41 @@ export const HealthInteractiveChart = () => {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={[styles.headerTitle, { color: themeColors.textPrimary }]}>{t('health.progress')}</Text>
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate('WeightList', {
-              metric,
-              label: metrics.find(m => m.value === metric)?.label,
-            })
-          }
-          style={styles.historyButton}
-        >
-          <Text style={styles.historyButtonText}>{t('health.history')}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {onExportPress ? (
+            <TouchableOpacity
+              onPress={onExportPress}
+              style={[
+                styles.exportButton,
+                {
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : themeColors.primary + '14',
+                  borderColor: isDark ? 'rgba(255,255,255,0.12)' : themeColors.primary + '30',
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('health.exportHealthHistory')}
+              disabled={isExporting}
+              activeOpacity={0.75}
+            >
+              {isExporting ? (
+                <ActivityIndicator size="small" color={themeColors.primary} />
+              ) : (
+                <Download size={18} color={themeColors.primary} />
+              )}
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate('WeightList', {
+                metric,
+                label: metrics.find(m => m.value === metric)?.label,
+              })
+            }
+            style={styles.historyButton}
+          >
+            <Text style={styles.historyButtonText}>{t('health.history')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -565,6 +595,19 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exportButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
   historyButton: {
     paddingHorizontal: 12,

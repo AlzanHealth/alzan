@@ -455,6 +455,7 @@ const en = {
     pdfFatMass: 'Fat Mass',
     pdfNoWeightData: 'No weight or body composition records in this range',
     pdfLatestMeasurements: 'Latest measurements',
+    pdfAllMeasurements: 'All recorded measurements',
     pdfLatestValue: 'Latest value',
     pdfSleepAndRecovery: 'Sleep and recovery',
     pdfNoMeasurements: 'No body measurements in this range',
