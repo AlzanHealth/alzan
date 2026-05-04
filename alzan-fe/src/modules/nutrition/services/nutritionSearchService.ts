@@ -4,6 +4,7 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { DbIngredient, RecipeUsageContext } from '../../../types/requests.types';
 import {
+  isRecipeOnlyIngredientSource,
   normalizeInput,
   searchIngredientsWithFilters,
   IngredientSearchFilters,
@@ -368,6 +369,7 @@ export async function searchMealByName(query: string, options: SearchMealByNameO
 
     if (!error && ingredients) {
       ingredients
+        .filter(ing => !isRecipeOnlyIngredientSource(ing.source_primary))
         .filter(ing => matchesLoosely(query, ing.name_es, ing.name_en, ing.notes_es, ing.notes_en))
         .forEach(ing => {
           results.push({

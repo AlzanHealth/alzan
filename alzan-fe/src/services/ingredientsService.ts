@@ -33,6 +33,14 @@ const INGREDIENT_SEARCH_TIMEOUT_MS = 7000;
 const INGREDIENT_CANDIDATE_MULTIPLIER = 6;
 const INGREDIENT_CANDIDATE_FLOOR = 60;
 
+export function isRecipeOnlyIngredientSource(source: DbIngredient['source_primary']): boolean {
+  if (!source || typeof source !== 'object') {
+    return false;
+  }
+
+  return source.recipe_only === true || source.recipe_only === 'true';
+}
+
 // 1. Normalization
 export const normalizeInput = (str: string): string => {
   return str
@@ -140,6 +148,7 @@ export const searchIngredients = async (
     }
 
     const localizedResults = data
+      .filter(item => !isRecipeOnlyIngredientSource(item.source_primary))
       .map(item => mapIngredientResult(item, languageCode))
       .filter(ing => matchesLoosely(query, ing.name_es, ing.name_en, ing.notes_es, ing.notes_en));
 
@@ -223,6 +232,7 @@ export const searchIngredientsWithFilters = async (
     }
 
     const localizedResults = data
+      .filter(item => !isRecipeOnlyIngredientSource(item.source_primary))
       .map(item => mapIngredientResult(item, languageCode))
       .filter(ing => {
         if (!hasLetterFilter) return true;

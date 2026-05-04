@@ -59,6 +59,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchByBarcode } from '../../modules/nutrition/services/nutritionSearchService';
 import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 import { supabase } from '../../lib/supabaseClient';
+import { IngredientsCategory, MealItemsSource } from '../../types/requests.types';
 import {
   getCurrentAppLocale,
   getLocalizedIngredientName,
@@ -78,6 +79,7 @@ const RECIPE_LIBRARY_PAGE_SIZE = 10;
 const RECIPE_LIBRARY_SAVED_PAGE_SIZE = 10;
 const MEAL_RECIPE_PAGE_SIZE = 5;
 const INGREDIENT_AMOUNT_DECIMALS = 1;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const roundIngredientAmount = (amount: number): number =>
   Math.round(amount * 10 ** INGREDIENT_AMOUNT_DECIMALS) / 10 ** INGREDIENT_AMOUNT_DECIMALS;
@@ -108,6 +110,8 @@ const isIngredientAmountOverLimit = (input: string): boolean => {
   const amount = parseIngredientAmountInput(input);
   return amount != null && amount > 1000;
 };
+
+const isUuid = (value: string | null | undefined): value is string => Boolean(value && UUID_PATTERN.test(value));
 
 interface SavedRecipeDraft {
   id: string;
@@ -849,6 +853,43 @@ export const MealLogFormScreen = () => {
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ');
 
+  const canResolveRecipeIngredient = (ingredient: MealComponent): boolean =>
+    isUuid(ingredient.external_id) || ingredient.source === 'manual' || ingredient.source === 'openfoodfacts';
+
+  const resolveRecipeIngredientId = async (ingredient: MealComponent): Promise<string | null> => {
+    if (isUuid(ingredient.external_id)) {
+      return ingredient.external_id;
+    }
+
+    if (ingredient.source !== 'manual' && ingredient.source !== 'openfoodfacts') {
+      return null;
+    }
+
+    const source: Extract<MealItemsSource, 'manual' | 'openfoodfacts'> = ingredient.source;
+    const category: IngredientsCategory = toFoodCategory(ingredient.category);
+    const barcode = ingredient.barcode ?? (source === 'openfoodfacts' ? ingredient.external_id : null) ?? null;
+
+    const { data, error } = await supabase.rpc('ensure_recipe_ingredient', {
+      p_name_es: ingredient.name,
+      p_name_en: ingredient.name,
+      p_name_norm_es: normalizeName(ingredient.name),
+      p_category: category,
+      p_kcal_100: ingredient.kcal_100 ?? 0,
+      p_protein_g_100: ingredient.protein_g_100 ?? 0,
+      p_carbs_g_100: ingredient.carbs_g_100 ?? 0,
+      p_fat_g_100: ingredient.fat_g_100 ?? 0,
+      p_source: source,
+      p_barcode: barcode,
+    });
+
+    if (error) {
+      console.error('[MealLogForm] Error resolving recipe ingredient:', error);
+      return null;
+    }
+
+    return data;
+  };
+
   const getCurrentUserId = async (): Promise<string | null> => {
     const {
       data: { user },
@@ -1156,7 +1197,7 @@ export const MealLogFormScreen = () => {
       return;
     }
 
-    const missingDbIngredient = ingredients.some(ingredient => !ingredient.external_id);
+    const missingDbIngredient = ingredients.some(ingredient => !canResolveRecipeIngredient(ingredient));
     if (missingDbIngredient) {
       Alert.alert(
         t('nutrition.saveRecipeNeedsDatabaseIngredientsTitle'),
@@ -1171,6 +1212,18 @@ export const MealLogFormScreen = () => {
       const currentUserId = await getCurrentUserId();
       if (!currentUserId) {
         Alert.alert(t('common.error'), t('nutrition.saveMealError'));
+        return;
+      }
+
+      const resolvedRecipeIngredientIds = await Promise.all(
+        ingredients.map(ingredient => resolveRecipeIngredientId(ingredient)),
+      );
+
+      if (resolvedRecipeIngredientIds.some(ingredientId => !ingredientId)) {
+        Alert.alert(
+          t('nutrition.saveRecipeNeedsDatabaseIngredientsTitle'),
+          t('nutrition.saveRecipeNeedsDatabaseIngredientsMessage'),
+        );
         return;
       }
 
@@ -1255,7 +1308,7 @@ export const MealLogFormScreen = () => {
 
       const recipeItemsPayload = ingredients.map((ingredient, index) => ({
         recipe_id: recipeId as string,
-        ingredient_id: ingredient.external_id as string,
+        ingredient_id: resolvedRecipeIngredientIds[index] as string,
         order_index: index,
         quantity: roundIngredientAmount(ingredient.amount_g || 0),
         unit: 'g' as const,
@@ -1518,6 +1571,7 @@ export const MealLogFormScreen = () => {
         external_id: selectedFood.external_id,
         category: toFoodCategory(selectedFood.category),
         brand: selectedFood.brand,
+        barcode: selectedFood.barcode,
         kcal_100: selectedFood.kcal_100,
         protein_g_100: selectedFood.protein_g_100,
         carbs_g_100: selectedFood.carbs_g_100,
