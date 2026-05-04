@@ -113,6 +113,14 @@ const isIngredientAmountOverLimit = (input: string): boolean => {
 
 const isUuid = (value: string | null | undefined): value is string => Boolean(value && UUID_PATTERN.test(value));
 
+const parseManualMacroInput = (input: string): number | null => {
+  const normalized = input.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
+
+  const value = Number(normalized);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+};
+
 interface SavedRecipeDraft {
   id: string;
   name: string;
@@ -283,6 +291,20 @@ export const MealLogFormScreen = () => {
     carbs_g_100: 0,
     fat_g_100: 0,
   });
+  const [manualMacroInputs, setManualMacroInputs] = useState({
+    kcal_100: '',
+    protein_g_100: '',
+    carbs_g_100: '',
+    fat_g_100: '',
+  });
+  const isManualIngredientFormComplete =
+    manualIngName.trim().length > 0 &&
+    parseIngredientAmountInput(amountInput) != null &&
+    !isIngredientAmountOverLimit(amountInput) &&
+    parseManualMacroInput(manualMacroInputs.kcal_100) != null &&
+    parseManualMacroInput(manualMacroInputs.protein_g_100) != null &&
+    parseManualMacroInput(manualMacroInputs.carbs_g_100) != null &&
+    parseManualMacroInput(manualMacroInputs.fat_g_100) != null;
 
   // Inline Editing State
   const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
@@ -879,7 +901,7 @@ export const MealLogFormScreen = () => {
       p_carbs_g_100: ingredient.carbs_g_100 ?? 0,
       p_fat_g_100: ingredient.fat_g_100 ?? 0,
       p_source: source,
-      p_barcode: barcode,
+      p_barcode: barcode ?? '',
     });
 
     if (error) {
@@ -1592,6 +1614,7 @@ export const MealLogFormScreen = () => {
     setSelectedFood(null);
     setSelectedFood(null);
     setManualPer100g({ kcal_100: 0, protein_g_100: 0, carbs_g_100: 0, fat_g_100: 0 });
+    setManualMacroInputs({ kcal_100: '', protein_g_100: '', carbs_g_100: '', fat_g_100: '' });
   };
 
   const handleRemoveIngredient = (id: string) => {
@@ -2832,14 +2855,17 @@ export const MealLogFormScreen = () => {
                                 },
                               ]}
                               placeholder="0"
-                              keyboardType="numeric"
+                              value={manualMacroInputs.kcal_100}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                               placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={t =>
+                              onChangeText={text => {
+                                const value = sanitizeIngredientAmountInput(text);
+                                setManualMacroInputs(prev => ({ ...prev, kcal_100: value }));
                                 setManualPer100g({
                                   ...manualPer100g,
-                                  kcal_100: parseEnergyToKcal(parseFloat(t) || 0),
-                                })
-                              }
+                                  kcal_100: parseEnergyToKcal(parseManualMacroInput(value) ?? 0),
+                                });
+                              }}
                             />
                           </View>
                           <View style={styles.macroField}>
@@ -2856,14 +2882,17 @@ export const MealLogFormScreen = () => {
                                 },
                               ]}
                               placeholder="0"
-                              keyboardType="numeric"
+                              value={manualMacroInputs.protein_g_100}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                               placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={t =>
+                              onChangeText={text => {
+                                const value = sanitizeIngredientAmountInput(text);
+                                setManualMacroInputs(prev => ({ ...prev, protein_g_100: value }));
                                 setManualPer100g({
                                   ...manualPer100g,
-                                  protein_g_100: parseFloat(t) || 0,
-                                })
-                              }
+                                  protein_g_100: parseManualMacroInput(value) ?? 0,
+                                });
+                              }}
                             />
                           </View>
                           <View style={styles.macroField}>
@@ -2880,14 +2909,17 @@ export const MealLogFormScreen = () => {
                                 },
                               ]}
                               placeholder="0"
-                              keyboardType="numeric"
+                              value={manualMacroInputs.carbs_g_100}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                               placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={t =>
+                              onChangeText={text => {
+                                const value = sanitizeIngredientAmountInput(text);
+                                setManualMacroInputs(prev => ({ ...prev, carbs_g_100: value }));
                                 setManualPer100g({
                                   ...manualPer100g,
-                                  carbs_g_100: parseFloat(t) || 0,
-                                })
-                              }
+                                  carbs_g_100: parseManualMacroInput(value) ?? 0,
+                                });
+                              }}
                             />
                           </View>
                           <View style={styles.macroField}>
@@ -2904,14 +2936,17 @@ export const MealLogFormScreen = () => {
                                 },
                               ]}
                               placeholder="0"
-                              keyboardType="numeric"
+                              value={manualMacroInputs.fat_g_100}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                               placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={t =>
+                              onChangeText={text => {
+                                const value = sanitizeIngredientAmountInput(text);
+                                setManualMacroInputs(prev => ({ ...prev, fat_g_100: value }));
                                 setManualPer100g({
                                   ...manualPer100g,
-                                  fat_g_100: parseFloat(t) || 0,
-                                })
-                              }
+                                  fat_g_100: parseManualMacroInput(value) ?? 0,
+                                });
+                              }}
                             />
                           </View>
                         </View>
@@ -2919,12 +2954,12 @@ export const MealLogFormScreen = () => {
                           onPress={handleAddIngredient}
                           style={[
                             styles.manualAddButton,
-                            isIngredientAmountOverLimit(amountInput) && {
+                            !isManualIngredientFormComplete && {
                               backgroundColor: themeColors.textSecondary,
                               opacity: 0.5,
                             },
                           ]}
-                          disabled={isIngredientAmountOverLimit(amountInput)}
+                          disabled={!isManualIngredientFormComplete}
                         >
                           <Text style={styles.manualAddButtonText}>{t('nutrition.addIngredient')}</Text>
                         </TouchableOpacity>
