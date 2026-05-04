@@ -1189,7 +1189,7 @@ export default {
     provider: 'Proveedor',
     device: 'Dispositivo',
     importedAt: 'Importado el',
-    importedActivityData: 'Datos importados de actividad',
+    importedActivityData: 'Datos de actividad',
     elevationLossM: 'Desnivel negativo (m)',
     heartRateZones: 'Zonas de FC',
     partials: 'Parciales',

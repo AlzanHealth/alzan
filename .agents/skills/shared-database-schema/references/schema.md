@@ -42,9 +42,9 @@ from_order_index integer NOT NULL CHECK (from_order_index >= 0),
 to_order_index integer NOT NULL,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT activity_session_superset_links_pkey PRIMARY KEY (id),
+CONSTRAINT activity_session_superset_links_to_exercise_id_fkey FOREIGN KEY (to_exercise_id) REFERENCES public.exercises(id),
 CONSTRAINT activity_session_superset_links_from_exercise_id_fkey FOREIGN KEY (from_exercise_id) REFERENCES public.exercises(id),
-CONSTRAINT activity_session_superset_links_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
-CONSTRAINT activity_session_superset_links_to_exercise_id_fkey FOREIGN KEY (to_exercise_id) REFERENCES public.exercises(id)
+CONSTRAINT activity_session_superset_links_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id)
 );
 CREATE TABLE public.activity_session_tags (
 session_id uuid NOT NULL,
@@ -99,6 +99,10 @@ recovery_time_s integer CHECK (recovery_time_s IS NULL OR recovery_time_s >= 0),
 total_steps integer CHECK (total_steps IS NULL OR total_steps >= 0),
 vo2_max numeric CHECK (vo2_max IS NULL OR vo2_max > 0::numeric AND vo2_max <= 100::numeric),
 elev_loss_m numeric CHECK (elev_loss_m IS NULL OR elev_loss_m >= 0::numeric),
+min_heart_rate numeric,
+tss_hr numeric,
+epoc numeric,
+pte numeric,
 CONSTRAINT activity_sessions_pkey PRIMARY KEY (id),
 CONSTRAINT activity_sessions_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id),
 CONSTRAINT activity_sessions_endurance_template_id_fkey FOREIGN KEY (endurance_template_id) REFERENCES public.endurance_workout_templates(id),

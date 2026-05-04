@@ -1177,7 +1177,7 @@ const en = {
     provider: 'Provider',
     device: 'Device',
     importedAt: 'Imported at',
-    importedActivityData: 'Imported activity data',
+    importedActivityData: 'Activity data',
     elevationLossM: 'Elevation loss (m)',
     heartRateZones: 'HR zones',
     partials: 'Splits',
