@@ -606,9 +606,8 @@ export const MealLogFormScreen = () => {
 
   const currentRecipeSignature = useMemo(() => buildRecipeSignature(name, ingredients), [ingredients, name]);
   const isEditingRecipe = editingSavedRecipeId !== null;
-  const hasRecipeChanges =
-    isEditingRecipe && editingRecipeSignature !== null && editingRecipeSignature !== currentRecipeSignature;
-  const canSubmitRecipe = name.trim().length > 0 && ingredients.length > 0 && (!isEditingRecipe || hasRecipeChanges);
+  const isIdenticalToOriginalRecipe = editingRecipeSignature !== null && editingRecipeSignature === currentRecipeSignature;
+  const canSubmitRecipe = name.trim().length > 0 && ingredients.length > 0 && !isIdenticalToOriginalRecipe;
 
   // Handler to show meal detail
   const handleShowMealDetail = async (item: MealComponent, prefetchedIngredients?: RecipeIngredientItem[]) => {
@@ -874,6 +873,7 @@ export const MealLogFormScreen = () => {
             ),
           }));
           setIngredients(transformedIngredients);
+          setEditingRecipeSignature(buildRecipeSignature(item.name, transformedIngredients));
           setSearchMessage({ type: 'info', text: t('nutrition.ingredientsAddedAutomatically') });
         }
       } catch (error) {
