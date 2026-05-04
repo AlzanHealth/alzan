@@ -1026,6 +1026,10 @@ export default {
     kg: 'KG',
     profileAllCaps: 'PERFIL',
     contentAllCaps: 'CONTENIDO',
+    stravaConnectError: 'No se pudo iniciar la conexión con Strava. Inténtalo de nuevo.',
+    stravaDisconnectTitle: 'Desconectar Strava',
+    stravaDisconnectMessage: '¿Seguro que quieres desconectar tu cuenta de Strava?',
+    stravaConnectedSince: 'Conectado',
   },
   training: {
     workout: 'Entrenamiento de',

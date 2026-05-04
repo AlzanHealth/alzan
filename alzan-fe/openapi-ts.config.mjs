@@ -19,7 +19,7 @@ export default {
   // fetch from localhost in local development
   fetchers: [
     {
-      input: 'http://localhost:1111/api-json',
+      input: 'http://localhost:1111/openapi-json',
       output: 'src/openapi/alzan-be.json',
     },
   ],

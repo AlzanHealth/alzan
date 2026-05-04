@@ -4,8 +4,9 @@
   "packageManager": "pnpm@10.26.1",
   "scripts": {
     "env:sync": "node scripts/sync-env.js",
-    "start": "pnpm env:sync && concurrently --kill-others-on-fail -n be,fe -c blue,green \"pnpm start:be\" \"pnpm start:fe\"",
-    "start:web": "pnpm env:sync && concurrently --kill-others-on-fail -n be,fe -c blue,green \"pnpm start:be\" \"pnpm start:fe:web\"",
+    "prestart": "pnpm env:sync",
+    "start": "pnpm run prestart && concurrently --kill-others-on-fail -n be,fe -c blue,green \"pnpm start:be\" \"pnpm start:fe\"",
+    "start:web": "pnpm run prestart && concurrently --kill-others-on-fail -n be,fe -c blue,green \"pnpm start:be\" \"pnpm start:fe:web\"",
     "start:be": "pnpm --prefix alzan-be start:dev",
     "start:fe": "pnpm --prefix alzan-fe start",
     "start:fe:web": "dotenv -e .env -- sh -c 'pnpm --prefix alzan-fe start -- --port $FE_PORT'",

@@ -7,12 +7,10 @@ import { AppService } from './app.service';
 import serverConfig from './config/server.config';
 import { GlobalExceptionFilter } from './core/filters/global-exception.filter';
 import { ResponseSerializerInterceptor } from './core/interceptors/response-serializer.interceptor';
-import { SwaggerApi } from './core/swagger/swagger-api.enum';
 import { createLoggerConfig } from './config/logger.config';
 import { createValidationPipe } from './core/pipes/validation.pipe';
 import { AuthGuard } from './core/guards/auth.guard';
 import { validateEnv } from './config/validate-env';
-import { Api } from './core/swagger/swagger-api.decorator';
 import supabaseConfig from './config/supabase.config';
 import { ComponentsModule } from './components/components.modules';
 import { SupabaseModule } from './core/supabase/supabase.module';
@@ -27,7 +25,6 @@ export const appRootImports = [
   SupabaseModule,
 ];
 
-@Api(SwaggerApi.USER_API)
 @Module({
   imports: [...appRootImports, ComponentsModule],
   controllers: [AppController],

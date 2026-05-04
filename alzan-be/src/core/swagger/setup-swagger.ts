@@ -15,6 +15,10 @@ function getModulesForApi(app: INestApplication, apiType: SwaggerApi): Type<unkn
         | SwaggerApi[]
         | undefined;
 
+      if (apiType === SwaggerApi.ALL_API) {
+        return !!apiTypesForModule && apiTypesForModule.length > 0;
+      }
+
       return (apiTypesForModule ?? []).includes(apiType);
     })
     .map(module => module.metatype);

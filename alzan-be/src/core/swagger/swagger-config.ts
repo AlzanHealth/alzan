@@ -18,6 +18,16 @@ export const SWAGGER_CONFIGURATIONS: Record<SwaggerApi, ISwaggerConfiguration> =
     title: 'Notification API',
     description: 'Notification API',
   },
+  [SwaggerApi.PROVIDERS_API]: {
+    endpoint: 'providers',
+    title: 'Providers API',
+    description: 'Providers API',
+  },
+  [SwaggerApi.ALL_API]: {
+    endpoint: 'openapi',
+    title: 'Alzan Full API',
+    description: 'Unified API for frontend generation',
+  },
 };
 
 export const getSwaggerConfig = (apiType: SwaggerApi): ISwaggerConfiguration => {

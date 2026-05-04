@@ -1,31 +1,35 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/": {
+    "/users/search": {
       "get": {
-        "operationId": "getHealth",
-        "parameters": [],
+        "operationId": "searchUsers",
+        "parameters": [
+          { "name": "q", "required": true, "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 1, "default": 10, "type": "number" }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": { "minimum": 0, "default": 0, "type": "number" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppOutputDto" } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UserProfileDto" } }
+              }
+            }
           }
         },
-        "summary": "Returns the application information",
-        "tags": ["App"]
-      }
-    },
-    "/users/{userId}": {
-      "get": {
-        "operationId": "getUserById",
-        "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserProfileDto" } } }
-          }
-        },
-        "summary": "Get user profile by id",
+        "summary": "Search users",
         "tags": ["User"]
       }
     },
@@ -33,7 +37,12 @@
       "post": {
         "operationId": "followUser",
         "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
-        "responses": { "201": { "description": "" } },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VoidResponse" } } }
+          }
+        },
         "summary": "Follow a user",
         "tags": ["User"]
       }
@@ -42,7 +51,12 @@
       "post": {
         "operationId": "acceptFollowRequest",
         "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
-        "responses": { "201": { "description": "" } },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VoidResponse" } } }
+          }
+        },
         "summary": "Accept a follow request",
         "tags": ["User"]
       }
@@ -51,7 +65,12 @@
       "post": {
         "operationId": "rejectFollowRequest",
         "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
-        "responses": { "201": { "description": "" } },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VoidResponse" } } }
+          }
+        },
         "summary": "Reject a follow request",
         "tags": ["User"]
       }
@@ -134,40 +153,143 @@
         "tags": ["User"]
       }
     },
-    "/users/search": {
+    "/users/{userId}": {
       "get": {
-        "operationId": "searchUsers",
+        "operationId": "getProfile",
+        "parameters": [{ "name": "userId", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserProfileDto" } } }
+          }
+        },
+        "summary": "Get user profile by id",
+        "tags": ["User"]
+      }
+    },
+    "/oauth/{provider}/authorize": {
+      "get": {
+        "operationId": "getAuthorizationUrl",
         "parameters": [
-          { "name": "q", "required": true, "in": "query", "schema": { "type": "string" } },
+          { "name": "provider", "required": true, "in": "path", "schema": { "type": "string" } },
           {
-            "name": "limit",
+            "name": "user_id",
             "required": true,
             "in": "query",
-            "schema": { "minimum": 1, "default": 10, "type": "number" }
+            "description": "User ID to associate with the connection",
+            "schema": { "example": "4424c5d6-5751-4038-aa39-bd85895ddb78", "type": "string" }
           },
           {
-            "name": "offset",
-            "required": true,
+            "name": "redirect_uri",
+            "required": false,
             "in": "query",
-            "schema": { "minimum": 0, "default": 0, "type": "number" }
+            "description": "Optional custom redirect URI after authorization",
+            "schema": { "example": "alzan://oauth/success", "type": "string" }
           }
         ],
         "responses": {
           "200": {
             "description": "",
-            "content": {
-              "application/json": {
-                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UserProfileDto" } }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AuthorizationResponseDto" } } }
           }
         },
-        "summary": "Search users",
-        "tags": ["User"]
+        "tags": ["Providers"]
+      }
+    },
+    "/oauth/{provider}/callback": {
+      "get": {
+        "operationId": "oauthCallback",
+        "parameters": [
+          { "name": "provider", "required": true, "in": "path", "schema": { "type": "string" } },
+          {
+            "name": "code",
+            "required": false,
+            "in": "query",
+            "description": "Authorization code returned by the provider",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "State string returned by the provider",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "error",
+            "required": false,
+            "in": "query",
+            "description": "Error code if the authorization failed",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "error_description",
+            "required": false,
+            "in": "query",
+            "description": "Human-readable error description",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": { "200": { "description": "" } },
+        "tags": ["Providers"]
+      }
+    },
+    "/oauth/success": {
+      "get": {
+        "operationId": "oauthSuccess",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "query",
+            "description": "Provider identifier",
+            "schema": { "example": "strava", "type": "string" }
+          },
+          {
+            "name": "user_id",
+            "required": true,
+            "in": "query",
+            "description": "User ID associated with the connection",
+            "schema": { "example": "4424c5d6-5751-4038-aa39-bd85895ddb78", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OAuthSuccessResponseDto" } } }
+          }
+        },
+        "tags": ["Providers"]
+      }
+    },
+    "/oauth/error": {
+      "get": {
+        "operationId": "oauthError",
+        "parameters": [
+          {
+            "name": "message",
+            "required": false,
+            "in": "query",
+            "description": "Error message to display",
+            "schema": { "example": "OAuth authentication failed", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OAuthErrorResponseDto" } } }
+          }
+        },
+        "tags": ["Providers"]
       }
     }
   },
-  "info": { "title": "Alzan API", "description": "Alzan Backend API", "version": "1.0.0", "contact": {} },
+  "info": {
+    "title": "Alzan Full API",
+    "description": "Unified API for frontend generation",
+    "version": "1.0.0",
+    "contact": {}
+  },
   "tags": [{ "name": "Alzan api", "description": "" }],
   "servers": [],
   "components": {
@@ -180,20 +302,6 @@
       }
     },
     "schemas": {
-      "AppOutputDto": {
-        "type": "object",
-        "properties": {
-          "status": { "type": "string", "description": "Status of the request", "example": "ok" },
-          "timestamp": {
-            "type": "string",
-            "description": "Timestamp of the request",
-            "example": "2026-01-25T14:26:29.000Z"
-          },
-          "environment": { "type": "string", "description": "Environment of the request", "example": "local" },
-          "baseUrl": { "type": "string", "description": "Base URL of the request", "example": "http://localhost:1111" }
-        },
-        "required": ["status", "timestamp", "environment", "baseUrl"]
-      },
       "UserProfileDto": {
         "type": "object",
         "properties": {
@@ -225,7 +333,49 @@
         },
         "required": ["id", "username", "followers_count", "following_count"]
       },
-      "VoidResponse": { "type": "object", "properties": {} }
+      "VoidResponse": { "type": "object", "properties": {} },
+      "AuthorizationResponseDto": {
+        "type": "object",
+        "properties": {
+          "authorization_url": {
+            "type": "string",
+            "description": "The URL to redirect the user to for authorization",
+            "example": "https://www.strava.com/oauth/mobile/authorize?..."
+          },
+          "state": {
+            "type": "string",
+            "description": "Random state string used to prevent CSRF",
+            "example": "abc123def456"
+          }
+        },
+        "required": ["authorization_url", "state"]
+      },
+      "OAuthSuccessResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "description": "Indicates if the operation was successful", "example": true, "type": "boolean" },
+          "message": { "type": "string", "description": "Success message" },
+          "user_id": {
+            "type": "string",
+            "description": "User ID associated with the connection",
+            "example": "4424c5d6-5751-4038-aa39-bd85895ddb78"
+          },
+          "provider": { "type": "string", "description": "Provider identifier", "example": "strava" }
+        },
+        "required": ["success", "message", "user_id", "provider"]
+      },
+      "OAuthErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "description": "Indicates if the operation was successful",
+            "example": false,
+            "type": "boolean"
+          },
+          "message": { "type": "string", "description": "Error message" }
+        },
+        "required": ["success", "message"]
+      }
     }
   },
   "security": [{ "bearer-auth": [] }]
