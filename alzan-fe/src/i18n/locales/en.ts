@@ -109,6 +109,7 @@ const en = {
       'The displayed quality score is a calculated value for informational purposes and does not constitute medical advice. For personalized nutrition advice, consult a health professional.',
     addIngredient: 'Add Ingredient',
     carbsShort: 'Carbs',
+    manualIngredientNutritionInvalid: 'Check the nutrition info: the values per 100g do not look possible.',
     maxInputLimit1kg: 'The maximum value to enter is 1kg',
     openBarcodeScanner: 'Open Barcode Scanner',
     searchingScannedProduct: 'Looking up scanned product',

@@ -111,6 +111,7 @@ export default {
       'La puntuación de calidad mostrada es un valor calculado con fines informativos y no constituye una recomendación médica. Para obtener asesoramiento nutricional personalizado, consulta a un profesional de la salud.',
     addIngredient: 'Añadir Ingrediente',
     carbsShort: 'Carbos',
+    manualIngredientNutritionInvalid: 'Revisa la información nutricional: los valores por 100g no parecen posibles.',
     maxInputLimit1kg: 'El valor máximo a introducir es 1kg',
     openBarcodeScanner: 'Abrir Escáner de Código de Barras',
     searchingScannedProduct: 'Buscando producto escaneado',

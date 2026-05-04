@@ -121,6 +121,61 @@ const parseManualMacroInput = (input: string): number | null => {
   return Number.isFinite(value) && value >= 0 ? value : null;
 };
 
+type ManualIngredientNutritionValidationReason =
+  | 'negative'
+  | 'macro_over_100'
+  | 'macro_sum_over_limit'
+  | 'kcal_over_limit'
+  | 'zero_kcal_with_macros'
+  | 'energy_mismatch';
+
+type ManualIngredientNutritionInput = {
+  kcal_100: number;
+  protein_g_100: number;
+  carbs_g_100: number;
+  fat_g_100: number;
+};
+
+type ManualIngredientNutritionValidation = {
+  isValid: boolean;
+  reason?: ManualIngredientNutritionValidationReason;
+};
+
+const validateManualIngredientNutrition = ({
+  kcal_100,
+  protein_g_100,
+  carbs_g_100,
+  fat_g_100,
+}: ManualIngredientNutritionInput): ManualIngredientNutritionValidation => {
+  const values = [kcal_100, protein_g_100, carbs_g_100, fat_g_100];
+  if (values.some(value => !Number.isFinite(value) || value < 0)) {
+    return { isValid: false, reason: 'negative' };
+  }
+
+  if (protein_g_100 > 100 || carbs_g_100 > 100 || fat_g_100 > 100) {
+    return { isValid: false, reason: 'macro_over_100' };
+  }
+
+  if (protein_g_100 + carbs_g_100 + fat_g_100 > 115) {
+    return { isValid: false, reason: 'macro_sum_over_limit' };
+  }
+
+  if (kcal_100 > 950) {
+    return { isValid: false, reason: 'kcal_over_limit' };
+  }
+
+  const estimatedKcal = protein_g_100 * 4 + carbs_g_100 * 4 + fat_g_100 * 9;
+  if (kcal_100 === 0 && estimatedKcal > 0) {
+    return { isValid: false, reason: 'zero_kcal_with_macros' };
+  }
+
+  if (estimatedKcal >= 5 && (kcal_100 < estimatedKcal * 0.35 || kcal_100 > estimatedKcal * 2.5)) {
+    return { isValid: false, reason: 'energy_mismatch' };
+  }
+
+  return { isValid: true };
+};
+
 interface SavedRecipeDraft {
   id: string;
   name: string;
@@ -297,7 +352,8 @@ export const MealLogFormScreen = () => {
     carbs_g_100: '',
     fat_g_100: '',
   });
-  const isManualIngredientFormComplete =
+  const manualIngredientNutritionValidation = validateManualIngredientNutrition(manualPer100g);
+  const isManualIngredientFieldsComplete =
     manualIngName.trim().length > 0 &&
     parseIngredientAmountInput(amountInput) != null &&
     !isIngredientAmountOverLimit(amountInput) &&
@@ -305,6 +361,10 @@ export const MealLogFormScreen = () => {
     parseManualMacroInput(manualMacroInputs.protein_g_100) != null &&
     parseManualMacroInput(manualMacroInputs.carbs_g_100) != null &&
     parseManualMacroInput(manualMacroInputs.fat_g_100) != null;
+  const shouldShowManualIngredientNutritionWarning =
+    isManualIngredientFieldsComplete && !manualIngredientNutritionValidation.isValid;
+  const isManualIngredientFormComplete =
+    isManualIngredientFieldsComplete && manualIngredientNutritionValidation.isValid;
 
   // Inline Editing State
   const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
@@ -1573,6 +1633,8 @@ export const MealLogFormScreen = () => {
 
     if (inputMode === 'manual') {
       if (!manualIngName) return;
+      if (!isManualIngredientFormComplete) return;
+
       newIngredient = {
         id: Date.now().toString(),
         name: manualIngName,
@@ -2950,6 +3012,11 @@ export const MealLogFormScreen = () => {
                             />
                           </View>
                         </View>
+                        {shouldShowManualIngredientNutritionWarning && (
+                          <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 6 }}>
+                            {t('nutrition.manualIngredientNutritionInvalid')}
+                          </Text>
+                        )}
                         <TouchableOpacity
                           onPress={handleAddIngredient}
                           style={[
