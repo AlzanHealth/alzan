@@ -606,7 +606,8 @@ export const MealLogFormScreen = () => {
 
   const currentRecipeSignature = useMemo(() => buildRecipeSignature(name, ingredients), [ingredients, name]);
   const isEditingRecipe = editingSavedRecipeId !== null;
-  const isIdenticalToOriginalRecipe = editingRecipeSignature !== null && editingRecipeSignature === currentRecipeSignature;
+  const isIdenticalToOriginalRecipe =
+    editingRecipeSignature !== null && editingRecipeSignature === currentRecipeSignature;
   const canSubmitRecipe = name.trim().length > 0 && ingredients.length > 0 && !isIdenticalToOriginalRecipe;
 
   // Handler to show meal detail
