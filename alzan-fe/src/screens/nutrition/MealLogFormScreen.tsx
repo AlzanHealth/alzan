@@ -77,6 +77,37 @@ type RecipeOriginFilter = 'all' | 'users' | 'system';
 const RECIPE_LIBRARY_PAGE_SIZE = 10;
 const RECIPE_LIBRARY_SAVED_PAGE_SIZE = 10;
 const MEAL_RECIPE_PAGE_SIZE = 5;
+const INGREDIENT_AMOUNT_DECIMALS = 1;
+
+const roundIngredientAmount = (amount: number): number =>
+  Math.round(amount * 10 ** INGREDIENT_AMOUNT_DECIMALS) / 10 ** INGREDIENT_AMOUNT_DECIMALS;
+
+const parseIngredientAmountInput = (input: string): number | null => {
+  const normalized = input.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
+
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  return roundIngredientAmount(amount);
+};
+
+const sanitizeIngredientAmountInput = (input: string): string => {
+  const normalized = input.replace(',', '.').replace(/[^\d.]/g, '');
+  const [integerPart, ...decimalParts] = normalized.split('.');
+  if (decimalParts.length === 0) return integerPart;
+  return `${integerPart}.${decimalParts.join('')}`;
+};
+
+const formatIngredientAmount = (amount: number): string => {
+  const rounded = roundIngredientAmount(amount);
+  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(INGREDIENT_AMOUNT_DECIMALS);
+};
+
+const isIngredientAmountOverLimit = (input: string): boolean => {
+  const amount = parseIngredientAmountInput(input);
+  return amount != null && amount > 1000;
+};
 
 interface SavedRecipeDraft {
   id: string;
@@ -264,7 +295,7 @@ export const MealLogFormScreen = () => {
       const mapped: MealComponent[] = dbIngredients.map(item => ({
         id: item.id,
         name: item.name,
-        amount_g: item.quantity_g || 0,
+        amount_g: roundIngredientAmount(item.quantity_g || 0),
         source: item.source as MealComponent['source'],
         external_id: item.source_ref || undefined,
         macros_per_100g: undefined, // Removed property
@@ -432,7 +463,7 @@ export const MealLogFormScreen = () => {
       name: recipeName.trim().toLowerCase(),
       ingredients: recipeIngredients.map(ingredient => ({
         ingredientId: ingredient.external_id || ingredient.id,
-        quantity: Number((ingredient.amount_g || 0).toFixed(2)),
+        quantity: roundIngredientAmount(ingredient.amount_g || 0),
         unit: 'g',
       })),
     };
@@ -738,7 +769,7 @@ export const MealLogFormScreen = () => {
           const transformedIngredients: MealComponent[] = recipeIngredients.map((ri, index: number) => ({
             id: `recipe-${index}-${Date.now()}`,
             name: ri.ingredient_name,
-            amount_g: ri.quantity,
+            amount_g: roundIngredientAmount(ri.quantity),
             source: 'database' as const,
             external_id: ri.ingredient_id,
             itemType: 'ingredient' as const,
@@ -753,7 +784,7 @@ export const MealLogFormScreen = () => {
                 carbs_g_100: ri.carbs_g_100 || 0,
                 fat_g_100: ri.fat_g_100 || 0,
               },
-              ri.quantity,
+              roundIngredientAmount(ri.quantity),
             ),
           }));
           setIngredients(transformedIngredients);
@@ -768,10 +799,10 @@ export const MealLogFormScreen = () => {
       let defaultAmount = 100;
       const localizedNotes = getLocalizedIngredientNotes(item);
       if (localizedNotes) {
-        const weightMatch = localizedNotes.match(/(?:Peso Real|Actual weight):\s*(\d+)/i);
+        const weightMatch = localizedNotes.match(/(?:Peso Real|Actual weight):\s*(\d+(?:[.,]\d+)?)/i);
         if (weightMatch && weightMatch[1]) {
-          const weight = parseInt(weightMatch[1], 10);
-          if (!isNaN(weight) && weight > 0) {
+          const weight = parseIngredientAmountInput(weightMatch[1]);
+          if (weight != null) {
             defaultAmount = weight;
           }
         }
@@ -900,7 +931,7 @@ export const MealLogFormScreen = () => {
     return {
       id: `saved-recipe-item-${item.recipe_id}-${index}`,
       name: ingredientName,
-      amount_g: item.quantity,
+      amount_g: roundIngredientAmount(item.quantity),
       source: 'database',
       external_id: item.ingredient_id,
       category: toFoodCategory(item.ingredients.category),
@@ -1226,7 +1257,7 @@ export const MealLogFormScreen = () => {
         recipe_id: recipeId as string,
         ingredient_id: ingredient.external_id as string,
         order_index: index,
-        quantity: ingredient.amount_g || 0,
+        quantity: roundIngredientAmount(ingredient.amount_g || 0),
         unit: 'g' as const,
       }));
 
@@ -1310,7 +1341,7 @@ export const MealLogFormScreen = () => {
       ingredient_name: ingredient.name,
       ingredient_name_es: ingredient.name,
       ingredient_name_en: ingredient.name,
-      quantity: ingredient.amount_g || 0,
+      quantity: roundIngredientAmount(ingredient.amount_g || 0),
       unit: 'g',
       order_index: index,
       kcal_100: ingredient.kcal_100 || 0,
@@ -1430,7 +1461,7 @@ export const MealLogFormScreen = () => {
 
   const handleStartEdit = (ing: MealComponent) => {
     setEditingIngredientId(ing.id);
-    setEditAmountInput((ing.amount_g || 0).toString());
+    setEditAmountInput(formatIngredientAmount(ing.amount_g || 0));
   };
 
   const handleCancelEdit = () => {
@@ -1439,9 +1470,8 @@ export const MealLogFormScreen = () => {
   };
 
   const handleSaveEdit = () => {
-    if (!editAmountInput) return;
-    const amount = parseFloat(editAmountInput);
-    if (isNaN(amount) || amount <= 0) return;
+    const amount = parseIngredientAmountInput(editAmountInput);
+    if (amount == null) return;
 
     setIngredients(prev =>
       prev.map(ing => {
@@ -1461,9 +1491,8 @@ export const MealLogFormScreen = () => {
   };
 
   const handleAddIngredient = () => {
-    if (!amountInput) return;
-    const amount = parseFloat(amountInput);
-    if (isNaN(amount) || amount <= 0) return;
+    const amount = parseIngredientAmountInput(amountInput);
+    if (amount == null) return;
 
     let newIngredient: MealComponent;
 
@@ -1569,7 +1598,7 @@ export const MealLogFormScreen = () => {
 
       const ingredientsPayload = ingredients.map(ing => ({
         name: ing.name,
-        quantity_g: ing.amount_g || 0,
+        quantity_g: roundIngredientAmount(ing.amount_g || 0),
         source: ing.source,
         source_ref: ing.external_id,
         kcal_100: ing.kcal_100,
@@ -2324,14 +2353,14 @@ export const MealLogFormScreen = () => {
                                         },
                                       ]}
                                       value={editAmountInput}
-                                      onChangeText={setEditAmountInput}
-                                      keyboardType="numeric"
+                                      onChangeText={value => setEditAmountInput(sanitizeIngredientAmountInput(value))}
+                                      keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                                       autoFocus
                                       selectTextOnFocus
                                     />
                                     <Text style={[styles.editUnit, { color: themeColors.textSecondary }]}>g</Text>
                                   </View>
-                                  {parseFloat(editAmountInput) > 1000 && (
+                                  {isIngredientAmountOverLimit(editAmountInput) && (
                                     <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4 }}>
                                       {t('nutrition.max1kgLabel')}
                                     </Text>
@@ -2340,7 +2369,7 @@ export const MealLogFormScreen = () => {
                               ) : (
                                 <View style={styles.ingredientMeta}>
                                   <Text style={[styles.ingredientAmount, { color: themeColors.primary }]}>
-                                    {ing.amount_g}g
+                                    {formatIngredientAmount(ing.amount_g || 0)}g
                                   </Text>
                                   <View style={styles.dot} />
                                   <Text style={[styles.ingredientSource, { color: themeColors.textSecondary }]}>
@@ -2355,8 +2384,11 @@ export const MealLogFormScreen = () => {
                                 <>
                                   <TouchableOpacity
                                     onPress={handleSaveEdit}
-                                    style={[styles.actionBtn, parseFloat(editAmountInput) > 1000 && { opacity: 0.5 }]}
-                                    disabled={parseFloat(editAmountInput) > 1000}
+                                    style={[
+                                      styles.actionBtn,
+                                      isIngredientAmountOverLimit(editAmountInput) && { opacity: 0.5 },
+                                    ]}
+                                    disabled={isIngredientAmountOverLimit(editAmountInput)}
                                   >
                                     <Check size={20} color={themeColors.primary} strokeWidth={2.5} />
                                   </TouchableOpacity>
@@ -2543,8 +2575,8 @@ export const MealLogFormScreen = () => {
                                   },
                                 ]}
                                 value={amountInput}
-                                onChangeText={setAmountInput}
-                                keyboardType="numeric"
+                                onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                                keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                                 placeholder="100"
                                 placeholderTextColor={themeColors.textSecondary}
                                 selectTextOnFocus
@@ -2554,17 +2586,17 @@ export const MealLogFormScreen = () => {
                                 onPress={handleAddIngredient}
                                 style={[
                                   styles.addBtn,
-                                  parseFloat(amountInput) > 1000 && {
+                                  isIngredientAmountOverLimit(amountInput) && {
                                     backgroundColor: themeColors.textSecondary,
                                     opacity: 0.5,
                                   },
                                 ]}
-                                disabled={parseFloat(amountInput) > 1000}
+                                disabled={isIngredientAmountOverLimit(amountInput)}
                               >
                                 <Text style={styles.addBtnText}>{t('nutrition.add')}</Text>
                               </TouchableOpacity>
                             </View>
-                            {parseFloat(amountInput) > 1000 && (
+                            {isIngredientAmountOverLimit(amountInput) && (
                               <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
                                 {t('nutrition.maxInputLimit1kg')}
                               </Text>
@@ -2661,8 +2693,8 @@ export const MealLogFormScreen = () => {
                                   },
                                 ]}
                                 value={amountInput}
-                                onChangeText={setAmountInput}
-                                keyboardType="numeric"
+                                onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                                keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                                 placeholder="100"
                                 placeholderTextColor={themeColors.textSecondary}
                                 selectTextOnFocus
@@ -2672,17 +2704,17 @@ export const MealLogFormScreen = () => {
                                 onPress={handleAddIngredient}
                                 style={[
                                   styles.addBtn,
-                                  parseFloat(amountInput) > 1000 && {
+                                  isIngredientAmountOverLimit(amountInput) && {
                                     backgroundColor: themeColors.textSecondary,
                                     opacity: 0.5,
                                   },
                                 ]}
-                                disabled={parseFloat(amountInput) > 1000}
+                                disabled={isIngredientAmountOverLimit(amountInput)}
                               >
                                 <Text style={styles.addBtnText}>{t('nutrition.add')}</Text>
                               </TouchableOpacity>
                             </View>
-                            {parseFloat(amountInput) > 1000 && (
+                            {isIngredientAmountOverLimit(amountInput) && (
                               <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
                                 {t('nutrition.maxInputLimit1kg')}
                               </Text>
@@ -2718,12 +2750,12 @@ export const MealLogFormScreen = () => {
                             },
                           ]}
                           value={amountInput}
-                          onChangeText={setAmountInput}
-                          keyboardType="numeric"
+                          onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                          keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
                           placeholder={t('nutrition.weightGrams')}
                           placeholderTextColor={themeColors.textSecondary}
                         />
-                        {parseFloat(amountInput) > 1000 && (
+                        {isIngredientAmountOverLimit(amountInput) && (
                           <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: -8, marginBottom: 4 }}>
                             {t('nutrition.maxInputLimit1kg')}
                           </Text>
@@ -2833,12 +2865,12 @@ export const MealLogFormScreen = () => {
                           onPress={handleAddIngredient}
                           style={[
                             styles.manualAddButton,
-                            parseFloat(amountInput) > 1000 && {
+                            isIngredientAmountOverLimit(amountInput) && {
                               backgroundColor: themeColors.textSecondary,
                               opacity: 0.5,
                             },
                           ]}
-                          disabled={parseFloat(amountInput) > 1000}
+                          disabled={isIngredientAmountOverLimit(amountInput)}
                         >
                           <Text style={styles.manualAddButtonText}>{t('nutrition.addIngredient')}</Text>
                         </TouchableOpacity>
@@ -3440,7 +3472,7 @@ export const MealLogFormScreen = () => {
                               {ing.ingredient_name}
                             </Text>
                             <Text style={[styles.macroValue, { color: themeColors.textSecondary }]}>
-                              {ing.quantity}g
+                              {formatIngredientAmount(ing.quantity)}g
                             </Text>
                           </View>
                         ))}

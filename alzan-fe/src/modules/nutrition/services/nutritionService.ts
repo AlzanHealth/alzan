@@ -18,6 +18,8 @@ import { IngredientInput } from '../types/db';
 import { getLocalizedIngredientName } from '../../../services/localization';
 import { Locale } from '../../../i18n';
 
+const roundIngredientQuantity = (quantity: number): number => Math.round(quantity * 10) / 10;
+
 interface IngredientNameLookupRow {
   id: string;
   name_es: string;
@@ -161,7 +163,7 @@ export const nutritionService = {
       dataQuality = 'computed';
 
       ingredients.forEach(ing => {
-        const q = ing.quantity_g;
+        const q = roundIngredientQuantity(ing.quantity_g);
         if (ing.kcal_100 || ing.protein_g_100 || ing.carbs_g_100 || ing.fat_g_100) {
           totals.kcal += ((ing.kcal_100 || 0) * q) / 100;
           totals.protein_g += ((ing.protein_g_100 || 0) * q) / 100;
@@ -221,7 +223,7 @@ export const nutritionService = {
 
     if (ingredients && ingredients.length > 0) {
       const itemsPayload = ingredients.map<MealItemInsert>(ing => {
-        const q = ing.quantity_g;
+        const q = roundIngredientQuantity(ing.quantity_g);
         const m = {
           kcal: ing.kcal_100 || 0,
           protein_g: ing.protein_g_100 || 0,
