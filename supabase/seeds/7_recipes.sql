@@ -606,8 +606,49 @@ begin
     set
       owner_user_id = null,
       source = 'system',
-      visibility = 'public'
+      visibility = 'public',
+      published_at = case
+        when exists (
+          select 1
+          from information_schema.columns
+          where table_schema = 'public'
+            and table_name = 'recipes'
+            and column_name = 'published_at'
+        ) then coalesce(published_at, created_at)
+        else null
+      end
     where owner_user_id is null;
+  end if;
+end
+$$;
+
+-- Public catalog recipes are loaded after migrations during db reset, so
+-- generate slugs here as well as in the migration backfill.
+do $$
+declare
+  v_recipe_id uuid;
+begin
+  if exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'ensure_recipe_public_slug'
+  ) and exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'recipes'
+      and column_name = 'public_slug'
+  ) then
+    for v_recipe_id in
+      select id
+      from public.recipes
+      where owner_user_id is null
+        and public_slug is null
+    loop
+      perform public.ensure_recipe_public_slug(v_recipe_id);
+    end loop;
   end if;
 end
 $$;

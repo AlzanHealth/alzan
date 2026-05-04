@@ -2640,3 +2640,25 @@ INSERT INTO "public"."recipe_items" ("id", "recipe_id", "ingredient_id", "order_
 	('46b1b3f8-5aa7-4144-b7fb-801cbba24eeb', 'f5de5077-64d8-4bdd-a715-139a340067d7', '81690058-27a6-46b7-9153-158baaaf0d4d', 7, 1, 'g', NULL, '2026-01-05 16:22:42.62786+00'),
 	('20f5775b-7f71-4e02-afb4-9d3dc36ae3c5', 'f9c0e696-0d59-4e42-b4ee-7b8178523007', '81690058-27a6-46b7-9153-158baaaf0d4d', 6, 1, 'g', NULL, '2026-01-05 16:22:42.62786+00');
 
+-- Recipes are loaded before recipe_items during db reset. Rebuild nutrition
+-- snapshots after the catalog ingredients have been attached.
+do $$
+declare
+  v_recipe_id uuid;
+begin
+  if exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'refresh_recipe_snapshot'
+  ) then
+    for v_recipe_id in
+      select distinct recipe_id
+      from public.recipe_items
+    loop
+      perform public.refresh_recipe_snapshot(v_recipe_id);
+    end loop;
+  end if;
+end
+$$;

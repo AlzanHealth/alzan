@@ -30,8 +30,8 @@ split_group text NOT NULL DEFAULT 'legacy'::text CHECK (split_group = ANY (ARRAY
 split_distance_m integer CHECK (split_distance_m IS NULL OR split_distance_m > 0),
 split_group_order integer NOT NULL DEFAULT 0,
 CONSTRAINT activity_laps_pkey PRIMARY KEY (id),
-CONSTRAINT activity_laps_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-CONSTRAINT activity_laps_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id)
+CONSTRAINT activity_laps_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT activity_laps_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.activity_session_superset_links (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -42,17 +42,17 @@ from_order_index integer NOT NULL CHECK (from_order_index >= 0),
 to_order_index integer NOT NULL,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT activity_session_superset_links_pkey PRIMARY KEY (id),
+CONSTRAINT activity_session_superset_links_from_exercise_id_fkey FOREIGN KEY (from_exercise_id) REFERENCES public.exercises(id),
 CONSTRAINT activity_session_superset_links_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
-CONSTRAINT activity_session_superset_links_to_exercise_id_fkey FOREIGN KEY (to_exercise_id) REFERENCES public.exercises(id),
-CONSTRAINT activity_session_superset_links_from_exercise_id_fkey FOREIGN KEY (from_exercise_id) REFERENCES public.exercises(id)
+CONSTRAINT activity_session_superset_links_to_exercise_id_fkey FOREIGN KEY (to_exercise_id) REFERENCES public.exercises(id)
 );
 CREATE TABLE public.activity_session_tags (
 session_id uuid NOT NULL,
 tag_id uuid NOT NULL,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT activity_session_tags_pkey PRIMARY KEY (session_id, tag_id),
-CONSTRAINT activity_session_tags_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tags(id),
-CONSTRAINT activity_session_tags_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id)
+CONSTRAINT activity_session_tags_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT activity_session_tags_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tags(id)
 );
 CREATE TABLE public.activity_sessions (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -100,10 +100,10 @@ total_steps integer CHECK (total_steps IS NULL OR total_steps >= 0),
 vo2_max numeric CHECK (vo2_max IS NULL OR vo2_max > 0::numeric AND vo2_max <= 100::numeric),
 elev_loss_m numeric CHECK (elev_loss_m IS NULL OR elev_loss_m >= 0::numeric),
 CONSTRAINT activity_sessions_pkey PRIMARY KEY (id),
-CONSTRAINT activity_sessions_workout_template_id_fkey FOREIGN KEY (workout_template_id) REFERENCES public.workout_templates(id),
 CONSTRAINT activity_sessions_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id),
 CONSTRAINT activity_sessions_endurance_template_id_fkey FOREIGN KEY (endurance_template_id) REFERENCES public.endurance_workout_templates(id),
-CONSTRAINT activity_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+CONSTRAINT activity_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT activity_sessions_workout_template_id_fkey FOREIGN KEY (workout_template_id) REFERENCES public.workout_templates(id)
 );
 CREATE TABLE public.activity_streams (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -116,8 +116,8 @@ source text NOT NULL DEFAULT 'manual'::text,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 user_id uuid,
 CONSTRAINT activity_streams_pkey PRIMARY KEY (id),
-CONSTRAINT activity_streams_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-CONSTRAINT activity_streams_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id)
+CONSTRAINT activity_streams_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT activity_streams_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.body_measurements (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -173,8 +173,8 @@ target_fats_g numeric,
 order_index integer NOT NULL DEFAULT 0,
 user_id uuid,
 CONSTRAINT diet_template_meals_pkey PRIMARY KEY (id),
-CONSTRAINT diet_template_meals_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-CONSTRAINT diet_template_meals_diet_template_id_fkey FOREIGN KEY (diet_template_id) REFERENCES public.diet_templates(id)
+CONSTRAINT diet_template_meals_diet_template_id_fkey FOREIGN KEY (diet_template_id) REFERENCES public.diet_templates(id),
+CONSTRAINT diet_template_meals_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.diet_template_translations (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -214,8 +214,8 @@ is_group boolean DEFAULT false,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 user_id uuid,
 CONSTRAINT endurance_workout_steps_pkey PRIMARY KEY (id),
-CONSTRAINT endurance_workout_steps_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.endurance_workout_templates(id),
 CONSTRAINT endurance_workout_steps_parent_step_id_fkey FOREIGN KEY (parent_step_id) REFERENCES public.endurance_workout_steps(id),
+CONSTRAINT endurance_workout_steps_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.endurance_workout_templates(id),
 CONSTRAINT endurance_workout_steps_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.endurance_workout_templates (
@@ -285,11 +285,11 @@ base_name_en text,
 description_en text,
 load_type USER-DEFINED,
 CONSTRAINT exercises_pkey PRIMARY KEY (id),
-CONSTRAINT exercises_primary_muscle_id_fkey FOREIGN KEY (primary_muscle_id) REFERENCES public.muscle_groups(id),
-CONSTRAINT exercises_secondary_muscle_id_fkey FOREIGN KEY (secondary_muscle_id) REFERENCES public.muscle_groups(id),
 CONSTRAINT exercises_equipment_id_fkey FOREIGN KEY (equipment_id) REFERENCES public.equipment(id),
 CONSTRAINT exercises_exercise_type_id_fkey FOREIGN KEY (exercise_type_id) REFERENCES public.exercise_types(id),
-CONSTRAINT exercises_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id)
+CONSTRAINT exercises_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id),
+CONSTRAINT exercises_primary_muscle_id_fkey FOREIGN KEY (primary_muscle_id) REFERENCES public.muscle_groups(id),
+CONSTRAINT exercises_secondary_muscle_id_fkey FOREIGN KEY (secondary_muscle_id) REFERENCES public.muscle_groups(id)
 );
 CREATE TABLE public.external_accounts (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -314,8 +314,8 @@ external_activity_id text NOT NULL,
 activity_session_id uuid NOT NULL,
 imported_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT external_activity_mappings_pkey PRIMARY KEY (id),
-CONSTRAINT external_activity_mappings_external_account_id_fkey FOREIGN KEY (external_account_id) REFERENCES public.external_accounts(id),
 CONSTRAINT external_activity_mappings_activity_session_id_fkey FOREIGN KEY (activity_session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT external_activity_mappings_external_account_id_fkey FOREIGN KEY (external_account_id) REFERENCES public.external_accounts(id),
 CONSTRAINT external_activity_mappings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.external_raw_payloads (
@@ -396,12 +396,12 @@ created_at timestamp with time zone NOT NULL DEFAULT now(),
 origin USER-DEFINED NOT NULL DEFAULT 'user'::meal_items_origin,
 confidence numeric,
 CONSTRAINT meal_items_pkey PRIMARY KEY (id),
-CONSTRAINT meal_items_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
 CONSTRAINT meal_items_meal_log_fkey FOREIGN KEY (meal_log_id) REFERENCES public.meal_logs(id),
 CONSTRAINT meal_items_meal_log_user_fkey FOREIGN KEY (meal_log_id) REFERENCES public.meal_logs(id),
 CONSTRAINT meal_items_meal_log_user_fkey FOREIGN KEY (user_id) REFERENCES public.meal_logs(id),
 CONSTRAINT meal_items_meal_log_user_fkey FOREIGN KEY (meal_log_id) REFERENCES public.meal_logs(user_id),
-CONSTRAINT meal_items_meal_log_user_fkey FOREIGN KEY (user_id) REFERENCES public.meal_logs(user_id)
+CONSTRAINT meal_items_meal_log_user_fkey FOREIGN KEY (user_id) REFERENCES public.meal_logs(user_id),
+CONSTRAINT meal_items_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.meal_logs (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -477,8 +477,8 @@ unit USER-DEFINED NOT NULL,
 notes text,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT recipe_items_pkey PRIMARY KEY (id),
-CONSTRAINT recipe_items_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id),
-CONSTRAINT recipe_items_ingredient_id_fkey FOREIGN KEY (ingredient_id) REFERENCES public.ingredients(id)
+CONSTRAINT recipe_items_ingredient_id_fkey FOREIGN KEY (ingredient_id) REFERENCES public.ingredients(id),
+CONSTRAINT recipe_items_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id)
 );
 CREATE TABLE public.recipe_usage_events (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -546,8 +546,8 @@ notes text,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT session_feedback_pkey PRIMARY KEY (id),
-CONSTRAINT session_feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT session_feedback_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id)
+CONSTRAINT session_feedback_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT session_feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.sleep_logs (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -676,9 +676,9 @@ updated_at timestamp with time zone NOT NULL DEFAULT now(),
 activity_session_id uuid,
 completed_at timestamp with time zone,
 CONSTRAINT workout_plans_pkey PRIMARY KEY (id),
-CONSTRAINT workout_plans_gym_template_id_fkey FOREIGN KEY (gym_template_id) REFERENCES public.workout_templates(id),
-CONSTRAINT workout_plans_endurance_template_id_fkey FOREIGN KEY (endurance_template_id) REFERENCES public.endurance_workout_templates(id),
 CONSTRAINT workout_plans_activity_session_id_fkey FOREIGN KEY (activity_session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT workout_plans_endurance_template_id_fkey FOREIGN KEY (endurance_template_id) REFERENCES public.endurance_workout_templates(id),
+CONSTRAINT workout_plans_gym_template_id_fkey FOREIGN KEY (gym_template_id) REFERENCES public.workout_templates(id),
 CONSTRAINT workout_plans_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.workout_sets (
@@ -705,8 +705,8 @@ avg_hr_bpm integer,
 max_hr_bpm integer,
 CONSTRAINT workout_sets_pkey PRIMARY KEY (id),
 CONSTRAINT workout_sets_exercise_id_fkey FOREIGN KEY (exercise_id) REFERENCES public.exercises(id),
-CONSTRAINT workout_sets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT workout_sets_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id)
+CONSTRAINT workout_sets_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT workout_sets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.workout_template_exercises (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
