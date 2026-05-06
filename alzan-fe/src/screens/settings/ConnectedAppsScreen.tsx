@@ -1,13 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
 import { useSettingsStyles } from '../../hooks/useSettingsStyles';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import { useStravaConnection } from '../../hooks/useStravaConnection';
 
 export const ConnectedAppsScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors } = useSettingsStyles();
+  const strava = useStravaConnection();
 
   const AppCard = ({
     name,
@@ -15,12 +17,16 @@ export const ConnectedAppsScreen = () => {
     onConnect,
     onDisconnect,
     comingSoon = false,
+    isLoading = false,
+    isActioning = false,
   }: {
     name: string;
     connected: boolean;
     onConnect: () => void;
     onDisconnect: () => void;
     comingSoon?: boolean;
+    isLoading?: boolean;
+    isActioning?: boolean;
   }) => (
     <View style={[styles.card, dynamicStyles.card]}>
       <View style={styles.cardHeader}>
@@ -29,7 +35,9 @@ export const ConnectedAppsScreen = () => {
         </View>
         <View style={styles.appInfo}>
           <Text style={[styles.appName, { color: themeColors.textPrimary }]}>{name}</Text>
-          {comingSoon ? (
+          {isLoading ? (
+            <ActivityIndicator size="small" color={themeColors.textSecondary} style={styles.statusLoader} />
+          ) : comingSoon ? (
             <Text style={[styles.statusTextPending, { color: themeColors.primary }]}>{t('alzan.comingSoon')}</Text>
           ) : (
             <Text
@@ -44,7 +52,7 @@ export const ConnectedAppsScreen = () => {
           )}
         </View>
       </View>
-      {!comingSoon && (
+      {!comingSoon && !isLoading && (
         <TouchableOpacity
           style={[
             styles.button,
@@ -53,17 +61,22 @@ export const ConnectedAppsScreen = () => {
               : { backgroundColor: themeColors.primary, borderColor: themeColors.primary },
           ]}
           onPress={connected ? onDisconnect : onConnect}
+          disabled={isActioning}
         >
-          <Text
-            style={[
-              styles.buttonText,
-              connected
-                ? [styles.buttonTextDisconnect, { color: themeColors.textPrimary }]
-                : { color: themeColors.white },
-            ]}
-          >
-            {connected ? t('settings.disconnect') : t('settings.connect')}
-          </Text>
+          {isActioning ? (
+            <ActivityIndicator size="small" color={connected ? themeColors.textPrimary : themeColors.white} />
+          ) : (
+            <Text
+              style={[
+                styles.buttonText,
+                connected
+                  ? [styles.buttonTextDisconnect, { color: themeColors.textPrimary }]
+                  : { color: themeColors.white },
+              ]}
+            >
+              {connected ? t('settings.disconnect') : t('settings.connect')}
+            </Text>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -76,9 +89,16 @@ export const ConnectedAppsScreen = () => {
           {t('settings.syncAppsDescription')}
         </Text>
 
-        <AppCard name="Suunto" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
+        <AppCard
+          name="Strava"
+          connected={strava.isConnected}
+          isLoading={strava.isLoading}
+          isActioning={strava.isConnecting || strava.isDisconnecting}
+          onConnect={strava.connect}
+          onDisconnect={strava.disconnect}
+        />
 
-        <AppCard name="Strava" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
+        <AppCard name="Suunto" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
 
         <AppCard name="Garmin" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
 
@@ -93,11 +113,6 @@ export const ConnectedAppsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   content: {
     padding: spacing.m,
@@ -152,15 +167,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontStyle: 'italic',
   },
+  statusLoader: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
   button: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: borderRadius.full,
     borderWidth: 1,
-  },
-  buttonConnect: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    minWidth: 90,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
   },
   buttonDisconnect: {
     backgroundColor: 'transparent',
@@ -168,9 +187,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  buttonTextConnect: {
-    color: colors.white,
   },
   buttonTextDisconnect: {},
 });

@@ -1,4 +1,6 @@
 export enum SwaggerApi {
   USER_API = 'USER_API',
   NOTIFICATION_API = 'NOTIFICATION_API',
+  PROVIDERS_API = 'PROVIDERS_API',
+  ALL_API = 'ALL_API',
 }

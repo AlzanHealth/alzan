@@ -530,7 +530,7 @@ export const UserProfileScreen: React.FC = () => {
   const { data: profile, isLoading } = useQuery({
     queryKey: ['user-profile', userId],
     queryFn: async () => {
-      const res = await User.getUserById({ path: { userId } });
+      const res = await User.getProfile({ path: { userId } });
       return res.data ?? null;
     },
     enabled: !!userId,

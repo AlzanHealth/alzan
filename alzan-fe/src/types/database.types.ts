@@ -1556,6 +1556,44 @@ export type Database = {
           },
         ];
       };
+      provider_oauth_states: {
+        Row: {
+          code_verifier: string | null;
+          created_at: string;
+          expires_at: string;
+          provider: Database['public']['Enums']['wearable_provider_enum'];
+          redirect_uri: string | null;
+          state: string;
+          user_id: string;
+        };
+        Insert: {
+          code_verifier?: string | null;
+          created_at?: string;
+          expires_at: string;
+          provider: Database['public']['Enums']['wearable_provider_enum'];
+          redirect_uri?: string | null;
+          state: string;
+          user_id: string;
+        };
+        Update: {
+          code_verifier?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          provider?: Database['public']['Enums']['wearable_provider_enum'];
+          redirect_uri?: string | null;
+          state?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'provider_oauth_states_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       recipe_aliases: {
         Row: {
           alias_es: string;
@@ -2019,6 +2057,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'tags_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      user_connections: {
+        Row: {
+          access_token: string;
+          created_at: string;
+          id: string;
+          provider: Database['public']['Enums']['wearable_provider_enum'];
+          provider_user_id: string | null;
+          provider_username: string | null;
+          refresh_token: string | null;
+          scope: string | null;
+          token_expires_at: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          access_token: string;
+          created_at?: string;
+          id?: string;
+          provider: Database['public']['Enums']['wearable_provider_enum'];
+          provider_user_id?: string | null;
+          provider_username?: string | null;
+          refresh_token?: string | null;
+          scope?: string | null;
+          token_expires_at: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          access_token?: string;
+          created_at?: string;
+          id?: string;
+          provider?: Database['public']['Enums']['wearable_provider_enum'];
+          provider_user_id?: string | null;
+          provider_username?: string | null;
+          refresh_token?: string | null;
+          scope?: string | null;
+          token_expires_at?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'user_connections_user_id_fkey';
             columns: ['user_id'];
             isOneToOne: false;
             referencedRelation: 'users';
@@ -2723,6 +2811,7 @@ export type Database = {
       user_preferences_weight_unit: 'kg' | 'lb';
       users_sex: 'male' | 'female' | 'other' | 'prefer_not_to_say';
       visibility_enum: 'private' | 'followers' | 'public';
+      wearable_provider_enum: 'strava' | 'garmin' | 'polar' | 'suunto' | 'whoop' | 'oura' | 'fitbit' | 'ultrahuman';
       workout_goal_enum: 'resistencia' | 'fuerza' | 'velocidad' | 'potencia' | 'hipertrofia' | 'perdida_grasa';
       workout_plans_status: 'planned' | 'completed' | 'skipped' | 'rescheduled';
     };
@@ -2917,6 +3006,7 @@ export const Constants = {
       user_preferences_weight_unit: ['kg', 'lb'],
       users_sex: ['male', 'female', 'other', 'prefer_not_to_say'],
       visibility_enum: ['private', 'followers', 'public'],
+      wearable_provider_enum: ['strava', 'garmin', 'polar', 'suunto', 'whoop', 'oura', 'fitbit', 'ultrahuman'],
       workout_goal_enum: ['resistencia', 'fuerza', 'velocidad', 'potencia', 'hipertrofia', 'perdida_grasa'],
       workout_plans_status: ['planned', 'completed', 'skipped', 'rescheduled'],
     },

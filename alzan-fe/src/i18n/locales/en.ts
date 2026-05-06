@@ -1087,6 +1087,10 @@ const en = {
     kg: 'KG',
     profileAllCaps: 'PROFILE',
     contentAllCaps: 'CONTENT',
+    stravaConnectError: 'Could not start Strava connection. Please try again.',
+    stravaDisconnectTitle: 'Disconnect Strava',
+    stravaDisconnectMessage: 'Are you sure you want to disconnect your Strava account?',
+    stravaConnectedSince: 'Connected',
   },
   training: {
     workout: 'Workout of',
