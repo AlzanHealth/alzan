@@ -1242,14 +1242,15 @@ export const EnduranceSessionFormScreen = () => {
         },
         {
           label: t('training.pte'),
-          value:
-            importedStrengthSummary.pte != null ? importedStrengthSummary.pte.toFixed(1).replace('.', ',') : '-',
+          value: importedStrengthSummary.pte != null ? importedStrengthSummary.pte.toFixed(1).replace('.', ',') : '-',
         },
         {
           label: t('training.recoveryTime'),
           value:
             importedStrengthSummary.recoveryTimeSeconds != null
-              ? `${Math.floor(importedStrengthSummary.recoveryTimeSeconds / 60)}:${Math.floor(importedStrengthSummary.recoveryTimeSeconds % 60)
+              ? `${Math.floor(importedStrengthSummary.recoveryTimeSeconds / 60)}:${Math.floor(
+                  importedStrengthSummary.recoveryTimeSeconds % 60,
+                )
                   .toString()
                   .padStart(2, '0')}`
               : '-',
@@ -1291,7 +1292,9 @@ export const EnduranceSessionFormScreen = () => {
             dynamicStyles.input,
             {
               opacity:
-                pickStrengthActivityImport.isPending || applyStrengthActivityImport.isPending || !gymSessionData?.sessionId
+                pickStrengthActivityImport.isPending ||
+                applyStrengthActivityImport.isPending ||
+                !gymSessionData?.sessionId
                   ? 0.6
                   : 1,
             },
@@ -1959,7 +1962,9 @@ export const EnduranceSessionFormScreen = () => {
             >
               <View style={styles.importModalOverlay}>
                 <View style={[styles.importModalCard, dynamicStyles.card]}>
-                  <Text style={[styles.importModalTitle, dynamicStyles.title]}>{t('training.importedActivityPreview')}</Text>
+                  <Text style={[styles.importModalTitle, dynamicStyles.title]}>
+                    {t('training.importedActivityPreview')}
+                  </Text>
                   <View style={styles.importPreviewRow}>
                     <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.duration')}</Text>
                     <Text style={[styles.importPreviewValue, { color: themeColors.textPrimary }]}>
