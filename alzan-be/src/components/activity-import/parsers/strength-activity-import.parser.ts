@@ -42,6 +42,10 @@ export interface ImportedStrengthActivitySummary {
   heartRateStream: ImportedStrengthActivityHeartRateSample[];
 }
 
+interface ParseStrengthActivityOptions {
+  estimatedMaxHeartRate?: number | null;
+}
+
 export type DatabaseProvider = Database['public']['Enums']['provider_enum'];
 
 type JsonRecord = Record<string, unknown>;
@@ -312,7 +316,65 @@ function buildHeartRateZonesFromHeader(
     .filter(zone => zone.durationSeconds > 0);
 }
 
-function parseSuuntoJson(parsed: JsonRecord): ImportedStrengthActivitySummary {
+function resolveHeartRateZone(normalisedHeartRate: number): 1 | 2 | 3 | 4 | 5 {
+  if (normalisedHeartRate >= 0.9) return 5;
+  if (normalisedHeartRate >= 0.8) return 4;
+  if (normalisedHeartRate >= 0.7) return 3;
+  if (normalisedHeartRate >= 0.6) return 2;
+  return 1;
+}
+
+function resolveEffectiveMaxHeartRate(
+  heartRateSamples: number[],
+  estimatedMaxHeartRate?: number | null,
+): number | null {
+  const safeEstimated =
+    estimatedMaxHeartRate != null && Number.isFinite(estimatedMaxHeartRate) && estimatedMaxHeartRate > 0
+      ? estimatedMaxHeartRate
+      : null;
+
+  if (safeEstimated != null) return safeEstimated;
+  if (heartRateSamples.length === 0) return null;
+
+  const observedMax = heartRateSamples.reduce((highest, value) => (value > highest ? value : highest), heartRateSamples[0]);
+  return Number.isFinite(observedMax) && observedMax > 0 ? observedMax : null;
+}
+
+function buildHeartRateZonesFromStream(
+  stream: ImportedStrengthActivityHeartRateSample[],
+  estimatedMaxHeartRate?: number | null,
+): ImportedStrengthActivityHeartRateZone[] {
+  const samples = stream
+    .map(sample => sample.bpm)
+    .filter((bpm): bpm is number => Number.isFinite(bpm) && bpm > 0);
+
+  if (samples.length === 0) return [];
+
+  const effectiveMaxHeartRate = resolveEffectiveMaxHeartRate(samples, estimatedMaxHeartRate);
+  if (effectiveMaxHeartRate == null) return [];
+
+  const durationsByZone = [0, 0, 0, 0, 0];
+  for (const bpm of samples) {
+    const zone = resolveHeartRateZone(bpm / effectiveMaxHeartRate);
+    durationsByZone[zone - 1] += 1;
+  }
+
+  const totalDurationSeconds = samples.length;
+  if (totalDurationSeconds <= 0) return [];
+
+  return ([5, 4, 3, 2, 1] as const)
+    .map(zone => {
+      const zoneSeconds = durationsByZone[zone - 1];
+      return {
+        zone,
+        durationSeconds: Math.round(zoneSeconds),
+        percentage: (zoneSeconds / totalDurationSeconds) * 100,
+      };
+    })
+    .filter(zone => zone.durationSeconds > 0);
+}
+
+function parseSuuntoJson(parsed: JsonRecord, options?: ParseStrengthActivityOptions): ImportedStrengthActivitySummary {
   const deviceLog = isRecord(parsed.DeviceLog) ? parsed.DeviceLog : parsed;
   const header = isRecord(deviceLog.Header) ? deviceLog.Header : {};
   const windows = Array.isArray(deviceLog.Windows) ? deviceLog.Windows : [];
@@ -367,6 +429,7 @@ function parseSuuntoJson(parsed: JsonRecord): ImportedStrengthActivitySummary {
   const deviceInfo = device && isRecord(device.Info) ? device.Info : null;
   const stream = parseHeartRateStream(deviceLog.Samples, startedAt);
   const distanceM = readNumber(header.Distance) ?? readNumber(activityWindow?.Distance);
+  const zonesFromHeader = buildHeartRateZonesFromHeader(header, durationSeconds ?? null);
 
   if (isClearlyUnsupportedJsonActivity(parsed, distanceM)) {
     throw new Error(STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG);
@@ -399,7 +462,10 @@ function parseSuuntoJson(parsed: JsonRecord): ImportedStrengthActivitySummary {
           model: null,
           serial: null,
         },
-    heartRateZones: buildHeartRateZonesFromHeader(header, durationSeconds ?? null),
+    heartRateZones:
+      zonesFromHeader.length > 0
+        ? zonesFromHeader
+        : buildHeartRateZonesFromStream(stream, options?.estimatedMaxHeartRate),
     heartRateStream: stream,
   };
 }
@@ -694,7 +760,11 @@ function detectFitProvider(filename: string): StrengthActivityProvider {
   return fileProvider === 'unknown' ? 'unknown' : fileProvider;
 }
 
-function parseFitActivity(binary: Uint8Array, filename: string): ImportedStrengthActivitySummary {
+function parseFitActivity(
+  binary: Uint8Array,
+  filename: string,
+  options?: ParseStrengthActivityOptions,
+): ImportedStrengthActivitySummary {
   if (binary.byteLength < 12) throw new Error(STRENGTH_ACTIVITY_PARSE_ERROR_TAG);
   const dataView = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
   const headerSize = dataView.getUint8(0);
@@ -762,6 +832,7 @@ function parseFitActivity(binary: Uint8Array, filename: string): ImportedStrengt
   const avgFromStream =
     heartRates.length > 0 ? heartRates.reduce((sum, value) => sum + value, 0) / heartRates.length : null;
   const maxFromStream = heartRates.length > 0 ? Math.max(...heartRates) : null;
+  const computedZones = buildHeartRateZonesFromStream(state.heartRateStream, options?.estimatedMaxHeartRate);
 
   return {
     provider: detectFitProvider(filename),
@@ -780,12 +851,16 @@ function parseFitActivity(binary: Uint8Array, filename: string): ImportedStrengt
     tss: null,
     trainingLoadPeak: null,
     device: state.device,
-    heartRateZones: [],
+    heartRateZones: computedZones,
     heartRateStream: state.heartRateStream,
   };
 }
 
-export function parseStrengthActivityJson(rawJson: string, filename: string): ImportedStrengthActivitySummary {
+export function parseStrengthActivityJson(
+  rawJson: string,
+  filename: string,
+  options?: ParseStrengthActivityOptions,
+): ImportedStrengthActivitySummary {
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawJson);
@@ -794,7 +869,7 @@ export function parseStrengthActivityJson(rawJson: string, filename: string): Im
   }
 
   if (isRecord(parsed) && isRecord(parsed.DeviceLog)) {
-    return parseSuuntoJson(parsed);
+    return parseSuuntoJson(parsed, options);
   }
 
   return parseGenericJson(parsed, filename);
@@ -803,17 +878,18 @@ export function parseStrengthActivityJson(rawJson: string, filename: string): Im
 export function parseStrengthActivityFile(
   content: string | Uint8Array,
   filename: string,
+  options?: ParseStrengthActivityOptions,
 ): ImportedStrengthActivitySummary {
   const lower = filename.toLowerCase();
 
   if (lower.endsWith('.fit')) {
     if (typeof content === 'string') throw new Error(STRENGTH_ACTIVITY_PARSE_ERROR_TAG);
-    return parseFitActivity(content, filename);
+    return parseFitActivity(content, filename, options);
   }
 
   if (lower.endsWith('.json')) {
     if (typeof content !== 'string') throw new Error(STRENGTH_ACTIVITY_PARSE_ERROR_TAG);
-    return parseStrengthActivityJson(content, filename);
+    return parseStrengthActivityJson(content, filename, options);
   }
 
   throw new Error(STRENGTH_ACTIVITY_PARSE_ERROR_TAG);

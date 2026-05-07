@@ -489,42 +489,42 @@ export const EnduranceSessionDetailScreen = () => {
 
   const secondaryMetrics: Array<{ key: string; label: string; value: string }> = [];
   if (!isGymSession) {
-    if (session.avg_heart_rate != null) {
+    if (session.avg_heart_rate != null && session.avg_heart_rate > 0) {
       secondaryMetrics.push({
         key: 'avg-heart-rate',
         label: t('health.heartRate'),
         value: `${session.avg_heart_rate}${t('health.unitBpm')}`,
       });
     }
-    if (session.elev_gain_m != null) {
+    if (session.elev_gain_m != null && session.elev_gain_m > 0) {
       secondaryMetrics.push({
         key: 'elevation-gain',
         label: t('training.elevationM'),
         value: `${Math.round(session.elev_gain_m)} m`,
       });
     }
-    if (session.elev_loss_m != null) {
+    if (session.elev_loss_m != null && session.elev_loss_m > 0) {
       secondaryMetrics.push({
         key: 'elevation-loss',
         label: t('training.elevationLossM'),
         value: `${Math.round(session.elev_loss_m)} m`,
       });
     }
-    if (session.rpe != null) {
+    if (session.rpe != null && session.rpe > 0) {
       secondaryMetrics.push({
         key: 'rpe',
         label: t('training.effortRpe'),
         value: `${Math.round(session.rpe)}/10`,
       });
     }
-    if (session.vo2_max != null) {
+    if (session.vo2_max != null && session.vo2_max > 0) {
       secondaryMetrics.push({
         key: 'vo2',
         label: t('training.vo2Max'),
         value: `${session.vo2_max.toFixed(1)}`,
       });
     }
-    if (session.total_steps != null) {
+    if (session.total_steps != null && session.total_steps > 0) {
       secondaryMetrics.push({
         key: 'steps',
         label: t('training.totalSteps'),
@@ -609,68 +609,93 @@ export const EnduranceSessionDetailScreen = () => {
 
   const strengthImportedMetrics: Array<{ key: string; label: string; value: string; hasInfo?: boolean }> = [];
   if (isGymSession && session.imported_at) {
-    const numberWithUnitOrDash = (value: number | null | undefined, unit: string) =>
-      value != null ? `${Math.round(value)} ${unit}` : '-';
+    const formatPositiveNumberWithUnit = (value: number | null | undefined, unit: string) =>
+      value != null && value > 0 ? `${Math.round(value)} ${unit}` : null;
 
-    strengthImportedMetrics.push(
-      {
+    if (session.duration_s != null && session.duration_s > 0) {
+      strengthImportedMetrics.push({
         key: 'duration',
         label: t('training.duration'),
-        value: session.duration_s != null ? formatMaybeDuration(session.duration_s) : '-',
+        value: formatMaybeDuration(session.duration_s),
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    const caloriesLabel = formatPositiveNumberWithUnit(importedCalories, t('nutrition.kcal'));
+    if (caloriesLabel) {
+      strengthImportedMetrics.push({
         key: 'calories',
         label: t('nutrition.kcal'),
-        value: numberWithUnitOrDash(importedCalories, t('nutrition.kcal')),
+        value: caloriesLabel,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    const avgHeartRateLabel = formatPositiveNumberWithUnit(importedAvgHr, t('health.unitBpm'));
+    if (avgHeartRateLabel) {
+      strengthImportedMetrics.push({
         key: 'avg-heart-rate',
         label: t('training.avgHeartRate'),
-        value: numberWithUnitOrDash(importedAvgHr, t('health.unitBpm')),
+        value: avgHeartRateLabel,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    const maxHeartRateLabel = formatPositiveNumberWithUnit(importedMaxHr, t('health.unitBpm'));
+    if (maxHeartRateLabel) {
+      strengthImportedMetrics.push({
         key: 'max-heart-rate',
         label: t('training.maxHeartRate'),
-        value: numberWithUnitOrDash(importedMaxHr, t('health.unitBpm')),
+        value: maxHeartRateLabel,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    const minHeartRateLabel = formatPositiveNumberWithUnit(importedMinHr, t('health.unitBpm'));
+    if (minHeartRateLabel) {
+      strengthImportedMetrics.push({
         key: 'min-heart-rate',
         label: t('training.minHeartRate'),
-        value: numberWithUnitOrDash(importedMinHr, t('health.unitBpm')),
+        value: minHeartRateLabel,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    if (importedTss != null && importedTss > 0) {
+      strengthImportedMetrics.push({
         key: 'tss',
         label: t('training.tssHr'),
-        value: importedTss != null ? `${Math.round(importedTss)}` : '-',
+        value: `${Math.round(importedTss)}`,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    if (importedEpoc != null && importedEpoc > 0) {
+      strengthImportedMetrics.push({
         key: 'epoc',
         label: t('training.epoc'),
-        value: importedEpoc != null ? `${Math.round(importedEpoc)}` : '-',
+        value: `${Math.round(importedEpoc)}`,
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    if (importedPte != null && importedPte > 0) {
+      strengthImportedMetrics.push({
         key: 'pte',
         label: t('training.pte'),
-        value: importedPte != null ? importedPte.toFixed(1).replace('.', ',') : '-',
+        value: importedPte.toFixed(1).replace('.', ','),
         hasInfo: true,
-      },
-      {
+      });
+    }
+
+    if (importedRecoverySeconds != null && importedRecoverySeconds > 0) {
+      strengthImportedMetrics.push({
         key: 'recovery',
         label: t('training.recoveryTime'),
-        value:
-          importedRecoverySeconds != null && importedRecoverySeconds >= 0
-            ? formatMaybeDuration(importedRecoverySeconds)
-            : '-',
+        value: formatMaybeDuration(importedRecoverySeconds),
         hasInfo: true,
-      },
-    );
+      });
+    }
   }
 
   const renderProgrammedWorkoutSection = () => {

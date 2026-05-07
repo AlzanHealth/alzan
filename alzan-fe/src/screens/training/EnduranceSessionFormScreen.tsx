@@ -1071,65 +1071,72 @@ export const EnduranceSessionFormScreen = () => {
     );
   };
 
-  const importedMetricsRows = importedStrengthSummary
-    ? [
-        {
-          label: t('training.duration'),
-          value: `${durationHours || '0'}:${(durationMinutes || '0').padStart(2, '0')}:${(durationSeconds || '0').padStart(2, '0')}`,
-        },
-        {
-          label: t('nutrition.kcal'),
-          value:
-            importedStrengthSummary.caloriesKcal != null
-              ? `${Math.round(importedStrengthSummary.caloriesKcal)} ${t('nutrition.kcal')}`
-              : '-',
-        },
-        {
-          label: t('training.avgHeartRate'),
-          value:
-            importedStrengthSummary.avgHeartRate != null
-              ? `${Math.round(importedStrengthSummary.avgHeartRate)} ${t('health.unitBpm')}`
-              : '-',
-        },
-        {
-          label: t('training.maxHeartRate'),
-          value:
-            importedStrengthSummary.maxHeartRate != null
-              ? `${Math.round(importedStrengthSummary.maxHeartRate)} ${t('health.unitBpm')}`
-              : '-',
-        },
-        {
-          label: t('training.minHeartRate'),
-          value:
-            importedStrengthSummary.minHeartRate != null
-              ? `${Math.round(importedStrengthSummary.minHeartRate)} ${t('health.unitBpm')}`
-              : '-',
-        },
-        {
-          label: t('training.tssHr'),
-          value: importedStrengthSummary.tss != null ? `${Math.round(importedStrengthSummary.tss)}` : '-',
-        },
-        {
-          label: t('training.epoc'),
-          value: importedStrengthSummary.epoc != null ? `${Math.round(importedStrengthSummary.epoc)}` : '-',
-        },
-        {
-          label: t('training.pte'),
-          value: importedStrengthSummary.pte != null ? importedStrengthSummary.pte.toFixed(1).replace('.', ',') : '-',
-        },
-        {
-          label: t('training.recoveryTime'),
-          value:
-            importedStrengthSummary.recoveryTimeSeconds != null
-              ? `${Math.floor(importedStrengthSummary.recoveryTimeSeconds / 60)}:${Math.floor(
-                  importedStrengthSummary.recoveryTimeSeconds % 60,
-                )
-                  .toString()
-                  .padStart(2, '0')}`
-              : '-',
-        },
-      ]
-    : [];
+  const importedMetricsRows: Array<{ label: string; value: string }> = [];
+  if (importedStrengthSummary) {
+    const importedDurationTotalSeconds =
+      (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
+      (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
+      (Number.parseInt(durationSeconds || '0', 10) || 0);
+
+    if (importedDurationTotalSeconds > 0) {
+      importedMetricsRows.push({
+        label: t('training.duration'),
+        value: `${durationHours || '0'}:${(durationMinutes || '0').padStart(2, '0')}:${(durationSeconds || '0').padStart(2, '0')}`,
+      });
+    }
+    if (importedStrengthSummary.caloriesKcal != null && importedStrengthSummary.caloriesKcal > 0) {
+      importedMetricsRows.push({
+        label: t('nutrition.kcal'),
+        value: `${Math.round(importedStrengthSummary.caloriesKcal)} ${t('nutrition.kcal')}`,
+      });
+    }
+    if (importedStrengthSummary.avgHeartRate != null && importedStrengthSummary.avgHeartRate > 0) {
+      importedMetricsRows.push({
+        label: t('training.avgHeartRate'),
+        value: `${Math.round(importedStrengthSummary.avgHeartRate)} ${t('health.unitBpm')}`,
+      });
+    }
+    if (importedStrengthSummary.maxHeartRate != null && importedStrengthSummary.maxHeartRate > 0) {
+      importedMetricsRows.push({
+        label: t('training.maxHeartRate'),
+        value: `${Math.round(importedStrengthSummary.maxHeartRate)} ${t('health.unitBpm')}`,
+      });
+    }
+    if (importedStrengthSummary.minHeartRate != null && importedStrengthSummary.minHeartRate > 0) {
+      importedMetricsRows.push({
+        label: t('training.minHeartRate'),
+        value: `${Math.round(importedStrengthSummary.minHeartRate)} ${t('health.unitBpm')}`,
+      });
+    }
+    if (importedStrengthSummary.tss != null && importedStrengthSummary.tss > 0) {
+      importedMetricsRows.push({
+        label: t('training.tssHr'),
+        value: `${Math.round(importedStrengthSummary.tss)}`,
+      });
+    }
+    if (importedStrengthSummary.epoc != null && importedStrengthSummary.epoc > 0) {
+      importedMetricsRows.push({
+        label: t('training.epoc'),
+        value: `${Math.round(importedStrengthSummary.epoc)}`,
+      });
+    }
+    if (importedStrengthSummary.pte != null && importedStrengthSummary.pte > 0) {
+      importedMetricsRows.push({
+        label: t('training.pte'),
+        value: importedStrengthSummary.pte.toFixed(1).replace('.', ','),
+      });
+    }
+    if (importedStrengthSummary.recoveryTimeSeconds != null && importedStrengthSummary.recoveryTimeSeconds > 0) {
+      importedMetricsRows.push({
+        label: t('training.recoveryTime'),
+        value: `${Math.floor(importedStrengthSummary.recoveryTimeSeconds / 60)}:${Math.floor(
+          importedStrengthSummary.recoveryTimeSeconds % 60,
+        )
+          .toString()
+          .padStart(2, '0')}`,
+      });
+    }
+  }
 
   const renderGymContent = () => (
     <View style={styles.gymContainer}>

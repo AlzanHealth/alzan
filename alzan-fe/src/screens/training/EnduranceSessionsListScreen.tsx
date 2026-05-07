@@ -887,12 +887,14 @@ export const EnduranceSessionsListScreen = () => {
                 // Build metrics array dynamically
                 const metrics: Array<{ value: string; label: string; unit?: string }> = [];
 
-                metrics.push({
-                  value: session.duration_s ? formatDuration(session.duration_s) : isActive ? '--:--' : '-',
-                  label: t('training.timeAllCaps'),
-                });
+                if (isActive || (session.duration_s != null && session.duration_s > 0)) {
+                  metrics.push({
+                    value: session.duration_s ? formatDuration(session.duration_s) : '--:--',
+                    label: t('training.timeAllCaps'),
+                  });
+                }
 
-                if (!isGym && session.distance_m !== null) {
+                if (!isGym && session.distance_m != null && session.distance_m > 0) {
                   metrics.push({
                     value: String(distanceDisplay),
                     label: t('training.distanceParenAllCaps'),
@@ -908,14 +910,18 @@ export const EnduranceSessionsListScreen = () => {
                 }
 
                 if (isGym) {
-                  metrics.push({
-                    value: session.total_sets ? String(session.total_sets) : '-',
-                    label: t('training.setsAllCaps'),
-                  });
-                  metrics.push({
-                    value: typeof session.calories_kcal === 'number' ? String(Math.round(session.calories_kcal)) : '-',
-                    label: t('training.caloriesKcal'),
-                  });
+                  if (session.total_sets != null && session.total_sets > 0) {
+                    metrics.push({
+                      value: String(session.total_sets),
+                      label: t('training.setsAllCaps'),
+                    });
+                  }
+                  if (typeof session.calories_kcal === 'number' && session.calories_kcal > 0) {
+                    metrics.push({
+                      value: String(Math.round(session.calories_kcal)),
+                      label: t('training.caloriesKcal'),
+                    });
+                  }
                 }
 
                 return (
@@ -1009,36 +1015,38 @@ export const EnduranceSessionsListScreen = () => {
                       )}
 
                       {/* Metrics row */}
-                      <View style={styles.metricsRow}>
-                        {metrics.map((metric, index) => (
-                          <React.Fragment key={metric.label}>
-                            {index > 0 && (
-                              <View
-                                style={[
-                                  styles.metricDivider,
-                                  {
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                                  },
-                                ]}
-                              />
-                            )}
-                            <View style={styles.metricItem}>
-                              <Text style={[styles.metricValue, { color: themeColors.textPrimary }]}>
-                                {metric.value}
-                                {metric.unit ? (
-                                  <Text style={[styles.metricUnit, { color: themeColors.textSecondary }]}>
-                                    {' '}
-                                    {metric.unit}
-                                  </Text>
-                                ) : null}
-                              </Text>
-                              <Text style={[styles.metricLabel, { color: themeColors.textSecondary }]}>
-                                {metric.label}
-                              </Text>
-                            </View>
-                          </React.Fragment>
-                        ))}
-                      </View>
+                      {metrics.length > 0 && (
+                        <View style={styles.metricsRow}>
+                          {metrics.map((metric, index) => (
+                            <React.Fragment key={metric.label}>
+                              {index > 0 && (
+                                <View
+                                  style={[
+                                    styles.metricDivider,
+                                    {
+                                      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                    },
+                                  ]}
+                                />
+                              )}
+                              <View style={styles.metricItem}>
+                                <Text style={[styles.metricValue, { color: themeColors.textPrimary }]}>
+                                  {metric.value}
+                                  {metric.unit ? (
+                                    <Text style={[styles.metricUnit, { color: themeColors.textSecondary }]}>
+                                      {' '}
+                                      {metric.unit}
+                                    </Text>
+                                  ) : null}
+                                </Text>
+                                <Text style={[styles.metricLabel, { color: themeColors.textSecondary }]}>
+                                  {metric.label}
+                                </Text>
+                              </View>
+                            </React.Fragment>
+                          ))}
+                        </View>
+                      )}
                     </View>
                   </TouchableOpacity>
                 );

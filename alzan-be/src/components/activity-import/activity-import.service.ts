@@ -36,6 +36,16 @@ type RouteImportFileContent = string | Uint8Array;
 
 @Injectable()
 export class ActivityImportService {
+  public async parseRouteFileForUser(params: {
+    ctx: UserCtx;
+    file: ActivityImportUploadedFile;
+    estimatedMaxHeartRate?: number | null;
+  }): Promise<ParsedRouteImport> {
+    const estimatedMaxHeartRate =
+      params.estimatedMaxHeartRate ?? (await this.resolveUserEstimatedMaxHeartRate(params.ctx));
+    return this.parseRouteFile(params.file, estimatedMaxHeartRate);
+  }
+
   public parseRouteFile(file: ActivityImportUploadedFile, estimatedMaxHeartRate?: number | null): ParsedRouteImport {
     this.assertValidFile(file);
     const content = this.readRouteFileContent(file);
@@ -56,7 +66,9 @@ export class ActivityImportService {
     persistDetails: boolean;
     estimatedMaxHeartRate?: number | null;
   }): Promise<ParsedRouteImport> {
-    const parsedRoute = this.parseRouteFile(params.file, params.estimatedMaxHeartRate);
+    const estimatedMaxHeartRate =
+      params.estimatedMaxHeartRate ?? (await this.resolveUserEstimatedMaxHeartRate(params.ctx));
+    const parsedRoute = this.parseRouteFile(params.file, estimatedMaxHeartRate);
 
     await this.updateSessionRoute(params.ctx, params.sessionId, parsedRoute.polyline);
 
@@ -72,7 +84,8 @@ export class ActivityImportService {
     file: ActivityImportUploadedFile;
     sessionId: string;
   }): Promise<ImportedStrengthActivitySummary> {
-    const summary = this.parseStrengthFile(params.file);
+    const estimatedMaxHeartRate = await this.resolveUserEstimatedMaxHeartRate(params.ctx);
+    const summary = this.parseStrengthFile(params.file, estimatedMaxHeartRate);
     const deviceId = await this.ensureDevice(params.ctx, summary);
     const sessionUpdate = this.buildStrengthSessionUpdate(summary, deviceId);
 
@@ -90,16 +103,38 @@ export class ActivityImportService {
     return summary;
   }
 
-  private parseStrengthFile(file: ActivityImportUploadedFile): ImportedStrengthActivitySummary {
+  private parseStrengthFile(
+    file: ActivityImportUploadedFile,
+    estimatedMaxHeartRate?: number | null,
+  ): ImportedStrengthActivitySummary {
     this.assertValidFile(file);
     const filename = this.resolveFilename(file);
     const { content, parseFilename } = this.readStrengthFileContent(file, filename);
 
     try {
-      return parseStrengthActivityFile(content, parseFilename);
+      return parseStrengthActivityFile(content, parseFilename, { estimatedMaxHeartRate });
     } catch (error) {
       throw this.toStrengthParseException(error);
     }
+  }
+
+  private async resolveUserEstimatedMaxHeartRate(ctx: UserCtx): Promise<number | null> {
+    const { data, error } = await ctx.supabase.from('users').select('date_of_birth').eq('id', ctx.user.id).maybeSingle();
+    if (error) return null;
+
+    const dateOfBirth = data?.date_of_birth;
+    if (!dateOfBirth) return null;
+
+    const parsedDate = Date.parse(dateOfBirth);
+    if (!Number.isFinite(parsedDate)) return null;
+
+    const ageInYears = Math.floor((Date.now() - parsedDate) / (365.25 * 24 * 60 * 60 * 1000));
+    if (!Number.isFinite(ageInYears) || ageInYears <= 0) return null;
+
+    // Simple age-based fallback when user-specific max HR is not stored explicitly.
+    const estimated = 220 - ageInYears;
+    const clamped = Math.max(120, Math.min(220, estimated));
+    return Number.isFinite(clamped) ? clamped : null;
   }
 
   private assertValidFile(file: ActivityImportUploadedFile | undefined): asserts file is ActivityImportUploadedFile {

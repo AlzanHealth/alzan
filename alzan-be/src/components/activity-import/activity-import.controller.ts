@@ -59,11 +59,16 @@ export class ActivityImportController {
   })
   @ApiOkResponse({ type: ParsedRouteImportDto })
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: ACTIVITY_IMPORT_MAX_FILE_SIZE_BYTES } }))
-  parseRouteImport(
+  async parseRouteImport(
+    @UserContext() ctx: UserCtx,
     @UploadedFile() file: ActivityImportUploadedFile,
     @Body() body: ParseRouteActivityImportDto,
-  ): ParsedRouteImportDto {
-    return this.activityImportService.parseRouteFile(file, this.parseNullableNumber(body.estimated_max_heart_rate));
+  ): Promise<ParsedRouteImportDto> {
+    return this.activityImportService.parseRouteFileForUser({
+      ctx,
+      file,
+      estimatedMaxHeartRate: this.parseNullableNumber(body.estimated_max_heart_rate),
+    });
   }
 
   @Post('route/apply')
