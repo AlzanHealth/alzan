@@ -23,6 +23,11 @@ export const SWAGGER_CONFIGURATIONS: Record<SwaggerApi, ISwaggerConfiguration> =
     title: 'Providers API',
     description: 'Providers API',
   },
+  [SwaggerApi.ACTIVITY_IMPORT_API]: {
+    endpoint: 'activity-imports',
+    title: 'Activity Imports API',
+    description: 'Activity Imports API',
+  },
   [SwaggerApi.ALL_API]: {
     endpoint: 'openapi',
     title: 'Alzan Full API',

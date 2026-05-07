@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
@@ -22,18 +23,15 @@ import { useEnduranceSessions } from '../../hooks/useEnduranceSessions';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
-import { usePickPolyline } from '../../hooks/useActivityPolyline';
+import { useApplyPickedRouteImport, usePickPolyline } from '../../hooks/useActivityPolyline';
 import { estimateCalories } from '../../utils/caloriesEstimator';
 import { supabase } from '../../lib/supabaseClient';
 import { format } from 'date-fns';
 import { Route, Upload } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
-import { useApplyStrengthActivityImport, usePickStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
+import { useApplyStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
 import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImportedStrengthSummary';
-import {
-  ImportedStrengthActivitySummary,
-  STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG,
-} from '../../services/strengthActivityImportService';
+import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strengthActivityImportService';
 import {
   type RouteImportDetails,
   type RouteImportDistanceSplitBucket,
@@ -43,9 +41,6 @@ import {
 
 import { SPORTS_CONFIG } from '../../constants/sports';
 import {
-  ActivityHeartRateZoneInsert,
-  ActivityLap,
-  ActivityLapInsert,
   ActivitySessionInsert,
   ActivitySessionUpdate,
   EnduranceWorkoutStep,
@@ -170,8 +165,8 @@ export const EnduranceSessionFormScreen = () => {
   const { preferences, toDisplayDistance, toDbDistanceFromDisplay } = useUserPreferences();
   const { data: userProfile } = useUserProfile();
   const { convertWeightToUi, convertSpeedToUi } = useUnitConversion();
-  const pickStrengthActivityImport = usePickStrengthActivityImport();
   const applyStrengthActivityImport = useApplyStrengthActivityImport();
+  const applyPickedRouteImport = useApplyPickedRouteImport();
 
   // Internal state for fetched template
   const [fetchedTemplate, setFetchedTemplate] = useState<PopulatedEnduranceWorkoutTemplate | null>(null);
@@ -264,8 +259,8 @@ export const EnduranceSessionFormScreen = () => {
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [routePolyline, setRoutePolyline] = useState<string | null>(null);
   const [routeDetails, setRouteDetails] = useState<RouteImportDetails | null>(null);
+  const [routeUploadAsset, setRouteUploadAsset] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
-  const [pendingStrengthImport, setPendingStrengthImport] = useState<ImportedStrengthActivitySummary | null>(null);
   const [hasAppliedStrengthImport, setHasAppliedStrengthImport] = useState(false);
   const { data: importedStrengthSummary } = useSessionImportedStrengthSummary(gymSessionData?.sessionId);
 
@@ -518,10 +513,11 @@ export const EnduranceSessionFormScreen = () => {
 
   const pickPolyline = usePickPolyline({
     estimatedMaxHeartRate,
-    onRoutePicked: parsedRoute => {
+    onRoutePicked: (parsedRoute, uploadAsset) => {
       setRoutePolyline(parsedRoute.polyline);
       applyRouteSummaryToForm(parsedRoute.summary);
       setRouteDetails(parsedRoute.details);
+      setRouteUploadAsset(uploadAsset);
       setSelectedSplitTabKey(null);
     },
   });
@@ -851,130 +847,15 @@ export const EnduranceSessionFormScreen = () => {
 
   const persistParsedRouteDetails = React.useCallback(
     async (sessionId: string) => {
-      if (!sessionId || !routeDetails) return;
+      if (!sessionId || !routeUploadAsset) return;
 
-      const distanceBuckets = getDistanceSplitBuckets(routeDetails);
-      const tabsToPersist =
-        splitTabs.length > 0
-          ? splitTabs
-          : routeDetails.customSplits.length > 0
-            ? [
-                {
-                  key: 'custom',
-                  label: t('training.splitCustom'),
-                  splitGroup: 'custom' as const,
-                  splitDistanceM: null,
-                  laps: routeDetails.customSplits,
-                },
-              ]
-            : distanceBuckets.length > 0
-              ? distanceBuckets.map(bucket => ({
-                  key: `distance-${bucket.splitDistanceM}`,
-                  label: formatSplitDistanceBucketLabel(bucket.splitDistanceM),
-                  splitGroup: 'distance' as const,
-                  splitDistanceM: bucket.splitDistanceM,
-                  laps: bucket.laps,
-                }))
-              : [];
-
-      const lapRows: ActivityLapInsert[] = tabsToPersist.flatMap((tab, tabIndex) =>
-        tab.laps.map(lap => ({
-          session_id: sessionId,
-          user_id: user?.id ?? null,
-          lap_index: lap.lapIndex,
-          lap_type: lap.lapType,
-          split_group: tab.splitGroup,
-          split_group_order: tabIndex,
-          split_distance_m: tab.splitDistanceM != null ? Math.round(tab.splitDistanceM) : null,
-          distance_m: lap.distanceM,
-          duration_s: lap.durationSeconds != null ? Math.round(lap.durationSeconds) : null,
-          avg_heart_rate: lap.avgHeartRate != null ? Math.round(lap.avgHeartRate) : null,
-          max_heart_rate: lap.maxHeartRate != null ? Math.round(lap.maxHeartRate) : null,
-          avg_pace_s_per_km: lap.avgPaceSecondsPerKm != null ? Math.round(lap.avgPaceSecondsPerKm) : null,
-          start_offset_s: lap.startOffsetSeconds != null ? Math.round(lap.startOffsetSeconds) : null,
-          end_offset_s: lap.endOffsetSeconds != null ? Math.round(lap.endOffsetSeconds) : null,
-        })),
-      );
-      const zoneRows: ActivityHeartRateZoneInsert[] = routeDetails.heartRateZones.map(zone => ({
-        session_id: sessionId,
-        zone: zone.zone,
-        duration_s: Math.max(0, Math.round(zone.durationSeconds)),
-        percentage: Number.parseFloat(Math.max(0, Math.min(100, zone.percentage)).toFixed(2)),
-      }));
-
-      if (lapRows.length === 0 && zoneRows.length === 0) return;
-
-      if (lapRows.length > 0) {
-        const { data: previousLaps, error: previousLapsError } = await supabase
-          .from('activity_laps')
-          .select('*')
-          .eq('session_id', sessionId);
-        if (previousLapsError) {
-          throw previousLapsError;
-        }
-
-        const safePreviousLaps = previousLaps ?? [];
-        const restorePreviousLaps = async () => {
-          const { error: clearLapsError } = await supabase.from('activity_laps').delete().eq('session_id', sessionId);
-          if (clearLapsError) throw clearLapsError;
-
-          if (safePreviousLaps.length === 0) return;
-
-          const previousLapRows: ActivityLapInsert[] = safePreviousLaps.map((lap: ActivityLap) => ({
-            id: lap.id,
-            session_id: lap.session_id,
-            user_id: lap.user_id,
-            lap_index: lap.lap_index,
-            lap_type: lap.lap_type,
-            distance_m: lap.distance_m,
-            duration_s: lap.duration_s,
-            avg_heart_rate: lap.avg_heart_rate,
-            max_heart_rate: lap.max_heart_rate,
-            avg_pace_s_per_km: lap.avg_pace_s_per_km,
-            split_group: lap.split_group,
-            split_group_order: lap.split_group_order,
-            split_distance_m: lap.split_distance_m,
-            start_offset_s: lap.start_offset_s,
-            end_offset_s: lap.end_offset_s,
-          }));
-
-          const { error: restoreLapsError } = await supabase.from('activity_laps').insert(previousLapRows);
-          if (restoreLapsError) throw restoreLapsError;
-        };
-
-        try {
-          const { error: deleteLapsError } = await supabase.from('activity_laps').delete().eq('session_id', sessionId);
-          if (deleteLapsError) throw deleteLapsError;
-
-          const { error: insertLapsError } = await supabase.from('activity_laps').insert(lapRows);
-          if (insertLapsError) throw insertLapsError;
-        } catch (lapPersistError) {
-          try {
-            await restorePreviousLaps();
-          } catch (restoreError) {
-            void restoreError;
-          }
-
-          throw lapPersistError;
-        }
-      }
-
-      if (zoneRows.length > 0) {
-        try {
-          const { error: deleteZonesError } = await supabase
-            .from('activity_heart_rate_zones')
-            .delete()
-            .eq('session_id', sessionId);
-          if (deleteZonesError) throw deleteZonesError;
-
-          const { error: insertZonesError } = await supabase.from('activity_heart_rate_zones').insert(zoneRows);
-          if (insertZonesError) throw insertZonesError;
-        } catch (zonePersistError) {
-          void zonePersistError;
-        }
-      }
+      await applyPickedRouteImport.mutateAsync({
+        sessionId,
+        uploadAsset: routeUploadAsset,
+        estimatedMaxHeartRate,
+      });
     },
-    [formatSplitDistanceBucketLabel, routeDetails, splitTabs, t, user?.id],
+    [applyPickedRouteImport, estimatedMaxHeartRate, routeUploadAsset],
   );
 
   const handleSave = async () => {
@@ -1154,28 +1035,14 @@ export const EnduranceSessionFormScreen = () => {
   };
 
   const handlePickStrengthActivityFile = () => {
-    pickStrengthActivityImport.mutate(undefined, {
-      onSuccess: summary => setPendingStrengthImport(summary),
-      onError: (error: Error) => {
-        if (error.message === 'CANCELLED') return;
-        const message =
-          error.message === STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG
-            ? t('training.strengthActivityUnsupportedError')
-            : t('training.strengthActivityParseError');
-        Alert.alert(t('training.uploadActivityFile'), message);
-      },
-    });
-  };
-
-  const handleApplyStrengthActivityImport = () => {
-    if (!gymSessionData?.sessionId || !pendingStrengthImport) return;
+    if (!gymSessionData?.sessionId) return;
 
     applyStrengthActivityImport.mutate(
-      { sessionId: gymSessionData.sessionId, summary: pendingStrengthImport },
+      { sessionId: gymSessionData.sessionId },
       {
-        onSuccess: () => {
-          if (pendingStrengthImport.durationSeconds != null) {
-            const total = Math.max(0, pendingStrengthImport.durationSeconds);
+        onSuccess: summary => {
+          if (summary.durationSeconds != null) {
+            const total = Math.max(0, summary.durationSeconds);
             const hours = Math.floor(total / 3600);
             const minutes = Math.floor((total % 3600) / 60);
             const seconds = Math.floor(total % 60);
@@ -1183,16 +1050,22 @@ export const EnduranceSessionFormScreen = () => {
             setDurationMinutes(String(minutes));
             setDurationSeconds(String(seconds));
           }
-          if (pendingStrengthImport.caloriesKcal != null) {
-            setCalories(String(Math.round(pendingStrengthImport.caloriesKcal)));
+          if (summary.caloriesKcal != null) {
+            setCalories(String(Math.round(summary.caloriesKcal)));
             setIsCaloriesLockedFromRouteImport(true);
           }
           setHasAppliedStrengthImport(true);
-          setPendingStrengthImport(null);
           Alert.alert(t('training.uploadActivityFile'), t('training.importedFileApplied'));
         },
-        onError: () => {
-          Alert.alert(t('training.uploadActivityFile'), t('training.importActivityFileError'));
+        onError: (error: Error) => {
+          if (error.message === 'CANCELLED') return;
+          const message =
+            error.message === STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG
+              ? t('training.strengthActivityUnsupportedError')
+              : error.message === 'STRENGTH_ACTIVITY_PARSE_ERROR'
+                ? t('training.strengthActivityParseError')
+                : t('training.importActivityFileError');
+          Alert.alert(t('training.uploadActivityFile'), message);
         },
       },
     );
@@ -1291,20 +1164,13 @@ export const EnduranceSessionFormScreen = () => {
             styles.routeUploadButton,
             dynamicStyles.input,
             {
-              opacity:
-                pickStrengthActivityImport.isPending ||
-                applyStrengthActivityImport.isPending ||
-                !gymSessionData?.sessionId
-                  ? 0.6
-                  : 1,
+              opacity: applyStrengthActivityImport.isPending || !gymSessionData?.sessionId ? 0.6 : 1,
             },
           ]}
           onPress={handlePickStrengthActivityFile}
-          disabled={
-            pickStrengthActivityImport.isPending || applyStrengthActivityImport.isPending || !gymSessionData?.sessionId
-          }
+          disabled={applyStrengthActivityImport.isPending || !gymSessionData?.sessionId}
         >
-          {pickStrengthActivityImport.isPending || applyStrengthActivityImport.isPending ? (
+          {applyStrengthActivityImport.isPending ? (
             <ActivityIndicator size="small" color={themeColors.primary} />
           ) : (
             <Upload size={16} color={themeColors.primary} />
@@ -1951,58 +1817,6 @@ export const EnduranceSessionFormScreen = () => {
                 </View>
               )}
             </>
-          )}
-
-          {pendingStrengthImport && (
-            <Modal
-              animationType="fade"
-              transparent={true}
-              visible={!!pendingStrengthImport}
-              onRequestClose={() => setPendingStrengthImport(null)}
-            >
-              <View style={styles.importModalOverlay}>
-                <View style={[styles.importModalCard, dynamicStyles.card]}>
-                  <Text style={[styles.importModalTitle, dynamicStyles.title]}>
-                    {t('training.importedActivityPreview')}
-                  </Text>
-                  <View style={styles.importPreviewRow}>
-                    <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.duration')}</Text>
-                    <Text style={[styles.importPreviewValue, { color: themeColors.textPrimary }]}>
-                      {pendingStrengthImport.durationSeconds != null
-                        ? `${Math.floor(pendingStrengthImport.durationSeconds / 3600)}h ${Math.floor((pendingStrengthImport.durationSeconds % 3600) / 60)}min :${Math.floor(pendingStrengthImport.durationSeconds % 60)}s`
-                        : '-'}
-                    </Text>
-                  </View>
-                  <View style={styles.importPreviewRow}>
-                    <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.caloriesKcal')}</Text>
-                    <Text style={[styles.importPreviewValue, { color: themeColors.textPrimary }]}>
-                      {pendingStrengthImport.caloriesKcal != null
-                        ? `${Math.round(pendingStrengthImport.caloriesKcal)}`
-                        : '-'}
-                    </Text>
-                  </View>
-                  <View style={styles.importModalActions}>
-                    <TouchableOpacity
-                      style={[styles.importModalButton, styles.importModalCancel]}
-                      onPress={() => setPendingStrengthImport(null)}
-                    >
-                      <Text style={[styles.importModalCancelText, { color: themeColors.textSecondary }]}>
-                        {t('common.cancel')}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.importModalButton, styles.importModalApply]}
-                      onPress={handleApplyStrengthActivityImport}
-                      disabled={applyStrengthActivityImport.isPending}
-                    >
-                      <Text style={styles.importModalApplyText}>
-                        {applyStrengthActivityImport.isPending ? '...' : t('training.applyImportedActivity')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
           )}
 
           {/* --- SHARED MODALS (Duration, Date, Time) --- */}

@@ -51,15 +51,11 @@ import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { useUploadPolyline } from '../../hooks/useActivityPolyline';
-import { useApplyStrengthActivityImport, usePickStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
+import { useApplyStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
 import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImportedStrengthSummary';
 import { Tooltip } from '../../components/common/Tooltip';
 import { RouteMap } from '../../components/common/RouteMap';
-import {
-  ImportedStrengthActivitySummary,
-  STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG,
-  StrengthActivityProvider,
-} from '../../services/strengthActivityImportService';
+import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strengthActivityImportService';
 
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
@@ -71,7 +67,6 @@ export const EnduranceSessionDetailScreen = () => {
   const { preferences, toDisplayWeight } = useUserPreferences();
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
   const updateSet = useUpdateWorkoutSet();
-  const pickStrengthActivityImport = usePickStrengthActivityImport();
   const applyStrengthActivityImport = useApplyStrengthActivityImport();
 
   // State for editing sets (gym only)
@@ -86,7 +81,6 @@ export const EnduranceSessionDetailScreen = () => {
 
   const [routePolyline, setRoutePolyline] = useState<string | null>(session?.route_polyline ?? null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
-  const [pendingStrengthImport, setPendingStrengthImport] = useState<ImportedStrengthActivitySummary | null>(null);
 
   // Controls parent ScrollView scrolling — disabled while the user interacts with the map.
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
@@ -284,88 +278,50 @@ export const EnduranceSessionDetailScreen = () => {
     [],
   );
 
-  const formatMaybeDate = useCallback(
-    (value: string | null | undefined) =>
-      value
-        ? format(new Date(value), 'd MMM yyyy · HH:mm', {
-            locale: getDateFnsLocale(),
-          })
-        : '-',
-    [],
-  );
-
-  const getProviderLabel = useCallback(
-    (provider: StrengthActivityProvider) => {
-      switch (provider) {
-        case 'suunto':
-          return 'Suunto';
-        case 'strava':
-          return 'Strava';
-        case 'garmin':
-          return 'Garmin';
-        case 'polar':
-          return 'Polar';
-        case 'unknown':
-          return t('training.unknownProvider');
-      }
-    },
-    [t],
-  );
-
   const handlePickStrengthActivityFile = useCallback(() => {
-    pickStrengthActivityImport.mutate(undefined, {
-      onSuccess: summary => setPendingStrengthImport(summary),
-      onError: (error: Error) => {
-        if (error.message === 'CANCELLED') return;
-
-        const message =
-          error.message === STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG
-            ? t('training.strengthActivityUnsupportedError')
-            : t('training.strengthActivityParseError');
-        Alert.alert(t('training.uploadActivityFile'), message);
-      },
-    });
-  }, [pickStrengthActivityImport, t]);
-
-  const handleApplyStrengthActivityImport = useCallback(() => {
-    if (!session || !pendingStrengthImport) return;
+    if (!session) return;
 
     applyStrengthActivityImport.mutate(
       {
         sessionId: session.id,
-        summary: pendingStrengthImport,
       },
       {
-        onSuccess: () => {
+        onSuccess: summary => {
           setSession(current => {
             if (!current) return current;
             return {
               ...current,
-              provider: pendingStrengthImport.provider === 'unknown' ? 'other' : pendingStrengthImport.provider,
+              provider: summary.provider === 'unknown' ? 'other' : summary.provider,
               imported_at: new Date().toISOString(),
-              start_time: pendingStrengthImport.startedAt ?? current.start_time,
-              end_time: pendingStrengthImport.endedAt ?? current.end_time,
-              duration_s: pendingStrengthImport.durationSeconds ?? current.duration_s,
-              calories_kcal: pendingStrengthImport.caloriesKcal ?? current.calories_kcal,
-              avg_heart_rate: pendingStrengthImport.avgHeartRate ?? current.avg_heart_rate,
-              max_heart_rate: pendingStrengthImport.maxHeartRate ?? current.max_heart_rate,
-              min_heart_rate: pendingStrengthImport.minHeartRate ?? current.min_heart_rate,
-              tss_hr: pendingStrengthImport.tss ?? current.tss_hr,
-              epoc: pendingStrengthImport.epoc ?? current.epoc,
-              pte: pendingStrengthImport.pte ?? current.pte,
-              total_steps: pendingStrengthImport.totalSteps ?? current.total_steps,
-              recovery_time_s: pendingStrengthImport.recoveryTimeSeconds ?? current.recovery_time_s,
+              start_time: summary.startedAt ?? current.start_time,
+              end_time: summary.endedAt ?? current.end_time,
+              duration_s: summary.durationSeconds ?? current.duration_s,
+              calories_kcal: summary.caloriesKcal ?? current.calories_kcal,
+              avg_heart_rate: summary.avgHeartRate ?? current.avg_heart_rate,
+              max_heart_rate: summary.maxHeartRate ?? current.max_heart_rate,
+              min_heart_rate: summary.minHeartRate ?? current.min_heart_rate,
+              tss_hr: summary.tss ?? current.tss_hr,
+              epoc: summary.epoc ?? current.epoc,
+              pte: summary.pte ?? current.pte,
+              total_steps: summary.totalSteps ?? current.total_steps,
+              recovery_time_s: summary.recoveryTimeSeconds ?? current.recovery_time_s,
             };
           });
-          setPendingStrengthImport(null);
           Alert.alert(t('training.uploadActivityFile'), t('training.importedFileApplied'));
         },
-        onError: () => {
-          Alert.alert(t('training.uploadActivityFile'), t('training.importActivityFileError'));
+        onError: (error: Error) => {
+          if (error.message === 'CANCELLED') return;
+          const message =
+            error.message === STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG
+              ? t('training.strengthActivityUnsupportedError')
+              : error.message === 'STRENGTH_ACTIVITY_PARSE_ERROR'
+                ? t('training.strengthActivityParseError')
+                : t('training.importActivityFileError');
+          Alert.alert(t('training.uploadActivityFile'), message);
         },
       },
     );
-  }, [applyStrengthActivityImport, pendingStrengthImport, session, t]);
+  }, [applyStrengthActivityImport, session, t]);
 
   if (!session) return null;
 
@@ -867,10 +823,10 @@ export const EnduranceSessionDetailScreen = () => {
                       handlePickStrengthActivityFile();
                     }
                   }}
-                  disabled={pickStrengthActivityImport.isPending || applyStrengthActivityImport.isPending}
+                  disabled={applyStrengthActivityImport.isPending}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  {pickStrengthActivityImport.isPending || applyStrengthActivityImport.isPending ? (
+                  {applyStrengthActivityImport.isPending ? (
                     <ActivityIndicator size="small" color={themeColors.primary} />
                   ) : (
                     <Upload size={16} color={themeColors.primary} />
@@ -1411,118 +1367,6 @@ export const EnduranceSessionDetailScreen = () => {
           {renderProgrammedWorkoutSection()}
         </ScrollView>
       </SafeAreaView>
-
-      <Modal
-        visible={!!pendingStrengthImport}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPendingStrengthImport(null)}
-      >
-        <View style={styles.modalContainer}>
-          <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={isDark ? 'dark' : 'light'} />
-
-          <TouchableWithoutFeedback onPress={() => setPendingStrengthImport(null)}>
-            <View style={styles.modalBackdrop} />
-          </TouchableWithoutFeedback>
-
-          <View style={styles.modalKeyboard}>
-            <View
-              style={[
-                styles.importPreviewCard,
-                {
-                  backgroundColor: isDark ? 'rgba(28,28,30,0.96)' : 'rgba(255,255,255,0.96)',
-                  shadowColor: isDark ? '#000' : themeColors.primary,
-                },
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.modalCloseButton}
-                onPress={() => setPendingStrengthImport(null)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <X size={18} color={themeColors.textSecondary} />
-              </TouchableOpacity>
-
-              <Text style={[styles.importPreviewTitle, { color: themeColors.textPrimary }]}>
-                {t('training.importedActivityPreview')}
-              </Text>
-
-              {pendingStrengthImport && (
-                <View style={styles.importPreviewRows}>
-                  {(
-                    [
-                      { label: t('training.provider'), value: getProviderLabel(pendingStrengthImport.provider) },
-                      { label: t('training.startDate'), value: formatMaybeDate(pendingStrengthImport.startedAt) },
-                      {
-                        label: t('training.duration'),
-                        value: formatMaybeDuration(pendingStrengthImport.durationSeconds),
-                      },
-                      {
-                        label: t('nutrition.kcal'),
-                        value:
-                          pendingStrengthImport.caloriesKcal != null
-                            ? `${pendingStrengthImport.caloriesKcal} ${t('nutrition.kcal')}`
-                            : '-',
-                      },
-                      {
-                        label: t('training.avgHeartRate'),
-                        value:
-                          pendingStrengthImport.avgHeartRate != null
-                            ? `${pendingStrengthImport.avgHeartRate} ${t('health.unitBpm')}`
-                            : '-',
-                      },
-                      {
-                        label: t('training.maxHeartRate'),
-                        value:
-                          pendingStrengthImport.maxHeartRate != null
-                            ? `${pendingStrengthImport.maxHeartRate} ${t('health.unitBpm')}`
-                            : '-',
-                      },
-                      {
-                        label: t('training.totalSteps'),
-                        value: pendingStrengthImport.totalSteps != null ? `${pendingStrengthImport.totalSteps}` : '-',
-                      },
-                      {
-                        label: t('training.recoveryTime'),
-                        value:
-                          pendingStrengthImport.recoveryTimeSeconds != null
-                            ? formatMaybeDuration(pendingStrengthImport.recoveryTimeSeconds)
-                            : '-',
-                      },
-                      {
-                        label: t('training.device'),
-                        value:
-                          [pendingStrengthImport.device?.name, pendingStrengthImport.device?.model]
-                            .filter((value): value is string => !!value)
-                            .join(' · ') || '-',
-                      },
-                    ] satisfies Array<{ label: string; value: string }>
-                  ).map(row => (
-                    <View key={row.label} style={styles.importPreviewRow}>
-                      <Text style={[styles.secondaryMetricLabel, dynamicStyles.sublabel]}>{row.label}</Text>
-                      <Text style={[styles.secondaryMetricValue, dynamicStyles.title]}>{row.value}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={[
-                  styles.modalSaveButton,
-                  { backgroundColor: themeColors.primary, shadowColor: themeColors.primary },
-                  applyStrengthActivityImport.isPending && styles.modalSaveDisabled,
-                ]}
-                onPress={handleApplyStrengthActivityImport}
-                disabled={applyStrengthActivityImport.isPending}
-              >
-                <Text style={styles.modalSaveText}>
-                  {applyStrengthActivityImport.isPending ? '...' : t('training.applyImportedActivity')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Edit Set Modal — exact WeightLogModal pattern */}
       <Modal visible={!!editingSet} transparent animationType="fade" onRequestClose={() => setEditingSet(null)}>

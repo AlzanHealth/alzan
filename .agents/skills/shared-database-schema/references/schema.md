@@ -453,6 +453,17 @@ created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT notifications_pkey PRIMARY KEY (id),
 CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.provider_oauth_states (
+state text NOT NULL,
+user_id uuid NOT NULL,
+provider USER-DEFINED NOT NULL,
+redirect_uri text,
+code_verifier text,
+expires_at timestamp with time zone NOT NULL,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT provider_oauth_states_pkey PRIMARY KEY (state),
+CONSTRAINT provider_oauth_states_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.recipe_aliases (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
 recipe_id uuid NOT NULL,
@@ -584,6 +595,21 @@ color text,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT tags_pkey PRIMARY KEY (id),
 CONSTRAINT tags_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.user_connections (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+user_id uuid NOT NULL,
+provider USER-DEFINED NOT NULL,
+provider_user_id text,
+provider_username text,
+access_token text NOT NULL,
+refresh_token text,
+token_expires_at timestamp with time zone NOT NULL,
+scope text,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT user_connections_pkey PRIMARY KEY (id),
+CONSTRAINT user_connections_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.user_goals (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
