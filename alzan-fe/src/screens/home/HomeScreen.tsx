@@ -257,8 +257,8 @@ export const HomeScreen = () => {
                     </View>
                     <View style={styles.statsValueContainer}>
                       <Text style={[styles.statsValue, { color: colors.textPrimary }]}>
-                        {latestSleep?.duration_min
-                          ? `${Math.floor(latestSleep.duration_min / 60)}h ${latestSleep.duration_min % 60}m`
+                        {latestSleep?.total_sleep_min
+                          ? `${Math.floor(latestSleep.total_sleep_min / 60)}h ${latestSleep.total_sleep_min % 60}m`
                           : '--'}
                       </Text>
                       <Text style={[styles.statsUnit, { color: colors.textSecondary }]}></Text>

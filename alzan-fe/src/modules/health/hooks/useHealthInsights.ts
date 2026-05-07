@@ -27,7 +27,7 @@
 
 import { useWeightLogs } from './useWeight';
 import { useMeasurements } from './useMeasurements';
-import { useSleepLogs } from './useSleep';
+import { useSleepSessions } from './useSleep';
 import { useRestingHRLogs } from './useRestingHR';
 import { useUserProfile } from './useUserProfile';
 import {
@@ -63,14 +63,14 @@ export const useHealthInsights = () => {
 
   const { data: weightLogs } = useWeightLogs();
   const { data: measurements } = useMeasurements();
-  const { data: sleepLogs } = useSleepLogs();
+  const { data: sleepSessions } = useSleepSessions();
   const { data: hrLogs } = useRestingHRLogs();
   const { data: profile } = useUserProfile();
 
   log('Data loaded', {
     weightLogsCount: weightLogs?.length || 0,
     measurementsCount: measurements?.length || 0,
-    sleepLogsCount: sleepLogs?.length || 0,
+    sleepLogsCount: sleepSessions?.length || 0,
     hrLogsCount: hrLogs?.length || 0,
     hasProfile: !!profile,
   });
@@ -85,8 +85,7 @@ export const useHealthInsights = () => {
   /** Previous weight log for delta calculation */
   const previousWeight = weightLogs?.[1];
 
-  /** Most recent sleep log */
-  const latestSleep = sleepLogs?.[0];
+  const latestSleep = sleepSessions?.[0];
 
   /** Most recent heart rate log */
   const latestHR = hrLogs?.[0];
@@ -232,8 +231,8 @@ export const useHealthInsights = () => {
   // =========================================================================
 
   const avgSleep =
-    sleepLogs && sleepLogs.length > 0
-      ? sleepLogs.reduce((acc, curr) => acc + (curr.duration_min || 0), 0) / sleepLogs.length
+    sleepSessions && sleepSessions.length > 0
+      ? sleepSessions.reduce((acc, curr) => acc + (curr.total_sleep_min || 0), 0) / sleepSessions.length
       : 0;
 
   const avgHR =

@@ -38,7 +38,7 @@ export type { WebExportWindow };
 
 type WeightLog = Row<'weight_logs'>;
 type BodyMeasurement = Row<'body_measurements'>;
-type SleepLog = Row<'sleep_logs'>;
+type SleepSession = Row<'sleep_sessions'>;
 type RestingHrLog = Row<'resting_hr_logs'>;
 type DailyHydration = Row<'daily_hydration'>;
 type SessionFeedback = Row<'session_feedback'>;
@@ -54,7 +54,7 @@ type DayBucket = {
   date: string;
   weights: WeightLog[];
   measurements: BodyMeasurement[];
-  sleep: SleepLog[];
+  sleep: SleepSession[];
   restingHr: RestingHrLog[];
   hydration: DailyHydration[];
   feedback: SessionFeedback[];
@@ -243,7 +243,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
         .lt('measured_at', endExclusive.toISOString())
         .order('measured_at', { ascending: true }),
       supabase
-        .from('sleep_logs')
+        .from('sleep_sessions')
         .select('*')
         .eq('user_id', user.id)
         .gte('date', startDate)
@@ -296,7 +296,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
     const distanceUnit: DistanceUnit = preferencesResult.data?.distance_unit === 'miles' ? 'miles' : 'km';
     const weights = (weightsResult.data ?? []) as WeightLog[];
     const measurements = (measurementsResult.data ?? []) as BodyMeasurement[];
-    const sleepLogs = (sleepResult.data ?? []) as SleepLog[];
+    const sleepSessions = (sleepResult.data ?? []) as SleepSession[];
     const restingHrLogs = (hrResult.data ?? []) as RestingHrLog[];
     const hydrationLogs = (hydrationResult.data ?? []) as DailyHydration[];
     const feedbackLogs = (feedbackResult.data ?? []) as SessionFeedback[];
@@ -305,7 +305,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
     const hasData =
       weights.length > 0 ||
       measurements.length > 0 ||
-      sleepLogs.length > 0 ||
+      sleepSessions.length > 0 ||
       restingHrLogs.length > 0 ||
       hydrationLogs.length > 0 ||
       feedbackLogs.length > 0;
@@ -322,16 +322,18 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
     const weightDeltaKg = getDelta(firstWeight?.weight_kg, lastWeight?.weight_kg);
     const bodyFatDelta = getDelta(firstWeight?.bodyfat_percent, lastWeight?.bodyfat_percent);
     const muscleDeltaKg = getDelta(firstWeight?.muscle_mass_kg, lastWeight?.muscle_mass_kg);
-    const avgSleepMinutes = average(sleepLogs.map(log => log.duration_min ?? Number.NaN));
-    const avgSleepQuality = average(sleepLogs.map(log => log.quality_score ?? Number.NaN));
+    const avgSleepMinutes = average(sleepSessions.map(log => log.total_sleep_min ?? Number.NaN));
+    const avgSleepQuality = average(sleepSessions.map(log => log.sleep_score ?? Number.NaN));
     const avgRestingHr = average(restingHrLogs.map(log => log.resting_hr_bpm));
     const restingHrDelta = getDelta(
       restingHrLogs[0]?.resting_hr_bpm,
       restingHrLogs[restingHrLogs.length - 1]?.resting_hr_bpm,
     );
     const avgHydrationMl = average(hydrationLogs.map(log => log.total_ml));
-    const goodSleepPercent = sleepLogs.length
-      ? Math.round((sleepLogs.filter(log => (log.duration_min ?? 0) >= 7 * 60).length / sleepLogs.length) * 100)
+    const goodSleepPercent = sleepSessions.length
+      ? Math.round(
+          (sleepSessions.filter(log => (log.total_sleep_min ?? 0) >= 7 * 60).length / sleepSessions.length) * 100,
+        )
       : null;
 
     const weightDisplay = lastWeight ? convertWeightToUi(lastWeight.weight_kg, weightUnit, 1).label : '-';
@@ -397,7 +399,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
       },
       {
         label: t('health.pdfDataPoints'),
-        value: `${weights.length + measurements.length + sleepLogs.length + restingHrLogs.length + hydrationLogs.length + feedbackLogs.length}`,
+        value: `${weights.length + measurements.length + sleepSessions.length + restingHrLogs.length + hydrationLogs.length + feedbackLogs.length}`,
         meta: `${totalDays} ${t('health.days')}`,
       },
     ];
@@ -439,12 +441,12 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
       format(parseISO(measurement.measured_at), datePattern, { locale: dateLocale }),
     ]);
 
-    const sleepRows = sleepLogs.map(log => [
+    const sleepRows = sleepSessions.map(log => [
       format(parseISO(log.date), datePattern, { locale: dateLocale }),
-      formatDurationMinutes(log.duration_min),
-      log.quality_score != null ? `${log.quality_score}/5` : '-',
-      log.sleep_start ? format(parseISO(log.sleep_start), 'HH:mm') : '-',
-      log.sleep_end ? format(parseISO(log.sleep_end), 'HH:mm') : '-',
+      formatDurationMinutes(log.total_sleep_min),
+      log.sleep_score != null ? `${log.sleep_score}/100` : '-',
+      log.start_time ? format(parseISO(log.start_time), 'HH:mm') : '-',
+      log.end_time ? format(parseISO(log.end_time), 'HH:mm') : '-',
     ]);
 
     const restingHrRows = restingHrLogs.map(log => [
@@ -477,7 +479,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
 
     weights.forEach(log => ensureDay(getDateKeyFromTimestamp(log.measured_at)).weights.push(log));
     measurements.forEach(log => ensureDay(getDateKeyFromTimestamp(log.measured_at)).measurements.push(log));
-    sleepLogs.forEach(log => ensureDay(log.date).sleep.push(log));
+    sleepSessions.forEach(log => ensureDay(log.date).sleep.push(log));
     restingHrLogs.forEach(log => ensureDay(getDateKeyFromTimestamp(log.measured_at)).restingHr.push(log));
     hydrationLogs.forEach(log => ensureDay(log.date).hydration.push(log));
     feedbackLogs.forEach(log => ensureDay(getDateKeyFromTimestamp(log.created_at)).feedback.push(log));
@@ -509,7 +511,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
           }
           bucket.sleep.forEach(log => {
             lines.push(
-              `${t('settings.sleep')}: ${formatDurationMinutes(log.duration_min)}${log.quality_score != null ? ` · ${t('health.quality')} ${log.quality_score}/5` : ''}`,
+              `${t('settings.sleep')}: ${formatDurationMinutes(log.total_sleep_min)}${log.sleep_score != null ? ` · ${t('health.quality')} ${log.sleep_score}/100` : ''}`,
             );
           });
           bucket.restingHr.forEach(log =>
@@ -706,11 +708,11 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
               {
                 label: t('settings.sleep'),
                 value: avgSleepMinutes ? formatDurationMinutes(avgSleepMinutes) : '-',
-                meta: `${sleepLogs.length}/${totalDays} ${t('health.days')}`,
+                meta: `${sleepSessions.length}/${totalDays} ${t('health.days')}`,
               },
               {
                 label: t('health.quality'),
-                value: avgSleepQuality ? `${formatNumber(avgSleepQuality, 1)}/5` : '-',
+                value: avgSleepQuality ? `${formatNumber(avgSleepQuality, 0)}/100` : '-',
                 meta: goodSleepPercent == null ? undefined : `${goodSleepPercent}% ${t('health.pdfGoodSleepNights')}`,
               },
               {

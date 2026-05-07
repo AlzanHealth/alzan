@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SimpleChart } from '../../../components/stats/SimpleChart';
 import { colors, typography } from '../../../theme';
-import { SleepLog } from '../../../types/requests.types';
+import { SleepSession } from '../services/sleepApi';
 import { useTranslation } from 'react-i18next';
 
 interface SleepBarChartProps {
-  data: SleepLog[];
+  data: SleepSession[];
 }
 
 export const SleepBarChart: React.FC<SleepBarChartProps> = ({ data }) => {
@@ -21,7 +21,7 @@ export const SleepBarChart: React.FC<SleepBarChartProps> = ({ data }) => {
     .reverse()
     .map(log => ({
       label: new Date(log.date).getDate().toString(),
-      value: (log.duration_min || 0) / 60, // Convert to hours
+      value: (log.total_sleep_min || 0) / 60, // Convert to hours
     }));
 
   return (

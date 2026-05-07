@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { HealthScreenNavigationProp } from '../../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Moon, Clock, Star, ChevronUp, ChevronDown, Calendar } from 'lucide-react-native';
-import { useAddSleepLog } from '../hooks/useSleep';
+import { useAddSleepSession } from '../hooks/useSleep';
 import { HealthStyles, useHealthStyles } from '../../../hooks/useHealthStyles';
 import { GlassCard } from '../../../components/GlassCard';
 import { format, subDays, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isAfter } from 'date-fns';
@@ -211,7 +211,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
 export const SleepAdd = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<HealthScreenNavigationProp>();
-  const addMutation = useAddSleepLog();
+  const addMutation = useAddSleepSession();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
 
   // States
@@ -290,10 +290,10 @@ export const SleepAdd = () => {
     addMutation.mutate(
       {
         date: dateStr,
-        duration_min: duration,
-        quality_score: quality,
-        sleep_start: finalStartDate.toISOString(),
-        sleep_end: finalEndDate.toISOString(),
+        total_sleep_min: duration,
+        sleep_score: quality * 20,
+        start_time: finalStartDate.toISOString(),
+        end_time: finalEndDate.toISOString(),
       },
       {
         onSuccess: () => navigation.goBack(),

@@ -1,59 +1,77 @@
 import { supabase } from '../../../lib/supabaseClient';
-import { SleepLog, SleepLogInsert } from '../../../types/requests.types';
+import { SleepLog, SleepLogInsert, Insert } from '../../../types/requests.types';
+import type { Row } from '../../../types/requests.types';
+
+export type SleepSession = Row<'sleep_sessions'>;
+export type SleepSessionInsert = Insert<'sleep_sessions'>;
+export type SleepStageInterval = Row<'sleep_stage_intervals'>;
 
 export const sleepApi = {
+  // ── Legacy sleep_logs (manual entries) ──────────────────────
   async getLogs(userId: string, limit = 30) {
-    console.log('[sleepApi.getLogs] Iniciando - userId:', userId, 'limit:', limit);
-    try {
-      const { data, error } = await supabase
-        .from('sleep_logs')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false })
-        .limit(limit);
+    const { data, error } = await supabase
+      .from('sleep_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+      .limit(limit);
 
-      if (error) {
-        console.error('[sleepApi.getLogs] Error:', error);
-        throw error;
-      }
-      console.log('[sleepApi.getLogs] Éxito - registros:', data?.length);
-      return data as SleepLog[];
-    } catch (err) {
-      console.error('[sleepApi.getLogs] Exception:', err);
-      throw err;
-    }
+    if (error) throw error;
+    return data as SleepLog[];
   },
 
   async addLog(log: Omit<SleepLogInsert, 'id'>) {
-    console.log('[sleepApi.addLog] Iniciando - date:', log.date, 'duration:', log.duration_min, 'min');
-    try {
-      const { data, error } = await supabase.from('sleep_logs').insert(log).select().single();
-
-      if (error) {
-        console.error('[sleepApi.addLog] Error:', error);
-        throw error;
-      }
-      console.log('[sleepApi.addLog] Éxito - id:', data?.id);
-      return data as SleepLog;
-    } catch (err) {
-      console.error('[sleepApi.addLog] Exception:', err);
-      throw err;
-    }
+    const { data, error } = await supabase.from('sleep_logs').insert(log).select().single();
+    if (error) throw error;
+    return data as SleepLog;
   },
 
   async deleteLog(id: string) {
-    console.log('[sleepApi.deleteLog] Iniciando - id:', id);
-    try {
-      const { error } = await supabase.from('sleep_logs').delete().eq('id', id);
+    const { error } = await supabase.from('sleep_logs').delete().eq('id', id);
+    if (error) throw error;
+  },
 
-      if (error) {
-        console.error('[sleepApi.deleteLog] Error:', error);
-        throw error;
-      }
-      console.log('[sleepApi.deleteLog] Éxito');
-    } catch (err) {
-      console.error('[sleepApi.deleteLog] Exception:', err);
-      throw err;
-    }
+  // ── New sleep_sessions (wearable / rich data) ───────────────
+  async getSessions(userId: string, limit = 30) {
+    const { data, error } = await supabase
+      .from('sleep_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_main_sleep', true)
+      .order('date', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return (data ?? []) as SleepSession[];
+  },
+
+  async addSession(session: Omit<SleepSessionInsert, 'id'>) {
+    const { data, error } = await supabase.from('sleep_sessions').insert(session).select().single();
+    if (error) throw error;
+    return data as SleepSession;
+  },
+
+  async getSessionWithStages(sessionId: string) {
+    const [sessionRes, stagesRes] = await Promise.all([
+      supabase.from('sleep_sessions').select('*').eq('id', sessionId).single(),
+      supabase
+        .from('sleep_stage_intervals')
+        .select('*')
+        .eq('sleep_session_id', sessionId)
+        .order('start_time', { ascending: true }),
+    ]);
+
+    if (sessionRes.error) throw sessionRes.error;
+    if (stagesRes.error) throw stagesRes.error;
+
+    return {
+      session: sessionRes.data as SleepSession,
+      stages: (stagesRes.data ?? []) as SleepStageInterval[],
+    };
+  },
+
+  async deleteSession(id: string) {
+    const { error } = await supabase.from('sleep_sessions').delete().eq('id', id);
+    if (error) throw error;
   },
 };

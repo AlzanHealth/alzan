@@ -22,7 +22,7 @@ export const HealthHome = () => {
   const { latestWeight, weightDelta, avgSleepMinutes, bodyComposition, latestSleep } = useHealthInsights();
 
   const { convertWeightToUi } = useUnitConversion();
-  const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
+  const { styles: dynamicStyles, colors: themeColors } = useHealthStyles();
 
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = React.useState(false);
@@ -232,38 +232,51 @@ export const HealthHome = () => {
                   <Text style={[styles.cardDate, dynamicStyles.subtitle]}>{formatDate(latestSleep.date)}</Text>
                   <View style={styles.weightContent}>
                     <Text style={[styles.bigValue, dynamicStyles.title]}>
-                      {latestSleep.duration_min
-                        ? `${Math.floor(latestSleep.duration_min / 60)}h ${latestSleep.duration_min % 60}m`
+                      {latestSleep.total_sleep_min
+                        ? `${Math.floor(latestSleep.total_sleep_min / 60)}h ${latestSleep.total_sleep_min % 60}m`
                         : '--'}
                     </Text>
                   </View>
-                  {latestSleep.quality_score && (
-                    <View style={styles.sleepQualityRow}>
-                      <Text style={[styles.qualityLabel, dynamicStyles.subtitle]}>{t('health.quality')}</Text>
-                      <View style={styles.qualityStars}>
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <View
-                            key={star}
-                            style={[
-                              styles.qualityStar,
-                              {
-                                backgroundColor:
-                                  star <= latestSleep.quality_score!
-                                    ? '#8B5CF6'
-                                    : isDark
-                                      ? 'rgba(255,255,255,0.1)'
-                                      : 'rgba(0,0,0,0.1)',
-                              },
-                            ]}
-                          />
-                        ))}
+                  {latestSleep.sleep_score != null && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 4 }}>
+                      <View
+                        style={{
+                          backgroundColor:
+                            latestSleep.sleep_score >= 85
+                              ? 'rgba(16, 185, 129, 0.15)'
+                              : latestSleep.sleep_score >= 70
+                                ? 'rgba(245, 158, 11, 0.15)'
+                                : 'rgba(239, 68, 68, 0.15)',
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 12,
+                          marginRight: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              latestSleep.sleep_score >= 85
+                                ? '#10B981'
+                                : latestSleep.sleep_score >= 70
+                                  ? '#F59E0B'
+                                  : '#EF4444',
+                            fontWeight: '700',
+                            fontSize: 14,
+                          }}
+                        >
+                          {latestSleep.sleep_score}
+                        </Text>
                       </View>
+                      <Text style={[dynamicStyles.subtitle, { fontSize: 13 }]}>
+                        {t('health.sleepScore', 'Sleep Score')}
+                      </Text>
                     </View>
                   )}
                   {avgSleepMinutes > 0 && (
-                    <Text style={[styles.comparisonText, dynamicStyles.subtitle]}>
-                      {t('health.averageLabel')}
-                      {Math.floor(avgSleepMinutes / 60)}h {Math.round(avgSleepMinutes % 60)}m
+                    <Text style={[styles.comparisonText, dynamicStyles.subtitle, { marginTop: 12 }]}>
+                      {t('health.avgLast30Days')} {Math.floor(avgSleepMinutes / 60)}h {Math.round(avgSleepMinutes % 60)}
+                      m
                     </Text>
                   )}
                 </>

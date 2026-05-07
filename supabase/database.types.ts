@@ -515,6 +515,258 @@ export type Database = {
           },
         ]
       }
+      daily_recovery: {
+        Row: {
+          ans_charge: number | null
+          avg_hrv_ms: number | null
+          body_battery_end: number | null
+          body_battery_max: number | null
+          body_battery_min: number | null
+          body_battery_start: number | null
+          created_at: string
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          hrv_balance_score: number | null
+          id: string
+          nightly_recharge_score: number | null
+          raw_payload: Json | null
+          readiness_score: number | null
+          recommendation: string | null
+          recovery_label: string | null
+          recovery_score: number | null
+          respiratory_rate_rpm: number | null
+          resting_hr_bpm: number | null
+          sleep_charge: number | null
+          sleep_score: number | null
+          sleep_session_id: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_record_id: string | null
+          spo2_avg_pct: number | null
+          strain_score: number | null
+          synced_at: string
+          temp_deviation_c: number | null
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ans_charge?: number | null
+          avg_hrv_ms?: number | null
+          body_battery_end?: number | null
+          body_battery_max?: number | null
+          body_battery_min?: number | null
+          body_battery_start?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          hrv_balance_score?: number | null
+          id?: string
+          nightly_recharge_score?: number | null
+          raw_payload?: Json | null
+          readiness_score?: number | null
+          recommendation?: string | null
+          recovery_label?: string | null
+          recovery_score?: number | null
+          respiratory_rate_rpm?: number | null
+          resting_hr_bpm?: number | null
+          sleep_charge?: number | null
+          sleep_score?: number | null
+          sleep_session_id?: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_record_id?: string | null
+          spo2_avg_pct?: number | null
+          strain_score?: number | null
+          synced_at?: string
+          temp_deviation_c?: number | null
+          timezone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ans_charge?: number | null
+          avg_hrv_ms?: number | null
+          body_battery_end?: number | null
+          body_battery_max?: number | null
+          body_battery_min?: number | null
+          body_battery_start?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date?: string
+          hrv_balance_score?: number | null
+          id?: string
+          nightly_recharge_score?: number | null
+          raw_payload?: Json | null
+          readiness_score?: number | null
+          recommendation?: string | null
+          recovery_label?: string | null
+          recovery_score?: number | null
+          respiratory_rate_rpm?: number | null
+          resting_hr_bpm?: number | null
+          sleep_charge?: number | null
+          sleep_score?: number | null
+          sleep_session_id?: string | null
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_record_id?: string | null
+          spo2_avg_pct?: number | null
+          strain_score?: number | null
+          synced_at?: string
+          temp_deviation_c?: number | null
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_recovery_sleep_session_id_fkey"
+            columns: ["sleep_session_id"]
+            isOneToOne: false
+            referencedRelation: "sleep_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_recovery_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_steps: {
+        Row: {
+          active_calories_kcal: number | null
+          active_distance_m: number | null
+          active_steps: number | null
+          calories_kcal: number | null
+          created_at: string
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          device_id: string | null
+          distance_m: number | null
+          elevation_gain_m: number | null
+          fairly_active_min: number | null
+          first_step_at: string | null
+          floors_climbed: number | null
+          goal_achieved: boolean | null
+          id: string
+          is_manual: boolean
+          last_step_at: string | null
+          lightly_active_min: number | null
+          raw_payload: Json | null
+          running_steps: number | null
+          sedentary_minutes: number | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_created_at: string | null
+          source_record_id: string | null
+          source_updated_at: string | null
+          step_goal: number | null
+          synced_at: string
+          timezone: string
+          total_steps: number
+          updated_at: string
+          user_id: string
+          very_active_min: number | null
+          walking_steps: number | null
+        }
+        Insert: {
+          active_calories_kcal?: number | null
+          active_distance_m?: number | null
+          active_steps?: number | null
+          calories_kcal?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          device_id?: string | null
+          distance_m?: number | null
+          elevation_gain_m?: number | null
+          fairly_active_min?: number | null
+          first_step_at?: string | null
+          floors_climbed?: number | null
+          goal_achieved?: boolean | null
+          id?: string
+          is_manual?: boolean
+          last_step_at?: string | null
+          lightly_active_min?: number | null
+          raw_payload?: Json | null
+          running_steps?: number | null
+          sedentary_minutes?: number | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_created_at?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
+          step_goal?: number | null
+          synced_at?: string
+          timezone: string
+          total_steps: number
+          updated_at?: string
+          user_id: string
+          very_active_min?: number | null
+          walking_steps?: number | null
+        }
+        Update: {
+          active_calories_kcal?: number | null
+          active_distance_m?: number | null
+          active_steps?: number | null
+          calories_kcal?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date?: string
+          device_id?: string | null
+          distance_m?: number | null
+          elevation_gain_m?: number | null
+          fairly_active_min?: number | null
+          first_step_at?: string | null
+          floors_climbed?: number | null
+          goal_achieved?: boolean | null
+          id?: string
+          is_manual?: boolean
+          last_step_at?: string | null
+          lightly_active_min?: number | null
+          raw_payload?: Json | null
+          running_steps?: number | null
+          sedentary_minutes?: number | null
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_created_at?: string | null
+          source_record_id?: string | null
+          source_updated_at?: string | null
+          step_goal?: number | null
+          synced_at?: string
+          timezone?: string
+          total_steps?: number
+          updated_at?: string
+          user_id?: string
+          very_active_min?: number | null
+          walking_steps?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_steps_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_steps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       devices: {
         Row: {
           created_at: string
@@ -1973,6 +2225,63 @@ export type Database = {
           },
         ]
       }
+      sleep_biomarker_samples: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          id: string
+          metric_type: Database["public"]["Enums"]["biomarker_type_enum"]
+          raw_payload: Json | null
+          sleep_session_id: string
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          timestamp: string
+          unit: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          metric_type: Database["public"]["Enums"]["biomarker_type_enum"]
+          raw_payload?: Json | null
+          sleep_session_id: string
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          timestamp: string
+          unit: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          metric_type?: Database["public"]["Enums"]["biomarker_type_enum"]
+          raw_payload?: Json | null
+          sleep_session_id?: string
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          timestamp?: string
+          unit?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_biomarker_samples_sleep_session_id_fkey"
+            columns: ["sleep_session_id"]
+            isOneToOne: false
+            referencedRelation: "sleep_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_biomarker_samples_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sleep_logs: {
         Row: {
           date: string
@@ -2014,6 +2323,267 @@ export type Database = {
           },
         ]
       }
+      sleep_sessions: {
+        Row: {
+          after_wakeup_min: number | null
+          avg_heart_rate_bpm: number | null
+          avg_hrv_ms: number | null
+          avg_respiratory_rpm: number | null
+          avg_skin_temp_c: number | null
+          avg_spo2_pct: number | null
+          awake_in_bed_min: number | null
+          awake_min: number | null
+          bedtime_end: string | null
+          bedtime_start: string | null
+          confidence: number | null
+          core_sleep_min: number | null
+          created_at: string
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          deep_sleep_min: number | null
+          device_id: string | null
+          duration_in_bed_min: number | null
+          end_time: string
+          hrv_rmssd_ms: number | null
+          id: string
+          is_main_sleep: boolean
+          is_manual: boolean
+          is_nap: boolean
+          light_sleep_min: number | null
+          max_heart_rate_bpm: number | null
+          max_respiratory_rpm: number | null
+          min_heart_rate_bpm: number | null
+          min_respiratory_rpm: number | null
+          min_spo2_pct: number | null
+          nap_type: string | null
+          number_of_awakenings: number | null
+          out_of_bed_min: number | null
+          raw_payload: Json | null
+          rem_sleep_min: number | null
+          resting_hr_bpm: number | null
+          restless_min: number | null
+          restless_periods: number | null
+          skin_temp_deviation_c: number | null
+          sleep_efficiency_pct: number | null
+          sleep_end: string | null
+          sleep_latency_min: number | null
+          sleep_quality_label: string | null
+          sleep_score: number | null
+          sleep_start: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_created_at: string | null
+          source_sleep_id: string | null
+          source_updated_at: string | null
+          start_time: string
+          synced_at: string
+          timezone: string
+          total_sleep_min: number | null
+          unknown_sleep_min: number | null
+          updated_at: string
+          user_id: string
+          waso_min: number | null
+        }
+        Insert: {
+          after_wakeup_min?: number | null
+          avg_heart_rate_bpm?: number | null
+          avg_hrv_ms?: number | null
+          avg_respiratory_rpm?: number | null
+          avg_skin_temp_c?: number | null
+          avg_spo2_pct?: number | null
+          awake_in_bed_min?: number | null
+          awake_min?: number | null
+          bedtime_end?: string | null
+          bedtime_start?: string | null
+          confidence?: number | null
+          core_sleep_min?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          deep_sleep_min?: number | null
+          device_id?: string | null
+          duration_in_bed_min?: number | null
+          end_time: string
+          hrv_rmssd_ms?: number | null
+          id?: string
+          is_main_sleep?: boolean
+          is_manual?: boolean
+          is_nap?: boolean
+          light_sleep_min?: number | null
+          max_heart_rate_bpm?: number | null
+          max_respiratory_rpm?: number | null
+          min_heart_rate_bpm?: number | null
+          min_respiratory_rpm?: number | null
+          min_spo2_pct?: number | null
+          nap_type?: string | null
+          number_of_awakenings?: number | null
+          out_of_bed_min?: number | null
+          raw_payload?: Json | null
+          rem_sleep_min?: number | null
+          resting_hr_bpm?: number | null
+          restless_min?: number | null
+          restless_periods?: number | null
+          skin_temp_deviation_c?: number | null
+          sleep_efficiency_pct?: number | null
+          sleep_end?: string | null
+          sleep_latency_min?: number | null
+          sleep_quality_label?: string | null
+          sleep_score?: number | null
+          sleep_start?: string | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_created_at?: string | null
+          source_sleep_id?: string | null
+          source_updated_at?: string | null
+          start_time: string
+          synced_at?: string
+          timezone: string
+          total_sleep_min?: number | null
+          unknown_sleep_min?: number | null
+          updated_at?: string
+          user_id: string
+          waso_min?: number | null
+        }
+        Update: {
+          after_wakeup_min?: number | null
+          avg_heart_rate_bpm?: number | null
+          avg_hrv_ms?: number | null
+          avg_respiratory_rpm?: number | null
+          avg_skin_temp_c?: number | null
+          avg_spo2_pct?: number | null
+          awake_in_bed_min?: number | null
+          awake_min?: number | null
+          bedtime_end?: string | null
+          bedtime_start?: string | null
+          confidence?: number | null
+          core_sleep_min?: number | null
+          created_at?: string
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date?: string
+          deep_sleep_min?: number | null
+          device_id?: string | null
+          duration_in_bed_min?: number | null
+          end_time?: string
+          hrv_rmssd_ms?: number | null
+          id?: string
+          is_main_sleep?: boolean
+          is_manual?: boolean
+          is_nap?: boolean
+          light_sleep_min?: number | null
+          max_heart_rate_bpm?: number | null
+          max_respiratory_rpm?: number | null
+          min_heart_rate_bpm?: number | null
+          min_respiratory_rpm?: number | null
+          min_spo2_pct?: number | null
+          nap_type?: string | null
+          number_of_awakenings?: number | null
+          out_of_bed_min?: number | null
+          raw_payload?: Json | null
+          rem_sleep_min?: number | null
+          resting_hr_bpm?: number | null
+          restless_min?: number | null
+          restless_periods?: number | null
+          skin_temp_deviation_c?: number | null
+          sleep_efficiency_pct?: number | null
+          sleep_end?: string | null
+          sleep_latency_min?: number | null
+          sleep_quality_label?: string | null
+          sleep_score?: number | null
+          sleep_start?: string | null
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_created_at?: string | null
+          source_sleep_id?: string | null
+          source_updated_at?: string | null
+          start_time?: string
+          synced_at?: string
+          timezone?: string
+          total_sleep_min?: number | null
+          unknown_sleep_min?: number | null
+          updated_at?: string
+          user_id?: string
+          waso_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_sessions_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sleep_stage_intervals: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          duration_min: number
+          end_time: string
+          id: string
+          provider_stage: string | null
+          raw_payload: Json | null
+          sleep_session_id: string
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          stage: Database["public"]["Enums"]["sleep_stage_enum"]
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          duration_min: number
+          end_time: string
+          id?: string
+          provider_stage?: string | null
+          raw_payload?: Json | null
+          sleep_session_id: string
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          stage: Database["public"]["Enums"]["sleep_stage_enum"]
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          duration_min?: number
+          end_time?: string
+          id?: string
+          provider_stage?: string | null
+          raw_payload?: Json | null
+          sleep_session_id?: string
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          stage?: Database["public"]["Enums"]["sleep_stage_enum"]
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sleep_stage_intervals_sleep_session_id_fkey"
+            columns: ["sleep_session_id"]
+            isOneToOne: false
+            referencedRelation: "sleep_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleep_stage_intervals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_follows: {
         Row: {
           created_at: string
@@ -2047,6 +2617,103 @@ export type Database = {
           {
             foreignKeyName: "social_follows_id_follower_fkey"
             columns: ["id_follower"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      step_intervals: {
+        Row: {
+          activity_type: string | null
+          cadence_spm: number | null
+          calories_kcal: number | null
+          context: string | null
+          created_at: string
+          daily_steps_id: string | null
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          device_id: string | null
+          distance_m: number | null
+          end_time: string
+          id: string
+          raw_payload: Json | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_record_id: string | null
+          speed_mps: number | null
+          start_time: string
+          steps: number
+          synced_at: string
+          timezone: string
+          user_id: string
+        }
+        Insert: {
+          activity_type?: string | null
+          cadence_spm?: number | null
+          calories_kcal?: number | null
+          context?: string | null
+          created_at?: string
+          daily_steps_id?: string | null
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          device_id?: string | null
+          distance_m?: number | null
+          end_time: string
+          id?: string
+          raw_payload?: Json | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_record_id?: string | null
+          speed_mps?: number | null
+          start_time: string
+          steps: number
+          synced_at?: string
+          timezone: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string | null
+          cadence_spm?: number | null
+          calories_kcal?: number | null
+          context?: string | null
+          created_at?: string
+          daily_steps_id?: string | null
+          data_quality?:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          device_id?: string | null
+          distance_m?: number | null
+          end_time?: string
+          id?: string
+          raw_payload?: Json | null
+          source?: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_record_id?: string | null
+          speed_mps?: number | null
+          start_time?: string
+          steps?: number
+          synced_at?: string
+          timezone?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "step_intervals_daily_steps_id_fkey"
+            columns: ["daily_steps_id"]
+            isOneToOne: false
+            referencedRelation: "daily_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "step_intervals_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "step_intervals_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -2782,10 +3449,26 @@ export type Database = {
         | "polar"
         | "gym_session"
       activity_status_enum: "active" | "completed" | "paused" | "cancelled"
+      biomarker_type_enum:
+        | "heart_rate"
+        | "hrv_rmssd"
+        | "hrv_sdnn"
+        | "spo2"
+        | "respiratory_rate"
+        | "skin_temperature"
+        | "body_temperature"
+        | "movement"
+        | "stress"
       daily_activity_enum: "sedentary" | "active" | "physical"
       daily_hydration_source: "manual" | "imported" | "ai"
       duration_type_enum: "time" | "distance" | "lap_button"
       exercise_load_type: "assisted" | "bodyweight" | "external" | "mixed"
+      health_data_quality_enum:
+        | "complete"
+        | "partial"
+        | "estimated"
+        | "manual"
+        | "unknown"
       ingredients_category:
         | "proteina_animal"
         | "proteina_vegetal"
@@ -2846,6 +3529,16 @@ export type Database = {
       recipe_source_enum: "system" | "user"
       recipe_usage_context_enum: "meal_log" | "planner" | "quick_add"
       recipe_visibility_enum: "private" | "public"
+      sleep_stage_enum:
+        | "unknown"
+        | "awake"
+        | "awake_in_bed"
+        | "out_of_bed"
+        | "sleeping"
+        | "light"
+        | "deep"
+        | "rem"
+        | "core"
       sport_subtype_enum:
         | "road"
         | "trail"
@@ -2913,6 +3606,9 @@ export type Database = {
         | "oura"
         | "fitbit"
         | "ultrahuman"
+        | "apple_health"
+        | "health_connect"
+        | "manual"
       workout_goal_enum:
         | "resistencia"
         | "fuerza"
@@ -3060,10 +3756,28 @@ export const Constants = {
         "gym_session",
       ],
       activity_status_enum: ["active", "completed", "paused", "cancelled"],
+      biomarker_type_enum: [
+        "heart_rate",
+        "hrv_rmssd",
+        "hrv_sdnn",
+        "spo2",
+        "respiratory_rate",
+        "skin_temperature",
+        "body_temperature",
+        "movement",
+        "stress",
+      ],
       daily_activity_enum: ["sedentary", "active", "physical"],
       daily_hydration_source: ["manual", "imported", "ai"],
       duration_type_enum: ["time", "distance", "lap_button"],
       exercise_load_type: ["assisted", "bodyweight", "external", "mixed"],
+      health_data_quality_enum: [
+        "complete",
+        "partial",
+        "estimated",
+        "manual",
+        "unknown",
+      ],
       ingredients_category: [
         "proteina_animal",
         "proteina_vegetal",
@@ -3129,6 +3843,17 @@ export const Constants = {
       recipe_source_enum: ["system", "user"],
       recipe_usage_context_enum: ["meal_log", "planner", "quick_add"],
       recipe_visibility_enum: ["private", "public"],
+      sleep_stage_enum: [
+        "unknown",
+        "awake",
+        "awake_in_bed",
+        "out_of_bed",
+        "sleeping",
+        "light",
+        "deep",
+        "rem",
+        "core",
+      ],
       sport_subtype_enum: [
         "road",
         "trail",
@@ -3202,6 +3927,9 @@ export const Constants = {
         "oura",
         "fitbit",
         "ultrahuman",
+        "apple_health",
+        "health_connect",
+        "manual",
       ],
       workout_goal_enum: [
         "resistencia",
