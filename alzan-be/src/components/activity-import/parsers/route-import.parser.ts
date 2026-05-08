@@ -1,3 +1,6 @@
+import { CanonicalActivity, CanonicalSportSubtype, CanonicalSportType } from './activity-import-canonical.types';
+import { parseSuuntoActivityFileToCanonical } from './suunto-activity-canonical.mapper';
+
 /**
  * mapService.ts
  *
@@ -23,15 +26,26 @@ export type LatLon = [number, number];
 export type SupportedRouteFormat = 'polyline' | 'gpx' | 'tcx' | 'fit' | 'kml' | 'json';
 
 export interface RouteImportSummary {
+  sportType: CanonicalSportType | null;
+  sportSubtype: CanonicalSportSubtype | null;
   distanceM: number | null;
   durationSeconds: number | null;
   elevationGainM: number | null;
   elevationLossM: number | null;
   recoveryTimeSeconds: number | null;
   avgHeartRate: number | null;
+  maxHeartRate: number | null;
   caloriesKcal: number | null;
   vo2Max: number | null;
   totalSteps: number | null;
+  avgSpeedMps: number | null;
+  maxSpeedMps: number | null;
+  avgCadence: number | null;
+  maxCadence: number | null;
+  avgPowerW: number | null;
+  maxPowerW: number | null;
+  avgTemperatureC: number | null;
+  maxTemperatureC: number | null;
 }
 
 export interface RouteImportLap {
@@ -56,6 +70,10 @@ export interface RouteImportHeartRateZone {
   durationSeconds: number;
   percentage: number;
 }
+
+type RouteImportNumericSummaryKey = {
+  [Key in keyof RouteImportSummary]: RouteImportSummary[Key] extends number | null ? Key : never;
+}[keyof RouteImportSummary];
 
 export interface RouteImportDetails {
   customSplits: RouteImportLap[];
@@ -414,15 +432,26 @@ function buildSummaryFromPoints(
       : null;
 
   return {
+    sportType: overrides.sportType ?? null,
+    sportSubtype: overrides.sportSubtype ?? null,
     distanceM: overrides.distanceM ?? derivedDistance ?? calculateDistanceFromCoords(coords),
     durationSeconds: overrides.durationSeconds ?? calculateDurationFromPoints(points),
     elevationGainM: overrides.elevationGainM ?? calculateElevationGain(points),
     elevationLossM: overrides.elevationLossM ?? calculateElevationLoss(points),
     recoveryTimeSeconds: overrides.recoveryTimeSeconds ?? null,
     avgHeartRate: overrides.avgHeartRate ?? calculateAverageHeartRate(points),
+    maxHeartRate: overrides.maxHeartRate ?? null,
     caloriesKcal: overrides.caloriesKcal ?? null,
     vo2Max: overrides.vo2Max ?? null,
     totalSteps: overrides.totalSteps ?? null,
+    avgSpeedMps: overrides.avgSpeedMps ?? null,
+    maxSpeedMps: overrides.maxSpeedMps ?? null,
+    avgCadence: overrides.avgCadence ?? null,
+    maxCadence: overrides.maxCadence ?? null,
+    avgPowerW: overrides.avgPowerW ?? null,
+    maxPowerW: overrides.maxPowerW ?? null,
+    avgTemperatureC: overrides.avgTemperatureC ?? null,
+    maxTemperatureC: overrides.maxTemperatureC ?? null,
   };
 }
 
@@ -774,7 +803,27 @@ function finaliseParsedRoute(parsed: ParsedRoutePoints, options?: ParseRouteFile
   const coords = mapPointsToCoords(parsed.points);
 
   if (coords.length === 0) {
-    throw new Error('No GPS coordinates found in file.');
+    const summary = buildSummaryFromPoints(parsed.points, coords, parsed.summaryOverrides);
+    const hasSummary = Object.values(summary).some(value => typeof value === 'number' && Number.isFinite(value));
+    const customSplits = parsed.customSplits ?? [];
+    const heartRateZones = parsed.heartRateZones ?? [];
+
+    if (!hasSummary && customSplits.length === 0 && heartRateZones.length === 0) {
+      throw new Error('No GPS coordinates found in file.');
+    }
+
+    return {
+      polyline: '',
+      summary,
+      details: {
+        customSplits,
+        distanceSplits: [],
+        splits1k: [],
+        splits5k: [],
+        splits10k: [],
+        heartRateZones,
+      },
+    };
   }
 
   const summary = buildSummaryFromPoints(parsed.points, coords, parsed.summaryOverrides);
@@ -1670,7 +1719,7 @@ function parseFitDefinitionMessage(
 
 function setFitSummaryOverride(
   summaryOverrides: Partial<RouteImportSummary>,
-  key: keyof RouteImportSummary,
+  key: RouteImportNumericSummaryKey,
   value: number | null,
 ): void {
   if (value == null || !Number.isFinite(value) || value <= 0) return;
@@ -1735,6 +1784,54 @@ function buildCustomSplitsFromFitLaps(
   });
 
   return normaliseCustomSplits(rawSplits, summaryOverrides);
+}
+
+function mapCanonicalLapsToRouteLaps(canonical: CanonicalActivity): RouteImportLap[] {
+  return canonical.laps
+    .filter(
+      lap => (lap.distanceM != null && lap.distanceM > 0) || (lap.durationSeconds != null && lap.durationSeconds > 0),
+    )
+    .map((lap, index) => ({
+      lapIndex: index + 1,
+      lapType: lap.lapType,
+      distanceM: lap.distanceM ?? 0,
+      durationSeconds: lap.durationSeconds,
+      avgPaceSecondsPerKm: lap.avgPaceSecondsPerKm,
+      avgHeartRate: lap.avgHeartRate,
+      maxHeartRate: lap.maxHeartRate,
+      startOffsetSeconds: lap.startOffsetSeconds,
+      endOffsetSeconds: lap.endOffsetSeconds,
+    }));
+}
+
+function mergeCanonicalSummary(
+  target: Partial<RouteImportSummary>,
+  canonical: CanonicalActivity | null,
+): Partial<RouteImportSummary> {
+  if (!canonical) return target;
+  return {
+    ...target,
+    sportType: target.sportType ?? canonical.sportType,
+    sportSubtype: target.sportSubtype ?? canonical.sportSubtype,
+    distanceM: target.distanceM ?? canonical.summary.distanceM,
+    durationSeconds: target.durationSeconds ?? canonical.summary.durationSeconds,
+    elevationGainM: target.elevationGainM ?? canonical.summary.elevationGainM,
+    elevationLossM: target.elevationLossM ?? canonical.summary.elevationLossM,
+    recoveryTimeSeconds: target.recoveryTimeSeconds ?? canonical.summary.recoveryTimeSeconds,
+    avgHeartRate: target.avgHeartRate ?? canonical.summary.avgHeartRate,
+    maxHeartRate: target.maxHeartRate ?? canonical.summary.maxHeartRate,
+    caloriesKcal: target.caloriesKcal ?? canonical.summary.caloriesKcal,
+    vo2Max: target.vo2Max ?? canonical.summary.vo2Max,
+    totalSteps: target.totalSteps ?? canonical.summary.totalSteps,
+    avgSpeedMps: target.avgSpeedMps ?? canonical.summary.avgSpeedMps,
+    maxSpeedMps: target.maxSpeedMps ?? canonical.summary.maxSpeedMps,
+    avgCadence: target.avgCadence ?? canonical.summary.avgCadence,
+    maxCadence: target.maxCadence ?? canonical.summary.maxCadence,
+    avgPowerW: target.avgPowerW ?? canonical.summary.avgPowerW,
+    maxPowerW: target.maxPowerW ?? canonical.summary.maxPowerW,
+    avgTemperatureC: target.avgTemperatureC ?? canonical.summary.avgTemperatureC,
+    maxTemperatureC: target.maxTemperatureC ?? canonical.summary.maxTemperatureC,
+  };
 }
 
 function parseFitDataMessage(
@@ -1871,7 +1968,11 @@ function parseFitDataMessage(
   return offset;
 }
 
-function parseFitDetailed(binary: Uint8Array, options?: ParseRouteFileOptions): ParsedRouteImport {
+function parseFitDetailed(
+  binary: Uint8Array,
+  options?: ParseRouteFileOptions,
+  filename = 'activity.fit',
+): ParsedRouteImport {
   if (binary.byteLength < 12) {
     throw new Error('Invalid FIT file: header is too short.');
   }
@@ -1910,6 +2011,14 @@ function parseFitDetailed(binary: Uint8Array, options?: ParseRouteFileOptions): 
     summaryOverrides: {},
     fitCustomSplits: [],
   };
+  let canonical: CanonicalActivity | null = null;
+
+  try {
+    canonical = parseSuuntoActivityFileToCanonical(binary, filename, options);
+    state.summaryOverrides = mergeCanonicalSummary(state.summaryOverrides, canonical);
+  } catch {
+    canonical = null;
+  }
 
   let offset = dataStart;
 
@@ -1952,15 +2061,17 @@ function parseFitDetailed(binary: Uint8Array, options?: ParseRouteFileOptions): 
     offset = parseFitDataMessage(dataView, offset, dataEnd, definition, state);
   }
 
-  if (state.points.length === 0) {
-    throw new Error('No GPS coordinates found in FIT file.');
-  }
-
   return finaliseParsedRoute(
     {
       points: state.points,
       summaryOverrides: state.summaryOverrides,
-      customSplits: buildCustomSplitsFromFitLaps(state.fitCustomSplits, state.summaryOverrides),
+      customSplits:
+        state.fitCustomSplits.length > 0
+          ? buildCustomSplitsFromFitLaps(state.fitCustomSplits, state.summaryOverrides)
+          : canonical
+            ? mapCanonicalLapsToRouteLaps(canonical)
+            : [],
+      heartRateZones: canonical?.heartRateZones.length ? canonical.heartRateZones : undefined,
     },
     options,
   );
@@ -2016,7 +2127,7 @@ export function parseRouteFileWithSummary(
       if (typeof content === 'string') {
         throw new Error('FIT file must be read as binary data.');
       }
-      return parseFitDetailed(content, options);
+      return parseFitDetailed(content, options, filename);
     }
 
     case 'kml': {

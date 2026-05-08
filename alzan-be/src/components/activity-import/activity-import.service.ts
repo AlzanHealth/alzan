@@ -119,7 +119,11 @@ export class ActivityImportService {
   }
 
   private async resolveUserEstimatedMaxHeartRate(ctx: UserCtx): Promise<number | null> {
-    const { data, error } = await ctx.supabase.from('users').select('date_of_birth').eq('id', ctx.user.id).maybeSingle();
+    const { data, error } = await ctx.supabase
+      .from('users')
+      .select('date_of_birth')
+      .eq('id', ctx.user.id)
+      .maybeSingle();
     if (error) return null;
 
     const dateOfBirth = data?.date_of_birth;

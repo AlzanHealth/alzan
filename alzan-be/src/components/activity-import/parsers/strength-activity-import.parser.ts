@@ -77,6 +77,7 @@ interface FitParseState {
   sport: number | null;
   subSport: number | null;
   device: ImportedStrengthActivityDevice | null;
+  heartRateZones: ImportedStrengthActivityHeartRateZone[];
   heartRateStream: ImportedStrengthActivityHeartRateSample[];
 }
 
@@ -336,7 +337,10 @@ function resolveEffectiveMaxHeartRate(
   if (safeEstimated != null) return safeEstimated;
   if (heartRateSamples.length === 0) return null;
 
-  const observedMax = heartRateSamples.reduce((highest, value) => (value > highest ? value : highest), heartRateSamples[0]);
+  const observedMax = heartRateSamples.reduce(
+    (highest, value) => (value > highest ? value : highest),
+    heartRateSamples[0],
+  );
   return Number.isFinite(observedMax) && observedMax > 0 ? observedMax : null;
 }
 
@@ -344,9 +348,7 @@ function buildHeartRateZonesFromStream(
   stream: ImportedStrengthActivityHeartRateSample[],
   estimatedMaxHeartRate?: number | null,
 ): ImportedStrengthActivityHeartRateZone[] {
-  const samples = stream
-    .map(sample => sample.bpm)
-    .filter((bpm): bpm is number => Number.isFinite(bpm) && bpm > 0);
+  const samples = stream.map(sample => sample.bpm).filter((bpm): bpm is number => Number.isFinite(bpm) && bpm > 0);
 
   if (samples.length === 0) return [];
 
@@ -625,6 +627,39 @@ function decodeFitFieldAsNumber(
   }
 }
 
+function decodeFitFieldAsNumbers(
+  dataView: DataView,
+  offset: number,
+  size: number,
+  baseType: number,
+  littleEndian: boolean,
+): number[] {
+  const baseTypeSize = getFitBaseTypeSize(baseType);
+  if (baseTypeSize == null || size < baseTypeSize) return [];
+  const values: number[] = [];
+
+  for (let relativeOffset = 0; relativeOffset + baseTypeSize <= size; relativeOffset += baseTypeSize) {
+    const value = decodeFitFieldAsNumber(dataView, offset + relativeOffset, baseTypeSize, baseType, littleEndian);
+    if (value != null && Number.isFinite(value)) values.push(value);
+  }
+
+  return values;
+}
+
+function buildHeartRateZonesFromFitSessionField(values: number[]): ImportedStrengthActivityHeartRateZone[] {
+  const durations = values.slice(0, 5).map(value => (Number.isFinite(value) && value > 0 ? value / 1000 : 0));
+  const totalDuration = durations.reduce((sum, value) => sum + value, 0);
+  if (totalDuration <= 0) return [];
+
+  return durations
+    .map((duration, index) => ({
+      zone: (index + 1) as 1 | 2 | 3 | 4 | 5,
+      durationSeconds: Math.round(duration),
+      percentage: Math.round((duration / totalDuration) * 100),
+    }))
+    .filter(zone => zone.durationSeconds > 0);
+}
+
 function parseFitDefinitionMessage(
   dataView: DataView,
   offset: number,
@@ -717,6 +752,12 @@ function parseFitDataMessage(
         state.avgHeartRate = setLargestNumber(state.avgHeartRate, numericValue);
       if (field.fieldNumber === 17 && numericValue != null)
         state.maxHeartRate = setLargestNumber(state.maxHeartRate, numericValue);
+      if (field.fieldNumber === 65) {
+        const zones = buildHeartRateZonesFromFitSessionField(
+          decodeFitFieldAsNumbers(dataView, offset, field.size, field.baseType, definition.littleEndian),
+        );
+        if (zones.length > 0) state.heartRateZones = zones;
+      }
       if (field.fieldNumber === 253) state.startedAt = state.startedAt ?? fitTimestampToIso(numericValue);
     }
 
@@ -792,6 +833,7 @@ function parseFitActivity(
     sport: null,
     subSport: null,
     device: null,
+    heartRateZones: [],
     heartRateStream: [],
   };
 
@@ -832,7 +874,10 @@ function parseFitActivity(
   const avgFromStream =
     heartRates.length > 0 ? heartRates.reduce((sum, value) => sum + value, 0) / heartRates.length : null;
   const maxFromStream = heartRates.length > 0 ? Math.max(...heartRates) : null;
-  const computedZones = buildHeartRateZonesFromStream(state.heartRateStream, options?.estimatedMaxHeartRate);
+  const computedZones =
+    state.heartRateZones.length > 0
+      ? state.heartRateZones
+      : buildHeartRateZonesFromStream(state.heartRateStream, options?.estimatedMaxHeartRate);
 
   return {
     provider: detectFitProvider(filename),
