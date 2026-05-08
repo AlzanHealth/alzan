@@ -1,5 +1,5 @@
 import { CanonicalActivity, CanonicalSportSubtype, CanonicalSportType } from './activity-import-canonical.types';
-import { parseSuuntoActivityFileToCanonical } from './suunto-activity-canonical.mapper';
+import { parseActivityFileToCanonical } from './activity-import-canonical.parser';
 
 /**
  * mapService.ts
@@ -1426,12 +1426,33 @@ function extractJsonCustomSplits(parsed: unknown, summaryOverrides: Partial<Rout
   return normaliseCustomSplits(rawSplits, summaryOverrides);
 }
 
-function parseJsonDetailed(rawJson: string, options?: ParseRouteFileOptions): ParsedRouteImport {
+function parseJsonDetailed(
+  rawJson: string,
+  filename = 'activity.json',
+  options?: ParseRouteFileOptions,
+): ParsedRouteImport {
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawJson);
   } catch {
     throw new Error('Invalid JSON file.');
+  }
+
+  try {
+    const canonical = parseActivityFileToCanonical(rawJson, filename, options);
+    if (canonical.provider === 'garmin') {
+      return finaliseParsedRoute(
+        {
+          points: mapCanonicalStreamsToRoutePoints(canonical),
+          summaryOverrides: mergeCanonicalSummary({}, canonical),
+          customSplits: mapCanonicalLapsToRouteLaps(canonical),
+          heartRateZones: canonical.heartRateZones.length > 0 ? canonical.heartRateZones : undefined,
+        },
+        options,
+      );
+    }
+  } catch {
+    // Keep the legacy JSON route parser for non-Garmin exports.
   }
 
   const points: RoutePoint[] = [];
@@ -1834,6 +1855,29 @@ function mergeCanonicalSummary(
   };
 }
 
+function findCanonicalMetricAtOffset(
+  samples: CanonicalActivity['streams']['heartRate'],
+  offsetSeconds: number | null,
+): number | null {
+  if (samples.length === 0) return null;
+  if (offsetSeconds == null) return samples[0]?.value ?? null;
+  return (
+    samples.find(sample => sample.offsetSeconds != null && Math.abs(sample.offsetSeconds - offsetSeconds) <= 1)
+      ?.value ?? null
+  );
+}
+
+function mapCanonicalStreamsToRoutePoints(canonical: CanonicalActivity): RoutePoint[] {
+  return canonical.streams.position.map(point => ({
+    lat: point.lat,
+    lon: point.lon,
+    elevationM: findCanonicalMetricAtOffset(canonical.streams.altitude, point.offsetSeconds),
+    timestampSeconds: point.timestamp ? Math.round(new Date(point.timestamp).getTime() / 1000) : null,
+    heartRate: findCanonicalMetricAtOffset(canonical.streams.heartRate, point.offsetSeconds),
+    distanceM: findCanonicalMetricAtOffset(canonical.streams.distance, point.offsetSeconds),
+  }));
+}
+
 function parseFitDataMessage(
   dataView: DataView,
   offset: number,
@@ -2014,7 +2058,7 @@ function parseFitDetailed(
   let canonical: CanonicalActivity | null = null;
 
   try {
-    canonical = parseSuuntoActivityFileToCanonical(binary, filename, options);
+    canonical = parseActivityFileToCanonical(binary, filename, options);
     state.summaryOverrides = mergeCanonicalSummary(state.summaryOverrides, canonical);
   } catch {
     canonical = null;
@@ -2141,7 +2185,7 @@ export function parseRouteFileWithSummary(
       if (typeof content !== 'string') {
         throw new Error('JSON file could not be read as text.');
       }
-      return parseJsonDetailed(content, options);
+      return parseJsonDetailed(content, filename, options);
     }
   }
 }

@@ -100,13 +100,25 @@ export interface CanonicalActivity {
   vendorFields: Record<string, unknown>;
 }
 
-export interface SuuntoDailyActivityCanonical {
-  source: 'suunto';
+export interface ProviderDailyActivityCanonical<TSource extends CanonicalActivityProvider = CanonicalActivityProvider> {
+  source: TSource;
   date: string;
   timezone: string;
   totalSteps: number | null;
+  activeSteps?: number | null;
+  walkingSteps?: number | null;
+  runningSteps?: number | null;
   caloriesKcal: number | null;
+  activeCaloriesKcal?: number | null;
   distanceM: number | null;
+  activeDistanceM?: number | null;
+  floorsClimbed?: number | null;
+  stepGoal?: number | null;
+  goalAchieved?: boolean | null;
+  sedentaryMinutes?: number | null;
+  lightlyActiveMin?: number | null;
+  fairlyActiveMin?: number | null;
+  veryActiveMin?: number | null;
   intervals: Array<{
     startTime: string;
     endTime: string | null;
@@ -118,8 +130,8 @@ export interface SuuntoDailyActivityCanonical {
   rawPayload: Record<string, unknown>;
 }
 
-export interface SuuntoSleepCanonical {
-  source: 'suunto';
+export interface ProviderSleepCanonical<TSource extends CanonicalActivityProvider = CanonicalActivityProvider> {
+  source: TSource;
   sourceSleepId: string | null;
   date: string;
   timezone: string;
@@ -139,17 +151,42 @@ export interface SuuntoSleepCanonical {
   sleepScore: number | null;
   avgHeartRateBpm: number | null;
   minHeartRateBpm: number | null;
+  maxHeartRateBpm?: number | null;
+  restingHrBpm?: number | null;
   avgHrvMs: number | null;
+  hrvRmssdMs?: number | null;
+  avgRespiratoryRpm?: number | null;
   avgSpo2Pct: number | null;
+  minSpo2Pct?: number | null;
   rawPayload: Record<string, unknown>;
 }
 
-export interface SuuntoRecoveryCanonical {
-  source: 'suunto';
+export interface ProviderRecoveryCanonical<TSource extends CanonicalActivityProvider = CanonicalActivityProvider> {
+  source: TSource;
   date: string;
   timezone: string;
   timestamp: string;
+  recoveryScore?: number | null;
+  readinessScore?: number | null;
+  sleepScore?: number | null;
+  strainScore?: number | null;
+  bodyBatteryStart?: number | null;
+  bodyBatteryMin?: number | null;
+  bodyBatteryMax?: number | null;
+  bodyBatteryEnd?: number | null;
+  restingHrBpm?: number | null;
+  avgHrvMs?: number | null;
+  respiratoryRateRpm?: number | null;
+  spo2AvgPct?: number | null;
   balance: number | null;
   stressState: number | null;
   rawPayload: Record<string, unknown>;
 }
+
+export type SuuntoDailyActivityCanonical = ProviderDailyActivityCanonical<'suunto'>;
+export type SuuntoSleepCanonical = ProviderSleepCanonical<'suunto'>;
+export type SuuntoRecoveryCanonical = ProviderRecoveryCanonical<'suunto'>;
+
+export type GarminDailyActivityCanonical = ProviderDailyActivityCanonical<'garmin'>;
+export type GarminSleepCanonical = ProviderSleepCanonical<'garmin'>;
+export type GarminRecoveryCanonical = ProviderRecoveryCanonical<'garmin'>;

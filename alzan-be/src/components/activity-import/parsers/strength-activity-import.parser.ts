@@ -76,6 +76,7 @@ interface FitParseState {
   totalSteps: number | null;
   sport: number | null;
   subSport: number | null;
+  manufacturer: number | null;
   device: ImportedStrengthActivityDevice | null;
   heartRateZones: ImportedStrengthActivityHeartRateZone[];
   heartRateStream: ImportedStrengthActivityHeartRateSample[];
@@ -86,6 +87,7 @@ const FIT_FILE_ID_MESSAGE_NUMBER = 0;
 const FIT_SESSION_MESSAGE_NUMBER = 18;
 const FIT_RECORD_MESSAGE_NUMBER = 20;
 const FIT_EPOCH_OFFSET_SECONDS = 631065600;
+const GARMIN_MANUFACTURER_ID = 1;
 const HEART_RATE_STREAM_LIMIT = 5000;
 
 const KNOWN_STRENGTH_ACTIVITY_TYPES = new Set([23]);
@@ -728,9 +730,16 @@ function parseFitDataMessage(
     const numericValue = decodeFitFieldAsNumber(dataView, offset, field.size, field.baseType, definition.littleEndian);
 
     if (definition.globalMessageNumber === FIT_FILE_ID_MESSAGE_NUMBER) {
+      if (field.fieldNumber === 1 && numericValue != null) {
+        state.manufacturer = Math.round(numericValue);
+      }
       if (field.fieldNumber === 3 && numericValue != null) {
         state.device = {
-          ...(state.device ?? { name: null, model: null, serial: null }),
+          ...(state.device ?? {
+            name: state.manufacturer === GARMIN_MANUFACTURER_ID ? 'Garmin' : null,
+            model: null,
+            serial: null,
+          }),
           serial: String(Math.round(numericValue)),
         };
       }
@@ -801,6 +810,11 @@ function detectFitProvider(filename: string): StrengthActivityProvider {
   return fileProvider === 'unknown' ? 'unknown' : fileProvider;
 }
 
+function detectProviderFromFitManufacturer(manufacturer: number | null, filename: string): StrengthActivityProvider {
+  if (manufacturer === GARMIN_MANUFACTURER_ID) return 'garmin';
+  return detectFitProvider(filename);
+}
+
 function parseFitActivity(
   binary: Uint8Array,
   filename: string,
@@ -832,6 +846,7 @@ function parseFitActivity(
     totalSteps: null,
     sport: null,
     subSport: null,
+    manufacturer: null,
     device: null,
     heartRateZones: [],
     heartRateStream: [],
@@ -880,7 +895,7 @@ function parseFitActivity(
       : buildHeartRateZonesFromStream(state.heartRateStream, options?.estimatedMaxHeartRate);
 
   return {
-    provider: detectFitProvider(filename),
+    provider: detectProviderFromFitManufacturer(state.manufacturer, filename),
     sourceFileType: 'fit',
     startedAt: state.startedAt,
     endedAt: deriveEndTime(state.startedAt, state.durationSeconds),
