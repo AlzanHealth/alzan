@@ -1,0 +1,11 @@
+{
+  "provider": "fitbit",
+  "activityName": "Run",
+  "startTime": "2026-05-01T14:00:00Z",
+  "duration": 1500,
+  "distance": 4200,
+  "calories": 240,
+  "averageHeartRate": 139,
+  "maxHeartRate": 162,
+  "steps": 5100
+}

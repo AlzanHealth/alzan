@@ -1,0 +1,42 @@
+{
+  "Summary": {
+    "ActivityId": "garmin-bike-001",
+    "SummaryId": "summary-bike-001",
+    "ActivityType": "cycling",
+    "StartTimeInSeconds": 1777626000,
+    "DurationInSeconds": 3600,
+    "DistanceInMeters": 28000,
+    "ActiveKilocalories": 620,
+    "AverageHeartRateInBeatsPerMinute": 132,
+    "MaxHeartRateInBeatsPerMinute": 166,
+    "AverageSpeedInMetersPerSecond": 7.78,
+    "MaxSpeedInMetersPerSecond": 13.1,
+    "AverageBikeCadenceInRoundsPerMinute": 86,
+    "MaxBikeCadenceInRoundsPerMinute": 112,
+    "AveragePowerInWatts": 185,
+    "MaxPowerInWatts": 460,
+    "TotalElevationGainInMeters": 420,
+    "TotalElevationLossInMeters": 410,
+    "DeviceName": "Edge Test"
+  },
+  "Samples": [
+    {
+      "StartTimeInSeconds": 1777626000,
+      "LatitudeInDegree": 41.3874,
+      "LongitudeInDegree": 2.1686,
+      "HeartRate": 128,
+      "PowerInWatts": 180,
+      "BikeCadenceInRPM": 84,
+      "SpeedMetersPerSecond": 7.5
+    },
+    {
+      "StartTimeInSeconds": 1777626060,
+      "LatitudeInDegree": 41.3884,
+      "LongitudeInDegree": 2.1696,
+      "HeartRate": 138,
+      "PowerInWatts": 210,
+      "BikeCadenceInRPM": 91,
+      "SpeedMetersPerSecond": 8.1
+    }
+  ]
+}

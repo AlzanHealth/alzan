@@ -718,6 +718,8 @@ function parseGarminJson(rawJson: string, options?: ParseGarminActivityOptions):
         readNumber(summary.AverageSwimCadenceInStrokesPerMinute),
       maxCadence:
         readNumber(summary.MaxRunCadenceInStepsPerMinute) ?? readNumber(summary.MaxBikeCadenceInRoundsPerMinute),
+      avgPowerW: readNumber(summary.AveragePowerInWatts) ?? readNumber(summary.AvgPowerInWatts),
+      maxPowerW: readNumber(summary.MaxPowerInWatts),
       elevationGainM: readNumber(summary.TotalElevationGainInMeters),
       elevationLossM: readNumber(summary.TotalElevationLossInMeters),
       totalSteps: readNumber(summary.Steps),

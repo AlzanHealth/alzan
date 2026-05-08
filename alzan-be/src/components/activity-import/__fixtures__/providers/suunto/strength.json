@@ -1,0 +1,36 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 23,
+      "ActivityName": "Strength training",
+      "DateTime": "2026-05-01T08:00:00Z",
+      "Duration": 3882,
+      "Energy": 1451848,
+      "AverageHeartRate": 83,
+      "MaxHeartRate": 112,
+      "MinHeartRate": 66,
+      "StepCount": 346,
+      "RecoveryTime": 10800,
+      "EPOC": 4,
+      "PeakTrainingEffect": 1.3,
+      "TSS": 34
+    },
+    "Device": {
+      "Name": "Suunto Race",
+      "SerialNumber": "REDACTED-SUUNTO-STRENGTH",
+      "Info": {
+        "HW": "Race"
+      }
+    },
+    "Samples": [
+      {
+        "TimeISO8601": "2026-05-01T08:00:10Z",
+        "HR": 66
+      },
+      {
+        "TimeISO8601": "2026-05-01T08:30:00Z",
+        "HR": 112
+      }
+    ]
+  }
+}

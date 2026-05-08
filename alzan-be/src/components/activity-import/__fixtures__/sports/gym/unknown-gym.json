@@ -1,0 +1,8 @@
+{
+  "sport_type": "gym",
+  "started_at": "2026-05-01T22:00:00Z",
+  "durationSeconds": 3000,
+  "calories_kcal": 360,
+  "avgHeartRate": 105,
+  "maxHeartRate": 149
+}

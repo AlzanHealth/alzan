@@ -1,0 +1,20 @@
+{
+  "provider": "polar",
+  "sport_type": "running",
+  "start_time": "2026-05-01T11:00:00Z",
+  "duration": 2100,
+  "calories": 390,
+  "distance": 6200,
+  "average_heart_rate": 148,
+  "maximum_heart_rate": 176,
+  "samples": [
+    {
+      "timestamp": "2026-05-01T11:00:00Z",
+      "heart_rate": 142
+    },
+    {
+      "timestamp": "2026-05-01T11:01:00Z",
+      "heart_rate": 154
+    }
+  ]
+}

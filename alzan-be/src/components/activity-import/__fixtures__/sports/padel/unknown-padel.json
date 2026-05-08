@@ -1,0 +1,8 @@
+{
+  "sport_type": "padel",
+  "started_at": "2026-05-01T20:00:00Z",
+  "durationSeconds": 3600,
+  "calories_kcal": 580,
+  "avgHeartRate": 126,
+  "maxHeartRate": 171
+}

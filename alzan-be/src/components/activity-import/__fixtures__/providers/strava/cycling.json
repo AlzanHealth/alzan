@@ -1,0 +1,17 @@
+{
+  "provider": "strava",
+  "sport_type": "Ride",
+  "start_date": "2026-05-01T13:00:00Z",
+  "elapsed_time": 4200,
+  "distance": 32000,
+  "calories": 720,
+  "average_heartrate": 136,
+  "max_heartrate": 171,
+  "streams": {
+    "latlng": [
+      [41.3874, 2.1686],
+      [41.3974, 2.1786]
+    ],
+    "time": [0, 60]
+  }
+}

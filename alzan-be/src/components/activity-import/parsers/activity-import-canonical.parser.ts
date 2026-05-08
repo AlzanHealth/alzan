@@ -1,4 +1,5 @@
 import { CanonicalActivity } from './activity-import-canonical.types';
+import { buildEmptyGenericActivity, parseGenericActivityJsonToCanonical } from './generic-activity-canonical.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
 import { parseSuuntoActivityFileToCanonical } from './suunto-activity-canonical.mapper';
 
@@ -174,7 +175,7 @@ export function parseActivityFileToCanonical(
       return parseGarminActivityFileToCanonical(content, filename, options);
     if (lower.includes('suunto') || isSuuntoJson(parsed))
       return parseSuuntoActivityFileToCanonical(content, filename, options);
-    return parseSuuntoActivityFileToCanonical(content, filename, options);
+    return parseGenericActivityJsonToCanonical(content, filename);
   }
-  return parseSuuntoActivityFileToCanonical(content, filename, options);
+  return buildEmptyGenericActivity();
 }

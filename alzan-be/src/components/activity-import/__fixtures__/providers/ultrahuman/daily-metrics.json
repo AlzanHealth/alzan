@@ -1,0 +1,15 @@
+{
+  "provider": "ultrahuman",
+  "date": "2026-05-01",
+  "movement": {
+    "steps": 9400,
+    "active_kcal": 660,
+    "vo2_max": 48
+  },
+  "heart_rate": {
+    "average_bpm": 61
+  },
+  "recovery": {
+    "score": 82
+  }
+}

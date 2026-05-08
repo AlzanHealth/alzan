@@ -1,0 +1,11 @@
+{
+  "provider": "health_connect",
+  "exerciseType": "EXERCISE_TYPE_BASKETBALL",
+  "startTime": "2026-05-01T19:00:00Z",
+  "endTime": "2026-05-01T19:45:00Z",
+  "durationSeconds": 2700,
+  "totalEnergyBurnedKcal": 520,
+  "avgHeartRate": 134,
+  "maxHeartRate": 178,
+  "steps": 4200
+}

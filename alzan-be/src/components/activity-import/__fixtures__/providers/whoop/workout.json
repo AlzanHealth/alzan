@@ -1,0 +1,13 @@
+{
+  "provider": "whoop",
+  "sport_name": "Weightlifting",
+  "start": "2026-05-01T15:00:00Z",
+  "end": "2026-05-01T16:00:00Z",
+  "duration": 3600,
+  "kilojoule": 1757,
+  "average_heart_rate": 118,
+  "max_heart_rate": 164,
+  "score": {
+    "strain": 9.8
+  }
+}

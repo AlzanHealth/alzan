@@ -1,0 +1,10 @@
+{
+  "provider": "strava",
+  "sport_type": "Run",
+  "start_date": "2026-05-01T12:00:00Z",
+  "elapsed_time": 1680,
+  "distance": 5200,
+  "calories": 305,
+  "average_heartrate": 142,
+  "max_heartrate": 169
+}

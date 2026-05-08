@@ -1,0 +1,27 @@
+{
+  "Summary": {
+    "ActivityId": "garmin-swim-001",
+    "SummaryId": "summary-swim-001",
+    "ActivityType": "pool swimming",
+    "StartTimeInSeconds": 1777630200,
+    "DurationInSeconds": 2400,
+    "DistanceInMeters": 1500,
+    "ActiveKilocalories": 410,
+    "AverageHeartRateInBeatsPerMinute": 124,
+    "MaxHeartRateInBeatsPerMinute": 151,
+    "AverageSwimCadenceInStrokesPerMinute": 32,
+    "DeviceName": "Swim Test"
+  },
+  "Samples": [
+    {
+      "StartTimeInSeconds": 1777630200,
+      "HeartRate": 118,
+      "SwimCadenceInStrokesPerMinute": 30
+    },
+    {
+      "StartTimeInSeconds": 1777630260,
+      "HeartRate": 131,
+      "SwimCadenceInStrokesPerMinute": 34
+    }
+  ]
+}

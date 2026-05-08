@@ -1,0 +1,30 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 1,
+      "ActivityName": "Running",
+      "DateTime": "2026-05-01T10:00:00Z",
+      "Duration": 2733,
+      "Distance": 6890,
+      "Calories": 510,
+      "AverageHeartRate": 151,
+      "MaxHeartRate": 181
+    },
+    "Samples": [
+      {
+        "TimeISO8601": "2026-05-01T10:00:00Z",
+        "Latitude": 40.4168,
+        "Longitude": -3.7038,
+        "HR": 145,
+        "Distance": 0
+      },
+      {
+        "TimeISO8601": "2026-05-01T10:01:00Z",
+        "Latitude": 40.4178,
+        "Longitude": -3.7048,
+        "HR": 155,
+        "Distance": 170
+      }
+    ]
+  }
+}

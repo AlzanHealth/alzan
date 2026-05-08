@@ -1,0 +1,9 @@
+{
+  "sport_type": "football",
+  "started_at": "2026-05-01T21:00:00Z",
+  "durationSeconds": 5400,
+  "distanceMeters": 8200,
+  "calories_kcal": 740,
+  "avgHeartRate": 141,
+  "maxHeartRate": 186
+}

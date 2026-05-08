@@ -1,0 +1,20 @@
+{
+  "provider": "apple_health",
+  "workoutActivityType": "HKWorkoutActivityTypeTennis",
+  "startDate": "2026-05-01T18:00:00Z",
+  "endDate": "2026-05-01T18:55:00Z",
+  "duration": 3300,
+  "activeEnergyBurned": 480,
+  "averageHeartRate": 128,
+  "maxHeartRate": 168,
+  "samples": [
+    {
+      "timestamp": "2026-05-01T18:05:00Z",
+      "heartRate": 120
+    },
+    {
+      "timestamp": "2026-05-01T18:30:00Z",
+      "heartRate": 150
+    }
+  ]
+}

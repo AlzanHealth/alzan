@@ -1,0 +1,48 @@
+{
+  "Summary": {
+    "ActivityId": "garmin-run-001",
+    "SummaryId": "summary-run-001",
+    "ActivityType": "running",
+    "StartTimeInSeconds": 1777622400,
+    "DurationInSeconds": 1800,
+    "DistanceInMeters": 5000,
+    "ActiveKilocalories": 260,
+    "AverageHeartRateInBeatsPerMinute": 145,
+    "MaxHeartRateInBeatsPerMinute": 172,
+    "AverageSpeedInMetersPerSecond": 2.78,
+    "MaxSpeedInMetersPerSecond": 4.2,
+    "AverageRunCadenceInStepsPerMinute": 168,
+    "MaxRunCadenceInStepsPerMinute": 186,
+    "TotalElevationGainInMeters": 34,
+    "TotalElevationLossInMeters": 30,
+    "Steps": 6200,
+    "DeviceName": "Forerunner Test"
+  },
+  "Samples": [
+    {
+      "StartTimeInSeconds": 1777622400,
+      "LatitudeInDegree": 40.4168,
+      "LongitudeInDegree": -3.7038,
+      "HeartRate": 140,
+      "SpeedMetersPerSecond": 2.7,
+      "TotalDistanceInMeters": 0
+    },
+    {
+      "StartTimeInSeconds": 1777622460,
+      "LatitudeInDegree": 40.4178,
+      "LongitudeInDegree": -3.7048,
+      "HeartRate": 150,
+      "SpeedMetersPerSecond": 2.9,
+      "TotalDistanceInMeters": 170
+    }
+  ],
+  "Laps": [
+    {
+      "StartTimeInSeconds": 1777622400,
+      "DurationInSeconds": 1800,
+      "DistanceInMeters": 5000,
+      "AverageHeartRateInBeatsPerMinute": 145,
+      "MaxHeartRateInBeatsPerMinute": 172
+    }
+  ]
+}
