@@ -1,6 +1,7 @@
 import { CanonicalActivity } from './activity-import-canonical.types';
 import { buildEmptyGenericActivity, parseGenericActivityJsonToCanonical } from './generic-activity-canonical.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
+import { parseStravaActivityJsonToCanonical } from './strava-activity-canonical.mapper';
 import { parseSuuntoActivityFileToCanonical } from './suunto-activity-canonical.mapper';
 
 interface ParseActivityFileOptions {
@@ -153,6 +154,29 @@ function isSuuntoJson(parsed: JsonRecord): boolean {
   return isRecord(parsed.DeviceLog) || 'entryData' in parsed;
 }
 
+function readString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function hasStravaProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from]
+    .map(readString)
+    .some(value => value?.toLowerCase().includes('strava') ?? false);
+}
+
+function isStravaJson(parsed: JsonRecord): boolean {
+  if (hasStravaProviderSignal(parsed)) return true;
+  return (
+    'upload_id' in parsed ||
+    'upload_id_str' in parsed ||
+    'suffer_score' in parsed ||
+    'splits_metric' in parsed ||
+    'segment_efforts' in parsed ||
+    (isRecord(parsed.map) && ('summary_polyline' in parsed.map || 'polyline' in parsed.map)) ||
+    ('streams' in parsed && ('sport_type' in parsed || 'type' in parsed))
+  );
+}
+
 export function parseActivityFileToCanonical(
   content: string | Uint8Array,
   filename: string,
@@ -171,6 +195,8 @@ export function parseActivityFileToCanonical(
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
+    if (lower.includes('strava') || isStravaJson(parsed))
+      return parseStravaActivityJsonToCanonical(content, filename, options);
     if (lower.includes('garmin') || isGarminJson(parsed))
       return parseGarminActivityFileToCanonical(content, filename, options);
     if (lower.includes('suunto') || isSuuntoJson(parsed))

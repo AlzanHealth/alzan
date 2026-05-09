@@ -1440,10 +1440,10 @@ function parseJsonDetailed(
 
   try {
     const canonical = parseActivityFileToCanonical(rawJson, filename, options);
-    if (canonical.provider === 'garmin') {
+    if (canonical.provider === 'garmin' || canonical.provider === 'strava') {
       return finaliseParsedRoute(
         {
-          points: mapCanonicalStreamsToRoutePoints(canonical),
+          points: mapCanonicalActivityToRoutePoints(canonical),
           summaryOverrides: mergeCanonicalSummary({}, canonical),
           customSplits: mapCanonicalLapsToRouteLaps(canonical),
           heartRateZones: canonical.heartRateZones.length > 0 ? canonical.heartRateZones : undefined,
@@ -1876,6 +1876,28 @@ function mapCanonicalStreamsToRoutePoints(canonical: CanonicalActivity): RoutePo
     heartRate: findCanonicalMetricAtOffset(canonical.streams.heartRate, point.offsetSeconds),
     distanceM: findCanonicalMetricAtOffset(canonical.streams.distance, point.offsetSeconds),
   }));
+}
+
+function mapCanonicalPolylineToRoutePoints(canonical: CanonicalActivity): RoutePoint[] {
+  const rawPolyline = canonical.vendorFields.stravaPolyline;
+  if (typeof rawPolyline !== 'string' || rawPolyline.trim().length === 0) return [];
+  try {
+    return decodePolyline(rawPolyline).map(([lat, lon]) => ({
+      lat,
+      lon,
+      elevationM: null,
+      timestampSeconds: null,
+      heartRate: null,
+      distanceM: null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function mapCanonicalActivityToRoutePoints(canonical: CanonicalActivity): RoutePoint[] {
+  const streamPoints = mapCanonicalStreamsToRoutePoints(canonical);
+  return streamPoints.length > 0 ? streamPoints : mapCanonicalPolylineToRoutePoints(canonical);
 }
 
 function parseFitDataMessage(
