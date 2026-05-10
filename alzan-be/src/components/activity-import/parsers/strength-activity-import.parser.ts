@@ -165,12 +165,30 @@ function deriveEndTime(
   return new Date(new Date(startedAt).getTime() + durationSeconds * 1000).toISOString();
 }
 
+function parseIsoDurationSeconds(value: unknown): number | null {
+  const text = readString(value);
+  if (!text) return null;
+  const match = /^P(?:\d+D)?T?(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?$/i.exec(text);
+  if (!match) return null;
+  const hours = Number.parseFloat(match[1] ?? '0');
+  const minutes = Number.parseFloat(match[2] ?? '0');
+  const seconds = Number.parseFloat(match[3] ?? '0');
+  const total = hours * 3600 + minutes * 60 + seconds;
+  return Number.isFinite(total) && total > 0 ? total : null;
+}
+
 function readNestedMetric(record: JsonRecord, key: string, metricKey: string): number | null {
   const section = record[key];
   if (!Array.isArray(section) || section.length === 0) return null;
   const firstMetric = section[0];
   if (!isRecord(firstMetric)) return null;
   return readNumber(firstMetric[metricKey]);
+}
+
+function readNestedObjectMetric(record: JsonRecord, key: string, metricKey: string): number | null {
+  const section = record[key];
+  if (!isRecord(section)) return null;
+  return readNumber(section[metricKey]);
 }
 
 function providerToDatabaseProvider(provider: StrengthActivityProvider): DatabaseProvider {
@@ -197,6 +215,7 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
 
   if (!isRecord(parsed)) return 'unknown';
   if (isRecord(parsed.DeviceLog)) return 'suunto';
+  if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return 'polar';
 
   const sourceText = [
     readString(parsed.provider),
@@ -239,8 +258,12 @@ function isClearlyUnsupportedJsonActivity(parsed: unknown, distanceM: number | n
     readString(header.ActivityName),
     readString(header.activityName),
     readString(header.type),
+    readString(header.sport),
+    readString(header.detailed_sport_info),
     readString(parsed.sport_type),
     readString(parsed.sportType),
+    readString(parsed.sport),
+    readString(parsed.detailed_sport_info),
   ]
     .filter((value): value is string => value != null)
     .join(' ')
@@ -288,6 +311,33 @@ function parseHeartRateStream(samples: unknown, startedAt: string | null): Impor
   return stream;
 }
 
+function parsePolarHeartRateStream(
+  parsed: JsonRecord,
+  startedAt: string | null,
+): ImportedStrengthActivityHeartRateSample[] {
+  if (!Array.isArray(parsed.samples)) return [];
+  const heartRateSample = parsed.samples
+    .filter(isRecord)
+    .find(sample => readString(sample['sample-type']) === '0' || readString(sample.sampleType) === '0');
+  if (!heartRateSample) return [];
+  const data = readString(heartRateSample.data);
+  if (!data) return [];
+  const recordingRate = readNumber(heartRateSample['recording-rate']) ?? readNumber(heartRateSample.recordingRate) ?? 1;
+  return data
+    .split(',')
+    .map(value => readNumber(value))
+    .filter((value): value is number => value != null && value > 0)
+    .slice(0, HEART_RATE_STREAM_LIMIT)
+    .map((value, index) => {
+      const offsetSeconds = index * recordingRate;
+      return {
+        bpm: Math.round(normaliseHeartRate(value)),
+        timestamp: startedAt ? new Date(new Date(startedAt).getTime() + offsetSeconds * 1000).toISOString() : null,
+        offsetSeconds,
+      };
+    });
+}
+
 function buildHeartRateZonesFromHeader(
   header: JsonRecord | null,
   durationSeconds: number | null,
@@ -315,6 +365,20 @@ function buildHeartRateZonesFromHeader(
       zone: zone.zone,
       durationSeconds: Math.round(zone.durationSeconds),
       percentage: (zone.durationSeconds / totalDuration) * 100,
+    }))
+    .filter(zone => zone.durationSeconds > 0);
+}
+
+function buildPolarHeartRateZones(parsed: JsonRecord): ImportedStrengthActivityHeartRateZone[] {
+  const zones = Array.isArray(parsed.heart_rate_zones) ? parsed.heart_rate_zones.filter(isRecord) : [];
+  const durations = zones.slice(0, 5).map(zone => Math.max(0, parseIsoDurationSeconds(zone['in-zone']) ?? 0));
+  const totalDuration = durations.reduce((sum, value) => sum + value, 0);
+  if (totalDuration <= 0) return [];
+  return durations
+    .map((duration, index) => ({
+      zone: (index + 1) as 1 | 2 | 3 | 4 | 5,
+      durationSeconds: Math.round(duration),
+      percentage: (duration / totalDuration) * 100,
     }))
     .filter(zone => zone.durationSeconds > 0);
 }
@@ -474,7 +538,11 @@ function parseSuuntoJson(parsed: JsonRecord, options?: ParseStrengthActivityOpti
   };
 }
 
-function parseGenericJson(parsed: unknown, filename: string): ImportedStrengthActivitySummary {
+function parseGenericJson(
+  parsed: unknown,
+  filename: string,
+  options?: ParseStrengthActivityOptions,
+): ImportedStrengthActivitySummary {
   if (!isRecord(parsed)) {
     throw new Error(STRENGTH_ACTIVITY_PARSE_ERROR_TAG);
   }
@@ -493,16 +561,23 @@ function parseGenericJson(parsed: unknown, filename: string): ImportedStrengthAc
     readNumber(parsed.elapsed_time) ??
     readNumber(parsed.moving_time) ??
     readNumber(parsed.duration) ??
-    readNumber(parsed.durationSeconds);
+    readNumber(parsed.durationSeconds) ??
+    parseIsoDurationSeconds(parsed.duration);
   const endedAt = normaliseTimestamp(parsed.endTime ?? parsed.ended_at);
   const caloriesKcal =
     readNumber(parsed.calories) ??
     readNumber(parsed.calories_kcal) ??
     normaliseCaloriesFromEnergy(readNumber(parsed.energy) ?? readNumber(parsed.Energy) ?? 0);
   const avgHeartRate =
-    readNumber(parsed.average_heartrate) ?? readNumber(parsed.avgHeartRate) ?? readNumber(parsed.averageHeartRate);
+    readNumber(parsed.average_heartrate) ??
+    readNumber(parsed.avgHeartRate) ??
+    readNumber(parsed.averageHeartRate) ??
+    readNestedObjectMetric(parsed, 'heart_rate', 'average');
   const maxHeartRate =
-    readNumber(parsed.max_heartrate) ?? readNumber(parsed.maxHeartRate) ?? readNumber(parsed.maximumHeartRate);
+    readNumber(parsed.max_heartrate) ??
+    readNumber(parsed.maxHeartRate) ??
+    readNumber(parsed.maximumHeartRate) ??
+    readNestedObjectMetric(parsed, 'heart_rate', 'maximum');
   const minHeartRate =
     readNumber(parsed.min_heartrate) ?? readNumber(parsed.minHeartRate) ?? readNumber(parsed.minimumHeartRate);
   const totalSteps = readNumber(parsed.steps) ?? readNumber(parsed.totalSteps);
@@ -511,6 +586,8 @@ function parseGenericJson(parsed: unknown, filename: string): ImportedStrengthAc
   const pte = readNumber(parsed.pte) ?? readNumber(parsed.PTE) ?? readNumber(parsed.peak_training_effect);
   const tss = readNumber(parsed.tss) ?? readNumber(parsed.TSS) ?? readNumber(parsed.hrTSS);
   const rawDevice = isRecord(parsed.device) ? parsed.device : isRecord(parsed.Device) ? parsed.Device : null;
+  const polarHeartRateStream = parsePolarHeartRateStream(parsed, startedAt);
+  const heartRateZones = buildPolarHeartRateZones(parsed);
 
   return {
     provider,
@@ -534,9 +611,18 @@ function parseGenericJson(parsed: unknown, filename: string): ImportedStrengthAc
           model: readString(rawDevice.model) ?? readString(rawDevice.Model),
           serial: readString(rawDevice.serial) ?? readString(rawDevice.SerialNumber),
         }
-      : null,
-    heartRateZones: [],
-    heartRateStream: [],
+      : readString(parsed.device)
+        ? {
+            name: readString(parsed.device),
+            model: readString(parsed.device),
+            serial: readString(parsed.device_id),
+          }
+        : null,
+    heartRateZones:
+      heartRateZones.length > 0
+        ? heartRateZones
+        : buildHeartRateZonesFromStream(polarHeartRateStream, options?.estimatedMaxHeartRate),
+    heartRateStream: polarHeartRateStream,
   };
 }
 
@@ -932,7 +1018,7 @@ export function parseStrengthActivityJson(
     return parseSuuntoJson(parsed, options);
   }
 
-  return parseGenericJson(parsed, filename);
+  return parseGenericJson(parsed, filename, options);
 }
 
 export function parseStrengthActivityFile(

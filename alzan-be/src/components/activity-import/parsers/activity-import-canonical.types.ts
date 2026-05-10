@@ -190,3 +190,7 @@ export type SuuntoRecoveryCanonical = ProviderRecoveryCanonical<'suunto'>;
 export type GarminDailyActivityCanonical = ProviderDailyActivityCanonical<'garmin'>;
 export type GarminSleepCanonical = ProviderSleepCanonical<'garmin'>;
 export type GarminRecoveryCanonical = ProviderRecoveryCanonical<'garmin'>;
+
+export type PolarDailyActivityCanonical = ProviderDailyActivityCanonical<'polar'>;
+export type PolarSleepCanonical = ProviderSleepCanonical<'polar'>;
+export type PolarRecoveryCanonical = ProviderRecoveryCanonical<'polar'>;

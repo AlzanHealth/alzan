@@ -1,6 +1,7 @@
 import { CanonicalActivity } from './activity-import-canonical.types';
 import { buildEmptyGenericActivity, parseGenericActivityJsonToCanonical } from './generic-activity-canonical.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
+import { parsePolarActivityFileToCanonical } from './polar-activity-canonical.mapper';
 import { parseStravaActivityJsonToCanonical } from './strava-activity-canonical.mapper';
 import { parseSuuntoActivityFileToCanonical } from './suunto-activity-canonical.mapper';
 
@@ -164,6 +165,24 @@ function hasStravaProviderSignal(parsed: JsonRecord): boolean {
     .some(value => value?.toLowerCase().includes('strava') ?? false);
 }
 
+function hasPolarProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from, parsed.application]
+    .map(value => (isRecord(value) ? value.name : value))
+    .map(readString)
+    .some(value => value?.toLowerCase().includes('polar') ?? false);
+}
+
+function isPolarJson(parsed: JsonRecord): boolean {
+  if (hasPolarProviderSignal(parsed)) return true;
+  if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return true;
+  if ('training_load_pro' in parsed || 'heart_rate_zones' in parsed) return true;
+  if ('durationMillis' in parsed || 'trainingLoadReport' in parsed) return true;
+  if (Array.isArray(parsed.exercises) && ('sport' in parsed || 'product' in parsed || 'application' in parsed))
+    return true;
+  if (isRecord(parsed.product) && readString(parsed.product.modelName)?.toLowerCase().includes('polar')) return true;
+  return false;
+}
+
 function isStravaJson(parsed: JsonRecord): boolean {
   if (hasStravaProviderSignal(parsed)) return true;
   return (
@@ -186,6 +205,9 @@ export function parseActivityFileToCanonical(
   if (lower.endsWith('.fit')) {
     if (typeof content === 'string') throw new Error('Invalid FIT file.');
     const manufacturer = detectFitManufacturer(content);
+    if (lower.includes('polar')) {
+      return parsePolarActivityFileToCanonical(content, filename, options);
+    }
     if (manufacturer === GARMIN_MANUFACTURER_ID || lower.includes('garmin')) {
       return parseGarminActivityFileToCanonical(content, filename, options);
     }
@@ -195,6 +217,8 @@ export function parseActivityFileToCanonical(
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
+    if (lower.includes('polar') || isPolarJson(parsed))
+      return parsePolarActivityFileToCanonical(content, filename, options);
     if (lower.includes('strava') || isStravaJson(parsed))
       return parseStravaActivityJsonToCanonical(content, filename, options);
     if (lower.includes('garmin') || isGarminJson(parsed))
