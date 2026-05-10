@@ -111,39 +111,6 @@ function areEquivalentLaps(left: RouteImportLap[], right: RouteImportLap[]): boo
   });
 }
 
-function inferRegularAutoSplitDistance(customSplits: RouteImportLap[]): number | null {
-  if (customSplits.length < 2) return null;
-
-  const candidateDistances = [1000, 5000, 10000, 15000, 20000];
-  const distances = customSplits
-    .map(split => split.distanceM)
-    .filter(distance => Number.isFinite(distance) && distance > 0);
-  if (distances.length !== customSplits.length) return null;
-
-  for (const candidate of candidateDistances) {
-    let nearTarget = 0;
-    let shortRemainders = 0;
-
-    distances.forEach((distance, index) => {
-      if (areCloseValues(distance, candidate, 120)) {
-        nearTarget += 1;
-        return;
-      }
-
-      const isLast = index === distances.length - 1;
-      if (isLast && distance < candidate - 120 && distance > 0) {
-        shortRemainders += 1;
-      }
-    });
-
-    if (nearTarget >= distances.length - 1 && shortRemainders <= 1) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
 const WEB_DATE_PARTIAL_REGEX = /^\d{0,4}(-\d{0,2})?(-\d{0,2})?$/;
 const WEB_TIME_PARTIAL_REGEX = /^\d{0,2}(:\d{0,2})?$/;
 
@@ -555,17 +522,9 @@ export const EnduranceSessionFormScreen = () => {
   const splitTabs = React.useMemo<SplitTab[]>(() => {
     const tabs: SplitTab[] = [];
     const customSplits = routeDetails?.customSplits ?? [];
-    const customSplitLooksRegular = customSplits.every(
-      split => split.lapType === 'auto' || split.lapType === 'distance' || split.lapType === 'unknown',
-    );
-    const inferredRegularCustomDistance = inferRegularAutoSplitDistance(customSplits);
-    const customMatchesRegularBucket =
-      customSplitLooksRegular &&
-      inferredRegularCustomDistance != null &&
-      distanceSplitBuckets.some(bucket => areCloseValues(bucket.splitDistanceM, inferredRegularCustomDistance, 10));
     const customDuplicatesDistanceBucket =
       customSplits.length > 0 && distanceSplitBuckets.some(bucket => areEquivalentLaps(customSplits, bucket.laps));
-    const shouldShowCustom = customSplits.length > 0 && !customDuplicatesDistanceBucket && !customMatchesRegularBucket;
+    const shouldShowCustom = customSplits.length > 0 && !customDuplicatesDistanceBucket;
 
     if (shouldShowCustom) {
       tabs.push({

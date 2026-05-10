@@ -1,5 +1,6 @@
 import { strict as assert } from 'assert';
 import { ActivityImportService } from './activity-import.service';
+import { RouteImportDetails, RouteImportLap } from './parsers/route-import.parser';
 import { ImportedStrengthActivitySummary } from './parsers/strength-activity-import.parser';
 
 interface ActivityImportServicePrivate {
@@ -13,6 +14,11 @@ interface ActivityImportServicePrivate {
     summary: ImportedStrengthActivitySummary,
   ): Promise<void>;
   replaceStrengthStream(ctx: FakeUserCtx, sessionId: string, summary: ImportedStrengthActivitySummary): Promise<void>;
+  resolveRouteTabs(details: RouteImportDetails): Array<{
+    splitGroup: 'custom' | 'distance';
+    splitDistanceM: number | null;
+    laps: RouteImportLap[];
+  }>;
 }
 
 interface FakeUserCtx {
@@ -178,8 +184,66 @@ async function assertReplaceStrengthStreamPersistsImportedMetrics(): Promise<voi
   ]);
 }
 
+function assertProviderSplitsAreNotHiddenByComputedDistanceBuckets(): void {
+  const service = getPrivateService();
+  const providerSplits: RouteImportLap[] = [
+    {
+      lapIndex: 1,
+      lapType: 'auto',
+      distanceM: 1000,
+      durationSeconds: 316.7,
+      avgPaceSecondsPerKm: 316.7,
+      avgHeartRate: 136,
+      maxHeartRate: 148,
+      startOffsetSeconds: 0,
+      endOffsetSeconds: 316.7,
+    },
+    {
+      lapIndex: 2,
+      lapType: 'auto',
+      distanceM: 1000,
+      durationSeconds: 318.2,
+      avgPaceSecondsPerKm: 318.2,
+      avgHeartRate: 159,
+      maxHeartRate: 167,
+      startOffsetSeconds: 316.7,
+      endOffsetSeconds: 634.9,
+    },
+    {
+      lapIndex: 3,
+      lapType: 'auto',
+      distanceM: 1000,
+      durationSeconds: 321.9,
+      avgPaceSecondsPerKm: 321.9,
+      avgHeartRate: 164,
+      maxHeartRate: 169,
+      startOffsetSeconds: 634.9,
+      endOffsetSeconds: 956.8,
+    },
+  ];
+  const computedSplits: RouteImportLap[] = providerSplits.map((lap, index) => ({
+    ...lap,
+    durationSeconds: index === 2 ? 346.9 : lap.durationSeconds,
+    avgPaceSecondsPerKm: index === 2 ? 346.9 : lap.avgPaceSecondsPerKm,
+  }));
+  const tabs = service.resolveRouteTabs({
+    customSplits: providerSplits,
+    distanceSplits: [{ splitDistanceM: 1000, laps: computedSplits }],
+    splits1k: computedSplits,
+    splits5k: [],
+    splits10k: [],
+    heartRateZones: [],
+  });
+
+  assert.equal(tabs[0].splitGroup, 'custom');
+  assert.equal(tabs[0].laps[2].durationSeconds, 321.9);
+  assert.equal(tabs[1].splitGroup, 'distance');
+  assert.equal(tabs[1].laps[2].durationSeconds, 346.9);
+}
+
 async function run(): Promise<void> {
   assertBuildStrengthSessionUpdateUsesImportedMasterValues();
+  assertProviderSplitsAreNotHiddenByComputedDistanceBuckets();
   await assertReplaceStrengthHeartRateZonesReplacesRows();
   await assertReplaceStrengthStreamPersistsImportedMetrics();
 }

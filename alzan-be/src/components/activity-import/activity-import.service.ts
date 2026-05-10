@@ -405,17 +405,9 @@ export class ActivityImportService {
       .filter(bucket => bucket.laps.length > 0)
       .sort((left, right) => left.splitDistanceM - right.splitDistanceM);
     const customSplits = details.customSplits;
-    const customSplitLooksRegular = customSplits.every(
-      split => split.lapType === 'auto' || split.lapType === 'distance' || split.lapType === 'unknown',
-    );
-    const inferredRegularCustomDistance = this.inferRegularAutoSplitDistance(customSplits);
-    const customMatchesRegularBucket =
-      customSplitLooksRegular &&
-      inferredRegularCustomDistance != null &&
-      distanceBuckets.some(bucket => this.areCloseValues(bucket.splitDistanceM, inferredRegularCustomDistance, 10));
     const customDuplicatesDistanceBucket =
       customSplits.length > 0 && distanceBuckets.some(bucket => this.areEquivalentLaps(customSplits, bucket.laps));
-    const shouldShowCustom = customSplits.length > 0 && !customDuplicatesDistanceBucket && !customMatchesRegularBucket;
+    const shouldShowCustom = customSplits.length > 0 && !customDuplicatesDistanceBucket;
 
     if (shouldShowCustom) {
       tabs.push({ splitGroup: 'custom', splitDistanceM: null, laps: customSplits });
@@ -459,39 +451,6 @@ export class ActivityImportService {
 
       return distanceMatches && durationMatches;
     });
-  }
-
-  private inferRegularAutoSplitDistance(customSplits: RouteImportLap[]): number | null {
-    if (customSplits.length < 2) return null;
-
-    const candidateDistances = [1000, 5000, 10000, 15000, 20000];
-    const distances = customSplits
-      .map(split => split.distanceM)
-      .filter(distance => Number.isFinite(distance) && distance > 0);
-    if (distances.length !== customSplits.length) return null;
-
-    for (const candidate of candidateDistances) {
-      let nearTarget = 0;
-      let shortRemainders = 0;
-
-      distances.forEach((distance, index) => {
-        if (this.areCloseValues(distance, candidate, 120)) {
-          nearTarget += 1;
-          return;
-        }
-
-        const isLast = index === distances.length - 1;
-        if (isLast && distance < candidate - 120 && distance > 0) {
-          shortRemainders += 1;
-        }
-      });
-
-      if (nearTarget >= distances.length - 1 && shortRemainders <= 1) {
-        return candidate;
-      }
-    }
-
-    return null;
   }
 
   private buildRouteZoneRows(sessionId: string, details: RouteImportDetails): ActivityHeartRateZoneInsert[] {

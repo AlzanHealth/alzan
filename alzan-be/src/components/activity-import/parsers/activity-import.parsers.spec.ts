@@ -92,7 +92,80 @@ function assertGpxRouteParses(): void {
   assert.ok(parsed.details.distanceSplits.length >= 0);
 }
 
+function assertSuuntoJsonKeepsNativeAutoLapDurations(): void {
+  const rawJson = JSON.stringify({
+    DeviceLog: {
+      Header: {
+        ActivityType: 3,
+        Activity: 'Running',
+        Distance: 8023,
+        Duration: 2638.264,
+      },
+      Samples: [
+        {
+          TimeISO8601: '2026-05-09T19:29:52.819+02:00',
+          Latitude: 0.6841518089661335,
+          Longitude: -0.008894602784549566,
+        },
+        {
+          TimeISO8601: '2026-05-09T19:46:52.819+02:00',
+          Latitude: 0.6841955957864075,
+          Longitude: -0.008928572127781132,
+        },
+      ],
+      Windows: [
+        {
+          Window: {
+            Type: 'Autolap',
+            Distance: 1000,
+            DistanceMax: 1000,
+            Duration: 316.7,
+            HR: [{ Avg: 2.271, Max: 2.467 }],
+            Speed: [{ Avg: 3.158 }],
+          },
+        },
+        {
+          Window: {
+            Type: 'Autolap',
+            Distance: 1000,
+            DistanceMax: 1000,
+            Duration: 318.2,
+            HR: [{ Avg: 2.657, Max: 2.783 }],
+            Speed: [{ Avg: 3.142 }],
+          },
+        },
+        {
+          Window: {
+            Type: 'Autolap',
+            Distance: 1000,
+            DistanceMax: 1000,
+            Duration: 321.9,
+            HR: [{ Avg: 2.738, Max: 2.817 }],
+            Speed: [{ Avg: 3.107 }],
+          },
+        },
+        {
+          Window: {
+            Type: 'Activity',
+            Distance: 8023,
+            DistanceMax: 8023,
+            Duration: 2609,
+          },
+        },
+      ],
+    },
+  });
+
+  const parsed = parseRouteFileWithSummary(rawJson, 'suunto-running.json', { estimatedMaxHeartRate: 195 });
+
+  assert.equal(parsed.details.customSplits.length, 3);
+  assert.equal(parsed.details.customSplits[2].durationSeconds, 321.9);
+  assert.equal(Math.round(parsed.details.customSplits[2].avgPaceSecondsPerKm ?? 0), 322);
+  assert.equal(Math.round(parsed.details.customSplits[2].avgHeartRate ?? 0), 164);
+}
+
 assertSuuntoStrengthJsonParses();
 assertClearEnduranceStrengthJsonIsRejected();
 assertSuuntoDistanceActivityIsRejectedForStrength();
 assertGpxRouteParses();
+assertSuuntoJsonKeepsNativeAutoLapDurations();
