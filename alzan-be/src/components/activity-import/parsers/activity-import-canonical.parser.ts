@@ -2,6 +2,7 @@ import { CanonicalActivity } from './activity-import-canonical.types';
 import { parseFitbitActivityJsonToCanonical } from './fitbit-activity-canonical.mapper';
 import { buildEmptyGenericActivity, parseGenericActivityJsonToCanonical } from './generic-activity-canonical.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
+import { parseOuraActivityJsonToCanonical } from './oura-activity-canonical.mapper';
 import { parsePolarActivityFileToCanonical } from './polar-activity-canonical.mapper';
 import { parseStravaActivityJsonToCanonical } from './strava-activity-canonical.mapper';
 import { parseSuuntoActivityFileToCanonical } from './suunto-activity-canonical.mapper';
@@ -180,6 +181,13 @@ function hasFitbitProviderSignal(parsed: JsonRecord): boolean {
     .some(value => value?.toLowerCase().includes('fitbit') ?? false);
 }
 
+function hasOuraProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from]
+    .map(value => (isRecord(value) ? value.name : value))
+    .map(readString)
+    .some(value => value?.toLowerCase().includes('oura') ?? false);
+}
+
 function isFitbitJson(parsed: JsonRecord): boolean {
   if (hasFitbitProviderSignal(parsed)) return true;
   if ('logId' in parsed && ('activityTypeId' in parsed || 'activityName' in parsed)) return true;
@@ -188,6 +196,26 @@ function isFitbitJson(parsed: JsonRecord): boolean {
   if (Array.isArray(parsed.activities)) {
     return parsed.activities.some(
       activity => isRecord(activity) && ('logId' in activity || 'activityTypeId' in activity),
+    );
+  }
+  return false;
+}
+
+function isOuraJson(parsed: JsonRecord): boolean {
+  if (hasOuraProviderSignal(parsed)) return true;
+  if ('activity' in parsed && ('start_datetime' in parsed || 'end_datetime' in parsed || 'intensity' in parsed))
+    return true;
+  if (
+    'daily_activity' in parsed ||
+    'readiness' in parsed ||
+    'sleep' in parsed ||
+    'spo2' in parsed ||
+    'sessions' in parsed
+  )
+    return true;
+  if (Array.isArray(parsed.data)) {
+    return parsed.data.some(
+      item => isRecord(item) && ('activity' in item || 'bedtime_start' in item || 'total_sleep_duration' in item),
     );
   }
   return false;
@@ -238,6 +266,8 @@ export function parseActivityFileToCanonical(
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
+    if (lower.includes('oura') || isOuraJson(parsed))
+      return parseOuraActivityJsonToCanonical(content, filename, options);
     if (lower.includes('fitbit') || isFitbitJson(parsed))
       return parseFitbitActivityJsonToCanonical(content, filename, options);
     if (lower.includes('polar') || isPolarJson(parsed))

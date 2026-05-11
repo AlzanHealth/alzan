@@ -1444,7 +1444,8 @@ function parseJsonDetailed(
       canonical.provider === 'garmin' ||
       canonical.provider === 'strava' ||
       canonical.provider === 'polar' ||
-      canonical.provider === 'fitbit'
+      canonical.provider === 'fitbit' ||
+      canonical.provider === 'oura'
     ) {
       return finaliseParsedRoute(
         {

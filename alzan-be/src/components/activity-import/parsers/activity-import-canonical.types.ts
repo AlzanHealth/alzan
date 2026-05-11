@@ -198,3 +198,7 @@ export type PolarRecoveryCanonical = ProviderRecoveryCanonical<'polar'>;
 export type FitbitDailyActivityCanonical = ProviderDailyActivityCanonical<'fitbit'>;
 export type FitbitSleepCanonical = ProviderSleepCanonical<'fitbit'>;
 export type FitbitRecoveryCanonical = ProviderRecoveryCanonical<'fitbit'>;
+
+export type OuraDailyActivityCanonical = ProviderDailyActivityCanonical<'oura'>;
+export type OuraSleepCanonical = ProviderSleepCanonical<'oura'>;
+export type OuraRecoveryCanonical = ProviderRecoveryCanonical<'oura'>;

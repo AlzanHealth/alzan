@@ -1,6 +1,6 @@
 import { Database } from '../../../types/database.types';
 
-export type StrengthActivityProvider = 'suunto' | 'strava' | 'garmin' | 'polar' | 'fitbit' | 'unknown';
+export type StrengthActivityProvider = 'suunto' | 'strava' | 'garmin' | 'polar' | 'fitbit' | 'oura' | 'unknown';
 export type StrengthActivitySourceFileType = 'fit' | 'json';
 
 export interface ImportedStrengthActivityDevice {
@@ -165,6 +165,14 @@ function deriveEndTime(
   return new Date(new Date(startedAt).getTime() + durationSeconds * 1000).toISOString();
 }
 
+function deriveDurationSeconds(startedAt: string | null, endedAt: string | null): number | null {
+  if (!startedAt || !endedAt) return null;
+  const startedMs = new Date(startedAt).getTime();
+  const endedMs = new Date(endedAt).getTime();
+  if (!Number.isFinite(startedMs) || !Number.isFinite(endedMs) || endedMs <= startedMs) return null;
+  return Math.round((endedMs - startedMs) / 1000);
+}
+
 function parseIsoDurationSeconds(value: unknown): number | null {
   const text = readString(value);
   if (!text) return null;
@@ -192,7 +200,7 @@ function readNestedObjectMetric(record: JsonRecord, key: string, metricKey: stri
 }
 
 function providerToDatabaseProvider(provider: StrengthActivityProvider): DatabaseProvider {
-  if (provider === 'unknown') return 'other';
+  if (provider === 'unknown' || provider === 'oura') return 'other';
   return provider;
 }
 
@@ -207,6 +215,7 @@ function detectProviderFromFilename(filename: string): StrengthActivityProvider 
   if (lower.includes('garmin')) return 'garmin';
   if (lower.includes('polar')) return 'polar';
   if (lower.includes('fitbit')) return 'fitbit';
+  if (lower.includes('oura')) return 'oura';
   return 'unknown';
 }
 
@@ -219,6 +228,8 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return 'polar';
   if ('logId' in parsed || 'activityTypeId' in parsed || 'tcxLink' in parsed || 'activeZoneMinutes' in parsed)
     return 'fitbit';
+  if ('activity' in parsed && ('start_datetime' in parsed || 'end_datetime' in parsed || 'intensity' in parsed))
+    return 'oura';
 
   const sourceText = [
     readString(parsed.provider),
@@ -235,6 +246,7 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if (sourceText.includes('garmin')) return 'garmin';
   if (sourceText.includes('polar')) return 'polar';
   if (sourceText.includes('fitbit')) return 'fitbit';
+  if (sourceText.includes('oura')) return 'oura';
   if (sourceText.includes('suunto')) return 'suunto';
 
   return 'unknown';
@@ -263,10 +275,12 @@ function isClearlyUnsupportedJsonActivity(parsed: unknown, distanceM: number | n
     readString(header.activityName),
     readString(header.type),
     readString(header.sport),
+    readString(header.activity),
     readString(header.detailed_sport_info),
     readString(parsed.sport_type),
     readString(parsed.sportType),
     readString(parsed.sport),
+    readString(parsed.activity),
     readString(parsed.detailed_sport_info),
   ]
     .filter((value): value is string => value != null)
@@ -416,6 +430,36 @@ function parseFitbitHeartRateStream(
       startedMs != null && timestampMs != null && Number.isFinite(timestampMs)
         ? Math.max(0, Math.round((timestampMs - startedMs) / 1000))
         : index * 60;
+    stream.push({
+      bpm: Math.round(normaliseHeartRate(bpm)),
+      timestamp:
+        timestamp ?? (startedAt ? new Date(new Date(startedAt).getTime() + offsetSeconds * 1000).toISOString() : null),
+      offsetSeconds,
+    });
+  });
+  return stream;
+}
+
+function parseOuraHeartRateStream(
+  parsed: JsonRecord,
+  startedAt: string | null,
+): ImportedStrengthActivityHeartRateSample[] {
+  const rawStream = parsed.heart_rate ?? parsed.heartRate ?? parsed.heartrate;
+  const samples = Array.isArray(rawStream) ? rawStream : isRecord(rawStream) ? [rawStream] : [];
+  const stream: ImportedStrengthActivityHeartRateSample[] = [];
+  samples.slice(0, HEART_RATE_STREAM_LIMIT).forEach((sample, index) => {
+    if (!isRecord(sample)) return;
+    const source = readString(sample.source)?.toLowerCase();
+    if (source && source !== 'workout') return;
+    const timestamp = normaliseTimestamp(sample.timestamp ?? sample.time ?? sample.dateTime);
+    const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
+    const startedMs = startedAt ? new Date(startedAt).getTime() : null;
+    const offsetSeconds =
+      startedMs != null && timestampMs != null && Number.isFinite(timestampMs)
+        ? Math.max(0, Math.round((timestampMs - startedMs) / 1000))
+        : index * 60;
+    const bpm = readNumber(sample.bpm) ?? readNumber(sample.value);
+    if (bpm == null || bpm <= 0) return;
     stream.push({
       bpm: Math.round(normaliseHeartRate(bpm)),
       timestamp:
@@ -623,7 +667,12 @@ function parseGenericJson(
   }
 
   const startedAt = normaliseTimestamp(
-    parsed.start_date ?? parsed.start_date_local ?? parsed.startTime ?? parsed.started_at ?? parsed.date,
+    parsed.start_date ??
+      parsed.start_date_local ??
+      parsed.startTime ??
+      parsed.start_datetime ??
+      parsed.started_at ??
+      parsed.date,
   );
   const rawDuration =
     readNumber(parsed.elapsed_time) ??
@@ -633,23 +682,29 @@ function parseGenericJson(
     parseIsoDurationSeconds(parsed.duration);
   const durationSeconds =
     provider === 'fitbit' && rawDuration != null && rawDuration > 10000 ? rawDuration / 1000 : rawDuration;
-  const endedAt = normaliseTimestamp(parsed.endTime ?? parsed.ended_at);
+  const explicitEndedAt = normaliseTimestamp(parsed.endTime ?? parsed.end_datetime ?? parsed.ended_at);
+  const derivedDurationSeconds = durationSeconds ?? deriveDurationSeconds(startedAt, explicitEndedAt);
   const caloriesKcal =
     readNumber(parsed.calories) ??
     readNumber(parsed.calories_kcal) ??
     normaliseCaloriesFromEnergy(readNumber(parsed.energy) ?? readNumber(parsed.Energy) ?? 0);
   const avgHeartRate =
     readNumber(parsed.average_heartrate) ??
+    readNumber(parsed.average_heart_rate) ??
     readNumber(parsed.avgHeartRate) ??
     readNumber(parsed.averageHeartRate) ??
     readNestedObjectMetric(parsed, 'heart_rate', 'average');
   const maxHeartRate =
     readNumber(parsed.max_heartrate) ??
+    readNumber(parsed.max_heart_rate) ??
     readNumber(parsed.maxHeartRate) ??
     readNumber(parsed.maximumHeartRate) ??
     readNestedObjectMetric(parsed, 'heart_rate', 'maximum');
   const minHeartRate =
-    readNumber(parsed.min_heartrate) ?? readNumber(parsed.minHeartRate) ?? readNumber(parsed.minimumHeartRate);
+    readNumber(parsed.min_heartrate) ??
+    readNumber(parsed.min_heart_rate) ??
+    readNumber(parsed.minHeartRate) ??
+    readNumber(parsed.minimumHeartRate);
   const totalSteps = readNumber(parsed.steps) ?? readNumber(parsed.totalSteps);
   const recoveryTimeSeconds = readNumber(parsed.recovery_time) ?? readNumber(parsed.recoveryTimeSeconds);
   const epoc = readNumber(parsed.epoc) ?? readNumber(parsed.EPOC);
@@ -664,15 +719,21 @@ function parseGenericJson(
         : null;
   const polarHeartRateStream = parsePolarHeartRateStream(parsed, startedAt);
   const fitbitHeartRateStream = parseFitbitHeartRateStream(parsed, startedAt);
-  const heartRateStream = fitbitHeartRateStream.length > 0 ? fitbitHeartRateStream : polarHeartRateStream;
+  const ouraHeartRateStream = parseOuraHeartRateStream(parsed, startedAt);
+  const heartRateStream =
+    ouraHeartRateStream.length > 0
+      ? ouraHeartRateStream
+      : fitbitHeartRateStream.length > 0
+        ? fitbitHeartRateStream
+        : polarHeartRateStream;
   const heartRateZones = provider === 'fitbit' ? buildFitbitHeartRateZones(parsed) : buildPolarHeartRateZones(parsed);
 
   return {
     provider,
     sourceFileType: 'json',
     startedAt,
-    endedAt: deriveEndTime(startedAt, durationSeconds ?? null, endedAt),
-    durationSeconds: roundNullable(durationSeconds),
+    endedAt: deriveEndTime(startedAt, derivedDurationSeconds ?? null, explicitEndedAt),
+    durationSeconds: roundNullable(derivedDurationSeconds),
     caloriesKcal: roundNullable(caloriesKcal),
     avgHeartRate: avgHeartRate != null ? roundNullable(normaliseHeartRate(avgHeartRate)) : null,
     maxHeartRate: maxHeartRate != null ? roundNullable(normaliseHeartRate(maxHeartRate)) : null,
