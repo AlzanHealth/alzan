@@ -7,6 +7,7 @@ import { parsePolarActivityFileToCanonical } from './polar-activity-canonical.ma
 import { parseStravaActivityJsonToCanonical } from './strava-activity-canonical.mapper';
 import { parseSuuntoActivityFileToCanonical } from './suunto-activity-canonical.mapper';
 import { parseUltrahumanActivityJsonToCanonical } from './ultrahuman-activity-canonical.mapper';
+import { parseWhoopActivityJsonToCanonical } from './whoop-activity-canonical.mapper';
 
 interface ParseActivityFileOptions {
   estimatedMaxHeartRate?: number | null;
@@ -196,6 +197,13 @@ function hasUltrahumanProviderSignal(parsed: JsonRecord): boolean {
     .some(value => value?.toLowerCase().includes('ultrahuman') ?? false);
 }
 
+function hasWhoopProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from]
+    .map(value => (isRecord(value) ? value.name : value))
+    .map(readString)
+    .some(value => value?.toLowerCase().includes('whoop') ?? false);
+}
+
 function isFitbitJson(parsed: JsonRecord): boolean {
   if (hasFitbitProviderSignal(parsed)) return true;
   if ('logId' in parsed && ('activityTypeId' in parsed || 'activityName' in parsed)) return true;
@@ -251,6 +259,21 @@ function isUltrahumanJson(parsed: JsonRecord): boolean {
   });
 }
 
+function isWhoopJson(parsed: JsonRecord): boolean {
+  if (hasWhoopProviderSignal(parsed)) return true;
+  if ('sport_name' in parsed && ('score_state' in parsed || 'score' in parsed || 'start' in parsed)) return true;
+  if ('cycle_id' in parsed || 'stage_summary' in parsed || 'sleep_needed' in parsed) return true;
+  if ('recovery_score' in parsed || 'hrv_rmssd_milli' in parsed) return true;
+  if (isRecord(parsed.score)) {
+    return 'strain' in parsed.score || 'zone_durations' in parsed.score || 'recovery_score' in parsed.score;
+  }
+  return ['records', 'data', 'workouts', 'sleeps', 'recoveries', 'cycles'].some(key => {
+    const value = parsed[key];
+    if (!Array.isArray(value) || !isRecord(value[0])) return false;
+    return isWhoopJson(value[0]);
+  });
+}
+
 function isPolarJson(parsed: JsonRecord): boolean {
   if (hasPolarProviderSignal(parsed)) return true;
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return true;
@@ -296,6 +319,8 @@ export function parseActivityFileToCanonical(
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
+    if (lower.includes('whoop') || isWhoopJson(parsed))
+      return parseWhoopActivityJsonToCanonical(content, filename, options);
     if (lower.includes('ultrahuman') || isUltrahumanJson(parsed))
       return parseUltrahumanActivityJsonToCanonical(content, filename, options);
     if (lower.includes('oura') || isOuraJson(parsed))

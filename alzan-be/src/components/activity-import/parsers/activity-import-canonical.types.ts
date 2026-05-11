@@ -176,6 +176,7 @@ export interface ProviderRecoveryCanonical<TSource extends CanonicalActivityProv
   bodyBatteryEnd?: number | null;
   restingHrBpm?: number | null;
   avgHrvMs?: number | null;
+  hrvRmssdMs?: number | null;
   respiratoryRateRpm?: number | null;
   spo2AvgPct?: number | null;
   balance: number | null;
@@ -206,6 +207,25 @@ export type OuraRecoveryCanonical = ProviderRecoveryCanonical<'oura'>;
 export type UltrahumanDailyActivityCanonical = ProviderDailyActivityCanonical<'ultrahuman'>;
 export type UltrahumanSleepCanonical = ProviderSleepCanonical<'ultrahuman'>;
 export type UltrahumanRecoveryCanonical = ProviderRecoveryCanonical<'ultrahuman'>;
+
+export interface WhoopCycleCanonical {
+  source: 'whoop';
+  sourceCycleId: string | null;
+  date: string;
+  timezone: string;
+  startTime: string;
+  endTime: string | null;
+  scoreState: string | null;
+  strainScore: number | null;
+  kilojoule: number | null;
+  caloriesKcal: number | null;
+  avgHeartRateBpm: number | null;
+  maxHeartRateBpm: number | null;
+  rawPayload: Record<string, unknown>;
+}
+
+export type WhoopSleepCanonical = ProviderSleepCanonical<'whoop'>;
+export type WhoopRecoveryCanonical = ProviderRecoveryCanonical<'whoop'>;
 
 export interface UltrahumanMetabolicCanonical {
   source: 'ultrahuman';

@@ -6,6 +6,7 @@ export type StrengthActivityProvider =
   | 'garmin'
   | 'polar'
   | 'fitbit'
+  | 'whoop'
   | 'oura'
   | 'ultrahuman'
   | 'unknown';
@@ -208,7 +209,8 @@ function readNestedObjectMetric(record: JsonRecord, key: string, metricKey: stri
 }
 
 function providerToDatabaseProvider(provider: StrengthActivityProvider): DatabaseProvider {
-  if (provider === 'unknown' || provider === 'oura' || provider === 'ultrahuman') return 'other';
+  if (provider === 'unknown' || provider === 'whoop' || provider === 'oura' || provider === 'ultrahuman')
+    return 'other';
   return provider;
 }
 
@@ -223,6 +225,7 @@ function detectProviderFromFilename(filename: string): StrengthActivityProvider 
   if (lower.includes('garmin')) return 'garmin';
   if (lower.includes('polar')) return 'polar';
   if (lower.includes('fitbit')) return 'fitbit';
+  if (lower.includes('whoop')) return 'whoop';
   if (lower.includes('oura')) return 'oura';
   if (lower.includes('ultrahuman')) return 'ultrahuman';
   return 'unknown';
@@ -237,6 +240,8 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return 'polar';
   if ('logId' in parsed || 'activityTypeId' in parsed || 'tcxLink' in parsed || 'activeZoneMinutes' in parsed)
     return 'fitbit';
+  if ('sport_name' in parsed && ('score_state' in parsed || 'score' in parsed || 'start' in parsed)) return 'whoop';
+  if (isRecord(parsed.score) && ('strain' in parsed.score || 'zone_durations' in parsed.score)) return 'whoop';
   if ('activity' in parsed && ('start_datetime' in parsed || 'end_datetime' in parsed || 'intensity' in parsed))
     return 'oura';
   if ('movement_index' in parsed || 'recovery_index' in parsed || 'metabolic_score' in parsed) return 'ultrahuman';
@@ -259,6 +264,7 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if (sourceText.includes('garmin')) return 'garmin';
   if (sourceText.includes('polar')) return 'polar';
   if (sourceText.includes('fitbit')) return 'fitbit';
+  if (sourceText.includes('whoop')) return 'whoop';
   if (sourceText.includes('oura')) return 'oura';
   if (sourceText.includes('ultrahuman')) return 'ultrahuman';
   if (sourceText.includes('suunto')) return 'suunto';
@@ -289,11 +295,13 @@ function isClearlyUnsupportedJsonActivity(parsed: unknown, distanceM: number | n
     readString(header.activityName),
     readString(header.type),
     readString(header.sport),
+    readString(header.sport_name),
     readString(header.activity),
     readString(header.detailed_sport_info),
     readString(parsed.sport_type),
     readString(parsed.sportType),
     readString(parsed.sport),
+    readString(parsed.sport_name),
     readString(parsed.activity),
     readString(parsed.detailed_sport_info),
   ]
@@ -543,6 +551,29 @@ function buildFitbitHeartRateZones(parsed: JsonRecord): ImportedStrengthActivity
     : [];
 }
 
+function buildWhoopHeartRateZones(parsed: JsonRecord): ImportedStrengthActivityHeartRateZone[] {
+  const score = isRecord(parsed.score) ? parsed.score : parsed;
+  const zoneDurations = isRecord(score.zone_durations) ? score.zone_durations : {};
+  const allZones: ImportedStrengthActivityHeartRateZone[] = [
+    {
+      zone: 1,
+      durationSeconds: Math.round(
+        ((readNumber(zoneDurations.zone_zero_milli) ?? 0) + (readNumber(zoneDurations.zone_one_milli) ?? 0)) / 1000,
+      ),
+      percentage: 0,
+    },
+    { zone: 2, durationSeconds: Math.round((readNumber(zoneDurations.zone_two_milli) ?? 0) / 1000), percentage: 0 },
+    { zone: 3, durationSeconds: Math.round((readNumber(zoneDurations.zone_three_milli) ?? 0) / 1000), percentage: 0 },
+    { zone: 4, durationSeconds: Math.round((readNumber(zoneDurations.zone_four_milli) ?? 0) / 1000), percentage: 0 },
+    { zone: 5, durationSeconds: Math.round((readNumber(zoneDurations.zone_five_milli) ?? 0) / 1000), percentage: 0 },
+  ];
+  const mapped = allZones.filter(zone => zone.durationSeconds > 0);
+  const totalDuration = mapped.reduce((sum, zone) => sum + zone.durationSeconds, 0);
+  return totalDuration > 0
+    ? mapped.map(zone => ({ ...zone, percentage: (zone.durationSeconds / totalDuration) * 100 }))
+    : [];
+}
+
 function resolveHeartRateZone(normalisedHeartRate: number): 1 | 2 | 3 | 4 | 5 {
   if (normalisedHeartRate >= 0.9) return 5;
   if (normalisedHeartRate >= 0.8) return 4;
@@ -717,6 +748,7 @@ function parseGenericJson(
   const startedAt = normaliseTimestamp(
     parsed.start_date ??
       parsed.start_date_local ??
+      parsed.start ??
       parsed.startTime ??
       parsed.start_datetime ??
       parsed.started_at ??
@@ -730,19 +762,24 @@ function parseGenericJson(
     parseIsoDurationSeconds(parsed.duration);
   const durationSeconds =
     provider === 'fitbit' && rawDuration != null && rawDuration > 10000 ? rawDuration / 1000 : rawDuration;
-  const explicitEndedAt = normaliseTimestamp(parsed.endTime ?? parsed.end_datetime ?? parsed.ended_at);
+  const explicitEndedAt = normaliseTimestamp(parsed.end ?? parsed.endTime ?? parsed.end_datetime ?? parsed.ended_at);
   const derivedDurationSeconds = durationSeconds ?? deriveDurationSeconds(startedAt, explicitEndedAt);
+  const score = isRecord(parsed.score) ? parsed.score : {};
+  const whoopKilojoule = readNumber(score.kilojoule) ?? readNumber(parsed.kilojoule);
   const caloriesKcal =
     readNumber(parsed.calories) ??
     readNumber(parsed.calories_kcal) ??
+    (provider === 'whoop' && whoopKilojoule != null ? whoopKilojoule / 4.184 : null) ??
     normaliseCaloriesFromEnergy(readNumber(parsed.energy) ?? readNumber(parsed.Energy) ?? 0);
   const avgHeartRate =
+    readNumber(score.average_heart_rate) ??
     readNumber(parsed.average_heartrate) ??
     readNumber(parsed.average_heart_rate) ??
     readNumber(parsed.avgHeartRate) ??
     readNumber(parsed.averageHeartRate) ??
     readNestedObjectMetric(parsed, 'heart_rate', 'average');
   const maxHeartRate =
+    readNumber(score.max_heart_rate) ??
     readNumber(parsed.max_heartrate) ??
     readNumber(parsed.max_heart_rate) ??
     readNumber(parsed.maxHeartRate) ??
@@ -777,7 +814,12 @@ function parseGenericJson(
         : fitbitHeartRateStream.length > 0
           ? fitbitHeartRateStream
           : polarHeartRateStream;
-  const heartRateZones = provider === 'fitbit' ? buildFitbitHeartRateZones(parsed) : buildPolarHeartRateZones(parsed);
+  const heartRateZones =
+    provider === 'fitbit'
+      ? buildFitbitHeartRateZones(parsed)
+      : provider === 'whoop'
+        ? buildWhoopHeartRateZones(parsed)
+        : buildPolarHeartRateZones(parsed);
 
   return {
     provider,
