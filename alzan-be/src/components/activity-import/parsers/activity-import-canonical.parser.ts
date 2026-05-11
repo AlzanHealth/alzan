@@ -6,6 +6,7 @@ import { parseOuraActivityJsonToCanonical } from './oura-activity-canonical.mapp
 import { parsePolarActivityFileToCanonical } from './polar-activity-canonical.mapper';
 import { parseStravaActivityJsonToCanonical } from './strava-activity-canonical.mapper';
 import { parseSuuntoActivityFileToCanonical } from './suunto-activity-canonical.mapper';
+import { parseUltrahumanActivityJsonToCanonical } from './ultrahuman-activity-canonical.mapper';
 
 interface ParseActivityFileOptions {
   estimatedMaxHeartRate?: number | null;
@@ -188,6 +189,13 @@ function hasOuraProviderSignal(parsed: JsonRecord): boolean {
     .some(value => value?.toLowerCase().includes('oura') ?? false);
 }
 
+function hasUltrahumanProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from]
+    .map(value => (isRecord(value) ? value.name : value))
+    .map(readString)
+    .some(value => value?.toLowerCase().includes('ultrahuman') ?? false);
+}
+
 function isFitbitJson(parsed: JsonRecord): boolean {
   if (hasFitbitProviderSignal(parsed)) return true;
   if ('logId' in parsed && ('activityTypeId' in parsed || 'activityName' in parsed)) return true;
@@ -219,6 +227,28 @@ function isOuraJson(parsed: JsonRecord): boolean {
     );
   }
   return false;
+}
+
+function isUltrahumanJson(parsed: JsonRecord): boolean {
+  if (hasUltrahumanProviderSignal(parsed)) return true;
+  if ('movement_index' in parsed || 'recovery_index' in parsed || 'metabolic_score' in parsed) return true;
+  if ('glucose' in parsed || 'cgm' in parsed || 'vo2_max' in parsed) return true;
+  if ('movement' in parsed && ('heart_rate' in parsed || 'recovery' in parsed || 'vo2_max' in parsed)) return true;
+  const metricData = isRecord(parsed.data) && Array.isArray(parsed.data.metric_data) ? parsed.data.metric_data : [];
+  return metricData.some(metric => {
+    if (!isRecord(metric)) return false;
+    const type = readString(metric.type)?.toLowerCase();
+    return (
+      type === 'sleep' ||
+      type === 'steps' ||
+      type === 'movement_index' ||
+      type === 'recovery_index' ||
+      type === 'metabolic_score' ||
+      type === 'glucose' ||
+      type === 'average_glucose' ||
+      type === 'glucose_variability'
+    );
+  });
 }
 
 function isPolarJson(parsed: JsonRecord): boolean {
@@ -266,6 +296,8 @@ export function parseActivityFileToCanonical(
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
+    if (lower.includes('ultrahuman') || isUltrahumanJson(parsed))
+      return parseUltrahumanActivityJsonToCanonical(content, filename, options);
     if (lower.includes('oura') || isOuraJson(parsed))
       return parseOuraActivityJsonToCanonical(content, filename, options);
     if (lower.includes('fitbit') || isFitbitJson(parsed))

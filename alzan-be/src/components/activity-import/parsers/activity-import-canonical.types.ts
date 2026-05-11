@@ -202,3 +202,21 @@ export type FitbitRecoveryCanonical = ProviderRecoveryCanonical<'fitbit'>;
 export type OuraDailyActivityCanonical = ProviderDailyActivityCanonical<'oura'>;
 export type OuraSleepCanonical = ProviderSleepCanonical<'oura'>;
 export type OuraRecoveryCanonical = ProviderRecoveryCanonical<'oura'>;
+
+export type UltrahumanDailyActivityCanonical = ProviderDailyActivityCanonical<'ultrahuman'>;
+export type UltrahumanSleepCanonical = ProviderSleepCanonical<'ultrahuman'>;
+export type UltrahumanRecoveryCanonical = ProviderRecoveryCanonical<'ultrahuman'>;
+
+export interface UltrahumanMetabolicCanonical {
+  source: 'ultrahuman';
+  date: string;
+  timezone: string;
+  timestamp: string;
+  glucoseMgDl: number | null;
+  averageGlucoseMgDl: number | null;
+  glucoseVariabilityPct: number | null;
+  hba1cPct: number | null;
+  timeInTargetPct: number | null;
+  metabolicScore: number | null;
+  rawPayload: Record<string, unknown>;
+}

@@ -1,6 +1,14 @@
 import { Database } from '../../../types/database.types';
 
-export type StrengthActivityProvider = 'suunto' | 'strava' | 'garmin' | 'polar' | 'fitbit' | 'oura' | 'unknown';
+export type StrengthActivityProvider =
+  | 'suunto'
+  | 'strava'
+  | 'garmin'
+  | 'polar'
+  | 'fitbit'
+  | 'oura'
+  | 'ultrahuman'
+  | 'unknown';
 export type StrengthActivitySourceFileType = 'fit' | 'json';
 
 export interface ImportedStrengthActivityDevice {
@@ -200,7 +208,7 @@ function readNestedObjectMetric(record: JsonRecord, key: string, metricKey: stri
 }
 
 function providerToDatabaseProvider(provider: StrengthActivityProvider): DatabaseProvider {
-  if (provider === 'unknown' || provider === 'oura') return 'other';
+  if (provider === 'unknown' || provider === 'oura' || provider === 'ultrahuman') return 'other';
   return provider;
 }
 
@@ -216,6 +224,7 @@ function detectProviderFromFilename(filename: string): StrengthActivityProvider 
   if (lower.includes('polar')) return 'polar';
   if (lower.includes('fitbit')) return 'fitbit';
   if (lower.includes('oura')) return 'oura';
+  if (lower.includes('ultrahuman')) return 'ultrahuman';
   return 'unknown';
 }
 
@@ -230,6 +239,10 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
     return 'fitbit';
   if ('activity' in parsed && ('start_datetime' in parsed || 'end_datetime' in parsed || 'intensity' in parsed))
     return 'oura';
+  if ('movement_index' in parsed || 'recovery_index' in parsed || 'metabolic_score' in parsed) return 'ultrahuman';
+  if ('movement' in parsed && ('heart_rate' in parsed || 'recovery' in parsed || 'vo2_max' in parsed))
+    return 'ultrahuman';
+  if (isRecord(parsed.data) && Array.isArray(parsed.data.metric_data)) return 'ultrahuman';
 
   const sourceText = [
     readString(parsed.provider),
@@ -247,6 +260,7 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if (sourceText.includes('polar')) return 'polar';
   if (sourceText.includes('fitbit')) return 'fitbit';
   if (sourceText.includes('oura')) return 'oura';
+  if (sourceText.includes('ultrahuman')) return 'ultrahuman';
   if (sourceText.includes('suunto')) return 'suunto';
 
   return 'unknown';
@@ -460,6 +474,40 @@ function parseOuraHeartRateStream(
         : index * 60;
     const bpm = readNumber(sample.bpm) ?? readNumber(sample.value);
     if (bpm == null || bpm <= 0) return;
+    stream.push({
+      bpm: Math.round(normaliseHeartRate(bpm)),
+      timestamp:
+        timestamp ?? (startedAt ? new Date(new Date(startedAt).getTime() + offsetSeconds * 1000).toISOString() : null),
+      offsetSeconds,
+    });
+  });
+  return stream;
+}
+
+function parseUltrahumanHeartRateStream(
+  parsed: JsonRecord,
+  startedAt: string | null,
+): ImportedStrengthActivityHeartRateSample[] {
+  const rawStream = parsed.heart_rate ?? parsed.heartRate ?? parsed.heartrate;
+  const samples = Array.isArray(rawStream)
+    ? rawStream
+    : isRecord(rawStream) && Array.isArray(rawStream.samples)
+      ? rawStream.samples
+      : isRecord(rawStream) && Array.isArray(rawStream.values)
+        ? rawStream.values
+        : [];
+  const stream: ImportedStrengthActivityHeartRateSample[] = [];
+  samples.slice(0, HEART_RATE_STREAM_LIMIT).forEach((sample, index) => {
+    const record = isRecord(sample) ? sample : null;
+    const bpm = record ? (readNumber(record.value) ?? readNumber(record.bpm)) : readNumber(sample);
+    if (bpm == null || bpm <= 0) return;
+    const timestamp = record ? normaliseTimestamp(record.timestamp ?? record.time ?? record.dateTime) : null;
+    const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
+    const startedMs = startedAt ? new Date(startedAt).getTime() : null;
+    const offsetSeconds =
+      startedMs != null && timestampMs != null && Number.isFinite(timestampMs)
+        ? Math.max(0, Math.round((timestampMs - startedMs) / 1000))
+        : index * 60;
     stream.push({
       bpm: Math.round(normaliseHeartRate(bpm)),
       timestamp:
@@ -717,15 +765,18 @@ function parseGenericJson(
       : isRecord(parsed.source)
         ? parsed.source
         : null;
+  const ultrahumanHeartRateStream = parseUltrahumanHeartRateStream(parsed, startedAt);
   const polarHeartRateStream = parsePolarHeartRateStream(parsed, startedAt);
   const fitbitHeartRateStream = parseFitbitHeartRateStream(parsed, startedAt);
   const ouraHeartRateStream = parseOuraHeartRateStream(parsed, startedAt);
   const heartRateStream =
-    ouraHeartRateStream.length > 0
-      ? ouraHeartRateStream
-      : fitbitHeartRateStream.length > 0
-        ? fitbitHeartRateStream
-        : polarHeartRateStream;
+    ultrahumanHeartRateStream.length > 0
+      ? ultrahumanHeartRateStream
+      : ouraHeartRateStream.length > 0
+        ? ouraHeartRateStream
+        : fitbitHeartRateStream.length > 0
+          ? fitbitHeartRateStream
+          : polarHeartRateStream;
   const heartRateZones = provider === 'fitbit' ? buildFitbitHeartRateZones(parsed) : buildPolarHeartRateZones(parsed);
 
   return {
