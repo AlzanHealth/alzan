@@ -1440,7 +1440,12 @@ function parseJsonDetailed(
 
   try {
     const canonical = parseActivityFileToCanonical(rawJson, filename, options);
-    if (canonical.provider === 'garmin' || canonical.provider === 'strava' || canonical.provider === 'polar') {
+    if (
+      canonical.provider === 'garmin' ||
+      canonical.provider === 'strava' ||
+      canonical.provider === 'polar' ||
+      canonical.provider === 'fitbit'
+    ) {
       return finaliseParsedRoute(
         {
           points: mapCanonicalActivityToRoutePoints(canonical),

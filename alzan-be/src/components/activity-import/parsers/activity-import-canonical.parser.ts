@@ -1,4 +1,5 @@
 import { CanonicalActivity } from './activity-import-canonical.types';
+import { parseFitbitActivityJsonToCanonical } from './fitbit-activity-canonical.mapper';
 import { buildEmptyGenericActivity, parseGenericActivityJsonToCanonical } from './generic-activity-canonical.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
 import { parsePolarActivityFileToCanonical } from './polar-activity-canonical.mapper';
@@ -172,6 +173,26 @@ function hasPolarProviderSignal(parsed: JsonRecord): boolean {
     .some(value => value?.toLowerCase().includes('polar') ?? false);
 }
 
+function hasFitbitProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from]
+    .map(value => (isRecord(value) ? value.name : value))
+    .map(readString)
+    .some(value => value?.toLowerCase().includes('fitbit') ?? false);
+}
+
+function isFitbitJson(parsed: JsonRecord): boolean {
+  if (hasFitbitProviderSignal(parsed)) return true;
+  if ('logId' in parsed && ('activityTypeId' in parsed || 'activityName' in parsed)) return true;
+  if ('tcxLink' in parsed || 'activeZoneMinutes' in parsed || 'workoutSummary' in parsed) return true;
+  if ('heartRateZones' in parsed && ('logType' in parsed || 'source' in parsed)) return true;
+  if (Array.isArray(parsed.activities)) {
+    return parsed.activities.some(
+      activity => isRecord(activity) && ('logId' in activity || 'activityTypeId' in activity),
+    );
+  }
+  return false;
+}
+
 function isPolarJson(parsed: JsonRecord): boolean {
   if (hasPolarProviderSignal(parsed)) return true;
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return true;
@@ -217,6 +238,8 @@ export function parseActivityFileToCanonical(
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
+    if (lower.includes('fitbit') || isFitbitJson(parsed))
+      return parseFitbitActivityJsonToCanonical(content, filename, options);
     if (lower.includes('polar') || isPolarJson(parsed))
       return parsePolarActivityFileToCanonical(content, filename, options);
     if (lower.includes('strava') || isStravaJson(parsed))

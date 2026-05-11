@@ -1,6 +1,6 @@
 import { Database } from '../../../types/database.types';
 
-export type StrengthActivityProvider = 'suunto' | 'strava' | 'garmin' | 'polar' | 'unknown';
+export type StrengthActivityProvider = 'suunto' | 'strava' | 'garmin' | 'polar' | 'fitbit' | 'unknown';
 export type StrengthActivitySourceFileType = 'fit' | 'json';
 
 export interface ImportedStrengthActivityDevice {
@@ -206,6 +206,7 @@ function detectProviderFromFilename(filename: string): StrengthActivityProvider 
   if (lower.includes('strava')) return 'strava';
   if (lower.includes('garmin')) return 'garmin';
   if (lower.includes('polar')) return 'polar';
+  if (lower.includes('fitbit')) return 'fitbit';
   return 'unknown';
 }
 
@@ -216,6 +217,8 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if (!isRecord(parsed)) return 'unknown';
   if (isRecord(parsed.DeviceLog)) return 'suunto';
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return 'polar';
+  if ('logId' in parsed || 'activityTypeId' in parsed || 'tcxLink' in parsed || 'activeZoneMinutes' in parsed)
+    return 'fitbit';
 
   const sourceText = [
     readString(parsed.provider),
@@ -231,6 +234,7 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if (sourceText.includes('strava')) return 'strava';
   if (sourceText.includes('garmin')) return 'garmin';
   if (sourceText.includes('polar')) return 'polar';
+  if (sourceText.includes('fitbit')) return 'fitbit';
   if (sourceText.includes('suunto')) return 'suunto';
 
   return 'unknown';
@@ -381,6 +385,70 @@ function buildPolarHeartRateZones(parsed: JsonRecord): ImportedStrengthActivityH
       percentage: (duration / totalDuration) * 100,
     }))
     .filter(zone => zone.durationSeconds > 0);
+}
+
+function parseFitbitHeartRateStream(
+  parsed: JsonRecord,
+  startedAt: string | null,
+): ImportedStrengthActivityHeartRateSample[] {
+  const streams = isRecord(parsed.streams) ? parsed.streams : null;
+  const rawStream = streams?.heartrate ?? streams?.heartRate;
+  const samples = Array.isArray(rawStream)
+    ? rawStream
+    : isRecord(rawStream) && Array.isArray(rawStream.data)
+      ? rawStream.data
+      : [];
+  const startedDate = startedAt?.slice(0, 10) ?? null;
+  const stream: ImportedStrengthActivityHeartRateSample[] = [];
+  samples.slice(0, HEART_RATE_STREAM_LIMIT).forEach((sample, index) => {
+    const record = isRecord(sample) ? sample : null;
+    const bpm = record ? (readNumber(record.value) ?? readNumber(record.bpm)) : readNumber(sample);
+    if (bpm == null || bpm <= 0) return;
+    const timestamp =
+      record && startedDate && readString(record.time)
+        ? normaliseTimestamp(`${startedDate}T${readString(record.time)}Z`)
+        : record
+          ? normaliseTimestamp(record.timestamp ?? record.dateTime)
+          : null;
+    const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
+    const startedMs = startedAt ? new Date(startedAt).getTime() : null;
+    const offsetSeconds =
+      startedMs != null && timestampMs != null && Number.isFinite(timestampMs)
+        ? Math.max(0, Math.round((timestampMs - startedMs) / 1000))
+        : index * 60;
+    stream.push({
+      bpm: Math.round(normaliseHeartRate(bpm)),
+      timestamp:
+        timestamp ?? (startedAt ? new Date(new Date(startedAt).getTime() + offsetSeconds * 1000).toISOString() : null),
+      offsetSeconds,
+    });
+  });
+  return stream;
+}
+
+function mapFitbitZoneName(rawName: unknown): 1 | 2 | 3 | 5 | null {
+  const name = readString(rawName)?.toLowerCase();
+  if (!name) return null;
+  if (name.includes('out') || name.includes('below')) return 1;
+  if (name.includes('fat') || name.includes('moderate')) return 2;
+  if (name.includes('cardio') || name.includes('vigorous')) return 3;
+  if (name.includes('peak')) return 5;
+  return null;
+}
+
+function buildFitbitHeartRateZones(parsed: JsonRecord): ImportedStrengthActivityHeartRateZone[] {
+  const zones = Array.isArray(parsed.heartRateZones) ? parsed.heartRateZones.filter(isRecord) : [];
+  const mapped: ImportedStrengthActivityHeartRateZone[] = [];
+  for (const zone of zones) {
+    const canonicalZone = mapFitbitZoneName(zone.name ?? zone.zoneName ?? zone.type);
+    const minutes = readNumber(zone.minutes);
+    if (!canonicalZone || minutes == null || minutes <= 0) continue;
+    mapped.push({ zone: canonicalZone, durationSeconds: Math.round(minutes * 60), percentage: 0 });
+  }
+  const totalDuration = mapped.reduce((sum, zone) => sum + zone.durationSeconds, 0);
+  return totalDuration > 0
+    ? mapped.map(zone => ({ ...zone, percentage: (zone.durationSeconds / totalDuration) * 100 }))
+    : [];
 }
 
 function resolveHeartRateZone(normalisedHeartRate: number): 1 | 2 | 3 | 4 | 5 {
@@ -557,12 +625,14 @@ function parseGenericJson(
   const startedAt = normaliseTimestamp(
     parsed.start_date ?? parsed.start_date_local ?? parsed.startTime ?? parsed.started_at ?? parsed.date,
   );
-  const durationSeconds =
+  const rawDuration =
     readNumber(parsed.elapsed_time) ??
     readNumber(parsed.moving_time) ??
     readNumber(parsed.duration) ??
     readNumber(parsed.durationSeconds) ??
     parseIsoDurationSeconds(parsed.duration);
+  const durationSeconds =
+    provider === 'fitbit' && rawDuration != null && rawDuration > 10000 ? rawDuration / 1000 : rawDuration;
   const endedAt = normaliseTimestamp(parsed.endTime ?? parsed.ended_at);
   const caloriesKcal =
     readNumber(parsed.calories) ??
@@ -585,9 +655,17 @@ function parseGenericJson(
   const epoc = readNumber(parsed.epoc) ?? readNumber(parsed.EPOC);
   const pte = readNumber(parsed.pte) ?? readNumber(parsed.PTE) ?? readNumber(parsed.peak_training_effect);
   const tss = readNumber(parsed.tss) ?? readNumber(parsed.TSS) ?? readNumber(parsed.hrTSS);
-  const rawDevice = isRecord(parsed.device) ? parsed.device : isRecord(parsed.Device) ? parsed.Device : null;
+  const rawDevice = isRecord(parsed.device)
+    ? parsed.device
+    : isRecord(parsed.Device)
+      ? parsed.Device
+      : isRecord(parsed.source)
+        ? parsed.source
+        : null;
   const polarHeartRateStream = parsePolarHeartRateStream(parsed, startedAt);
-  const heartRateZones = buildPolarHeartRateZones(parsed);
+  const fitbitHeartRateStream = parseFitbitHeartRateStream(parsed, startedAt);
+  const heartRateStream = fitbitHeartRateStream.length > 0 ? fitbitHeartRateStream : polarHeartRateStream;
+  const heartRateZones = provider === 'fitbit' ? buildFitbitHeartRateZones(parsed) : buildPolarHeartRateZones(parsed);
 
   return {
     provider,
@@ -621,8 +699,8 @@ function parseGenericJson(
     heartRateZones:
       heartRateZones.length > 0
         ? heartRateZones
-        : buildHeartRateZonesFromStream(polarHeartRateStream, options?.estimatedMaxHeartRate),
-    heartRateStream: polarHeartRateStream,
+        : buildHeartRateZonesFromStream(heartRateStream, options?.estimatedMaxHeartRate),
+    heartRateStream,
   };
 }
 
