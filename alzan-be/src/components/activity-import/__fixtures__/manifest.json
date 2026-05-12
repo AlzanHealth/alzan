@@ -318,6 +318,36 @@
     }
   },
   {
+    "id": "coros-running-json",
+    "provider": "coros",
+    "sportType": "running",
+    "sportSubtype": "road",
+    "format": "json",
+    "file": "providers/coros/running.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://support.coros.com/hc/en-us/articles/360040257251-Run",
+    "expectedSummary": {
+      "durationSeconds": 600,
+      "distanceM": 2200,
+      "caloriesKcal": 180,
+      "avgHeartRate": 140,
+      "maxHeartRate": 172,
+      "avgCadence": 168,
+      "avgPowerW": 255,
+      "elevationGainM": 24
+    },
+    "expectedStreams": {
+      "positionMinCount": 2,
+      "heartRateMinCount": 3,
+      "cadenceMinCount": 3,
+      "powerMinCount": 3
+    },
+    "expectedProviderFields": {
+      "sourceProvider": "coros",
+      "corosSport": "Run"
+    }
+  },
+  {
     "id": "unknown-padel-json",
     "provider": "other",
     "sportType": "padel",

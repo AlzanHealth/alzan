@@ -1,0 +1,41 @@
+{
+  "provider": "coros",
+  "id": "coros-run-fixture",
+  "activityType": "Run",
+  "startTime": "2026-05-01T08:00:00Z",
+  "durationSeconds": 600,
+  "distanceM": 2200,
+  "calories": 180,
+  "avgHeartRate": 140,
+  "maxHeartRate": 172,
+  "avgCadence": 168,
+  "avgPower": 255,
+  "elevationGainM": 24,
+  "training_load": 72,
+  "aerobic_te": 3.1,
+  "anaerobic_te": 1.2,
+  "route": [
+    { "elapsedSeconds": 0, "latitude": 40.4168, "longitude": -3.7038, "altitude": 650 },
+    { "elapsedSeconds": 600, "latitude": 40.4188, "longitude": -3.7058, "altitude": 674 }
+  ],
+  "samples": [
+    { "offsetSeconds": 0, "heartRate": 120, "speed": 3.4, "distance": 0, "cadence": 160, "power": 230 },
+    { "offsetSeconds": 300, "heartRate": 145, "speed": 3.7, "distance": 1100, "cadence": 170, "power": 255 },
+    { "offsetSeconds": 600, "heartRate": 172, "speed": 3.8, "distance": 2200, "cadence": 174, "power": 280 }
+  ],
+  "laps": [
+    { "type": "auto", "durationSeconds": 300, "distanceM": 1100, "avgHeartRate": 132, "maxHeartRate": 150 },
+    { "type": "auto", "durationSeconds": 300, "distanceM": 1100, "avgHeartRate": 154, "maxHeartRate": 172 }
+  ],
+  "heart_rate_zones": [
+    { "zone": 1, "durationSeconds": 120 },
+    { "zone": 2, "durationSeconds": 180 },
+    { "zone": 3, "durationSeconds": 240 },
+    { "zone": 4, "durationSeconds": 60 }
+  ],
+  "device": {
+    "name": "COROS PACE",
+    "model": "PACE 3",
+    "serial": "COROS123"
+  }
+}

@@ -1,6 +1,15 @@
 import { Database } from '../types/database.types';
 
-export type StrengthActivityProvider = 'suunto' | 'strava' | 'garmin' | 'polar' | 'unknown';
+export type StrengthActivityProvider =
+  | 'suunto'
+  | 'strava'
+  | 'garmin'
+  | 'polar'
+  | 'fitbit'
+  | 'coros'
+  | 'apple_health'
+  | 'whoop'
+  | 'unknown';
 export type StrengthActivitySourceFileType = 'fit' | 'json';
 
 export interface ImportedStrengthActivityDevice {

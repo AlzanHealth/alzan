@@ -3525,6 +3525,9 @@ export type Database = {
         | "fitbit"
         | "other"
         | "suunto"
+        | "coros"
+        | "apple_health"
+        | "whoop"
       recipe_items_unit: "g" | "ml"
       recipe_source_enum: "system" | "user"
       recipe_usage_context_enum: "meal_log" | "planner" | "quick_add"
@@ -3608,6 +3611,7 @@ export type Database = {
         | "ultrahuman"
         | "apple_health"
         | "health_connect"
+        | "coros"
         | "manual"
       workout_goal_enum:
         | "resistencia"
@@ -3838,6 +3842,9 @@ export const Constants = {
         "fitbit",
         "other",
         "suunto",
+        "coros",
+        "apple_health",
+        "whoop",
       ],
       recipe_items_unit: ["g", "ml"],
       recipe_source_enum: ["system", "user"],
@@ -3929,6 +3936,7 @@ export const Constants = {
         "ultrahuman",
         "apple_health",
         "health_connect",
+        "coros",
         "manual",
       ],
       workout_goal_enum: [
@@ -3943,4 +3951,3 @@ export const Constants = {
     },
   },
 } as const
-

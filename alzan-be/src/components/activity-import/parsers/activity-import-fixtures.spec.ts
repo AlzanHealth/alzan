@@ -119,6 +119,7 @@ function assertEveryWearableProviderIsCovered(entries: FixtureManifestEntry[]): 
     'ultrahuman',
     'apple_health',
     'health_connect',
+    'coros',
     'other',
   ]);
   const actualProviders = new Set(entries.map(entry => entry.provider));

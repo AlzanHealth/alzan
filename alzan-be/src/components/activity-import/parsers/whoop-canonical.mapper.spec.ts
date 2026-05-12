@@ -132,7 +132,7 @@ function assertWhoopStrengthParsesInStrengthFlow(): void {
     'whoop-strength.json',
   );
   assert.equal(parsed.provider, 'whoop');
-  assert.equal(getDatabaseProviderForStrengthImport(parsed.provider), 'other');
+  assert.equal(getDatabaseProviderForStrengthImport(parsed.provider), 'whoop');
   assert.equal(parsed.durationSeconds, 3600);
   assert.equal(parsed.caloriesKcal, 300);
   assert.equal(parsed.avgHeartRate, 116);

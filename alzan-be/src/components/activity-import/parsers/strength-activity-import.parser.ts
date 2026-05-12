@@ -6,6 +6,8 @@ export type StrengthActivityProvider =
   | 'garmin'
   | 'polar'
   | 'fitbit'
+  | 'apple_health'
+  | 'coros'
   | 'whoop'
   | 'oura'
   | 'ultrahuman'
@@ -209,8 +211,7 @@ function readNestedObjectMetric(record: JsonRecord, key: string, metricKey: stri
 }
 
 function providerToDatabaseProvider(provider: StrengthActivityProvider): DatabaseProvider {
-  if (provider === 'unknown' || provider === 'whoop' || provider === 'oura' || provider === 'ultrahuman')
-    return 'other';
+  if (provider === 'unknown' || provider === 'oura' || provider === 'ultrahuman') return 'other';
   return provider;
 }
 
@@ -225,6 +226,8 @@ function detectProviderFromFilename(filename: string): StrengthActivityProvider 
   if (lower.includes('garmin')) return 'garmin';
   if (lower.includes('polar')) return 'polar';
   if (lower.includes('fitbit')) return 'fitbit';
+  if (lower.includes('apple_health') || lower.includes('apple-health')) return 'apple_health';
+  if (lower.includes('coros')) return 'coros';
   if (lower.includes('whoop')) return 'whoop';
   if (lower.includes('oura')) return 'oura';
   if (lower.includes('ultrahuman')) return 'ultrahuman';
@@ -240,6 +243,16 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return 'polar';
   if ('logId' in parsed || 'activityTypeId' in parsed || 'tcxLink' in parsed || 'activeZoneMinutes' in parsed)
     return 'fitbit';
+  if ('workoutActivityType' in parsed || 'sourceRevision' in parsed) return 'apple_health';
+  if (isRecord(parsed.data) && (Array.isArray(parsed.data.workouts) || Array.isArray(parsed.data.records)))
+    return 'apple_health';
+  if (
+    'training_load' in parsed ||
+    'aerobic_te' in parsed ||
+    'anaerobic_te' in parsed ||
+    (('activityType' in parsed || 'activity_type' in parsed) && ('samples' in parsed || 'laps' in parsed))
+  )
+    return 'coros';
   if ('sport_name' in parsed && ('score_state' in parsed || 'score' in parsed || 'start' in parsed)) return 'whoop';
   if (isRecord(parsed.score) && ('strain' in parsed.score || 'zone_durations' in parsed.score)) return 'whoop';
   if ('activity' in parsed && ('start_datetime' in parsed || 'end_datetime' in parsed || 'intensity' in parsed))
@@ -264,6 +277,8 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if (sourceText.includes('garmin')) return 'garmin';
   if (sourceText.includes('polar')) return 'polar';
   if (sourceText.includes('fitbit')) return 'fitbit';
+  if (sourceText.includes('apple') || sourceText.includes('healthkit')) return 'apple_health';
+  if (sourceText.includes('coros')) return 'coros';
   if (sourceText.includes('whoop')) return 'whoop';
   if (sourceText.includes('oura')) return 'oura';
   if (sourceText.includes('ultrahuman')) return 'ultrahuman';
@@ -296,12 +311,18 @@ function isClearlyUnsupportedJsonActivity(parsed: unknown, distanceM: number | n
     readString(header.type),
     readString(header.sport),
     readString(header.sport_name),
+    readString(header.workoutActivityType),
+    readString(header.activityType),
+    readString(header.activity_type),
     readString(header.activity),
     readString(header.detailed_sport_info),
     readString(parsed.sport_type),
     readString(parsed.sportType),
     readString(parsed.sport),
     readString(parsed.sport_name),
+    readString(parsed.workoutActivityType),
+    readString(parsed.activityType),
+    readString(parsed.activity_type),
     readString(parsed.activity),
     readString(parsed.detailed_sport_info),
   ]
@@ -739,7 +760,12 @@ function parseGenericJson(
   }
 
   const provider = detectJsonProvider(parsed, filename);
-  const distanceM = readNumber(parsed.distance) ?? readNumber(parsed.distance_m) ?? readNumber(parsed.distanceMeters);
+  const distanceM =
+    readNumber(parsed.distance) ??
+    readNumber(parsed.distance_m) ??
+    readNumber(parsed.distanceMeters) ??
+    readNumber(parsed.distanceM) ??
+    readNumber(parsed.totalDistance);
 
   if (isClearlyUnsupportedJsonActivity(parsed, distanceM)) {
     throw new Error(STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG);
@@ -749,6 +775,7 @@ function parseGenericJson(
     parsed.start_date ??
       parsed.start_date_local ??
       parsed.start ??
+      parsed.startDate ??
       parsed.startTime ??
       parsed.start_datetime ??
       parsed.started_at ??
@@ -759,16 +786,21 @@ function parseGenericJson(
     readNumber(parsed.moving_time) ??
     readNumber(parsed.duration) ??
     readNumber(parsed.durationSeconds) ??
+    readNumber(parsed.duration_seconds) ??
     parseIsoDurationSeconds(parsed.duration);
   const durationSeconds =
     provider === 'fitbit' && rawDuration != null && rawDuration > 10000 ? rawDuration / 1000 : rawDuration;
-  const explicitEndedAt = normaliseTimestamp(parsed.end ?? parsed.endTime ?? parsed.end_datetime ?? parsed.ended_at);
+  const explicitEndedAt = normaliseTimestamp(
+    parsed.end ?? parsed.endDate ?? parsed.endTime ?? parsed.end_datetime ?? parsed.ended_at,
+  );
   const derivedDurationSeconds = durationSeconds ?? deriveDurationSeconds(startedAt, explicitEndedAt);
   const score = isRecord(parsed.score) ? parsed.score : {};
   const whoopKilojoule = readNumber(score.kilojoule) ?? readNumber(parsed.kilojoule);
   const caloriesKcal =
     readNumber(parsed.calories) ??
     readNumber(parsed.calories_kcal) ??
+    readNumber(parsed.activeEnergyBurned) ??
+    readNumber(parsed.totalEnergyBurned) ??
     (provider === 'whoop' && whoopKilojoule != null ? whoopKilojoule / 4.184 : null) ??
     normaliseCaloriesFromEnergy(readNumber(parsed.energy) ?? readNumber(parsed.Energy) ?? 0);
   const avgHeartRate =
@@ -806,14 +838,17 @@ function parseGenericJson(
   const polarHeartRateStream = parsePolarHeartRateStream(parsed, startedAt);
   const fitbitHeartRateStream = parseFitbitHeartRateStream(parsed, startedAt);
   const ouraHeartRateStream = parseOuraHeartRateStream(parsed, startedAt);
+  const appleHealthHeartRateStream = parseHeartRateStream(parsed.samples, startedAt);
   const heartRateStream =
-    ultrahumanHeartRateStream.length > 0
-      ? ultrahumanHeartRateStream
-      : ouraHeartRateStream.length > 0
-        ? ouraHeartRateStream
-        : fitbitHeartRateStream.length > 0
-          ? fitbitHeartRateStream
-          : polarHeartRateStream;
+    appleHealthHeartRateStream.length > 0
+      ? appleHealthHeartRateStream
+      : ultrahumanHeartRateStream.length > 0
+        ? ultrahumanHeartRateStream
+        : ouraHeartRateStream.length > 0
+          ? ouraHeartRateStream
+          : fitbitHeartRateStream.length > 0
+            ? fitbitHeartRateStream
+            : polarHeartRateStream;
   const heartRateZones =
     provider === 'fitbit'
       ? buildFitbitHeartRateZones(parsed)

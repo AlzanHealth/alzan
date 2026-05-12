@@ -1,4 +1,6 @@
 import { CanonicalActivity } from './activity-import-canonical.types';
+import { parseAppleHealthActivityJsonToCanonical } from './apple-health-activity-canonical.mapper';
+import { parseCorosActivityFileToCanonical } from './coros-activity-canonical.mapper';
 import { parseFitbitActivityJsonToCanonical } from './fitbit-activity-canonical.mapper';
 import { buildEmptyGenericActivity, parseGenericActivityJsonToCanonical } from './generic-activity-canonical.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
@@ -204,6 +206,32 @@ function hasWhoopProviderSignal(parsed: JsonRecord): boolean {
     .some(value => value?.toLowerCase().includes('whoop') ?? false);
 }
 
+function hasAppleHealthProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from, parsed.sourceRevision]
+    .map(value => (isRecord(value) ? value.name : value))
+    .map(readString)
+    .some(value => {
+      const lower = value?.toLowerCase() ?? '';
+      return lower.includes('apple') || lower.includes('healthkit');
+    });
+}
+
+function hasCorosProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from, parsed.application]
+    .map(value => (isRecord(value) ? value.name : value))
+    .map(readString)
+    .some(value => value?.toLowerCase().includes('coros') ?? false);
+}
+
+function isCorosJson(parsed: JsonRecord): boolean {
+  if (hasCorosProviderSignal(parsed)) return true;
+  if ('training_load' in parsed || 'aerobic_te' in parsed || 'anaerobic_te' in parsed) return true;
+  if ('activityType' in parsed && ('samples' in parsed || 'laps' in parsed || 'route' in parsed)) return true;
+  if ('heart_rate_zones' in parsed && ('sport' in parsed || 'mode' in parsed || 'activity_type' in parsed)) return true;
+  const workout = isRecord(parsed.workout) ? parsed.workout : null;
+  return workout != null && hasCorosProviderSignal({ ...parsed, ...workout });
+}
+
 function isFitbitJson(parsed: JsonRecord): boolean {
   if (hasFitbitProviderSignal(parsed)) return true;
   if ('logId' in parsed && ('activityTypeId' in parsed || 'activityName' in parsed)) return true;
@@ -274,6 +302,20 @@ function isWhoopJson(parsed: JsonRecord): boolean {
   });
 }
 
+function isAppleHealthJson(parsed: JsonRecord): boolean {
+  if (hasAppleHealthProviderSignal(parsed)) return true;
+  if ('workoutActivityType' in parsed || 'sourceRevision' in parsed) return true;
+  if (readString(parsed.type)?.startsWith('HKWorkoutActivityType')) return true;
+  const data = isRecord(parsed.data) ? parsed.data : {};
+  if (Array.isArray(data.workouts) || Array.isArray(data.records) || Array.isArray(data.sleep)) return true;
+  if (Array.isArray(parsed.workouts)) {
+    return parsed.workouts.some(
+      workout => isRecord(workout) && ('workoutActivityType' in workout || 'type' in workout),
+    );
+  }
+  return false;
+}
+
 function isPolarJson(parsed: JsonRecord): boolean {
   if (hasPolarProviderSignal(parsed)) return true;
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return true;
@@ -307,6 +349,9 @@ export function parseActivityFileToCanonical(
   if (lower.endsWith('.fit')) {
     if (typeof content === 'string') throw new Error('Invalid FIT file.');
     const manufacturer = detectFitManufacturer(content);
+    if (lower.includes('coros')) {
+      return parseCorosActivityFileToCanonical(content, filename, options);
+    }
     if (lower.includes('polar')) {
       return parsePolarActivityFileToCanonical(content, filename, options);
     }
@@ -319,6 +364,10 @@ export function parseActivityFileToCanonical(
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
+    if (lower.includes('apple_health') || lower.includes('apple-health') || isAppleHealthJson(parsed))
+      return parseAppleHealthActivityJsonToCanonical(content, filename, options);
+    if (lower.includes('coros') || isCorosJson(parsed))
+      return parseCorosActivityFileToCanonical(content, filename, options);
     if (lower.includes('whoop') || isWhoopJson(parsed))
       return parseWhoopActivityJsonToCanonical(content, filename, options);
     if (lower.includes('ultrahuman') || isUltrahumanJson(parsed))

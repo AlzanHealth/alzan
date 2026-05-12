@@ -227,6 +227,14 @@ export interface WhoopCycleCanonical {
 export type WhoopSleepCanonical = ProviderSleepCanonical<'whoop'>;
 export type WhoopRecoveryCanonical = ProviderRecoveryCanonical<'whoop'>;
 
+export type AppleHealthDailyActivityCanonical = ProviderDailyActivityCanonical<'apple_health'>;
+export type AppleHealthSleepCanonical = ProviderSleepCanonical<'apple_health'>;
+export type AppleHealthRecoveryCanonical = ProviderRecoveryCanonical<'apple_health'>;
+
+export type CorosDailyActivityCanonical = ProviderDailyActivityCanonical<'coros'>;
+export type CorosSleepCanonical = ProviderSleepCanonical<'coros'>;
+export type CorosRecoveryCanonical = ProviderRecoveryCanonical<'coros'>;
+
 export interface UltrahumanMetabolicCanonical {
   source: 'ultrahuman';
   date: string;

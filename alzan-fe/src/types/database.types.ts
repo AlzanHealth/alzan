@@ -3428,7 +3428,17 @@ export type Database = {
       measurement_type_enum: 'waist' | 'chest' | 'hips' | 'thigh' | 'arm' | 'calf' | 'neck' | 'shoulders' | 'abdomen';
       notification_type: 'USER_FOLLOW_REQUEST' | 'USER_FOLLOW_REQUEST_ACCEPTED' | 'USER_FOLLOW_REQUEST_REJECTED';
       phase_type_enum: 'warmup' | 'interval' | 'recovery' | 'cooldown' | 'relax';
-      provider_enum: 'manual' | 'strava' | 'garmin' | 'polar' | 'fitbit' | 'other' | 'suunto';
+      provider_enum:
+        | 'manual'
+        | 'strava'
+        | 'garmin'
+        | 'polar'
+        | 'fitbit'
+        | 'other'
+        | 'suunto'
+        | 'coros'
+        | 'apple_health'
+        | 'whoop';
       recipe_items_unit: 'g' | 'ml';
       recipe_source_enum: 'system' | 'user';
       recipe_usage_context_enum: 'meal_log' | 'planner' | 'quick_add';
@@ -3486,6 +3496,7 @@ export type Database = {
         | 'ultrahuman'
         | 'apple_health'
         | 'health_connect'
+        | 'coros'
         | 'manual';
       workout_goal_enum: 'resistencia' | 'fuerza' | 'velocidad' | 'potencia' | 'hipertrofia' | 'perdida_grasa';
       workout_plans_status: 'planned' | 'completed' | 'skipped' | 'rescheduled';
@@ -3660,7 +3671,18 @@ export const Constants = {
       measurement_type_enum: ['waist', 'chest', 'hips', 'thigh', 'arm', 'calf', 'neck', 'shoulders', 'abdomen'],
       notification_type: ['USER_FOLLOW_REQUEST', 'USER_FOLLOW_REQUEST_ACCEPTED', 'USER_FOLLOW_REQUEST_REJECTED'],
       phase_type_enum: ['warmup', 'interval', 'recovery', 'cooldown', 'relax'],
-      provider_enum: ['manual', 'strava', 'garmin', 'polar', 'fitbit', 'other', 'suunto'],
+      provider_enum: [
+        'manual',
+        'strava',
+        'garmin',
+        'polar',
+        'fitbit',
+        'other',
+        'suunto',
+        'coros',
+        'apple_health',
+        'whoop',
+      ],
       recipe_items_unit: ['g', 'ml'],
       recipe_source_enum: ['system', 'user'],
       recipe_usage_context_enum: ['meal_log', 'planner', 'quick_add'],
@@ -3705,6 +3727,7 @@ export const Constants = {
         'ultrahuman',
         'apple_health',
         'health_connect',
+        'coros',
         'manual',
       ],
       workout_goal_enum: ['resistencia', 'fuerza', 'velocidad', 'potencia', 'hipertrofia', 'perdida_grasa'],

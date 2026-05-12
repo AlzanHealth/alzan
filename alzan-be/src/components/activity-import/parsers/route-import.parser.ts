@@ -1445,6 +1445,8 @@ function parseJsonDetailed(
       canonical.provider === 'strava' ||
       canonical.provider === 'polar' ||
       canonical.provider === 'fitbit' ||
+      canonical.provider === 'apple_health' ||
+      canonical.provider === 'coros' ||
       canonical.provider === 'whoop' ||
       canonical.provider === 'oura' ||
       canonical.provider === 'ultrahuman'
