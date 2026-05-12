@@ -6,6 +6,7 @@ export type StrengthActivityProvider =
   | 'garmin'
   | 'polar'
   | 'fitbit'
+  | 'health_connect'
   | 'apple_health'
   | 'coros'
   | 'whoop'
@@ -226,6 +227,7 @@ function detectProviderFromFilename(filename: string): StrengthActivityProvider 
   if (lower.includes('garmin')) return 'garmin';
   if (lower.includes('polar')) return 'polar';
   if (lower.includes('fitbit')) return 'fitbit';
+  if (lower.includes('health_connect') || lower.includes('health-connect')) return 'health_connect';
   if (lower.includes('apple_health') || lower.includes('apple-health')) return 'apple_health';
   if (lower.includes('coros')) return 'coros';
   if (lower.includes('whoop')) return 'whoop';
@@ -243,6 +245,24 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return 'polar';
   if ('logId' in parsed || 'activityTypeId' in parsed || 'tcxLink' in parsed || 'activeZoneMinutes' in parsed)
     return 'fitbit';
+  if ('exerciseType' in parsed || (isRecord(parsed.metadata) && isRecord(parsed.metadata.dataOrigin)))
+    return 'health_connect';
+  if (isRecord(parsed.data) && (Array.isArray(parsed.data.workouts) || Array.isArray(parsed.data.records))) {
+    const dataRecords = [
+      ...(Array.isArray(parsed.data.workouts) ? parsed.data.workouts : []),
+      ...(Array.isArray(parsed.data.records) ? parsed.data.records : []),
+    ];
+    if (
+      dataRecords.some(
+        record =>
+          isRecord(record) &&
+          ('exerciseType' in record ||
+            readString(record.recordType)?.toLowerCase().includes('healthconnect') === true ||
+            (isRecord(record.metadata) && isRecord(record.metadata.dataOrigin))),
+      )
+    )
+      return 'health_connect';
+  }
   if ('workoutActivityType' in parsed || 'sourceRevision' in parsed) return 'apple_health';
   if (isRecord(parsed.data) && (Array.isArray(parsed.data.workouts) || Array.isArray(parsed.data.records)))
     return 'apple_health';
@@ -277,6 +297,12 @@ function detectJsonProvider(parsed: unknown, filename: string): StrengthActivity
   if (sourceText.includes('garmin')) return 'garmin';
   if (sourceText.includes('polar')) return 'polar';
   if (sourceText.includes('fitbit')) return 'fitbit';
+  if (
+    sourceText.includes('health_connect') ||
+    sourceText.includes('health connect') ||
+    sourceText.includes('healthconnect')
+  )
+    return 'health_connect';
   if (sourceText.includes('apple') || sourceText.includes('healthkit')) return 'apple_health';
   if (sourceText.includes('coros')) return 'coros';
   if (sourceText.includes('whoop')) return 'whoop';

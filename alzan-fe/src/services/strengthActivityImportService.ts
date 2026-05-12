@@ -6,6 +6,7 @@ export type StrengthActivityProvider =
   | 'garmin'
   | 'polar'
   | 'fitbit'
+  | 'health_connect'
   | 'coros'
   | 'apple_health'
   | 'whoop'

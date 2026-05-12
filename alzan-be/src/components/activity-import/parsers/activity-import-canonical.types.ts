@@ -231,6 +231,16 @@ export type AppleHealthDailyActivityCanonical = ProviderDailyActivityCanonical<'
 export type AppleHealthSleepCanonical = ProviderSleepCanonical<'apple_health'>;
 export type AppleHealthRecoveryCanonical = ProviderRecoveryCanonical<'apple_health'>;
 
+export type HealthConnectDailyActivityCanonical = ProviderDailyActivityCanonical<'health_connect'> & {
+  sourcePackage: string | null;
+};
+export type HealthConnectSleepCanonical = ProviderSleepCanonical<'health_connect'> & {
+  sourcePackage: string | null;
+};
+export type HealthConnectRecoveryCanonical = ProviderRecoveryCanonical<'health_connect'> & {
+  sourcePackage: string | null;
+};
+
 export type CorosDailyActivityCanonical = ProviderDailyActivityCanonical<'coros'>;
 export type CorosSleepCanonical = ProviderSleepCanonical<'coros'>;
 export type CorosRecoveryCanonical = ProviderRecoveryCanonical<'coros'>;

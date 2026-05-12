@@ -3438,7 +3438,8 @@ export type Database = {
         | 'suunto'
         | 'coros'
         | 'apple_health'
-        | 'whoop';
+        | 'whoop'
+        | 'health_connect';
       recipe_items_unit: 'g' | 'ml';
       recipe_source_enum: 'system' | 'user';
       recipe_usage_context_enum: 'meal_log' | 'planner' | 'quick_add';
@@ -3496,8 +3497,8 @@ export type Database = {
         | 'ultrahuman'
         | 'apple_health'
         | 'health_connect'
-        | 'coros'
-        | 'manual';
+        | 'manual'
+        | 'coros';
       workout_goal_enum: 'resistencia' | 'fuerza' | 'velocidad' | 'potencia' | 'hipertrofia' | 'perdida_grasa';
       workout_plans_status: 'planned' | 'completed' | 'skipped' | 'rescheduled';
     };
@@ -3682,6 +3683,7 @@ export const Constants = {
         'coros',
         'apple_health',
         'whoop',
+        'health_connect',
       ],
       recipe_items_unit: ['g', 'ml'],
       recipe_source_enum: ['system', 'user'],
@@ -3727,8 +3729,8 @@ export const Constants = {
         'ultrahuman',
         'apple_health',
         'health_connect',
-        'coros',
         'manual',
+        'coros',
       ],
       workout_goal_enum: ['resistencia', 'fuerza', 'velocidad', 'potencia', 'hipertrofia', 'perdida_grasa'],
       workout_plans_status: ['planned', 'completed', 'skipped', 'rescheduled'],

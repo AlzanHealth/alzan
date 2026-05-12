@@ -4,6 +4,7 @@ import { parseCorosActivityFileToCanonical } from './coros-activity-canonical.ma
 import { parseFitbitActivityJsonToCanonical } from './fitbit-activity-canonical.mapper';
 import { buildEmptyGenericActivity, parseGenericActivityJsonToCanonical } from './generic-activity-canonical.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
+import { parseHealthConnectActivityJsonToCanonical } from './health-connect-activity-canonical.mapper';
 import { parseOuraActivityJsonToCanonical } from './oura-activity-canonical.mapper';
 import { parsePolarActivityFileToCanonical } from './polar-activity-canonical.mapper';
 import { parseStravaActivityJsonToCanonical } from './strava-activity-canonical.mapper';
@@ -216,6 +217,16 @@ function hasAppleHealthProviderSignal(parsed: JsonRecord): boolean {
     });
 }
 
+function hasHealthConnectProviderSignal(parsed: JsonRecord): boolean {
+  return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from, parsed.sourceRevision]
+    .map(value => (isRecord(value) ? value.name : value))
+    .map(readString)
+    .some(value => {
+      const lower = value?.toLowerCase() ?? '';
+      return lower.includes('health_connect') || lower.includes('health connect') || lower.includes('healthconnect');
+    });
+}
+
 function hasCorosProviderSignal(parsed: JsonRecord): boolean {
   return [parsed.provider, parsed.source, parsed.platform, parsed.uploaded_from, parsed.application]
     .map(value => (isRecord(value) ? value.name : value))
@@ -316,6 +327,26 @@ function isAppleHealthJson(parsed: JsonRecord): boolean {
   return false;
 }
 
+function isHealthConnectJson(parsed: JsonRecord): boolean {
+  if (hasHealthConnectProviderSignal(parsed)) return true;
+  if ('exerciseType' in parsed && ('startTime' in parsed || 'endTime' in parsed || 'metadata' in parsed)) return true;
+  if (readString(parsed.recordType)?.toLowerCase().includes('exercisesessionrecord')) return true;
+  if (isRecord(parsed.metadata) && isRecord(parsed.metadata.dataOrigin)) return true;
+  const data = isRecord(parsed.data) ? parsed.data : {};
+  if (Array.isArray(data.workouts) || Array.isArray(data.records) || Array.isArray(data.sleep)) {
+    const records = [
+      ...(Array.isArray(data.workouts) ? data.workouts : []),
+      ...(Array.isArray(data.records) ? data.records : []),
+    ];
+    return records.some(record => {
+      if (!isRecord(record)) return false;
+      if ('exerciseType' in record || 'metadata' in record) return true;
+      return readString(record.recordType)?.toLowerCase().includes('healthconnect') === true;
+    });
+  }
+  return false;
+}
+
 function isPolarJson(parsed: JsonRecord): boolean {
   if (hasPolarProviderSignal(parsed)) return true;
   if ('polar_user' in parsed || 'start_time_utc_offset' in parsed || 'detailed_sport_info' in parsed) return true;
@@ -364,6 +395,8 @@ export function parseActivityFileToCanonical(
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
+    if (lower.includes('health_connect') || lower.includes('health-connect') || isHealthConnectJson(parsed))
+      return parseHealthConnectActivityJsonToCanonical(content, filename, options);
     if (lower.includes('apple_health') || lower.includes('apple-health') || isAppleHealthJson(parsed))
       return parseAppleHealthActivityJsonToCanonical(content, filename, options);
     if (lower.includes('coros') || isCorosJson(parsed))

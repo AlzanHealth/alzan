@@ -578,8 +578,8 @@ used_at timestamp with time zone NOT NULL DEFAULT now(),
 event_bucket_10m timestamp with time zone NOT NULL,
 is_public_eligible boolean NOT NULL DEFAULT false,
 CONSTRAINT recipe_usage_events_pkey PRIMARY KEY (id),
-CONSTRAINT recipe_usage_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT recipe_usage_events_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id)
+CONSTRAINT recipe_usage_events_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id),
+CONSTRAINT recipe_usage_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.recipes (
 id uuid NOT NULL DEFAULT gen_random_uuid(),

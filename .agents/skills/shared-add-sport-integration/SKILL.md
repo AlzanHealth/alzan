@@ -1,13 +1,13 @@
 ---
-name: shared-add-sport-and-provider-integration
-description: Use when adding a new sport end-to-end in Alzan, including provider ingestion updates (Suunto, Strava, Polar, Garmin, and future providers), so database enums, backend parsers/mappers, frontend sport UX (color, icon, templates), analytics, exports, tests, and docs stay aligned without regressions.
+name: shared-add-sport-integration
+description: Use when adding a new sport end-to-end in Alzan across the existing providers (Garmin, Suunto, Polar, Strava, Fitbit, Oura, Ultrahuman, WHOOP, Google Fit legacy, Apple Health, Health Connect, COROS), so database enums, backend parsers/mappers, frontend sport UX (color, icon, templates), analytics, exports, tests, and docs stay aligned without regressions.
 ---
 
-# Add a new sport with provider integrations (end-to-end)
+# Add a new sport (end-to-end)
 
 ## Purpose
 
-Use this skill to add a new sport safely across Alzan FE + BE + Supabase, including current providers and future ones.
+Use this skill to add a new sport safely across Alzan FE + BE + Supabase for the existing providers.
 
 Hard goal:
 - No partial additions.
@@ -50,7 +50,6 @@ Decide and write these values first:
 
 1. Enums and migrations
 - Update `sport_type_enum` and `sport_subtype_enum` when needed.
-- If adding a provider, update `wearable_provider_enum` too.
 
 2. Check dependent tables and contracts
 - Validate usage in:
@@ -74,10 +73,18 @@ Decide and write these values first:
 
 1. Parsers/mappers
 - Update provider mappers:
-  - Garmin,
-  - Strava,
-  - Polar,
-  - Suunto,
+  - Garmin
+  - Suunto
+  - Polar
+  - Strava
+  - Fitbit
+  - Oura
+  - Ultrahuman
+  - WHOOP
+  - Google Fit legacy
+  - Apple Health
+  - Health Connect
+  - COROS
   - generic mapper fallback.
 - Ensure canonical parser and route parser include the sport where applicable.
 
@@ -90,15 +97,6 @@ Decide and write these values first:
   - `summary`,
   - `streams` and `laps` if present,
   - HR zones behavior if present.
-
-3. New provider onboarding (if applicable)
-- Add provider in:
-  - provider enum/types,
-  - provider registry,
-  - OAuth service,
-  - DTO/controller integration path,
-  - external account persistence flow.
-- Define provider fallback policy for unsupported sport mappings.
 
 ## Phase D - Frontend sport experience
 
@@ -167,7 +165,7 @@ Decide and write these values first:
 ## Provider x Sport matrix (required artifact)
 
 For every change, create/update a matrix with this schema:
-- Provider: `garmin | strava | polar | suunto | <new_provider>`
+- Provider: `garmin | suunto | polar | strava | fitbit | oura | ultrahuman | whoop | google_fit | apple_health | health_connect | coros`
 - Sport key: `<sport_type>`
 - Status:
   - `mapped`,
@@ -177,9 +175,6 @@ For every change, create/update a matrix with this schema:
   - exact provider sport token(s),
   - fallback condition,
   - confidence caveats.
-
-Rule:
-- Any new provider PR must include an explicit Provider x Sport matrix.
 
 ## Common failure modes (must review before merge)
 
