@@ -1,0 +1,1067 @@
+[
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "garmin-daily-activity-health-json",
+    "provider": "garmin",
+    "domain": "daily_activity",
+    "sourceUrl": "https://developer.garmin.com/gc-developer-program/health-api/",
+    "payload": {
+      "CalendarDate": "2026-05-01",
+      "Timezone": "Europe/Madrid",
+      "StartTime": "2026-05-01T00:00:00Z",
+      "EndTime": "2026-05-02T00:00:00Z",
+      "Steps": 12000,
+      "ActiveKilocalories": 620,
+      "DistanceInMeters": 8500
+    },
+    "expected": {
+      "source": "garmin",
+      "date": "2026-05-01",
+      "totalSteps": 12000,
+      "caloriesKcal": 620,
+      "distanceM": 8500
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "garmin-sleep-health-json",
+    "provider": "garmin",
+    "domain": "sleep",
+    "sourceUrl": "https://developer.garmin.com/gc-developer-program/health-api/",
+    "payload": {
+      "CalendarDate": "2026-05-01",
+      "SleepSummaryId": "garmin-sleep-redacted",
+      "SleepStartTimestampGMT": "2026-05-01T22:30:00Z",
+      "SleepEndTimestampGMT": "2026-05-02T06:30:00Z",
+      "TotalSleepDurationInSeconds": 28800,
+      "AwakeDurationInSeconds": 1200,
+      "LightSleepDurationInSeconds": 14400,
+      "DeepSleepDurationInSeconds": 5400,
+      "RemSleepInSeconds": 7800,
+      "SleepScore": 86,
+      "AverageHeartRateInBeatsPerMinute": 52,
+      "AvgHrv": 62,
+      "AverageSpO2": 96
+    },
+    "expected": {
+      "source": "garmin",
+      "sourceSleepId": "garmin-sleep-redacted",
+      "totalSleepMin": 480,
+      "sleepScore": 86,
+      "avgHeartRateBpm": 52,
+      "avgHrvMs": 62,
+      "avgSpo2Pct": 96
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "garmin-recovery-health-json",
+    "provider": "garmin",
+    "domain": "recovery",
+    "sourceUrl": "https://developer.garmin.com/gc-developer-program/health-api/",
+    "payload": {
+      "CalendarDate": "2026-05-02",
+      "timestamp": "2026-05-02T07:00:00Z",
+      "RecoveryScore": 78,
+      "ReadinessScore": 80,
+      "BodyBatteryEnd": 91,
+      "RestingHeartRateInBeatsPerMinute": 51,
+      "AvgHrv": 64,
+      "AverageSpO2": 97,
+      "StressScore": 22
+    },
+    "expected": {
+      "source": "garmin",
+      "date": "2026-05-02",
+      "recoveryScore": 78,
+      "readinessScore": 80,
+      "bodyBatteryEnd": 91,
+      "restingHrBpm": 51,
+      "avgHrvMs": 64,
+      "spo2AvgPct": 97
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "suunto-daily-activity-health-json",
+    "provider": "suunto",
+    "domain": "daily_activity",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "payload": {
+      "timestamp": "2026-05-01T12:00:00Z",
+      "entryData": {
+        "StepCount": 9400,
+        "EnergyConsumption": 530,
+        "Distance": 7200
+      }
+    },
+    "expected": {
+      "source": "suunto",
+      "date": "2026-05-01",
+      "totalSteps": 9400,
+      "caloriesKcal": 530,
+      "distanceM": 7200
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "suunto-sleep-health-json",
+    "provider": "suunto",
+    "domain": "sleep",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "payload": {
+      "entryData": {
+        "SleepId": "suunto-sleep-redacted",
+        "BedtimeStart": "2026-05-01T22:45:00Z",
+        "BedtimeEnd": "2026-05-02T06:15:00Z",
+        "TotalSleepDuration": 25200,
+        "AwakeDuration": 1800,
+        "LightSleepDuration": 12600,
+        "DeepSleepDuration": 4800,
+        "RemSleepDuration": 7800,
+        "SleepScore": 82,
+        "AvgHeartRate": 54,
+        "AvgHRV": 58,
+        "AvgSpo2": 96
+      }
+    },
+    "expected": {
+      "source": "suunto",
+      "sourceSleepId": "suunto-sleep-redacted",
+      "totalSleepMin": 420,
+      "sleepScore": 82,
+      "avgHeartRateBpm": 54,
+      "avgHrvMs": 58,
+      "avgSpo2Pct": 96
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "suunto-recovery-health-json",
+    "provider": "suunto",
+    "domain": "recovery",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "payload": {
+      "timestamp": "2026-05-02T07:00:00Z",
+      "entryData": {
+        "Balance": 71,
+        "StressState": 2
+      }
+    },
+    "expected": {
+      "source": "suunto",
+      "date": "2026-05-02",
+      "balance": 71,
+      "stressState": 2
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "polar-daily-activity-health-json",
+    "provider": "polar",
+    "domain": "daily_activity",
+    "sourceUrl": "https://support.polar.com/en/export-training-sessions-flow",
+    "payload": {
+      "date": "2026-05-01",
+      "timezone": "Europe/Madrid",
+      "startTime": "2026-05-01T00:00:00Z",
+      "steps": 10100,
+      "calories": 540,
+      "distanceMeters": 7600
+    },
+    "expected": {
+      "source": "polar",
+      "date": "2026-05-01",
+      "totalSteps": 10100,
+      "caloriesKcal": 540,
+      "distanceM": 7600
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "polar-sleep-health-json",
+    "provider": "polar",
+    "domain": "sleep",
+    "sourceUrl": "https://www.polar.com/accesslink-api/",
+    "payload": {
+      "id": "polar-sleep-redacted",
+      "date": "2026-05-02",
+      "sleepStartTime": "2026-05-01T22:10:00Z",
+      "sleepEndTime": "2026-05-02T06:20:00Z",
+      "totalSleep": 430,
+      "awakeTime": 30,
+      "lightSleep": 220,
+      "deepSleep": 80,
+      "remSleep": 130,
+      "sleepScore": 81,
+      "averageHeartRate": 53,
+      "averageHrv": 57,
+      "averageSpo2": 96
+    },
+    "expected": {
+      "source": "polar",
+      "sourceSleepId": "polar-sleep-redacted",
+      "totalSleepMin": 430,
+      "sleepScore": 81,
+      "avgHeartRateBpm": 53,
+      "avgHrvMs": 57,
+      "avgSpo2Pct": 96
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "polar-recovery-health-json",
+    "provider": "polar",
+    "domain": "recovery",
+    "sourceUrl": "https://www.polar.com/accesslink-api/",
+    "payload": {
+      "date": "2026-05-02",
+      "timestamp": "2026-05-02T07:00:00Z",
+      "recoveryScore": 77,
+      "readinessScore": 79,
+      "restingHeartRate": 52,
+      "averageHrv": 59,
+      "breathingRate": 14,
+      "averageSpo2": 97
+    },
+    "expected": {
+      "source": "polar",
+      "date": "2026-05-02",
+      "recoveryScore": 77,
+      "readinessScore": 79,
+      "restingHrBpm": 52,
+      "avgHrvMs": 59,
+      "respiratoryRateRpm": 14,
+      "spo2AvgPct": 97
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "fitbit-daily-activity-health-json",
+    "provider": "fitbit",
+    "domain": "daily_activity",
+    "sourceUrl": "https://dev.fitbit.com/build/reference/web-api/activity/get-activity-log-list/",
+    "payload": {
+      "date": "2026-05-01",
+      "timezone": "Europe/Madrid",
+      "summary": {
+        "steps": 11000,
+        "caloriesOut": 2300,
+        "activityCalories": 650,
+        "distance": 8.2,
+        "floors": 12
+      },
+      "goals": {
+        "steps": 10000
+      }
+    },
+    "expected": {
+      "source": "fitbit",
+      "date": "2026-05-01",
+      "totalSteps": 11000,
+      "caloriesKcal": 2300,
+      "activeCaloriesKcal": 650,
+      "distanceM": 8200,
+      "floorsClimbed": 12,
+      "stepGoal": 10000
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "fitbit-sleep-health-json",
+    "provider": "fitbit",
+    "domain": "sleep",
+    "sourceUrl": "https://dev.fitbit.com/build/reference/web-api/sleep/",
+    "payload": {
+      "timezone": "Europe/Madrid",
+      "sleep": [
+        {
+          "logId": 123456,
+          "dateOfSleep": "2026-05-02",
+          "startTime": "2026-05-01T22:20:00Z",
+          "endTime": "2026-05-02T06:10:00Z",
+          "minutesAsleep": 420,
+          "minutesAwake": 50,
+          "efficiency": 89,
+          "averageHeartRate": 55,
+          "averageHrv": 51,
+          "breathingRate": 14.5,
+          "spo2": {
+            "avg": 96
+          },
+          "levels": {
+            "summary": {
+              "light": {
+                "minutes": 230
+              },
+              "deep": {
+                "minutes": 70
+              },
+              "rem": {
+                "minutes": 120
+              },
+              "wake": {
+                "minutes": 50
+              }
+            }
+          }
+        }
+      ]
+    },
+    "expected": {
+      "source": "fitbit",
+      "sourceSleepId": "123456",
+      "totalSleepMin": 420,
+      "sleepScore": 89,
+      "avgHeartRateBpm": 55,
+      "avgHrvMs": 51,
+      "avgRespiratoryRpm": 14.5,
+      "avgSpo2Pct": 96
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "fitbit-recovery-health-json",
+    "provider": "fitbit",
+    "domain": "recovery",
+    "sourceUrl": "https://dev.fitbit.com/build/reference/web-api/",
+    "payload": {
+      "date": "2026-05-02",
+      "timestamp": "2026-05-02T07:00:00Z",
+      "recoveryScore": 74,
+      "readinessScore": 76,
+      "sleepScore": 89,
+      "restingHeartRate": 55,
+      "hrv": {
+        "dailyRmssd": 51
+      },
+      "breathingRate": 14.5,
+      "spo2": {
+        "avg": 96
+      },
+      "vo2Max": 46
+    },
+    "expected": {
+      "source": "fitbit",
+      "date": "2026-05-02",
+      "recoveryScore": 74,
+      "readinessScore": 76,
+      "sleepScore": 89,
+      "restingHrBpm": 55,
+      "avgHrvMs": 51,
+      "respiratoryRateRpm": 14.5,
+      "spo2AvgPct": 96,
+      "balance": 46
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "oura-daily-activity-health-json",
+    "provider": "oura",
+    "domain": "daily_activity",
+    "sourceUrl": "https://cloud.ouraring.com/docs/",
+    "payload": {
+      "daily_activity": [
+        {
+          "day": "2026-05-01",
+          "timestamp": "2026-05-01T12:00:00Z",
+          "steps": 9200,
+          "active_calories": 520,
+          "total_calories": 2300,
+          "equivalent_walking_distance": 7100,
+          "meters_to_target": 0
+        }
+      ]
+    },
+    "expected": {
+      "source": "oura",
+      "date": "2026-05-01",
+      "totalSteps": 9200,
+      "caloriesKcal": 2300,
+      "activeCaloriesKcal": 520,
+      "distanceM": 7100,
+      "goalAchieved": true
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "oura-sleep-health-json",
+    "provider": "oura",
+    "domain": "sleep",
+    "sourceUrl": "https://cloud.ouraring.com/docs/",
+    "payload": {
+      "sleep": [
+        {
+          "id": "oura-sleep-redacted",
+          "day": "2026-05-02",
+          "bedtime_start": "2026-05-01T22:30:00Z",
+          "bedtime_end": "2026-05-02T06:30:00Z",
+          "total_sleep_duration": 27000,
+          "awake_time": 1800,
+          "light_sleep_duration": 14400,
+          "deep_sleep_duration": 5400,
+          "rem_sleep_duration": 7200,
+          "efficiency": 90,
+          "average_heart_rate": 52,
+          "lowest_heart_rate": 45,
+          "average_hrv": 61,
+          "average_breath": 14,
+          "spo2_percentage": {
+            "average": 96
+          }
+        }
+      ]
+    },
+    "expected": {
+      "source": "oura",
+      "sourceSleepId": "oura-sleep-redacted",
+      "totalSleepMin": 450,
+      "sleepScore": 90,
+      "avgHeartRateBpm": 52,
+      "minHeartRateBpm": 45,
+      "avgHrvMs": 61,
+      "avgRespiratoryRpm": 14,
+      "avgSpo2Pct": 96
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "oura-recovery-health-json",
+    "provider": "oura",
+    "domain": "recovery",
+    "sourceUrl": "https://cloud.ouraring.com/docs/",
+    "payload": {
+      "readiness": [
+        {
+          "day": "2026-05-02",
+          "timestamp": "2026-05-02T07:00:00Z",
+          "score": 82,
+          "sleep_score": 90,
+          "activity_score": 76,
+          "contributors": {
+            "resting_heart_rate": 52,
+            "hrv_balance": 61
+          },
+          "respiratory_rate": 14,
+          "spo2_percentage": {
+            "average": 96
+          },
+          "temperature_deviation": 0.1,
+          "daily_stress": {
+            "stress_high": 18
+          }
+        }
+      ]
+    },
+    "expected": {
+      "source": "oura",
+      "date": "2026-05-02",
+      "recoveryScore": 82,
+      "readinessScore": 82,
+      "sleepScore": 90,
+      "strainScore": 76,
+      "restingHrBpm": 52,
+      "avgHrvMs": 61,
+      "respiratoryRateRpm": 14,
+      "spo2AvgPct": 96,
+      "balance": 0.1,
+      "stressState": 18
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "ultrahuman-daily-activity-health-json",
+    "provider": "ultrahuman",
+    "domain": "daily_activity",
+    "sourceUrl": "https://blog.ultrahuman.com/blog/accessing-the-ultrahuman-partnership-api/",
+    "payload": {
+      "date": "2026-05-01",
+      "timezone": "Europe/Madrid",
+      "timestamp": "2026-05-01T12:00:00Z",
+      "movement": {
+        "steps": 9400,
+        "active_kcal": 660,
+        "distance_m": 7600
+      }
+    },
+    "expected": {
+      "source": "ultrahuman",
+      "date": "2026-05-01",
+      "totalSteps": 9400,
+      "caloriesKcal": 660,
+      "activeCaloriesKcal": 660,
+      "distanceM": 7600
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "ultrahuman-sleep-health-json",
+    "provider": "ultrahuman",
+    "domain": "sleep",
+    "sourceUrl": "https://blog.ultrahuman.com/blog/accessing-the-ultrahuman-partnership-api/",
+    "payload": {
+      "type": "Sleep",
+      "object": {
+        "id": "ultrahuman-sleep-redacted",
+        "date": "2026-05-02",
+        "bedtime_start": "2026-05-01T22:30:00Z",
+        "bedtime_end": "2026-05-02T06:00:00Z",
+        "sleep_stages": [
+          {
+            "type": "deep_sleep",
+            "stage_time": 5400
+          },
+          {
+            "type": "light_sleep",
+            "stage_time": 14400
+          },
+          {
+            "type": "rem_sleep",
+            "stage_time": 7200
+          },
+          {
+            "type": "awake",
+            "stage_time": 1800
+          }
+        ],
+        "quick_metrics": [
+          {
+            "type": "sleep_efic",
+            "value": 86
+          }
+        ],
+        "average_heart_rate": 53,
+        "lowest_heart_rate": 47,
+        "average_hrv": 58,
+        "respiratory_rate": 14,
+        "average_spo2": 96
+      }
+    },
+    "expected": {
+      "source": "ultrahuman",
+      "sourceSleepId": "ultrahuman-sleep-redacted",
+      "totalSleepMin": 450,
+      "sleepScore": 86,
+      "avgHeartRateBpm": 53,
+      "minHeartRateBpm": 47,
+      "avgHrvMs": 58,
+      "avgRespiratoryRpm": 14,
+      "avgSpo2Pct": 96
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "ultrahuman-recovery-health-json",
+    "provider": "ultrahuman",
+    "domain": "recovery",
+    "sourceUrl": "https://blog.ultrahuman.com/blog/accessing-the-ultrahuman-partnership-api/",
+    "payload": {
+      "date": "2026-05-02",
+      "timestamp": "2026-05-02T07:00:00Z",
+      "recovery_index": {
+        "value": 79
+      },
+      "movement_index": {
+        "value": 64
+      },
+      "resting_heart_rate": {
+        "value": 53
+      },
+      "hrv": {
+        "value": 58
+      },
+      "respiratory_rate": {
+        "value": 14
+      },
+      "spo2": {
+        "value": 96
+      },
+      "temperature": {
+        "value": 0.2
+      },
+      "metabolic_score": {
+        "value": 88
+      }
+    },
+    "expected": {
+      "source": "ultrahuman",
+      "date": "2026-05-02",
+      "recoveryScore": 79,
+      "readinessScore": 79,
+      "strainScore": 64,
+      "restingHrBpm": 53,
+      "avgHrvMs": 58,
+      "respiratoryRateRpm": 14,
+      "spo2AvgPct": 96,
+      "balance": 0.2,
+      "stressState": 88
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "ultrahuman-metabolic-health-json",
+    "provider": "ultrahuman",
+    "domain": "metabolic",
+    "sourceUrl": "https://blog.ultrahuman.com/blog/accessing-the-ultrahuman-partnership-api/",
+    "payload": {
+      "date": "2026-05-02",
+      "timestamp": "2026-05-02T08:00:00Z",
+      "glucose": {
+        "value": 92
+      },
+      "average_glucose": {
+        "value": 101
+      },
+      "glucose_variability": {
+        "value": 13
+      },
+      "hba1c": {
+        "value": 5.2
+      },
+      "time_in_target": {
+        "value": 94
+      },
+      "metabolic_score": {
+        "value": 88
+      }
+    },
+    "expected": {
+      "source": "ultrahuman",
+      "date": "2026-05-02",
+      "glucoseMgDl": 92,
+      "averageGlucoseMgDl": 101,
+      "glucoseVariabilityPct": 13,
+      "hba1cPct": 5.2,
+      "timeInTargetPct": 94,
+      "metabolicScore": 88
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "apple_health-daily-activity-health-json",
+    "provider": "apple_health",
+    "domain": "daily_activity",
+    "sourceUrl": "https://developer.apple.com/documentation/healthkit/hkworkout",
+    "payload": {
+      "records": [
+        {
+          "type": "HKQuantityTypeIdentifierStepCount",
+          "startDate": "2026-05-01T10:00:00Z",
+          "endDate": "2026-05-01T11:00:00Z",
+          "value": 8000
+        },
+        {
+          "type": "HKQuantityTypeIdentifierActiveEnergyBurned",
+          "startDate": "2026-05-01T10:00:00Z",
+          "endDate": "2026-05-01T11:00:00Z",
+          "value": 500
+        },
+        {
+          "type": "HKQuantityTypeIdentifierDistanceWalkingRunning",
+          "startDate": "2026-05-01T10:00:00Z",
+          "endDate": "2026-05-01T11:00:00Z",
+          "value": 6200
+        }
+      ]
+    },
+    "expected": {
+      "source": "apple_health",
+      "date": "2026-05-01",
+      "totalSteps": 8000,
+      "caloriesKcal": 500,
+      "activeCaloriesKcal": 500,
+      "distanceM": 6200
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "apple_health-sleep-health-json",
+    "provider": "apple_health",
+    "domain": "sleep",
+    "sourceUrl": "https://help.healthyapps.dev/en/health-auto-export/export-format/workouts",
+    "payload": {
+      "sleep": [
+        {
+          "id": "apple-sleep-redacted",
+          "stage": "asleepCore",
+          "startDate": "2026-05-01T22:00:00Z",
+          "endDate": "2026-05-02T02:00:00Z"
+        },
+        {
+          "stage": "asleepDeep",
+          "startDate": "2026-05-02T02:00:00Z",
+          "endDate": "2026-05-02T03:30:00Z"
+        },
+        {
+          "stage": "asleepREM",
+          "startDate": "2026-05-02T03:30:00Z",
+          "endDate": "2026-05-02T05:30:00Z"
+        },
+        {
+          "stage": "awake",
+          "startDate": "2026-05-02T05:30:00Z",
+          "endDate": "2026-05-02T06:00:00Z"
+        }
+      ]
+    },
+    "expected": {
+      "source": "apple_health",
+      "sourceSleepId": "apple-sleep-redacted",
+      "totalSleepMin": 450,
+      "awakeMin": 30,
+      "lightSleepMin": 240,
+      "deepSleepMin": 90,
+      "remSleepMin": 120
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "apple_health-recovery-health-json",
+    "provider": "apple_health",
+    "domain": "recovery",
+    "sourceUrl": "https://developer.apple.com/documentation/healthkit/hkworkout",
+    "payload": {
+      "records": [
+        {
+          "type": "HKQuantityTypeIdentifierRestingHeartRate",
+          "startDate": "2026-05-02T07:00:00Z",
+          "value": 52
+        },
+        {
+          "type": "HKQuantityTypeIdentifierHeartRateVariabilitySDNN",
+          "startDate": "2026-05-02T07:00:00Z",
+          "value": 61
+        },
+        {
+          "type": "HKQuantityTypeIdentifierOxygenSaturation",
+          "startDate": "2026-05-02T07:00:00Z",
+          "value": 96
+        },
+        {
+          "type": "HKQuantityTypeIdentifierRespiratoryRate",
+          "startDate": "2026-05-02T07:00:00Z",
+          "value": 14
+        }
+      ]
+    },
+    "expected": {
+      "source": "apple_health",
+      "date": "2026-05-02",
+      "restingHrBpm": 52,
+      "avgHrvMs": 61,
+      "spo2AvgPct": 96,
+      "respiratoryRateRpm": 14
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "health_connect-daily-activity-health-json",
+    "provider": "health_connect",
+    "domain": "daily_activity",
+    "sourceUrl": "https://developer.android.com/health-and-fitness/health-connect/experiences/workouts",
+    "payload": {
+      "date": "2026-05-01",
+      "sourcePackage": "com.google.android.apps.healthdata",
+      "steps": 8700,
+      "totalCaloriesBurned": {
+        "inKilocalories": 2200
+      },
+      "activeCaloriesBurned": {
+        "inKilocalories": 540
+      },
+      "distance": {
+        "inMeters": 6800
+      }
+    },
+    "expected": {
+      "source": "health_connect",
+      "sourcePackage": "com.google.android.apps.healthdata",
+      "date": "2026-05-01",
+      "totalSteps": 8700,
+      "caloriesKcal": 2200,
+      "activeCaloriesKcal": 540,
+      "distanceM": 6800
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "health_connect-sleep-health-json",
+    "provider": "health_connect",
+    "domain": "sleep",
+    "sourceUrl": "https://developer.android.com/health-and-fitness/health-connect/experiences/workouts",
+    "payload": {
+      "sleep": {
+        "id": "health-connect-sleep-redacted",
+        "sourcePackage": "com.google.android.apps.healthdata",
+        "startTime": "2026-05-01T22:00:00Z",
+        "endTime": "2026-05-02T06:00:00Z",
+        "totalSleepMin": 450,
+        "avgHeartRate": 54,
+        "hrvRmssd": 55,
+        "respiratoryRate": 14,
+        "spo2Avg": 96,
+        "stages": [
+          {
+            "type": "light",
+            "durationSeconds": 14400
+          },
+          {
+            "type": "deep",
+            "durationSeconds": 5400
+          },
+          {
+            "type": "rem",
+            "durationSeconds": 7200
+          },
+          {
+            "type": "awake",
+            "durationSeconds": 1800
+          }
+        ]
+      }
+    },
+    "expected": {
+      "source": "health_connect",
+      "sourcePackage": "com.google.android.apps.healthdata",
+      "totalSleepMin": 450,
+      "lightSleepMin": 240,
+      "deepSleepMin": 90,
+      "remSleepMin": 120,
+      "awakeMin": 30,
+      "avgHeartRateBpm": 54,
+      "avgHrvMs": 55,
+      "avgRespiratoryRpm": 14,
+      "avgSpo2Pct": 96
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "health_connect-recovery-health-json",
+    "provider": "health_connect",
+    "domain": "recovery",
+    "sourceUrl": "https://developer.android.com/health-and-fitness/health-connect/experiences/workouts",
+    "payload": {
+      "date": "2026-05-02",
+      "timestamp": "2026-05-02T07:00:00Z",
+      "sourcePackage": "com.google.android.apps.healthdata",
+      "readinessScore": 77,
+      "recoveryScore": 75,
+      "sleepScore": 82,
+      "restingHeartRate": 54,
+      "hrvRmssd": 55,
+      "respiratoryRate": 14,
+      "spo2Avg": 96,
+      "vo2Max": 47,
+      "temperatureC": 36.4
+    },
+    "expected": {
+      "source": "health_connect",
+      "sourcePackage": "com.google.android.apps.healthdata",
+      "recoveryScore": 75,
+      "readinessScore": 77,
+      "sleepScore": 82,
+      "restingHrBpm": 54,
+      "avgHrvMs": 55,
+      "respiratoryRateRpm": 14,
+      "spo2AvgPct": 96,
+      "balance": 47,
+      "stressState": 36.4
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "coros-daily-activity-health-json",
+    "provider": "coros",
+    "domain": "daily_activity",
+    "sourceUrl": "https://support.coros.com/hc/en-us/articles/25002333092500-Requesting-a-Bulk-Export-of-COROS-Data",
+    "payload": {
+      "date": "2026-05-01",
+      "timezone": "Europe/Madrid",
+      "steps": 9800,
+      "calories": 560,
+      "distanceM": 7300
+    },
+    "expected": {
+      "source": "coros",
+      "date": "2026-05-01",
+      "totalSteps": 9800,
+      "caloriesKcal": 560,
+      "distanceM": 7300
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "coros-sleep-health-json",
+    "provider": "coros",
+    "domain": "sleep",
+    "sourceUrl": "https://support.coros.com/hc/en-us/articles/25002333092500-Requesting-a-Bulk-Export-of-COROS-Data",
+    "payload": {
+      "date": "2026-05-02",
+      "sleep": {
+        "id": "coros-sleep-redacted",
+        "startTime": "2026-05-01T22:20:00Z",
+        "endTime": "2026-05-02T06:20:00Z",
+        "totalSleepMin": 430,
+        "awakeMin": 50,
+        "lightSleepMin": 230,
+        "deepSleepMin": 80,
+        "remSleepMin": 120,
+        "sleepScore": 84,
+        "avgHeartRate": 53,
+        "avgHrv": 56,
+        "respiratoryRate": 14,
+        "spo2Avg": 96
+      }
+    },
+    "expected": {
+      "source": "coros",
+      "sourceSleepId": "coros-sleep-redacted",
+      "totalSleepMin": 430,
+      "sleepScore": 84,
+      "avgHeartRateBpm": 53,
+      "avgHrvMs": 56,
+      "avgRespiratoryRpm": 14,
+      "avgSpo2Pct": 96
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "coros-recovery-health-json",
+    "provider": "coros",
+    "domain": "recovery",
+    "sourceUrl": "https://support.coros.com/hc/en-us/articles/25002333092500-Requesting-a-Bulk-Export-of-COROS-Data",
+    "payload": {
+      "date": "2026-05-02",
+      "timestamp": "2026-05-02T07:00:00Z",
+      "recoveryScore": 76,
+      "readinessScore": 78,
+      "sleepScore": 84,
+      "trainingLoad": 63,
+      "restingHeartRate": 53,
+      "hrv": 56,
+      "respiratoryRate": 14,
+      "spo2Avg": 96,
+      "recoveryBalance": 72,
+      "stressScore": 20
+    },
+    "expected": {
+      "source": "coros",
+      "date": "2026-05-02",
+      "recoveryScore": 76,
+      "readinessScore": 78,
+      "sleepScore": 84,
+      "strainScore": 63,
+      "restingHrBpm": 53,
+      "avgHrvMs": 56,
+      "respiratoryRateRpm": 14,
+      "spo2AvgPct": 96,
+      "balance": 72,
+      "stressState": 20
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "whoop-cycle-health-json",
+    "provider": "whoop",
+    "domain": "cycle",
+    "sourceUrl": "https://developer.whoop.com/api",
+    "payload": {
+      "id": 93845,
+      "start": "2026-05-01T22:00:00Z",
+      "end": "2026-05-02T06:00:00Z",
+      "timezone_offset": "+02:00",
+      "score_state": "SCORED",
+      "score": {
+        "strain": 5.2,
+        "kilojoule": 836.8,
+        "average_heart_rate": 68,
+        "max_heart_rate": 141
+      }
+    },
+    "expected": {
+      "source": "whoop",
+      "sourceCycleId": "93845",
+      "strainScore": 5.2,
+      "kilojoule": 836.8,
+      "caloriesKcal": 200,
+      "avgHeartRateBpm": 68,
+      "maxHeartRateBpm": 141
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "whoop-sleep-health-json",
+    "provider": "whoop",
+    "domain": "sleep",
+    "sourceUrl": "https://developer.whoop.com/api",
+    "payload": {
+      "id": "whoop-sleep-redacted",
+      "start": "2026-05-01T22:00:00Z",
+      "end": "2026-05-02T06:00:00Z",
+      "timezone_offset": "+02:00",
+      "nap": false,
+      "stage_summary": {
+        "total_light_sleep_time_milli": 14400000,
+        "total_slow_wave_sleep_time_milli": 5400000,
+        "total_rem_sleep_time_milli": 7200000,
+        "total_awake_time_milli": 1800000
+      },
+      "respiratory_rate": 14,
+      "sleep_performance_percentage": 88
+    },
+    "expected": {
+      "source": "whoop",
+      "sourceSleepId": "whoop-sleep-redacted",
+      "totalSleepMin": 450,
+      "awakeMin": 30,
+      "lightSleepMin": 240,
+      "deepSleepMin": 90,
+      "remSleepMin": 120,
+      "sleepScore": 88,
+      "avgRespiratoryRpm": 14
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "whoop-recovery-health-json",
+    "provider": "whoop",
+    "domain": "recovery",
+    "sourceUrl": "https://developer.whoop.com/api",
+    "payload": {
+      "created_at": "2026-05-02T07:00:00Z",
+      "score": {
+        "recovery_score": 73,
+        "resting_heart_rate": 55,
+        "hrv_rmssd_milli": 51,
+        "spo2_percentage": 96,
+        "skin_temp_celsius": 33.7
+      }
+    },
+    "expected": {
+      "source": "whoop",
+      "date": "2026-05-02",
+      "recoveryScore": 73,
+      "readinessScore": 73,
+      "restingHrBpm": 55,
+      "avgHrvMs": 51,
+      "hrvRmssdMs": 51,
+      "spo2AvgPct": 96,
+      "balance": 33.7
+    }
+  },
+  {
+    "sourceKind": "synthetic_official_shape",
+    "id": "whoop-body-measurement-unsupported",
+    "provider": "whoop",
+    "domain": "body_measurement",
+    "sourceUrl": "https://developer.whoop.com/api",
+    "unsupported": true,
+    "unsupportedReason": "No canonical body measurement mapper exists in activity-import yet.",
+    "payload": {
+      "height_meter": 1.82,
+      "weight_kilogram": 80,
+      "max_heart_rate": 190
+    },
+    "expected": {}
+  }
+]

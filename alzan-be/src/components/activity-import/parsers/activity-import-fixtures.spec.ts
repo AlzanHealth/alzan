@@ -16,9 +16,20 @@ interface FixtureManifestEntry {
   file: string;
   sourceKind: FixtureSourceKind;
   sourceUrl: string | null;
+  tolerance?: number;
   expectedSummary: Partial<CanonicalActivity['summary']>;
   expectedStreams: Partial<Record<keyof CanonicalActivity['streams'], number>>;
   expectedProviderFields: Record<string, unknown>;
+  expectedDevice?: Partial<CanonicalActivity['device']>;
+  expectedHeartRateZones?: CanonicalActivity['heartRateZones'];
+  expectedLaps?: {
+    exactCount?: number;
+    items?: Array<Partial<CanonicalActivity['laps'][number]>>;
+  };
+  expectedRoute?: {
+    positionExactCount?: number;
+    positionMinCount?: number;
+  };
 }
 
 const fixtureRoot = join(__dirname, '..', '__fixtures__');
@@ -28,8 +39,30 @@ function readFixtureManifest(): FixtureManifestEntry[] {
   return JSON.parse(rawManifest) as FixtureManifestEntry[];
 }
 
-function readFixture(entry: FixtureManifestEntry): string {
-  return readFileSync(join(fixtureRoot, entry.file), 'utf8');
+function readFixture(entry: FixtureManifestEntry): string | Uint8Array {
+  const fixturePath = join(fixtureRoot, entry.file);
+  return entry.format === 'fit' ? Uint8Array.from(readFileSync(fixturePath)) : readFileSync(fixturePath, 'utf8');
+}
+
+function buildFixtureContext(entry: FixtureManifestEntry, fieldPath: string): string {
+  return `${entry.id} provider=${entry.provider} sport=${entry.sportType} file=${entry.file} field=${fieldPath}`;
+}
+
+function assertFixtureValue(
+  actualValue: unknown,
+  expectedValue: unknown,
+  entry: FixtureManifestEntry,
+  fieldPath: string,
+): void {
+  if (typeof actualValue === 'number' && typeof expectedValue === 'number') {
+    const tolerance = entry.tolerance ?? 0;
+    assert.ok(
+      Math.abs(actualValue - expectedValue) <= tolerance,
+      `${buildFixtureContext(entry, fieldPath)} expected=${expectedValue} actual=${actualValue} tolerance=${tolerance}`,
+    );
+    return;
+  }
+  assert.equal(actualValue, expectedValue, buildFixtureContext(entry, fieldPath));
 }
 
 function assertFixtureMetadata(entry: FixtureManifestEntry): void {
@@ -44,32 +77,106 @@ function assertFixtureMetadata(entry: FixtureManifestEntry): void {
 function assertSummary(
   actualSummary: CanonicalActivity['summary'],
   expectedSummary: Partial<CanonicalActivity['summary']>,
-  fixtureId: string,
+  entry: FixtureManifestEntry,
 ): void {
   for (const [key, expectedValue] of Object.entries(expectedSummary)) {
     const actualValue = actualSummary[key as keyof CanonicalActivity['summary']];
-    assert.equal(actualValue, expectedValue, `${fixtureId} summary.${key}`);
+    assertFixtureValue(actualValue, expectedValue, entry, `summary.${key}`);
   }
 }
 
 function assertStreams(
   actualStreams: CanonicalActivity['streams'],
   expectedStreams: FixtureManifestEntry['expectedStreams'],
-  fixtureId: string,
+  entry: FixtureManifestEntry,
 ): void {
   for (const [key, expectedMinCount] of Object.entries(expectedStreams)) {
     const streamKey = key.replace('MinCount', '') as keyof CanonicalActivity['streams'];
-    assert.ok(actualStreams[streamKey].length >= expectedMinCount, `${fixtureId} streams.${streamKey}`);
+    assert.ok(
+      actualStreams[streamKey].length >= expectedMinCount,
+      `${buildFixtureContext(entry, `streams.${streamKey}`)} expectedMin=${expectedMinCount} actual=${actualStreams[streamKey].length}`,
+    );
   }
 }
 
 function assertProviderFields(
   actualVendorFields: CanonicalActivity['vendorFields'],
   expectedProviderFields: Record<string, unknown>,
-  fixtureId: string,
+  entry: FixtureManifestEntry,
 ): void {
   for (const [key, expectedValue] of Object.entries(expectedProviderFields)) {
-    assert.equal(actualVendorFields[key], expectedValue, `${fixtureId} vendorFields.${key}`);
+    assertFixtureValue(actualVendorFields[key], expectedValue, entry, `vendorFields.${key}`);
+  }
+}
+
+function assertDevice(canonical: CanonicalActivity, entry: FixtureManifestEntry): void {
+  if (!entry.expectedDevice) return;
+  for (const [key, expectedValue] of Object.entries(entry.expectedDevice)) {
+    assertFixtureValue(
+      canonical.device?.[key as keyof CanonicalActivity['device']] ?? null,
+      expectedValue,
+      entry,
+      `device.${key}`,
+    );
+  }
+}
+
+function assertHeartRateZones(canonical: CanonicalActivity, entry: FixtureManifestEntry): void {
+  if (!entry.expectedHeartRateZones) return;
+  assert.equal(
+    canonical.heartRateZones.length,
+    entry.expectedHeartRateZones.length,
+    buildFixtureContext(entry, 'heartRateZones.length'),
+  );
+  entry.expectedHeartRateZones.forEach((expectedZone, index) => {
+    const actualZone = canonical.heartRateZones[index];
+    assertFixtureValue(actualZone?.zone, expectedZone.zone, entry, `heartRateZones.${index}.zone`);
+    assertFixtureValue(
+      actualZone?.durationSeconds,
+      expectedZone.durationSeconds,
+      entry,
+      `heartRateZones.${index}.durationSeconds`,
+    );
+    assertFixtureValue(actualZone?.percentage, expectedZone.percentage, entry, `heartRateZones.${index}.percentage`);
+  });
+}
+
+function assertLaps(canonical: CanonicalActivity, entry: FixtureManifestEntry): void {
+  if (!entry.expectedLaps) return;
+  if (entry.expectedLaps.exactCount != null) {
+    assert.equal(canonical.laps.length, entry.expectedLaps.exactCount, buildFixtureContext(entry, 'laps.length'));
+  }
+  entry.expectedLaps.items?.forEach((expectedLap, index) => {
+    const lapIndex = expectedLap.lapIndex;
+    const actualLap =
+      typeof lapIndex === 'number' ? canonical.laps.find(lap => lap.lapIndex === lapIndex) : canonical.laps[index];
+    const contextIndex = typeof lapIndex === 'number' ? `lapIndex=${lapIndex}` : `${index}`;
+    assert.ok(actualLap, buildFixtureContext(entry, `laps.${contextIndex}`));
+    for (const [key, expectedValue] of Object.entries(expectedLap)) {
+      assertFixtureValue(
+        actualLap[key as keyof CanonicalActivity['laps'][number]],
+        expectedValue,
+        entry,
+        `laps.${contextIndex}.${key}`,
+      );
+    }
+  });
+}
+
+function assertRoute(canonical: CanonicalActivity, entry: FixtureManifestEntry): void {
+  if (!entry.expectedRoute) return;
+  if (entry.expectedRoute.positionExactCount != null) {
+    assert.equal(
+      canonical.streams.position.length,
+      entry.expectedRoute.positionExactCount,
+      buildFixtureContext(entry, 'route.positionExactCount'),
+    );
+  }
+  if (entry.expectedRoute.positionMinCount != null) {
+    assert.ok(
+      canonical.streams.position.length >= entry.expectedRoute.positionMinCount,
+      `${buildFixtureContext(entry, 'route.positionMinCount')} expectedMin=${entry.expectedRoute.positionMinCount} actual=${canonical.streams.position.length}`,
+    );
   }
 }
 
@@ -81,9 +188,13 @@ function assertCanonicalFixture(entry: FixtureManifestEntry): void {
   assert.equal(canonical.sourceFileType, entry.format, `${entry.id} sourceFileType`);
   assert.equal(canonical.sportType, entry.sportType, `${entry.id} sportType`);
   assert.equal(canonical.sportSubtype, entry.sportSubtype, `${entry.id} sportSubtype`);
-  assertSummary(canonical.summary, entry.expectedSummary, entry.id);
-  assertStreams(canonical.streams, entry.expectedStreams, entry.id);
-  assertProviderFields(canonical.vendorFields, entry.expectedProviderFields, entry.id);
+  assertSummary(canonical.summary, entry.expectedSummary, entry);
+  assertStreams(canonical.streams, entry.expectedStreams, entry);
+  assertProviderFields(canonical.vendorFields, entry.expectedProviderFields, entry);
+  assertDevice(canonical, entry);
+  assertHeartRateZones(canonical, entry);
+  assertLaps(canonical, entry);
+  assertRoute(canonical, entry);
 }
 
 function assertEveryAlzanSportIsCovered(entries: FixtureManifestEntry[]): void {
@@ -130,10 +241,26 @@ function assertEveryWearableProviderIsCovered(entries: FixtureManifestEntry[]): 
 }
 
 function assertFixtureManifestCoverage(): void {
-  const entries = readFixtureManifest();
+  const fixtureFilter = process.env.ACTIVITY_IMPORT_FIXTURE_FILTER;
+  const providerFilter = process.env.ACTIVITY_IMPORT_PROVIDER_FILTER;
+  const kindFilter = process.env.ACTIVITY_IMPORT_KIND_FILTER;
+  const entries = readFixtureManifest().filter(entry => {
+    if (fixtureFilter && entry.id !== fixtureFilter) return false;
+    if (providerFilter && entry.provider !== providerFilter) return false;
+    return true;
+  });
 
-  assertEveryAlzanSportIsCovered(entries);
-  assertEveryWearableProviderIsCovered(entries);
+  if (providerFilter || (fixtureFilter && kindFilter === 'activity')) {
+    assert.ok(
+      entries.length > 0,
+      `No activity fixture matched provider=${providerFilter ?? '*'} fixture=${fixtureFilter ?? '*'}`,
+    );
+  }
+
+  if (!fixtureFilter && !providerFilter) {
+    assertEveryAlzanSportIsCovered(entries);
+    assertEveryWearableProviderIsCovered(entries);
+  }
   entries.forEach(assertCanonicalFixture);
 }
 

@@ -17,6 +17,7 @@
     "format:check": "pnpm --prefix alzan-be format:check && pnpm --prefix alzan-fe format:check",
     "format": "pnpm --prefix alzan-be format && pnpm --prefix alzan-fe format",
     "typecheck": "pnpm --prefix alzan-be typecheck && pnpm --prefix alzan-fe typecheck",
+    "verify:activity-import": "pnpm --prefix alzan-be run verify:activity-import",
     "install:all": "pnpm --prefix alzan-be install && pnpm --prefix alzan-fe install",
     "supabase:gen": "supabase gen types --local > supabase/database.types.ts",
     "supabase:types": "pnpm run supabase:gen && pnpm run copy:db:types && pnpm run copy:request:types && pnpm run format",

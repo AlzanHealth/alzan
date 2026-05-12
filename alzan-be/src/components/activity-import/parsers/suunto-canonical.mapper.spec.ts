@@ -307,6 +307,62 @@ function assertSuuntoJsonCanonicalParsesSummary(): void {
   assert.equal(canonical.streams.position.length, 2);
 }
 
+function assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks(): void {
+  const rawJson = JSON.stringify({
+    DeviceLog: {
+      Header: {
+        Activity: 'Running',
+        ActivityType: 3,
+        DateTime: '2026-05-09T17:29:52Z',
+        Duration: 2638.264,
+        Distance: 8023,
+        Energy: 3698619,
+        TraingingLoadPeak: 172.7,
+      },
+      Samples: [],
+      Windows: [
+        {
+          Window: {
+            Type: 'Autolap',
+            Distance: 1000,
+            Duration: 316.7,
+            HR: [{ Avg: 2.271, Max: 2.467, Min: 1.45 }],
+          },
+        },
+        {
+          Window: {
+            Type: 'Autolap',
+            Distance: 1000,
+            Duration: 318.2,
+            HR: [{ Avg: 2.657, Max: 2.783, Min: 2.467 }],
+          },
+        },
+        {
+          Window: {
+            Type: 'Autolap',
+            Distance: 1000,
+            Duration: 321.9,
+            HR: [{ Avg: 2.738, Max: 2.817, Min: 2.533 }],
+          },
+        },
+      ],
+    },
+  });
+
+  const canonical = parseSuuntoActivityFileToCanonical(rawJson, 'suunto-running-export.json');
+
+  assert.equal(canonical.sportType, 'running');
+  assert.equal(canonical.sportSubtype, 'road');
+  assert.equal(canonical.summary.durationSeconds, 2638);
+  assert.equal(canonical.summary.distanceM, 8023);
+  assert.equal(canonical.summary.caloriesKcal, 884);
+  assert.equal(canonical.summary.tss, 172.7);
+  assert.equal(canonical.laps.length, 3);
+  assert.equal(canonical.laps[2]?.distanceM, 1000);
+  assert.equal(canonical.laps[2]?.durationSeconds, 321.9);
+  assert.equal(canonical.laps[2]?.avgPaceSecondsPerKm, 321.9);
+}
+
 function assertSuuntoHealthCanonicalParsesWithoutPersistence(): void {
   const dailyActivity = mapSuuntoDailyActivityToCanonical({
     timestamp: '2026-05-01T12:00:00.000+02:00',
@@ -362,4 +418,5 @@ assertSuuntoFitCanonicalParsesGpsAndLaps();
 assertSuuntoFitCanonicalParsesWithoutGps();
 assertSuuntoFitWithoutGpsStillParsesAsRouteImport();
 assertSuuntoJsonCanonicalParsesSummary();
+assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks();
 assertSuuntoHealthCanonicalParsesWithoutPersistence();

@@ -407,5 +407,357 @@
     "expectedProviderFields": {
       "sourceProvider": "unknown"
     }
+  },
+  {
+    "id": "suunto-running-json-user-redacted",
+    "provider": "suunto",
+    "sportType": "running",
+    "sportSubtype": "road",
+    "format": "json",
+    "file": "providers/suunto/running-user-redacted.json",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://us.suunto.com/pages/what-type-of-files-can-i-export-from-the-suunto-app",
+    "tolerance": 0.01,
+    "expectedSummary": {
+      "durationSeconds": 2638,
+      "caloriesKcal": 884,
+      "distanceM": 8023,
+      "avgHeartRate": 163,
+      "maxHeartRate": 176,
+      "minHeartRate": 87,
+      "totalSteps": 6164,
+      "recoveryTimeSeconds": 71520,
+      "epoc": 132.7,
+      "pte": 4.6,
+      "tss": 172.7,
+      "vo2Max": 49.3
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 2600,
+      "speedMinCount": 2500,
+      "distanceMinCount": 2500,
+      "altitudeMinCount": 2500,
+      "cadenceMinCount": 2500
+    },
+    "expectedProviderFields": {
+      "suuntoActivityId": 3
+    },
+    "expectedDevice": {
+      "name": "Suunto Redacted",
+      "serial": null
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedHeartRateZones": [
+      {
+        "zone": 1,
+        "durationSeconds": 66,
+        "percentage": 2
+      },
+      {
+        "zone": 2,
+        "durationSeconds": 348,
+        "percentage": 13
+      },
+      {
+        "zone": 3,
+        "durationSeconds": 1814,
+        "percentage": 68
+      },
+      {
+        "zone": 4,
+        "durationSeconds": 421,
+        "percentage": 16
+      }
+    ],
+    "expectedLaps": {
+      "exactCount": 9,
+      "items": [
+        {
+          "lapIndex": 1,
+          "lapType": "distance",
+          "distanceM": 1000,
+          "durationSeconds": 316.7,
+          "avgPaceSecondsPerKm": 316.7
+        },
+        {
+          "lapIndex": 2,
+          "lapType": "distance",
+          "distanceM": 1000,
+          "durationSeconds": 318.2,
+          "avgPaceSecondsPerKm": 318.2
+        },
+        {
+          "lapIndex": 3,
+          "lapType": "distance",
+          "distanceM": 1000,
+          "durationSeconds": 321.9,
+          "avgPaceSecondsPerKm": 321.9
+        }
+      ]
+    }
+  },
+  {
+    "id": "suunto-indoor-cycling-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "cycling",
+    "sportSubtype": "indoor",
+    "format": "fit",
+    "file": "providers/suunto/indoor-cycling-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 3676,
+      "caloriesKcal": 400,
+      "avgHeartRate": 88,
+      "maxHeartRate": 113,
+      "minHeartRate": 69
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 3600
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 2,
+      "suuntoFitSubSport": 6
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedHeartRateZones": [
+      {
+        "zone": 1,
+        "durationSeconds": 3675,
+        "percentage": 100
+      }
+    ],
+    "expectedLaps": {
+      "exactCount": 7,
+      "items": [
+        {
+          "lapIndex": 1,
+          "durationSeconds": 600,
+          "avgHeartRate": 82
+        },
+        {
+          "lapIndex": 7,
+          "durationSeconds": 75.7,
+          "maxHeartRate": 113
+        }
+      ]
+    }
+  },
+  {
+    "id": "suunto-running-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "running",
+    "sportSubtype": "road",
+    "format": "fit",
+    "file": "providers/suunto/running-fit-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 2634,
+      "elapsedSeconds": 2734,
+      "distanceM": 6890,
+      "caloriesKcal": 788,
+      "avgHeartRate": 153,
+      "maxHeartRate": 181,
+      "minHeartRate": 88,
+      "totalSteps": 2755,
+      "maxSpeedMps": 2.615,
+      "avgCadence": 68,
+      "maxCadence": 78,
+      "elevationLossM": 140
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 2600,
+      "speedMinCount": 2600,
+      "distanceMinCount": 2600,
+      "altitudeMinCount": 2600,
+      "cadenceMinCount": 2600
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 1,
+      "suuntoFitSubSport": null
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedLaps": {
+      "exactCount": 15,
+      "items": [
+        {
+          "lapIndex": 1,
+          "distanceM": 1681,
+          "durationSeconds": 600
+        },
+        {
+          "lapIndex": 2,
+          "distanceM": 400,
+          "durationSeconds": 94.9
+        },
+        {
+          "lapIndex": 3,
+          "distanceM": 110.4,
+          "durationSeconds": 90
+        }
+      ]
+    }
+  },
+  {
+    "id": "suunto-football-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "football",
+    "sportSubtype": "outdoor",
+    "format": "fit",
+    "file": "providers/suunto/football-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 3474,
+      "distanceM": 3435,
+      "caloriesKcal": 998,
+      "avgHeartRate": 147,
+      "maxHeartRate": 177,
+      "minHeartRate": 88,
+      "totalSteps": 2249,
+      "maxSpeedMps": 0.989,
+      "avgCadence": 58,
+      "maxCadence": 100,
+      "elevationLossM": 26
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 3400,
+      "speedMinCount": 3400,
+      "distanceMinCount": 3400,
+      "altitudeMinCount": 3400,
+      "cadenceMinCount": 3400
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 7,
+      "suuntoFitSubSport": null
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedLaps": {
+      "exactCount": 0
+    }
+  },
+  {
+    "id": "suunto-gym-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "strength",
+    "sportSubtype": "indoor",
+    "format": "fit",
+    "file": "providers/suunto/gym-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 3197,
+      "caloriesKcal": 267,
+      "avgHeartRate": 82,
+      "maxHeartRate": 102,
+      "minHeartRate": 63,
+      "totalSteps": 129
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 3100,
+      "altitudeMinCount": 3100
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 10,
+      "suuntoFitSubSport": 20
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedHeartRateZones": [
+      {
+        "zone": 1,
+        "durationSeconds": 3197,
+        "percentage": 100
+      }
+    ],
+    "expectedLaps": {
+      "exactCount": 0
+    }
+  },
+  {
+    "id": "suunto-padel-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "padel",
+    "sportSubtype": "outdoor",
+    "format": "fit",
+    "file": "providers/suunto/padel-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 4584,
+      "caloriesKcal": 810,
+      "avgHeartRate": 121,
+      "maxHeartRate": 145,
+      "minHeartRate": 88,
+      "totalSteps": 882
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 4500,
+      "altitudeMinCount": 4500
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 64,
+      "suuntoFitSubSport": 85
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedLaps": {
+      "exactCount": 0
+    }
+  },
+  {
+    "id": "suunto-tennis-fit-user-redacted",
+    "provider": "suunto",
+    "sportType": "tennis",
+    "sportSubtype": "outdoor",
+    "format": "fit",
+    "file": "providers/suunto/tennis-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "tolerance": 0.1,
+    "expectedSummary": {
+      "durationSeconds": 3531,
+      "distanceM": 1320,
+      "caloriesKcal": 702,
+      "avgHeartRate": 127,
+      "maxHeartRate": 153,
+      "minHeartRate": 84,
+      "totalSteps": 1913,
+      "maxSpeedMps": 0.374,
+      "elevationGainM": 11,
+      "elevationLossM": 14
+    },
+    "expectedStreams": {
+      "heartRateMinCount": 3500,
+      "speedMinCount": 3500,
+      "distanceMinCount": 3500,
+      "altitudeMinCount": 3500
+    },
+    "expectedProviderFields": {
+      "suuntoFitSport": 8,
+      "suuntoFitSubSport": null
+    },
+    "expectedRoute": {
+      "positionExactCount": 0
+    },
+    "expectedLaps": {
+      "exactCount": 0
+    }
   }
 ]

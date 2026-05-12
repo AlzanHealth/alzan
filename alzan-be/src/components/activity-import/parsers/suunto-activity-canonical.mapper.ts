@@ -697,6 +697,55 @@ function pushJsonSample(sample: JsonRecord, startedAt: string | null, streams: C
   );
 }
 
+function readWindowMetric(window: JsonRecord, metricName: string, metricKey: 'Avg' | 'Max' | 'Min'): number | null {
+  const metric = window[metricName];
+  if (Array.isArray(metric) && isRecord(metric[0])) {
+    return readNumber(metric[0][metricKey]);
+  }
+  return null;
+}
+
+function mapWindowTypeToLapType(windowType: string | null): CanonicalActivityLap['lapType'] {
+  if (windowType?.toLowerCase() === 'autolap') return 'distance';
+  return 'unknown';
+}
+
+function mapSuuntoWindowsToLaps(windows: unknown): CanonicalActivityLap[] {
+  if (!Array.isArray(windows)) return [];
+  let elapsedSeconds = 0;
+  return windows
+    .map(candidate => (isRecord(candidate) && isRecord(candidate.Window) ? candidate.Window : null))
+    .filter((window): window is JsonRecord => {
+      if (!window) return false;
+      const type = readString(window.Type)?.toLowerCase();
+      return type === 'autolap';
+    })
+    .map((window, index) => {
+      const distanceM = readNumber(window.Distance) ?? readNumber(window.DistanceMax);
+      const durationSeconds = readNumber(window.Duration);
+      const startOffsetSeconds = elapsedSeconds;
+      if (durationSeconds != null && durationSeconds > 0) elapsedSeconds += durationSeconds;
+      return {
+        lapIndex: index + 1,
+        lapType: mapWindowTypeToLapType(readString(window.Type)),
+        distanceM,
+        durationSeconds,
+        avgPaceSecondsPerKm:
+          distanceM != null && distanceM > 0 && durationSeconds != null ? durationSeconds / (distanceM / 1000) : null,
+        avgHeartRate:
+          readWindowMetric(window, 'HR', 'Avg') != null
+            ? normaliseHeartRate(readWindowMetric(window, 'HR', 'Avg') as number)
+            : null,
+        maxHeartRate:
+          readWindowMetric(window, 'HR', 'Max') != null
+            ? normaliseHeartRate(readWindowMetric(window, 'HR', 'Max') as number)
+            : null,
+        startOffsetSeconds,
+        endOffsetSeconds: durationSeconds != null ? startOffsetSeconds + durationSeconds : null,
+      };
+    });
+}
+
 function parseSuuntoJson(rawJson: string, options?: ParseSuuntoActivityOptions): CanonicalActivity {
   let parsed: unknown;
   try {
@@ -711,7 +760,11 @@ function parseSuuntoJson(rawJson: string, options?: ParseSuuntoActivityOptions):
     readNumber(header.ActivityType) ?? readNumber(header.activityId) ?? readNumber(header.activity_type_id);
   const sport = mapSuuntoActivityToCanonicalSport({
     activityId,
-    sportName: readString(header.ActivityName) ?? readString(header.Sport) ?? readString(header.sport),
+    sportName:
+      readString(header.ActivityName) ??
+      readString(header.Activity) ??
+      readString(header.Sport) ??
+      readString(header.sport),
   });
   const startedAt =
     normaliseTimestamp(header.DateTime) ?? normaliseTimestamp(header.StartTime) ?? normaliseTimestamp(header.startTime);
@@ -771,11 +824,15 @@ function parseSuuntoJson(rawJson: string, options?: ParseSuuntoActivityOptions):
       vo2Max: readNumber(header.MAXVO2) ?? readNumber(header.VO2Max),
       epoc: readNumber(header.PeakEPOC) ?? readNumber(header.EPOC),
       pte: readNumber(header.PeakTrainingEffect) ?? readNumber(header.PTE),
-      tss: readNumber(header.TrainingStressScore) ?? readNumber(header.TSS),
+      tss:
+        readNumber(header.TrainingStressScore) ??
+        readNumber(header.TSS) ??
+        readNumber(header.TrainingLoadPeak) ??
+        readNumber(header.TraingingLoadPeak),
       totalSteps: readNumber(header.StepCount) ?? readNumber(header.TotalSteps),
     },
     streams,
-    laps: [],
+    laps: mapSuuntoWindowsToLaps(deviceLog.Windows),
     device,
     vendorFields: { suuntoActivityId: activityId ?? null },
     estimatedMaxHeartRate: options?.estimatedMaxHeartRate,
