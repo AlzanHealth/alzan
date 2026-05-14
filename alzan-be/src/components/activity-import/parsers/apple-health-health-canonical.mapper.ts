@@ -2,6 +2,8 @@ import {
   AppleHealthDailyActivityCanonical,
   AppleHealthRecoveryCanonical,
   AppleHealthSleepCanonical,
+  CanonicalHealthMetricSample,
+  CanonicalSleepStageInterval,
 } from './activity-import-canonical.types';
 
 type JsonRecord = Record<string, unknown>;
@@ -60,6 +62,18 @@ function readTimezone(record: JsonRecord): string {
   return readString(record.zoneOffset) ?? readString(record.timezone) ?? 'UTC';
 }
 
+function readSourcePackage(record: JsonRecord): string | null {
+  const source = isRecord(record.source) ? record.source : {};
+  const sourceRevision = isRecord(record.sourceRevision) ? record.sourceRevision : {};
+  const revisionSource = isRecord(sourceRevision.source) ? sourceRevision.source : {};
+  return (
+    readString(source.bundleIdentifier) ??
+    readString(source.bundle_id) ??
+    readString(revisionSource.bundleIdentifier) ??
+    readString(revisionSource.bundle_id)
+  );
+}
+
 function minutesBetween(startTime: string | null, endTime: string | null): number | null {
   if (!startTime || !endTime) return null;
   const startMs = new Date(startTime).getTime();
@@ -80,9 +94,56 @@ function latestRecord(records: JsonRecord[], typeName: string): JsonRecord | nul
   return records.filter(record => normaliseType(record.type).includes(typeName)).at(-1) ?? null;
 }
 
-function readLatestValue(records: JsonRecord[], typeName: string): number | null {
-  const record = latestRecord(records, typeName);
-  return record ? readNumber(record.value) : null;
+function mapSleepStage(value: string): CanonicalSleepStageInterval['stage'] {
+  const normalised = normaliseType(value);
+  if (normalised.includes('awake')) return 'awake';
+  if (normalised.includes('asleepdeep') || normalised.includes('deep')) return 'deep';
+  if (normalised.includes('asleeprem') || normalised.includes('rem')) return 'rem';
+  if (normalised.includes('asleepcore') || normalised.includes('core')) return 'core';
+  if (normalised.includes('asleep')) return 'sleeping';
+  return 'unknown';
+}
+
+function mapSleepStageIntervals(records: JsonRecord[]): CanonicalSleepStageInterval[] {
+  return records.flatMap(record => {
+    const startTime = normaliseTimestamp(record.startDate);
+    const endTime = normaliseTimestamp(record.endDate);
+    if (!startTime || !endTime || endTime <= startTime) return [];
+    const providerStage = readString(record.stage ?? record.value ?? record.type) ?? 'unknown';
+    return [
+      {
+        startTime,
+        endTime,
+        stage: mapSleepStage(providerStage),
+        providerStage,
+        confidence: readNumber(record.confidence),
+        rawPayload: record,
+      },
+    ];
+  });
+}
+
+function buildHealthSample(
+  metricType: string,
+  value: number | null,
+  unit: string,
+  record: JsonRecord | null,
+  fallbackRecordedAt: string,
+  timezone: string,
+): CanonicalHealthMetricSample[] {
+  if (value == null) return [];
+  return [
+    {
+      metricType,
+      recordedAt: normaliseTimestamp(record?.startDate) ?? fallbackRecordedAt,
+      localDate: (normaliseTimestamp(record?.startDate) ?? fallbackRecordedAt).slice(0, 10),
+      timezone,
+      value,
+      unit,
+      sourceRecordId: readString(record?.uuid) ?? readString(record?.id),
+      rawPayload: record,
+    },
+  ];
 }
 
 export function mapAppleHealthDailyActivityToCanonical(payload: unknown): AppleHealthDailyActivityCanonical {
@@ -94,6 +155,8 @@ export function mapAppleHealthDailyActivityToCanonical(payload: unknown): AppleH
   const distance = sumRecords(records, 'distance');
   return {
     source: 'apple_health',
+    sourcePackage: records[0] ? readSourcePackage(records[0]) : null,
+    sourceRecordId: readString(records[0]?.uuid) ?? readString(records[0]?.id),
     date: readDateFromTimestamp(firstTimestamp),
     timezone: records[0] ? readTimezone(records[0]) : 'UTC',
     totalSteps: steps == null ? null : Math.round(steps),
@@ -131,7 +194,9 @@ export function mapAppleHealthSleepToCanonical(payload: unknown): AppleHealthSle
   const awake = (minutesByStage.awake ?? 0) + (minutesByStage.asleepawake ?? 0);
   return {
     source: 'apple_health',
+    sourcePackage: sleepRecords[0] ? readSourcePackage(sleepRecords[0]) : null,
     sourceSleepId: readString(sleepRecords[0]?.parentId) ?? readString(sleepRecords[0]?.id),
+    sourceRecordId: readString(sleepRecords[0]?.parentId) ?? readString(sleepRecords[0]?.id),
     date: readDateFromTimestamp(firstStart),
     timezone: sleepRecords[0] ? readTimezone(sleepRecords[0]) : 'UTC',
     startTime: firstStart,
@@ -152,6 +217,8 @@ export function mapAppleHealthSleepToCanonical(payload: unknown): AppleHealthSle
     minHeartRateBpm: null,
     avgHrvMs: null,
     avgSpo2Pct: null,
+    stageIntervals: mapSleepStageIntervals(sleepRecords),
+    healthSamples: [],
     rawPayload: isRecord(payload) ? payload : {},
   };
 }
@@ -159,21 +226,53 @@ export function mapAppleHealthSleepToCanonical(payload: unknown): AppleHealthSle
 export function mapAppleHealthRecoveryToCanonical(payload: unknown): AppleHealthRecoveryCanonical {
   const records = readDataRecords(payload);
   const firstTimestamp = normaliseTimestamp(records[0]?.startDate) ?? new Date(0).toISOString();
+  const timezone = records[0] ? readTimezone(records[0]) : 'UTC';
+  const restingHrRecord = latestRecord(records, 'restingheartrate');
+  const hrvRecord = latestRecord(records, 'heartratevariabilitysdnn');
+  const respiratoryRecord = latestRecord(records, 'respiratoryrate');
+  const spo2Record = latestRecord(records, 'oxygensaturation');
+  const bodyTemperatureRecord = latestRecord(records, 'bodytemperature') ?? latestRecord(records, 'wristtemperature');
+  const heartRateRecoveryRecord = latestRecord(records, 'heartraterecovery');
+  const restingHrBpm = restingHrRecord ? readNumber(restingHrRecord.value) : null;
+  const hrvSdnnMs = hrvRecord ? readNumber(hrvRecord.value) : null;
+  const respiratoryRateRpm = respiratoryRecord ? readNumber(respiratoryRecord.value) : null;
+  const spo2AvgPct = spo2Record ? readNumber(spo2Record.value) : null;
+  const bodyTemperatureC = bodyTemperatureRecord ? readNumber(bodyTemperatureRecord.value) : null;
+  const heartRateRecoveryBpm = heartRateRecoveryRecord ? readNumber(heartRateRecoveryRecord.value) : null;
   return {
     source: 'apple_health',
+    sourcePackage: records[0] ? readSourcePackage(records[0]) : null,
+    sourceRecordId: readString(records[0]?.uuid) ?? readString(records[0]?.id),
     date: readDateFromTimestamp(firstTimestamp),
-    timezone: records[0] ? readTimezone(records[0]) : 'UTC',
+    timezone,
     timestamp: firstTimestamp,
     recoveryScore: null,
     readinessScore: null,
     sleepScore: null,
     strainScore: null,
-    restingHrBpm: readLatestValue(records, 'restingheartrate'),
-    avgHrvMs: readLatestValue(records, 'heartratevariabilitysdnn'),
-    respiratoryRateRpm: readLatestValue(records, 'respiratoryrate'),
-    spo2AvgPct: readLatestValue(records, 'oxygensaturation'),
-    balance: readLatestValue(records, 'bodytemperature') ?? readLatestValue(records, 'wristtemperature'),
-    stressState: readLatestValue(records, 'heartraterecovery'),
+    restingHrBpm,
+    avgHrvMs: hrvSdnnMs,
+    respiratoryRateRpm,
+    spo2AvgPct,
+    bodyTemperatureC,
+    heartRateRecoveryBpm,
+    healthSamples: [
+      ...buildHealthSample('resting_heart_rate', restingHrBpm, 'bpm', restingHrRecord, firstTimestamp, timezone),
+      ...buildHealthSample('hrv_sdnn', hrvSdnnMs, 'ms', hrvRecord, firstTimestamp, timezone),
+      ...buildHealthSample('respiratory_rate', respiratoryRateRpm, 'rpm', respiratoryRecord, firstTimestamp, timezone),
+      ...buildHealthSample('spo2', spo2AvgPct, '%', spo2Record, firstTimestamp, timezone),
+      ...buildHealthSample('body_temperature', bodyTemperatureC, 'C', bodyTemperatureRecord, firstTimestamp, timezone),
+      ...buildHealthSample(
+        'heart_rate_recovery',
+        heartRateRecoveryBpm,
+        'bpm',
+        heartRateRecoveryRecord,
+        firstTimestamp,
+        timezone,
+      ),
+    ],
+    balance: null,
+    stressState: null,
     rawPayload: isRecord(payload) ? payload : {},
   };
 }

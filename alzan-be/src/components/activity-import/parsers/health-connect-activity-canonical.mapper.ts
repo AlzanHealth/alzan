@@ -484,6 +484,9 @@ export function parseHealthConnectActivityJsonToCanonical(
   const temperatureValues = streams.temperature.map(sample => sample.value);
   const sourcePackage = resolveSourcePackage(workout) ?? records.map(resolveSourcePackage).find(Boolean) ?? null;
   const sourceProviderKey = readString(parsed.sourceProviderKey) ?? resolveSourceProviderKey(sourcePackage);
+  const sourceRecordId =
+    readIdentifier(readNested(workout, 'metadata.id')) ?? readIdentifier(workout.id) ?? readIdentifier(workout.uuid);
+  const sourceUpdatedAt = normaliseTimestamp(readNested(workout, 'metadata.lastModifiedTime'));
   const sport = mapHealthConnectSport(workout);
   const caloriesKcal =
     readMetricNumber(workout, 'activeCaloriesKcal', 'totalEnergyBurnedKcal', 'caloriesKcal') ??
@@ -500,8 +503,7 @@ export function parseHealthConnectActivityJsonToCanonical(
     sourceFileType: 'json',
     sportType: sport.sportType,
     sportSubtype: sport.sportSubtype,
-    providerActivityId:
-      readIdentifier(readNested(workout, 'metadata.id')) ?? readIdentifier(workout.id) ?? readIdentifier(workout.uuid),
+    providerActivityId: sourceRecordId,
     summary: {
       startedAt,
       endedAt,
@@ -557,6 +559,13 @@ export function parseHealthConnectActivityJsonToCanonical(
       clientRecordId: readIdentifier(readNested(workout, 'metadata.clientRecordId')),
       healthConnectSegments: Array.isArray(workout.segments) ? workout.segments : [],
       rawMetadata: isRecord(workout.metadata) ? workout.metadata : null,
+    },
+    provenance: {
+      sourceChannel: 'health_connect',
+      sourcePackage,
+      sourceProviderKey,
+      sourceRecordId,
+      sourceUpdatedAt,
     },
   };
 }

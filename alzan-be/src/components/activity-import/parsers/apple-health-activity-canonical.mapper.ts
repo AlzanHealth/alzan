@@ -321,6 +321,18 @@ function readDevice(workout: JsonRecord): CanonicalActivity['device'] {
   };
 }
 
+function readSourcePackage(workout: JsonRecord): string | null {
+  const source = isRecord(workout.source) ? workout.source : {};
+  const sourceRevision = isRecord(workout.sourceRevision) ? workout.sourceRevision : {};
+  const revisionSource = isRecord(sourceRevision.source) ? sourceRevision.source : {};
+  return (
+    readString(source.bundleIdentifier) ??
+    readString(source.bundle_id) ??
+    readString(revisionSource.bundleIdentifier) ??
+    readString(revisionSource.bundle_id)
+  );
+}
+
 export function parseAppleHealthActivityJsonToCanonical(
   content: string,
   filename: string,
@@ -337,6 +349,8 @@ export function parseAppleHealthActivityJsonToCanonical(
   const streams = buildStreams(workout, linkedRecords, startedAt);
   const workoutType = readString(workout.workoutActivityType) ?? readString(workout.type);
   const sport = mapAppleHealthSport(workoutType, readString(workout.title), workout.metadata);
+  const sourceRecordId = readIdentifier(workout.uuid) ?? readIdentifier(workout.id);
+  const sourcePackage = readSourcePackage(workout);
   const distanceM =
     readNumber(workout.totalDistance) ??
     readNumber(workout.distance) ??
@@ -353,7 +367,7 @@ export function parseAppleHealthActivityJsonToCanonical(
     sourceFileType: 'json',
     sportType: sport.sportType,
     sportSubtype: sport.sportSubtype,
-    providerActivityId: readIdentifier(workout.uuid) ?? readIdentifier(workout.id),
+    providerActivityId: sourceRecordId,
     summary: {
       startedAt,
       endedAt,
@@ -408,6 +422,13 @@ export function parseAppleHealthActivityJsonToCanonical(
       appleHealthSegments: Array.isArray(workout.segments) ? workout.segments : null,
       appleHealthSwimmingStrokeCount:
         readNumber(workout.totalSwimmingStrokeCount) ?? readStatistic(workout, ['swimmingstrokecount']),
+    },
+    provenance: {
+      sourceChannel: 'apple_health',
+      sourcePackage,
+      sourceProviderKey: 'apple_health',
+      sourceRecordId,
+      sourceUpdatedAt: null,
     },
   };
 }

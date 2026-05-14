@@ -1,4 +1,6 @@
 import {
+  CanonicalHealthMetricSample,
+  CanonicalSleepStageInterval,
   HealthConnectDailyActivityCanonical,
   HealthConnectRecoveryCanonical,
   HealthConnectSleepCanonical,
@@ -65,6 +67,14 @@ function readSourcePackage(payload: JsonRecord): string | null {
   );
 }
 
+function readSourceRecordId(payload: JsonRecord): string | null {
+  return readString(readNested(payload, 'metadata.id')) ?? readString(payload.id);
+}
+
+function readSourceUpdatedAt(payload: JsonRecord): string | null {
+  return normaliseTimestamp(readNested(payload, 'metadata.lastModifiedTime'));
+}
+
 function readIntervals(payload: JsonRecord, date: string): HealthConnectDailyActivityCanonical['intervals'] {
   const intervals = Array.isArray(payload.intervals)
     ? payload.intervals
@@ -87,6 +97,8 @@ export function mapHealthConnectDailyActivityToCanonical(payload: unknown): Heal
   return {
     source: 'health_connect',
     sourcePackage: readSourcePackage(root),
+    sourceRecordId: readSourceRecordId(root),
+    sourceUpdatedAt: readSourceUpdatedAt(root),
     date,
     timezone: readString(root.timezone) ?? readString(root.zoneOffset) ?? 'UTC',
     totalSteps: readMetricNumber(root, 'steps', 'totalSteps', 'count'),
@@ -117,6 +129,61 @@ function readStageMinutes(stages: unknown, names: string[]): number | null {
   return total > 0 ? total / 60 : null;
 }
 
+function mapSleepStage(value: string): CanonicalSleepStageInterval['stage'] {
+  const normalised = value.toLowerCase();
+  if (normalised.includes('awake')) return 'awake';
+  if (normalised.includes('outofbed') || normalised.includes('out_of_bed')) return 'out_of_bed';
+  if (normalised.includes('deep')) return 'deep';
+  if (normalised.includes('rem')) return 'rem';
+  if (normalised.includes('light')) return 'light';
+  if (normalised.includes('core')) return 'core';
+  if (normalised.includes('sleeping') || normalised.includes('asleep')) return 'sleeping';
+  return 'unknown';
+}
+
+function readStageIntervals(stages: unknown): CanonicalSleepStageInterval[] {
+  if (!Array.isArray(stages)) return [];
+  return stages.filter(isRecord).flatMap(stage => {
+    const startTime = normaliseTimestamp(stage.startTime ?? stage.start);
+    const endTime = normaliseTimestamp(stage.endTime ?? stage.end);
+    if (!startTime || !endTime || endTime <= startTime) return [];
+    const providerStage = readString(stage.stage ?? stage.type ?? stage.name) ?? 'unknown';
+    return [
+      {
+        startTime,
+        endTime,
+        stage: mapSleepStage(providerStage),
+        providerStage,
+        confidence: readMetricNumber(stage, 'confidence'),
+        rawPayload: stage,
+      },
+    ];
+  });
+}
+
+function buildHealthSample(
+  metricType: string,
+  value: number | null,
+  unit: string,
+  root: JsonRecord,
+  recordedAt: string,
+  date: string,
+): CanonicalHealthMetricSample[] {
+  if (value == null) return [];
+  return [
+    {
+      metricType,
+      recordedAt,
+      localDate: date,
+      timezone: readString(root.timezone) ?? 'UTC',
+      value,
+      unit,
+      sourceRecordId: readSourceRecordId(root),
+      rawPayload: root,
+    },
+  ];
+}
+
 export function mapHealthConnectSleepToCanonical(payload: unknown): HealthConnectSleepCanonical {
   const root = isRecord(payload) ? payload : {};
   const sleep = isRecord(root.sleep) ? root.sleep : root;
@@ -127,7 +194,9 @@ export function mapHealthConnectSleepToCanonical(payload: unknown): HealthConnec
   return {
     source: 'health_connect',
     sourcePackage: readSourcePackage(sleep) ?? readSourcePackage(root),
-    sourceSleepId: readString(readNested(sleep, 'metadata.id')) ?? readString(sleep.id),
+    sourceSleepId: readSourceRecordId(sleep),
+    sourceRecordId: readSourceRecordId(sleep),
+    sourceUpdatedAt: readSourceUpdatedAt(sleep),
     date: readDate(sleep.date ?? startTime),
     timezone: readString(sleep.timezone) ?? readString(sleep.startZoneOffset) ?? 'UTC',
     startTime,
@@ -152,6 +221,8 @@ export function mapHealthConnectSleepToCanonical(payload: unknown): HealthConnec
     hrvRmssdMs: readMetricNumber(sleep, 'hrvRmssd'),
     avgRespiratoryRpm: readMetricNumber(sleep, 'respiratoryRate'),
     avgSpo2Pct: readMetricNumber(sleep, 'spo2Avg', 'oxygenSaturation.inPercent'),
+    stageIntervals: readStageIntervals(stages),
+    healthSamples: [],
     rawPayload: root,
   };
 }
@@ -159,23 +230,42 @@ export function mapHealthConnectSleepToCanonical(payload: unknown): HealthConnec
 export function mapHealthConnectRecoveryToCanonical(payload: unknown): HealthConnectRecoveryCanonical {
   const root = isRecord(payload) ? payload : {};
   const date = readDate(root.date ?? root.day ?? root.timestamp);
+  const recordedAt = normaliseTimestamp(root.timestamp ?? root.startTime) ?? `${date}T00:00:00.000Z`;
+  const restingHrBpm = readMetricNumber(root, 'restingHeartRate', 'restingHeartRateBpm');
+  const hrvRmssdMs = readMetricNumber(root, 'hrvRmssd', 'heartRateVariabilityRmssd');
+  const respiratoryRateRpm = readMetricNumber(root, 'respiratoryRate');
+  const spo2AvgPct = readMetricNumber(root, 'spo2Avg', 'oxygenSaturation.inPercent');
+  const vo2Max = readMetricNumber(root, 'vo2Max');
+  const skinTemperatureC = readMetricNumber(root, 'temperatureC', 'skinTemperature.inCelsius');
   return {
     source: 'health_connect',
     sourcePackage: readSourcePackage(root),
+    sourceRecordId: readSourceRecordId(root),
+    sourceUpdatedAt: readSourceUpdatedAt(root),
     date,
     timezone: readString(root.timezone) ?? 'UTC',
-    timestamp: normaliseTimestamp(root.timestamp ?? root.startTime) ?? `${date}T00:00:00.000Z`,
+    timestamp: recordedAt,
     recoveryScore: readMetricNumber(root, 'recoveryScore', 'readinessScore'),
     readinessScore: readMetricNumber(root, 'readinessScore'),
     sleepScore: readMetricNumber(root, 'sleepScore'),
     strainScore: null,
-    restingHrBpm: readMetricNumber(root, 'restingHeartRate', 'restingHeartRateBpm'),
-    avgHrvMs: readMetricNumber(root, 'hrvRmssd', 'heartRateVariabilityRmssd'),
-    hrvRmssdMs: readMetricNumber(root, 'hrvRmssd', 'heartRateVariabilityRmssd'),
-    respiratoryRateRpm: readMetricNumber(root, 'respiratoryRate'),
-    spo2AvgPct: readMetricNumber(root, 'spo2Avg', 'oxygenSaturation.inPercent'),
-    balance: readMetricNumber(root, 'vo2Max'),
-    stressState: readMetricNumber(root, 'temperatureC', 'skinTemperature.inCelsius'),
+    restingHrBpm,
+    avgHrvMs: hrvRmssdMs,
+    hrvRmssdMs,
+    respiratoryRateRpm,
+    spo2AvgPct,
+    skinTemperatureC,
+    vo2Max,
+    healthSamples: [
+      ...buildHealthSample('resting_heart_rate', restingHrBpm, 'bpm', root, recordedAt, date),
+      ...buildHealthSample('hrv_rmssd', hrvRmssdMs, 'ms', root, recordedAt, date),
+      ...buildHealthSample('respiratory_rate', respiratoryRateRpm, 'rpm', root, recordedAt, date),
+      ...buildHealthSample('spo2', spo2AvgPct, '%', root, recordedAt, date),
+      ...buildHealthSample('skin_temperature', skinTemperatureC, 'C', root, recordedAt, date),
+      ...buildHealthSample('vo2_max', vo2Max, 'ml/kg/min', root, recordedAt, date),
+    ],
+    balance: null,
+    stressState: null,
     rawPayload: root,
   };
 }

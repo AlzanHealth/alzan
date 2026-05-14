@@ -121,15 +121,23 @@ export abstract class BaseOAuthProvider {
       const expiresAt = new Date();
       expiresAt.setSeconds(expiresAt.getSeconds() + tokenResponse.expires_in);
 
-      await this.supabaseAdmin.client
+      const { error: connectionError } = await this.supabaseAdmin.client
         .from('user_connections')
         .update({
-          access_token: tokenResponse.access_token,
-          refresh_token: tokenResponse.refresh_token || refreshToken,
+          access_token: null,
+          refresh_token: null,
           token_expires_at: expiresAt.toISOString(),
+          status: 'active',
+          last_error: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', connection.id);
+      if (connectionError) throw new Error(`Failed to update connection after refresh: ${connectionError.message}`);
+
+      await this.saveConnectionTokens(connection.id, userId, {
+        ...tokenResponse,
+        refresh_token: tokenResponse.refresh_token || refreshToken,
+      });
     }
 
     this.logger.log(`OAuth token refreshed successfully for user ${userId}`);
@@ -282,30 +290,67 @@ export abstract class BaseOAuthProvider {
       const { error } = await this.supabaseAdmin.client
         .from('user_connections')
         .update({
-          access_token: tokenResponse.access_token,
-          refresh_token: tokenResponse.refresh_token,
+          access_token: null,
+          refresh_token: null,
           token_expires_at: expiresAt.toISOString(),
           provider_user_id: userInfo.userId,
           provider_username: userInfo.username,
           scope: userInfo.scope,
+          connection_kind: 'oauth',
+          status: 'active',
+          revoked_at: null,
+          last_error: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingConnection.id);
 
       if (error) throw new Error(`Failed to update connection: ${error.message}`);
+      await this.saveConnectionTokens(existingConnection.id, userId, tokenResponse, userInfo.scope);
     } else {
-      const { error } = await this.supabaseAdmin.client.from('user_connections').insert({
+      const { data, error } = await this.supabaseAdmin.client
+        .from('user_connections')
+        .insert({
+          user_id: userId,
+          provider: this.providerName,
+          access_token: null,
+          refresh_token: null,
+          token_expires_at: expiresAt.toISOString(),
+          provider_user_id: userInfo.userId,
+          provider_username: userInfo.username,
+          scope: userInfo.scope,
+          connection_kind: 'oauth',
+          status: 'active',
+        })
+        .select('id')
+        .single();
+
+      if (error) throw new Error(`Failed to insert connection: ${error.message}`);
+      await this.saveConnectionTokens(data.id, userId, tokenResponse, userInfo.scope);
+    }
+  }
+
+  private async saveConnectionTokens(
+    connectionId: string,
+    userId: string,
+    tokenResponse: OAuthTokenResponse,
+    scope?: string | null,
+  ): Promise<void> {
+    const expiresAt = new Date();
+    expiresAt.setSeconds(expiresAt.getSeconds() + tokenResponse.expires_in);
+    const { error } = await this.supabaseAdmin.client.from('provider_connection_tokens').upsert(
+      {
+        connection_id: connectionId,
         user_id: userId,
         provider: this.providerName,
         access_token: tokenResponse.access_token,
         refresh_token: tokenResponse.refresh_token,
+        token_type: tokenResponse.token_type,
         token_expires_at: expiresAt.toISOString(),
-        provider_user_id: userInfo.userId,
-        provider_username: userInfo.username,
-        scope: userInfo.scope,
-      });
-
-      if (error) throw new Error(`Failed to insert connection: ${error.message}`);
-    }
+        scope: scope ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'connection_id' },
+    );
+    if (error) throw new Error(`Failed to save provider tokens: ${error.message}`);
   }
 }

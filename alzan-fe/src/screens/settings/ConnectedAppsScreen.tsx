@@ -104,7 +104,7 @@ export const ConnectedAppsScreen = () => {
 
         <AppCard name="Apple Health" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
 
-        <AppCard name="Google Fit" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
+        <AppCard name="Health Connect" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
       </ScrollView>
     </LinearGradient>
   );

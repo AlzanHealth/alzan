@@ -105,6 +105,8 @@ const buildOptimisticPreferences = (
     distance_unit: 'km',
     energy_unit: 'kcal',
     health_data_consent: false,
+    health_data_consent_at: null,
+    health_data_consent_version: null,
     import_health_metrics: false,
     language_code: DEFAULT_LOCALE,
     notification_settings: DEFAULT_NOTIFICATION_SETTINGS,

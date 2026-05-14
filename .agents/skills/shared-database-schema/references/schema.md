@@ -3,6 +3,25 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.activity_files (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+user_id uuid NOT NULL,
+session_id uuid,
+provider USER-DEFINED NOT NULL,
+source_channel text,
+source_package text,
+file_type text NOT NULL,
+storage_bucket text,
+storage_path text,
+file_hash text,
+size_bytes integer CHECK (size_bytes IS NULL OR size_bytes >= 0),
+raw_payload_id uuid,
+imported_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT activity_files_pkey PRIMARY KEY (id),
+CONSTRAINT activity_files_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT activity_files_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT activity_files_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
+);
 CREATE TABLE public.activity_heart_rate_zones (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
 session_id uuid NOT NULL,
@@ -32,6 +51,46 @@ split_group_order integer NOT NULL DEFAULT 0,
 CONSTRAINT activity_laps_pkey PRIMARY KEY (id),
 CONSTRAINT activity_laps_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
 CONSTRAINT activity_laps_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.activity_provider_fields (
+session_id uuid NOT NULL,
+user_id uuid NOT NULL,
+provider USER-DEFINED NOT NULL,
+source_channel text,
+source_package text,
+fields jsonb NOT NULL DEFAULT '{}'::jsonb,
+raw_metadata jsonb,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT activity_provider_fields_pkey PRIMARY KEY (session_id),
+CONSTRAINT activity_provider_fields_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT activity_provider_fields_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.activity_route_points (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+session_id uuid NOT NULL,
+user_id uuid NOT NULL,
+point_index integer NOT NULL CHECK (point_index >= 0),
+timestamp timestamp with time zone,
+offset_s integer CHECK (offset_s IS NULL OR offset_s >= 0),
+lat double precision NOT NULL CHECK (lat >= '-90'::integer::double precision AND lat <= 90::double precision),
+lon double precision NOT NULL CHECK (lon >= '-180'::integer::double precision AND lon <= 180::double precision),
+altitude_m numeric,
+distance_m numeric CHECK (distance_m IS NULL OR distance_m >= 0::numeric),
+speed_mps numeric CHECK (speed_mps IS NULL OR speed_mps >= 0::numeric),
+horizontal_accuracy_m numeric CHECK (horizontal_accuracy_m IS NULL OR horizontal_accuracy_m >= 0::numeric),
+vertical_accuracy_m numeric CHECK (vertical_accuracy_m IS NULL OR vertical_accuracy_m >= 0::numeric),
+source text,
+source_channel text,
+source_package text,
+source_record_id text,
+raw_payload_id uuid,
+raw_payload jsonb,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT activity_route_points_pkey PRIMARY KEY (id),
+CONSTRAINT activity_route_points_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT activity_route_points_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT activity_route_points_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.activity_session_superset_links (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -103,11 +162,39 @@ min_heart_rate numeric,
 tss_hr numeric,
 epoc numeric,
 pte numeric,
+source_channel text,
+source_package text,
+source_provider_key text,
+source_record_id text,
+source_updated_at timestamp with time zone,
+raw_payload_id uuid,
 CONSTRAINT activity_sessions_pkey PRIMARY KEY (id),
 CONSTRAINT activity_sessions_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id),
 CONSTRAINT activity_sessions_endurance_template_id_fkey FOREIGN KEY (endurance_template_id) REFERENCES public.endurance_workout_templates(id),
 CONSTRAINT activity_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT activity_sessions_workout_template_id_fkey FOREIGN KEY (workout_template_id) REFERENCES public.workout_templates(id)
+CONSTRAINT activity_sessions_workout_template_id_fkey FOREIGN KEY (workout_template_id) REFERENCES public.workout_templates(id),
+CONSTRAINT activity_sessions_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
+);
+CREATE TABLE public.activity_stream_samples (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+session_id uuid NOT NULL,
+user_id uuid NOT NULL,
+stream_type USER-DEFINED NOT NULL,
+timestamp timestamp with time zone,
+offset_s integer CHECK (offset_s IS NULL OR offset_s >= 0),
+value numeric NOT NULL,
+unit text,
+source text,
+source_channel text,
+source_package text,
+source_record_id text,
+raw_payload_id uuid,
+raw_payload jsonb,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT activity_stream_samples_pkey PRIMARY KEY (id),
+CONSTRAINT activity_stream_samples_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT activity_stream_samples_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT activity_stream_samples_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.activity_streams (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -119,9 +206,14 @@ sample_hz numeric,
 source text NOT NULL DEFAULT 'manual'::text,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 user_id uuid,
+source_channel text,
+source_package text,
+source_record_id text,
+raw_payload_id uuid,
 CONSTRAINT activity_streams_pkey PRIMARY KEY (id),
 CONSTRAINT activity_streams_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
-CONSTRAINT activity_streams_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+CONSTRAINT activity_streams_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+CONSTRAINT activity_streams_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.body_measurements (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -174,9 +266,14 @@ raw_payload jsonb,
 synced_at timestamp with time zone NOT NULL DEFAULT now(),
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
+source_channel text,
+source_package text,
+source_provider_key text,
+raw_payload_id uuid,
 CONSTRAINT daily_recovery_pkey PRIMARY KEY (id),
 CONSTRAINT daily_recovery_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT daily_recovery_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id)
+CONSTRAINT daily_recovery_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id),
+CONSTRAINT daily_recovery_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.daily_steps (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -212,9 +309,14 @@ synced_at timestamp with time zone NOT NULL DEFAULT now(),
 raw_payload jsonb,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
+source_channel text,
+source_package text,
+source_provider_key text,
+raw_payload_id uuid,
 CONSTRAINT daily_steps_pkey PRIMARY KEY (id),
 CONSTRAINT daily_steps_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT daily_steps_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id)
+CONSTRAINT daily_steps_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id),
+CONSTRAINT daily_steps_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.devices (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -404,6 +506,66 @@ payload jsonb NOT NULL,
 CONSTRAINT external_raw_payloads_pkey PRIMARY KEY (id),
 CONSTRAINT external_raw_payloads_external_activity_mapping_id_fkey FOREIGN KEY (external_activity_mapping_id) REFERENCES public.external_activity_mappings(id)
 );
+CREATE TABLE public.external_raw_payloads_v2 (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+user_id uuid NOT NULL,
+provider USER-DEFINED NOT NULL,
+source_channel text NOT NULL,
+source_package text,
+object_type text NOT NULL,
+source_record_id text,
+payload_hash text NOT NULL,
+payload jsonb,
+storage_bucket text,
+storage_path text,
+size_bytes integer CHECK (size_bytes IS NULL OR size_bytes >= 0),
+trace_id text,
+related_table text,
+related_id uuid,
+received_at timestamp with time zone NOT NULL DEFAULT now(),
+processed_at timestamp with time zone,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT external_raw_payloads_v2_pkey PRIMARY KEY (id),
+CONSTRAINT external_raw_payloads_v2_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.health_connect_provider_selection (
+user_id uuid NOT NULL,
+origin_id uuid NOT NULL,
+selected_package_name text NOT NULL,
+selected_provider_key text,
+selected_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT health_connect_provider_selection_pkey PRIMARY KEY (user_id),
+CONSTRAINT health_connect_provider_selection_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT health_connect_provider_selection_origin_user_fkey FOREIGN KEY (user_id) REFERENCES public.provider_data_origins(id),
+CONSTRAINT health_connect_provider_selection_origin_user_fkey FOREIGN KEY (origin_id) REFERENCES public.provider_data_origins(id),
+CONSTRAINT health_connect_provider_selection_origin_user_fkey FOREIGN KEY (user_id) REFERENCES public.provider_data_origins(user_id),
+CONSTRAINT health_connect_provider_selection_origin_user_fkey FOREIGN KEY (origin_id) REFERENCES public.provider_data_origins(user_id)
+);
+CREATE TABLE public.health_metric_samples (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+user_id uuid NOT NULL,
+provider USER-DEFINED NOT NULL,
+source_channel text NOT NULL,
+source_package text,
+source_record_id text,
+metric_type text NOT NULL CHECK (length(metric_type) > 0),
+recorded_at timestamp with time zone NOT NULL,
+local_date date,
+timezone text,
+value numeric NOT NULL,
+unit text NOT NULL,
+sleep_session_id uuid,
+activity_session_id uuid,
+raw_payload_id uuid,
+raw_payload jsonb,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT health_metric_samples_pkey PRIMARY KEY (id),
+CONSTRAINT health_metric_samples_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT health_metric_samples_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id),
+CONSTRAINT health_metric_samples_activity_session_id_fkey FOREIGN KEY (activity_session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT health_metric_samples_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
+);
 CREATE TABLE public.ingredient_import_batches (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
 batch_number integer,
@@ -452,6 +614,26 @@ created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
 notes_en text,
 CONSTRAINT ingredients_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.integration_sync_state (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+user_id uuid NOT NULL,
+provider USER-DEFINED NOT NULL,
+source_channel text NOT NULL,
+source_package text,
+sync_domain text NOT NULL,
+cursor_token text,
+anchor_token text,
+last_success_at timestamp with time zone,
+last_attempt_at timestamp with time zone,
+last_record_at timestamp with time zone,
+status text NOT NULL DEFAULT 'idle'::text CHECK (status = ANY (ARRAY['idle'::text, 'running'::text, 'success'::text, 'error'::text, 'paused'::text, 'expired'::text])),
+last_error text,
+metadata jsonb,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT integration_sync_state_pkey PRIMARY KEY (id),
+CONSTRAINT integration_sync_state_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.meal_items (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -526,6 +708,41 @@ read_at timestamp with time zone,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT notifications_pkey PRIMARY KEY (id),
 CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.provider_connection_tokens (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+connection_id uuid NOT NULL UNIQUE,
+user_id uuid NOT NULL,
+provider USER-DEFINED NOT NULL,
+access_token text NOT NULL,
+refresh_token text,
+token_type text,
+token_expires_at timestamp with time zone,
+scope text,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT provider_connection_tokens_pkey PRIMARY KEY (id),
+CONSTRAINT provider_connection_tokens_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.user_connections(id),
+CONSTRAINT provider_connection_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.provider_data_origins (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+user_id uuid NOT NULL,
+source_channel text NOT NULL,
+provider USER-DEFINED NOT NULL,
+source_package text,
+source_provider_key text,
+display_name text,
+platform text,
+device_id uuid,
+first_seen_at timestamp with time zone NOT NULL DEFAULT now(),
+last_seen_at timestamp with time zone NOT NULL DEFAULT now(),
+raw_payload jsonb,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT provider_data_origins_pkey PRIMARY KEY (id),
+CONSTRAINT provider_data_origins_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT provider_data_origins_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id)
 );
 CREATE TABLE public.provider_oauth_states (
 state text NOT NULL,
@@ -619,8 +836,15 @@ user_id uuid NOT NULL,
 measured_at timestamp with time zone NOT NULL DEFAULT now(),
 resting_hr_bpm integer NOT NULL,
 source text NOT NULL DEFAULT 'manual'::text,
+source_channel text,
+source_package text,
+source_provider_key text,
+source_record_id text,
+source_updated_at timestamp with time zone,
+raw_payload_id uuid,
 CONSTRAINT resting_hr_logs_pkey PRIMARY KEY (id),
-CONSTRAINT resting_hr_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+CONSTRAINT resting_hr_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT resting_hr_logs_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.session_feedback (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -650,7 +874,12 @@ unit text NOT NULL,
 confidence numeric,
 raw_payload jsonb,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
+source_channel text,
+source_package text,
+source_record_id text,
+raw_payload_id uuid,
 CONSTRAINT sleep_biomarker_samples_pkey PRIMARY KEY (id),
+CONSTRAINT sleep_biomarker_samples_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id),
 CONSTRAINT sleep_biomarker_samples_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
 CONSTRAINT sleep_biomarker_samples_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id)
 );
@@ -724,7 +953,13 @@ synced_at timestamp with time zone NOT NULL DEFAULT now(),
 raw_payload jsonb,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
+source_channel text,
+source_package text,
+source_provider_key text,
+source_record_id text,
+raw_payload_id uuid,
 CONSTRAINT sleep_sessions_pkey PRIMARY KEY (id),
+CONSTRAINT sleep_sessions_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id),
 CONSTRAINT sleep_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
 CONSTRAINT sleep_sessions_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id)
 );
@@ -741,7 +976,12 @@ provider_stage text,
 confidence numeric,
 raw_payload jsonb,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
+source_channel text,
+source_package text,
+source_record_id text,
+raw_payload_id uuid,
 CONSTRAINT sleep_stage_intervals_pkey PRIMARY KEY (id),
+CONSTRAINT sleep_stage_intervals_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id),
 CONSTRAINT sleep_stage_intervals_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
 CONSTRAINT sleep_stage_intervals_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id)
 );
@@ -776,10 +1016,15 @@ source_record_id text,
 raw_payload jsonb,
 synced_at timestamp with time zone NOT NULL DEFAULT now(),
 created_at timestamp with time zone NOT NULL DEFAULT now(),
+source_channel text,
+source_package text,
+source_provider_key text,
+raw_payload_id uuid,
 CONSTRAINT step_intervals_pkey PRIMARY KEY (id),
 CONSTRAINT step_intervals_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
 CONSTRAINT step_intervals_daily_steps_id_fkey FOREIGN KEY (daily_steps_id) REFERENCES public.daily_steps(id),
-CONSTRAINT step_intervals_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id)
+CONSTRAINT step_intervals_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id),
+CONSTRAINT step_intervals_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.tags (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -797,12 +1042,17 @@ user_id uuid NOT NULL,
 provider USER-DEFINED NOT NULL,
 provider_user_id text,
 provider_username text,
-access_token text NOT NULL,
+access_token text,
 refresh_token text,
-token_expires_at timestamp with time zone NOT NULL,
+token_expires_at timestamp with time zone,
 scope text,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
+connection_kind text NOT NULL DEFAULT 'oauth'::text CHECK (connection_kind = ANY (ARRAY['oauth'::text, 'local_sdk'::text, 'file_import'::text])),
+status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'revoked'::text, 'expired'::text, 'error'::text, 'paused'::text])),
+revoked_at timestamp with time zone,
+last_synced_at timestamp with time zone,
+last_error text,
 CONSTRAINT user_connections_pkey PRIMARY KEY (id),
 CONSTRAINT user_connections_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
@@ -859,6 +1109,8 @@ temperature_unit text NOT NULL DEFAULT 'celsius'::text,
 notification_settings jsonb DEFAULT '{}'::jsonb,
 appearance_settings jsonb DEFAULT '{"theme": "system"}'::jsonb,
 privacy_settings jsonb DEFAULT '{"profile_public": false, "default_workout_visibility": "private"}'::jsonb,
+health_data_consent_at timestamp with time zone,
+health_data_consent_version text,
 CONSTRAINT user_preferences_pkey PRIMARY KEY (user_id),
 CONSTRAINT user_preferences_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
@@ -877,6 +1129,23 @@ onboarding_step integer DEFAULT 0,
 CONSTRAINT users_pkey PRIMARY KEY (id),
 CONSTRAINT users_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
+CREATE TABLE public.vo2_max_logs (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+user_id uuid NOT NULL,
+measured_at timestamp with time zone NOT NULL,
+value_ml_kg_min numeric NOT NULL CHECK (value_ml_kg_min > 0::numeric AND value_ml_kg_min <= 100::numeric),
+provider USER-DEFINED NOT NULL,
+source_channel text,
+source_package text,
+source_record_id text,
+activity_session_id uuid,
+raw_payload_id uuid,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT vo2_max_logs_pkey PRIMARY KEY (id),
+CONSTRAINT vo2_max_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT vo2_max_logs_activity_session_id_fkey FOREIGN KEY (activity_session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT vo2_max_logs_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
+);
 CREATE TABLE public.weight_logs (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
 user_id uuid NOT NULL,
@@ -885,8 +1154,15 @@ weight_kg numeric NOT NULL,
 bodyfat_percent numeric,
 muscle_mass_kg numeric,
 source text NOT NULL DEFAULT 'manual'::text,
+source_channel text,
+source_package text,
+source_provider_key text,
+source_record_id text,
+source_updated_at timestamp with time zone,
+raw_payload_id uuid,
 CONSTRAINT weight_logs_pkey PRIMARY KEY (id),
-CONSTRAINT weight_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+CONSTRAINT weight_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT weight_logs_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.workout_plans (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),

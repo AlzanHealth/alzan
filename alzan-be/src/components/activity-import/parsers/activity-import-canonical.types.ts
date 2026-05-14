@@ -21,6 +21,11 @@ export interface CanonicalActivityPointSample {
   timestamp: string | null;
   lat: number;
   lon: number;
+  altitudeM?: number | null;
+  distanceM?: number | null;
+  speedMps?: number | null;
+  horizontalAccuracyM?: number | null;
+  verticalAccuracyM?: number | null;
 }
 
 export interface CanonicalActivityMetricSample {
@@ -86,6 +91,14 @@ export interface CanonicalActivityHeartRateZone {
   percentage: number;
 }
 
+export interface CanonicalActivityProvenance {
+  sourceChannel: 'cloud' | 'apple_health' | 'health_connect' | 'file_import' | 'manual';
+  sourcePackage: string | null;
+  sourceProviderKey: string | null;
+  sourceRecordId: string | null;
+  sourceUpdatedAt: string | null;
+}
+
 export interface CanonicalActivity {
   provider: CanonicalActivityProvider;
   sourceFileType: CanonicalActivitySourceFileType;
@@ -98,10 +111,34 @@ export interface CanonicalActivity {
   heartRateZones: CanonicalActivityHeartRateZone[];
   device: CanonicalActivityDevice | null;
   vendorFields: Record<string, unknown>;
+  provenance?: CanonicalActivityProvenance;
+}
+
+export interface CanonicalSleepStageInterval {
+  startTime: string;
+  endTime: string;
+  stage: Database['public']['Enums']['sleep_stage_enum'];
+  providerStage: string | null;
+  confidence: number | null;
+  rawPayload: Record<string, unknown> | null;
+}
+
+export interface CanonicalHealthMetricSample {
+  metricType: string;
+  recordedAt: string;
+  localDate?: string | null;
+  timezone?: string | null;
+  value: number;
+  unit: string;
+  sourceRecordId?: string | null;
+  rawPayload?: Record<string, unknown> | null;
 }
 
 export interface ProviderDailyActivityCanonical<TSource extends CanonicalActivityProvider = CanonicalActivityProvider> {
   source: TSource;
+  sourcePackage?: string | null;
+  sourceRecordId?: string | null;
+  sourceUpdatedAt?: string | null;
   date: string;
   timezone: string;
   totalSteps: number | null;
@@ -132,7 +169,10 @@ export interface ProviderDailyActivityCanonical<TSource extends CanonicalActivit
 
 export interface ProviderSleepCanonical<TSource extends CanonicalActivityProvider = CanonicalActivityProvider> {
   source: TSource;
+  sourcePackage?: string | null;
   sourceSleepId: string | null;
+  sourceRecordId?: string | null;
+  sourceUpdatedAt?: string | null;
   date: string;
   timezone: string;
   startTime: string;
@@ -158,11 +198,16 @@ export interface ProviderSleepCanonical<TSource extends CanonicalActivityProvide
   avgRespiratoryRpm?: number | null;
   avgSpo2Pct: number | null;
   minSpo2Pct?: number | null;
+  stageIntervals?: CanonicalSleepStageInterval[];
+  healthSamples?: CanonicalHealthMetricSample[];
   rawPayload: Record<string, unknown>;
 }
 
 export interface ProviderRecoveryCanonical<TSource extends CanonicalActivityProvider = CanonicalActivityProvider> {
   source: TSource;
+  sourcePackage?: string | null;
+  sourceRecordId?: string | null;
+  sourceUpdatedAt?: string | null;
   date: string;
   timezone: string;
   timestamp: string;
@@ -179,6 +224,12 @@ export interface ProviderRecoveryCanonical<TSource extends CanonicalActivityProv
   hrvRmssdMs?: number | null;
   respiratoryRateRpm?: number | null;
   spo2AvgPct?: number | null;
+  temperatureDeviationC?: number | null;
+  skinTemperatureC?: number | null;
+  bodyTemperatureC?: number | null;
+  vo2Max?: number | null;
+  heartRateRecoveryBpm?: number | null;
+  healthSamples?: CanonicalHealthMetricSample[];
   balance: number | null;
   stressState: number | null;
   rawPayload: Record<string, unknown>;

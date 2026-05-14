@@ -28,6 +28,11 @@ export const SWAGGER_CONFIGURATIONS: Record<SwaggerApi, ISwaggerConfiguration> =
     title: 'Activity Imports API',
     description: 'Activity Imports API',
   },
+  [SwaggerApi.WEARABLES_API]: {
+    endpoint: 'wearables',
+    title: 'Wearables API',
+    description: 'Wearables API',
+  },
   [SwaggerApi.ALL_API]: {
     endpoint: 'openapi',
     title: 'Alzan Full API',

@@ -3,7 +3,7 @@
  * ONLY EDIT IN THE ROOT!
  */
 
-import { Database as DatabaseGenerated } from './database.types';
+import { Database as DatabaseGenerated, Json } from './database.types';
 export type UserFollowNotificationData = {
   follower_id: string;
   follower_name?: string;
@@ -110,6 +110,38 @@ export type RecipeUsageContext = 'meal_log' | 'planner' | 'quick_add';
 
 type PublicSchema = DatabaseGenerated['public'];
 type GeneratedTables = PublicSchema['Tables'];
+type WearableProvider = PublicSchema['Enums']['wearable_provider_enum'];
+type WearableStreamType = PublicSchema['Enums']['stream_type_enum'];
+
+type ProvenanceRow = {
+  source_channel: string | null;
+  source_package: string | null;
+  source_provider_key: string | null;
+  raw_payload_id: string | null;
+};
+
+type ProvenanceInsert = {
+  source_channel?: string | null;
+  source_package?: string | null;
+  source_provider_key?: string | null;
+  raw_payload_id?: string | null;
+};
+
+type SourceRecordRow = {
+  source_record_id: string | null;
+};
+
+type SourceRecordInsert = {
+  source_record_id?: string | null;
+};
+
+type SourceUpdatedAtRow = {
+  source_updated_at: string | null;
+};
+
+type SourceUpdatedAtInsert = {
+  source_updated_at?: string | null;
+};
 
 type ActivitySessionsOverride = {
   Row: GeneratedTables['activity_sessions']['Row'] & {
@@ -117,20 +149,37 @@ type ActivitySessionsOverride = {
     recovery_time_s: number | null;
     total_steps: number | null;
     vo2_max: number | null;
-  };
+  } & ProvenanceRow &
+    SourceRecordRow &
+    SourceUpdatedAtRow;
   Insert: GeneratedTables['activity_sessions']['Insert'] & {
     elev_loss_m?: number | null;
     recovery_time_s?: number | null;
     total_steps?: number | null;
     vo2_max?: number | null;
-  };
+  } & ProvenanceInsert &
+    SourceRecordInsert &
+    SourceUpdatedAtInsert;
   Update: GeneratedTables['activity_sessions']['Update'] & {
     elev_loss_m?: number | null;
     recovery_time_s?: number | null;
     total_steps?: number | null;
     vo2_max?: number | null;
-  };
+  } & ProvenanceInsert &
+    SourceRecordInsert &
+    SourceUpdatedAtInsert;
   Relationships: GeneratedTables['activity_sessions']['Relationships'];
+};
+
+type ActivityStreamsOverride = {
+  Row: GeneratedTables['activity_streams']['Row'] & Omit<ProvenanceRow, 'source_provider_key'> & SourceRecordRow;
+  Insert: GeneratedTables['activity_streams']['Insert'] &
+    Omit<ProvenanceInsert, 'source_provider_key'> &
+    SourceRecordInsert;
+  Update: GeneratedTables['activity_streams']['Update'] &
+    Omit<ProvenanceInsert, 'source_provider_key'> &
+    SourceRecordInsert;
+  Relationships: GeneratedTables['activity_streams']['Relationships'];
 };
 
 type ActivityHeartRateZonesOverride = {
@@ -357,9 +406,688 @@ type RecipeUsageEventsOverride = {
   ];
 };
 
+type UserConnectionsOverride = {
+  Row: Omit<GeneratedTables['user_connections']['Row'], 'access_token' | 'refresh_token' | 'token_expires_at'> & {
+    access_token: string | null;
+    refresh_token: string | null;
+    token_expires_at: string | null;
+    connection_kind: 'oauth' | 'local_sdk' | 'file_import';
+    status: 'active' | 'revoked' | 'expired' | 'error' | 'paused';
+    revoked_at: string | null;
+    last_synced_at: string | null;
+    last_error: string | null;
+  };
+  Insert: Omit<GeneratedTables['user_connections']['Insert'], 'access_token' | 'refresh_token' | 'token_expires_at'> & {
+    access_token?: string | null;
+    refresh_token?: string | null;
+    token_expires_at?: string | null;
+    connection_kind?: 'oauth' | 'local_sdk' | 'file_import';
+    status?: 'active' | 'revoked' | 'expired' | 'error' | 'paused';
+    revoked_at?: string | null;
+    last_synced_at?: string | null;
+    last_error?: string | null;
+  };
+  Update: Omit<GeneratedTables['user_connections']['Update'], 'access_token' | 'refresh_token' | 'token_expires_at'> & {
+    access_token?: string | null;
+    refresh_token?: string | null;
+    token_expires_at?: string | null;
+    connection_kind?: 'oauth' | 'local_sdk' | 'file_import';
+    status?: 'active' | 'revoked' | 'expired' | 'error' | 'paused';
+    revoked_at?: string | null;
+    last_synced_at?: string | null;
+    last_error?: string | null;
+  };
+  Relationships: GeneratedTables['user_connections']['Relationships'];
+};
+
+type DailyStepsOverride = {
+  Row: GeneratedTables['daily_steps']['Row'] & ProvenanceRow;
+  Insert: GeneratedTables['daily_steps']['Insert'] & ProvenanceInsert;
+  Update: GeneratedTables['daily_steps']['Update'] & ProvenanceInsert;
+  Relationships: GeneratedTables['daily_steps']['Relationships'];
+};
+
+type StepIntervalsOverride = {
+  Row: GeneratedTables['step_intervals']['Row'] & ProvenanceRow;
+  Insert: GeneratedTables['step_intervals']['Insert'] & ProvenanceInsert;
+  Update: GeneratedTables['step_intervals']['Update'] & ProvenanceInsert;
+  Relationships: GeneratedTables['step_intervals']['Relationships'];
+};
+
+type SleepSessionsOverride = {
+  Row: GeneratedTables['sleep_sessions']['Row'] & ProvenanceRow & SourceRecordRow;
+  Insert: GeneratedTables['sleep_sessions']['Insert'] & ProvenanceInsert & SourceRecordInsert;
+  Update: GeneratedTables['sleep_sessions']['Update'] & ProvenanceInsert & SourceRecordInsert;
+  Relationships: GeneratedTables['sleep_sessions']['Relationships'];
+};
+
+type SleepStageIntervalsOverride = {
+  Row: GeneratedTables['sleep_stage_intervals']['Row'] & Omit<ProvenanceRow, 'source_provider_key'> & SourceRecordRow;
+  Insert: GeneratedTables['sleep_stage_intervals']['Insert'] &
+    Omit<ProvenanceInsert, 'source_provider_key'> &
+    SourceRecordInsert;
+  Update: GeneratedTables['sleep_stage_intervals']['Update'] &
+    Omit<ProvenanceInsert, 'source_provider_key'> &
+    SourceRecordInsert;
+  Relationships: GeneratedTables['sleep_stage_intervals']['Relationships'];
+};
+
+type SleepBiomarkerSamplesOverride = {
+  Row: GeneratedTables['sleep_biomarker_samples']['Row'] & Omit<ProvenanceRow, 'source_provider_key'> & SourceRecordRow;
+  Insert: GeneratedTables['sleep_biomarker_samples']['Insert'] &
+    Omit<ProvenanceInsert, 'source_provider_key'> &
+    SourceRecordInsert;
+  Update: GeneratedTables['sleep_biomarker_samples']['Update'] &
+    Omit<ProvenanceInsert, 'source_provider_key'> &
+    SourceRecordInsert;
+  Relationships: GeneratedTables['sleep_biomarker_samples']['Relationships'];
+};
+
+type DailyRecoveryOverride = {
+  Row: GeneratedTables['daily_recovery']['Row'] & ProvenanceRow;
+  Insert: GeneratedTables['daily_recovery']['Insert'] & ProvenanceInsert;
+  Update: GeneratedTables['daily_recovery']['Update'] & ProvenanceInsert;
+  Relationships: GeneratedTables['daily_recovery']['Relationships'];
+};
+
+type WeightLogsOverride = {
+  Row: GeneratedTables['weight_logs']['Row'] & ProvenanceRow & SourceRecordRow & SourceUpdatedAtRow;
+  Insert: GeneratedTables['weight_logs']['Insert'] & ProvenanceInsert & SourceRecordInsert & SourceUpdatedAtInsert;
+  Update: GeneratedTables['weight_logs']['Update'] & ProvenanceInsert & SourceRecordInsert & SourceUpdatedAtInsert;
+  Relationships: GeneratedTables['weight_logs']['Relationships'];
+};
+
+type RestingHrLogsOverride = {
+  Row: GeneratedTables['resting_hr_logs']['Row'] & ProvenanceRow & SourceRecordRow & SourceUpdatedAtRow;
+  Insert: GeneratedTables['resting_hr_logs']['Insert'] & ProvenanceInsert & SourceRecordInsert & SourceUpdatedAtInsert;
+  Update: GeneratedTables['resting_hr_logs']['Update'] & ProvenanceInsert & SourceRecordInsert & SourceUpdatedAtInsert;
+  Relationships: GeneratedTables['resting_hr_logs']['Relationships'];
+};
+
+type ProviderConnectionTokensTable = {
+  Row: {
+    id: string;
+    connection_id: string;
+    user_id: string;
+    provider: WearableProvider;
+    access_token: string;
+    refresh_token: string | null;
+    token_type: string | null;
+    token_expires_at: string | null;
+    scope: string | null;
+    created_at: string;
+    updated_at: string;
+  };
+  Insert: {
+    id?: string;
+    connection_id: string;
+    user_id: string;
+    provider: WearableProvider;
+    access_token: string;
+    refresh_token?: string | null;
+    token_type?: string | null;
+    token_expires_at?: string | null;
+    scope?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+  Update: {
+    id?: string;
+    connection_id?: string;
+    user_id?: string;
+    provider?: WearableProvider;
+    access_token?: string;
+    refresh_token?: string | null;
+    token_type?: string | null;
+    token_expires_at?: string | null;
+    scope?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+  Relationships: [];
+};
+
+type ProviderDataOriginsTable = {
+  Row: {
+    id: string;
+    user_id: string;
+    source_channel: string;
+    provider: WearableProvider;
+    source_package: string | null;
+    source_provider_key: string | null;
+    display_name: string | null;
+    platform: string | null;
+    device_id: string | null;
+    first_seen_at: string;
+    last_seen_at: string;
+    raw_payload: Json | null;
+    created_at: string;
+    updated_at: string;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    source_channel: string;
+    provider: WearableProvider;
+    source_package?: string | null;
+    source_provider_key?: string | null;
+    display_name?: string | null;
+    platform?: string | null;
+    device_id?: string | null;
+    first_seen_at?: string;
+    last_seen_at?: string;
+    raw_payload?: Json | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    source_channel?: string;
+    provider?: WearableProvider;
+    source_package?: string | null;
+    source_provider_key?: string | null;
+    display_name?: string | null;
+    platform?: string | null;
+    device_id?: string | null;
+    first_seen_at?: string;
+    last_seen_at?: string;
+    raw_payload?: Json | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+  Relationships: [];
+};
+
+type HealthConnectProviderSelectionTable = {
+  Row: {
+    user_id: string;
+    origin_id: string;
+    selected_package_name: string;
+    selected_provider_key: string | null;
+    selected_at: string;
+    updated_at: string;
+  };
+  Insert: {
+    user_id: string;
+    origin_id: string;
+    selected_package_name: string;
+    selected_provider_key?: string | null;
+    selected_at?: string;
+    updated_at?: string;
+  };
+  Update: {
+    user_id?: string;
+    origin_id?: string;
+    selected_package_name?: string;
+    selected_provider_key?: string | null;
+    selected_at?: string;
+    updated_at?: string;
+  };
+  Relationships: [];
+};
+
+type IntegrationSyncStateTable = {
+  Row: {
+    id: string;
+    user_id: string;
+    provider: WearableProvider;
+    source_channel: string;
+    source_package: string | null;
+    sync_domain: string;
+    cursor_token: string | null;
+    anchor_token: string | null;
+    last_success_at: string | null;
+    last_attempt_at: string | null;
+    last_record_at: string | null;
+    status: 'idle' | 'running' | 'success' | 'error' | 'paused' | 'expired';
+    last_error: string | null;
+    metadata: Json | null;
+    created_at: string;
+    updated_at: string;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    provider: WearableProvider;
+    source_channel: string;
+    source_package?: string | null;
+    sync_domain: string;
+    cursor_token?: string | null;
+    anchor_token?: string | null;
+    last_success_at?: string | null;
+    last_attempt_at?: string | null;
+    last_record_at?: string | null;
+    status?: 'idle' | 'running' | 'success' | 'error' | 'paused' | 'expired';
+    last_error?: string | null;
+    metadata?: Json | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    provider?: WearableProvider;
+    source_channel?: string;
+    source_package?: string | null;
+    sync_domain?: string;
+    cursor_token?: string | null;
+    anchor_token?: string | null;
+    last_success_at?: string | null;
+    last_attempt_at?: string | null;
+    last_record_at?: string | null;
+    status?: 'idle' | 'running' | 'success' | 'error' | 'paused' | 'expired';
+    last_error?: string | null;
+    metadata?: Json | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+  Relationships: [];
+};
+
+type ExternalRawPayloadsV2Table = {
+  Row: {
+    id: string;
+    user_id: string;
+    provider: WearableProvider;
+    source_channel: string;
+    source_package: string | null;
+    object_type: string;
+    source_record_id: string | null;
+    payload_hash: string;
+    payload: Json | null;
+    storage_bucket: string | null;
+    storage_path: string | null;
+    size_bytes: number | null;
+    trace_id: string | null;
+    related_table: string | null;
+    related_id: string | null;
+    received_at: string;
+    processed_at: string | null;
+    created_at: string;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    provider: WearableProvider;
+    source_channel: string;
+    source_package?: string | null;
+    object_type: string;
+    source_record_id?: string | null;
+    payload_hash: string;
+    payload?: Json | null;
+    storage_bucket?: string | null;
+    storage_path?: string | null;
+    size_bytes?: number | null;
+    trace_id?: string | null;
+    related_table?: string | null;
+    related_id?: string | null;
+    received_at?: string;
+    processed_at?: string | null;
+    created_at?: string;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    provider?: WearableProvider;
+    source_channel?: string;
+    source_package?: string | null;
+    object_type?: string;
+    source_record_id?: string | null;
+    payload_hash?: string;
+    payload?: Json | null;
+    storage_bucket?: string | null;
+    storage_path?: string | null;
+    size_bytes?: number | null;
+    trace_id?: string | null;
+    related_table?: string | null;
+    related_id?: string | null;
+    received_at?: string;
+    processed_at?: string | null;
+    created_at?: string;
+  };
+  Relationships: [];
+};
+
+type ActivityRoutePointsTable = {
+  Row: {
+    id: string;
+    session_id: string;
+    user_id: string;
+    point_index: number;
+    timestamp: string | null;
+    offset_s: number | null;
+    lat: number;
+    lon: number;
+    altitude_m: number | null;
+    distance_m: number | null;
+    speed_mps: number | null;
+    horizontal_accuracy_m: number | null;
+    vertical_accuracy_m: number | null;
+    source: string | null;
+    source_channel: string | null;
+    source_package: string | null;
+    source_record_id: string | null;
+    raw_payload_id: string | null;
+    raw_payload: Json | null;
+    created_at: string;
+  };
+  Insert: {
+    id?: string;
+    session_id: string;
+    user_id: string;
+    point_index: number;
+    timestamp?: string | null;
+    offset_s?: number | null;
+    lat: number;
+    lon: number;
+    altitude_m?: number | null;
+    distance_m?: number | null;
+    speed_mps?: number | null;
+    horizontal_accuracy_m?: number | null;
+    vertical_accuracy_m?: number | null;
+    source?: string | null;
+    source_channel?: string | null;
+    source_package?: string | null;
+    source_record_id?: string | null;
+    raw_payload_id?: string | null;
+    raw_payload?: Json | null;
+    created_at?: string;
+  };
+  Update: {
+    id?: string;
+    session_id?: string;
+    user_id?: string;
+    point_index?: number;
+    timestamp?: string | null;
+    offset_s?: number | null;
+    lat?: number;
+    lon?: number;
+    altitude_m?: number | null;
+    distance_m?: number | null;
+    speed_mps?: number | null;
+    horizontal_accuracy_m?: number | null;
+    vertical_accuracy_m?: number | null;
+    source?: string | null;
+    source_channel?: string | null;
+    source_package?: string | null;
+    source_record_id?: string | null;
+    raw_payload_id?: string | null;
+    raw_payload?: Json | null;
+    created_at?: string;
+  };
+  Relationships: [];
+};
+
+type ActivityStreamSamplesTable = {
+  Row: {
+    id: string;
+    session_id: string;
+    user_id: string;
+    stream_type: WearableStreamType;
+    timestamp: string | null;
+    offset_s: number | null;
+    value: number;
+    unit: string | null;
+    source: string | null;
+    source_channel: string | null;
+    source_package: string | null;
+    source_record_id: string | null;
+    raw_payload_id: string | null;
+    raw_payload: Json | null;
+    created_at: string;
+  };
+  Insert: {
+    id?: string;
+    session_id: string;
+    user_id: string;
+    stream_type: WearableStreamType;
+    timestamp?: string | null;
+    offset_s?: number | null;
+    value: number;
+    unit?: string | null;
+    source?: string | null;
+    source_channel?: string | null;
+    source_package?: string | null;
+    source_record_id?: string | null;
+    raw_payload_id?: string | null;
+    raw_payload?: Json | null;
+    created_at?: string;
+  };
+  Update: {
+    id?: string;
+    session_id?: string;
+    user_id?: string;
+    stream_type?: WearableStreamType;
+    timestamp?: string | null;
+    offset_s?: number | null;
+    value?: number;
+    unit?: string | null;
+    source?: string | null;
+    source_channel?: string | null;
+    source_package?: string | null;
+    source_record_id?: string | null;
+    raw_payload_id?: string | null;
+    raw_payload?: Json | null;
+    created_at?: string;
+  };
+  Relationships: [];
+};
+
+type ActivityProviderFieldsTable = {
+  Row: {
+    session_id: string;
+    user_id: string;
+    provider: WearableProvider;
+    source_channel: string | null;
+    source_package: string | null;
+    fields: Json;
+    raw_metadata: Json | null;
+    created_at: string;
+    updated_at: string;
+  };
+  Insert: {
+    session_id: string;
+    user_id: string;
+    provider: WearableProvider;
+    source_channel?: string | null;
+    source_package?: string | null;
+    fields?: Json;
+    raw_metadata?: Json | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+  Update: {
+    session_id?: string;
+    user_id?: string;
+    provider?: WearableProvider;
+    source_channel?: string | null;
+    source_package?: string | null;
+    fields?: Json;
+    raw_metadata?: Json | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+  Relationships: [];
+};
+
+type ActivityFilesTable = {
+  Row: {
+    id: string;
+    user_id: string;
+    session_id: string | null;
+    provider: WearableProvider;
+    source_channel: string | null;
+    source_package: string | null;
+    file_type: string;
+    storage_bucket: string | null;
+    storage_path: string | null;
+    file_hash: string | null;
+    size_bytes: number | null;
+    raw_payload_id: string | null;
+    imported_at: string;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    session_id?: string | null;
+    provider: WearableProvider;
+    source_channel?: string | null;
+    source_package?: string | null;
+    file_type: string;
+    storage_bucket?: string | null;
+    storage_path?: string | null;
+    file_hash?: string | null;
+    size_bytes?: number | null;
+    raw_payload_id?: string | null;
+    imported_at?: string;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    session_id?: string | null;
+    provider?: WearableProvider;
+    source_channel?: string | null;
+    source_package?: string | null;
+    file_type?: string;
+    storage_bucket?: string | null;
+    storage_path?: string | null;
+    file_hash?: string | null;
+    size_bytes?: number | null;
+    raw_payload_id?: string | null;
+    imported_at?: string;
+  };
+  Relationships: [];
+};
+
+type HealthMetricSamplesTable = {
+  Row: {
+    id: string;
+    user_id: string;
+    provider: WearableProvider;
+    source_channel: string;
+    source_package: string | null;
+    source_record_id: string | null;
+    metric_type: string;
+    recorded_at: string;
+    local_date: string | null;
+    timezone: string | null;
+    value: number;
+    unit: string;
+    sleep_session_id: string | null;
+    activity_session_id: string | null;
+    raw_payload_id: string | null;
+    raw_payload: Json | null;
+    created_at: string;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    provider: WearableProvider;
+    source_channel: string;
+    source_package?: string | null;
+    source_record_id?: string | null;
+    metric_type: string;
+    recorded_at: string;
+    local_date?: string | null;
+    timezone?: string | null;
+    value: number;
+    unit: string;
+    sleep_session_id?: string | null;
+    activity_session_id?: string | null;
+    raw_payload_id?: string | null;
+    raw_payload?: Json | null;
+    created_at?: string;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    provider?: WearableProvider;
+    source_channel?: string;
+    source_package?: string | null;
+    source_record_id?: string | null;
+    metric_type?: string;
+    recorded_at?: string;
+    local_date?: string | null;
+    timezone?: string | null;
+    value?: number;
+    unit?: string;
+    sleep_session_id?: string | null;
+    activity_session_id?: string | null;
+    raw_payload_id?: string | null;
+    raw_payload?: Json | null;
+    created_at?: string;
+  };
+  Relationships: [];
+};
+
+type Vo2MaxLogsTable = {
+  Row: {
+    id: string;
+    user_id: string;
+    measured_at: string;
+    value_ml_kg_min: number;
+    provider: WearableProvider;
+    source_channel: string | null;
+    source_package: string | null;
+    source_record_id: string | null;
+    activity_session_id: string | null;
+    raw_payload_id: string | null;
+    created_at: string;
+  };
+  Insert: {
+    id?: string;
+    user_id: string;
+    measured_at: string;
+    value_ml_kg_min: number;
+    provider: WearableProvider;
+    source_channel?: string | null;
+    source_package?: string | null;
+    source_record_id?: string | null;
+    activity_session_id?: string | null;
+    raw_payload_id?: string | null;
+    created_at?: string;
+  };
+  Update: {
+    id?: string;
+    user_id?: string;
+    measured_at?: string;
+    value_ml_kg_min?: number;
+    provider?: WearableProvider;
+    source_channel?: string | null;
+    source_package?: string | null;
+    source_record_id?: string | null;
+    activity_session_id?: string | null;
+    raw_payload_id?: string | null;
+    created_at?: string;
+  };
+  Relationships: [];
+};
+
 type TableOverrides = {
   activity_sessions: ActivitySessionsOverride;
+  activity_streams: ActivityStreamsOverride;
   activity_heart_rate_zones: ActivityHeartRateZonesOverride;
+  activity_route_points: ActivityRoutePointsTable;
+  activity_stream_samples: ActivityStreamSamplesTable;
+  activity_provider_fields: ActivityProviderFieldsTable;
+  activity_files: ActivityFilesTable;
+  daily_steps: DailyStepsOverride;
+  step_intervals: StepIntervalsOverride;
+  sleep_sessions: SleepSessionsOverride;
+  sleep_stage_intervals: SleepStageIntervalsOverride;
+  sleep_biomarker_samples: SleepBiomarkerSamplesOverride;
+  daily_recovery: DailyRecoveryOverride;
+  weight_logs: WeightLogsOverride;
+  resting_hr_logs: RestingHrLogsOverride;
+  provider_connection_tokens: ProviderConnectionTokensTable;
+  provider_data_origins: ProviderDataOriginsTable;
+  health_connect_provider_selection: HealthConnectProviderSelectionTable;
+  integration_sync_state: IntegrationSyncStateTable;
+  external_raw_payloads_v2: ExternalRawPayloadsV2Table;
+  health_metric_samples: HealthMetricSamplesTable;
+  vo2_max_logs: Vo2MaxLogsTable;
+  user_connections: UserConnectionsOverride;
   ingredients: IngredientsOverride;
   user_preferences: UserPreferencesOverride;
   notifications: NotificationsOverride;
