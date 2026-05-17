@@ -5,28 +5,42 @@ import { useSettingsStyles } from '../../hooks/useSettingsStyles';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { useStravaConnection } from '../../hooks/useStravaConnection';
+import { useAppleHealthConnection } from '../../hooks/useAppleHealthConnection';
+import { useHealthConnectConnection } from '../../hooks/useHealthConnectConnection';
+import { usePolarConnection } from '../../hooks/usePolarConnection';
 
 export const ConnectedAppsScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors } = useSettingsStyles();
   const strava = useStravaConnection();
+  const appleHealth = useAppleHealthConnection();
+  const healthConnect = useHealthConnectConnection();
+  const polar = usePolarConnection();
+  const formatLastSync = (lastSyncedAt?: string | null) =>
+    lastSyncedAt ? t('settings.lastSync', { date: new Date(lastSyncedAt).toLocaleDateString() }) : null;
 
   const AppCard = ({
     name,
     connected,
     onConnect,
     onDisconnect,
+    onSync,
+    detail,
     comingSoon = false,
     isLoading = false,
     isActioning = false,
+    isSyncing = false,
   }: {
     name: string;
     connected: boolean;
     onConnect: () => void;
     onDisconnect: () => void;
+    onSync?: () => void;
+    detail?: string | null;
     comingSoon?: boolean;
     isLoading?: boolean;
     isActioning?: boolean;
+    isSyncing?: boolean;
   }) => (
     <View style={[styles.card, dynamicStyles.card]}>
       <View style={styles.cardHeader}>
@@ -50,34 +64,50 @@ export const ConnectedAppsScreen = () => {
               {connected ? t('settings.connected') : t('settings.disconnected')}
             </Text>
           )}
+          {!!detail && <Text style={[styles.detailText, { color: themeColors.textSecondary }]}>{detail}</Text>}
         </View>
       </View>
       {!comingSoon && !isLoading && (
-        <TouchableOpacity
-          style={[
-            styles.button,
-            connected
-              ? [styles.buttonDisconnect, { borderColor: themeColors.border }]
-              : { backgroundColor: themeColors.primary, borderColor: themeColors.primary },
-          ]}
-          onPress={connected ? onDisconnect : onConnect}
-          disabled={isActioning}
-        >
-          {isActioning ? (
-            <ActivityIndicator size="small" color={connected ? themeColors.textPrimary : themeColors.white} />
-          ) : (
-            <Text
-              style={[
-                styles.buttonText,
-                connected
-                  ? [styles.buttonTextDisconnect, { color: themeColors.textPrimary }]
-                  : { color: themeColors.white },
-              ]}
+        <View style={styles.actions}>
+          {connected && onSync && (
+            <TouchableOpacity
+              style={[styles.iconButton, { borderColor: themeColors.border }]}
+              onPress={onSync}
+              disabled={isSyncing}
             >
-              {connected ? t('settings.disconnect') : t('settings.connect')}
-            </Text>
+              {isSyncing ? (
+                <ActivityIndicator size="small" color={themeColors.textPrimary} />
+              ) : (
+                <Text style={[styles.buttonText, { color: themeColors.textPrimary }]}>{t('settings.sync')}</Text>
+              )}
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              connected
+                ? [styles.buttonDisconnect, { borderColor: themeColors.border }]
+                : { backgroundColor: themeColors.primary, borderColor: themeColors.primary },
+            ]}
+            onPress={connected ? onDisconnect : onConnect}
+            disabled={isActioning}
+          >
+            {isActioning ? (
+              <ActivityIndicator size="small" color={connected ? themeColors.textPrimary : themeColors.white} />
+            ) : (
+              <Text
+                style={[
+                  styles.buttonText,
+                  connected
+                    ? [styles.buttonTextDisconnect, { color: themeColors.textPrimary }]
+                    : { color: themeColors.white },
+                ]}
+              >
+                {connected ? t('settings.disconnect') : t('settings.connect')}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -102,9 +132,45 @@ export const ConnectedAppsScreen = () => {
 
         <AppCard name="Garmin" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
 
-        <AppCard name="Apple Health" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
+        <AppCard
+          name="Polar"
+          connected={polar.isConnected}
+          isLoading={polar.isLoading}
+          isActioning={polar.isConnecting || polar.isDisconnecting}
+          isSyncing={polar.isSyncing}
+          onConnect={polar.connect}
+          onDisconnect={polar.disconnect}
+          onSync={polar.sync}
+          detail={formatLastSync(polar.lastSyncedAt)}
+        />
 
-        <AppCard name="Health Connect" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
+        <AppCard
+          name="Apple Health"
+          connected={appleHealth.isConnected}
+          isLoading={appleHealth.isLoading}
+          isActioning={appleHealth.isConnecting || appleHealth.isDisconnecting}
+          isSyncing={appleHealth.isSyncing}
+          onConnect={appleHealth.connect}
+          onDisconnect={appleHealth.disconnect}
+          onSync={appleHealth.sync}
+          detail={formatLastSync(appleHealth.lastSyncedAt)}
+        />
+
+        <AppCard
+          name="Health Connect"
+          connected={healthConnect.isConnected}
+          isLoading={healthConnect.isLoading}
+          isActioning={healthConnect.isConnecting || healthConnect.isDisconnecting}
+          isSyncing={healthConnect.isSyncing}
+          onConnect={healthConnect.connect}
+          onDisconnect={healthConnect.disconnect}
+          onSync={healthConnect.sync}
+          detail={
+            healthConnect.selectedOriginName ??
+            healthConnect.selectedPackageName ??
+            formatLastSync(healthConnect.lastSyncedAt)
+          }
+        />
       </ScrollView>
     </LinearGradient>
   );
@@ -153,6 +219,10 @@ const styles = StyleSheet.create({
   appName: {
     ...typography.h4,
   },
+  detailText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
   statusTextConnected: {
     fontSize: 12,
     color: colors.success,
@@ -183,6 +253,20 @@ const styles = StyleSheet.create({
   },
   buttonDisconnect: {
     backgroundColor: 'transparent',
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  iconButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonText: {
     fontSize: 14,

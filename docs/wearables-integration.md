@@ -9,12 +9,16 @@ Implemented in this branch:
 - Supabase migrations for wearable provenance, source origins, sync state, raw payloads, activity route points, normalized activity stream samples, generic health samples, and VO2 max history.
 - Backend NestJS module at `alzan-be/src/components/wearables/`.
 - Local SDK sync endpoint for Apple Health and Health Connect batches.
+- Alzan-owned Apple Health native module `NativeModules.AlzanAppleHealth` for read-only HealthKit sync, installed through `alzan-fe/plugins/withAlzanAppleHealth.js`.
+- Alzan-owned mobile bridge contract for Health Connect; Open Wearables remains reference material only and is not a runtime dependency.
+- Polar AccessLink v1 manual sync through `POST /wearables/cloud/polar/sync`.
 - Health Connect origin discovery and selected-source persistence.
 - OAuth token hardening for future provider callbacks by moving tokens from visible `user_connections` rows into private `provider_connection_tokens`.
+- Connected Apps actions for Apple Health, Health Connect, and Polar in `alzan-fe/src/screens/settings/ConnectedAppsScreen.tsx`.
 
 Not implemented here:
 
-- Native Expo modules for HealthKit and Health Connect. The app must add platform-specific dependencies and call the backend contract below.
+- A final Alzan-native Android Health Connect reader that filters reads with `DataOrigin(selectedPackage)`.
 - Cloud provider pull jobs, webhooks, and delete event processors.
 - Cross-provider duplicate group tables.
 
@@ -54,6 +58,7 @@ Main services:
 - `CanonicalActivityWriterService`: upserts workouts, laps, HR zones, JSON streams, normalized stream samples, route points, and provider fields.
 - `CanonicalHealthWriterService`: upserts daily steps, step intervals, sleep sessions, stages, daily recovery, health samples, VO2 max logs, weight logs, and resting HR logs.
 - `LocalHealthSyncService`: orchestrates Apple Health and Health Connect batch imports.
+- `PolarAccessLinkService`: pulls Polar AccessLink exercises and writes them through the canonical activity writer.
 
 ## API Contract
 
@@ -139,6 +144,23 @@ Supported `object_type` values: `activity`, `daily_activity`, `sleep`, `recovery
 
 Health Connect imports must include a package name and it must match the user's selected Health Connect origin. Apple Health imports may have `source_package` as the HealthKit source bundle identifier when available.
 
+### Mobile native bridge contract
+
+The app calls Alzan-owned native modules and uploads their batches through `POST /wearables/local-sync`:
+
+- `NativeModules.AlzanAppleHealth`: requests HealthKit read permissions and returns an `AppleHealthLocalSyncBatch`.
+- `NativeModules.AlzanHealthConnect`: discovers `DataOrigin.packageName`, requests Health Connect read permissions, reads only the selected package, and returns a `HealthConnectLocalSyncBatch`.
+
+The local `open-wearables/` repo remains reference material only. It is not installed, imported, or used by the app/runtime.
+
+Apple Health can only be tested through an iOS app build. Web cannot access HealthKit, and the iOS Simulator is useful mainly for compile and permission-flow checks; real Apple Watch/Fitness/Health data requires a physical iPhone with the HealthKit capability enabled for the signing team.
+
+### Sync Polar activities
+
+`POST /wearables/cloud/polar/sync`
+
+This endpoint requires an active Polar OAuth connection. It reads private tokens from `provider_connection_tokens`, calls Polar AccessLink `/v3/exercises`, stores raw payloads, and upserts activities through the canonical writer.
+
 ## Mobile Responsibilities
 
 Android Health Connect:
@@ -155,10 +177,20 @@ Android Health Connect:
 iOS HealthKit:
 
 1. Request read permissions only for the selected first version.
-2. Read `HKWorkout`, samples, sleep analysis, biometrics, body metrics, and routes locally.
-3. Include `uuid`, `sourceRevision`, `device`, and `metadata` in each payload.
-4. Send batches to `POST /wearables/local-sync`.
-5. Store `HKAnchoredObjectQuery` anchors through `sync_states`.
+2. Use `NativeModules.AlzanAppleHealth` from `alzan-fe/src/modules/apple-health/appleHealthNative.ts`.
+3. Read `HKWorkout`, samples, sleep analysis, biometrics, body metrics, and routes locally.
+4. Upload the returned `AppleHealthLocalSyncBatch` to `POST /wearables/local-sync`.
+5. Store `HKAnchoredObjectQuery` anchors through `integration_sync_state` when delta sync is added.
+
+The native source of truth is versioned in `alzan-fe/plugins/alzan-apple-health/`; the Expo config plugin copies those files into the generated `ios/` project, adds HealthKit/CoreLocation frameworks, sets the bridging header, enables the HealthKit entitlement, and writes `NSHealthShareUsageDescription`.
+
+Polar:
+
+1. Set `POLAR_CLIENT_ID`, `POLAR_CLIENT_SECRET`, `POLAR_REDIRECT_URI`, and optionally `POLAR_DEFAULT_SCOPE`.
+2. Connect from Settings through `/oauth/polar/authorize`.
+3. OAuth callback registers the Polar AccessLink user at `/v3/users`.
+4. Run `POST /wearables/cloud/polar/sync`.
+5. Verify imported rows in `activity_sessions`, `activity_streams`, `activity_stream_samples`, `activity_route_points`, and `external_raw_payloads_v2`.
 
 ## Security Notes
 
@@ -174,6 +206,7 @@ Run from the repo root:
 
 ```sh
 pnpm --prefix alzan-be run typecheck
+pnpm --prefix alzan-fe run typecheck
 pnpm verify:activity-import
 ```
 

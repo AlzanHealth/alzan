@@ -1,6 +1,7 @@
 import { CONFIG } from '../../constants/environment';
 import { supabase } from '../../lib/supabaseClient';
 import {
+  CloudProviderSyncResult,
   LocalHealthSyncRequest,
   LocalHealthSyncResult,
   ProviderOrigin,
@@ -20,7 +21,25 @@ class WearablesApiError extends Error {
   }
 }
 
-const getAccessToken = async (): Promise<string> => {
+const parseApiErrorMessage = (responseText: string, fallback: string): string => {
+  if (!responseText) return fallback;
+  try {
+    const payload = JSON.parse(responseText) as { message?: unknown };
+    return typeof payload.message === 'string' ? payload.message : responseText;
+  } catch {
+    return responseText;
+  }
+};
+
+const getAccessToken = async (forceRefresh = false): Promise<string> => {
+  if (forceRefresh) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) throw error;
+    const refreshedToken = data.session?.access_token;
+    if (!refreshedToken) throw new Error('User not authenticated');
+    return refreshedToken;
+  }
+
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
   const token = data.session?.access_token;
@@ -29,19 +48,34 @@ const getAccessToken = async (): Promise<string> => {
 };
 
 const requestJson = async <T>(path: string, options: { method?: string; body?: JsonBody } = {}): Promise<T> => {
-  const token = await getAccessToken();
-  const response = await fetch(`${CONFIG.alzanBeBaseUrl}${path}`, {
-    method: options.method ?? 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const makeRequest = async (forceRefreshToken: boolean): Promise<Response> => {
+    const token = await getAccessToken(forceRefreshToken);
+    return fetch(`${CONFIG.alzanBeBaseUrl}${path}`, {
+      method: options.method ?? 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  };
+
+  let response = await makeRequest(false);
+
+  if (response.status === 401) {
+    console.warn('[wearablesLocalHealthApi] 401 received, refreshing Supabase session and retrying once', { path });
+    response = await makeRequest(true);
+  }
 
   const text = await response.text();
   if (!response.ok) {
-    throw new WearablesApiError(text || `Wearables API request failed with ${response.status}`, response.status, text);
+    const fallback = `Wearables API request failed with ${response.status}`;
+    console.error('[wearablesLocalHealthApi] Request failed', {
+      path,
+      status: response.status,
+      responseText: text,
+    });
+    throw new WearablesApiError(parseApiErrorMessage(text, fallback), response.status, text);
   }
   return (text ? JSON.parse(text) : null) as T;
 };
@@ -67,6 +101,11 @@ export const wearablesLocalHealthApi = {
     requestJson<LocalHealthSyncResult>('/wearables/local-sync', {
       method: 'POST',
       body: payload,
+    }),
+
+  syncPolarActivities: () =>
+    requestJson<CloudProviderSyncResult>('/wearables/cloud/polar/sync', {
+      method: 'POST',
     }),
 };
 

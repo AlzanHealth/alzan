@@ -8,10 +8,11 @@ Este dashboard resume los cambios implementados para la integracion de wearables
 |---|---|---|
 | Base de datos | Hecho | Hay migraciones para provenance, raw payloads, sync state, origins, rutas, streams, health samples y VO2 max. |
 | Backend wearables | Hecho | Existe modulo NestJS `/wearables` con endpoints y servicios de importacion local. |
-| Health Connect | Base hecha | Backend exige un unico `source_package` seleccionado y rechaza batches que no coincidan. Falta lector nativo Android. |
-| Apple HealthKit | Base hecha | Backend acepta batches locales con `uuid`, `sourceRevision`, `device` y metadata. Falta lector nativo iOS. |
-| Cloud providers | Parcial | Se endurecio OAuth/token storage y se preparo provenance. Faltan jobs/webhooks/backfills por proveedor. |
-| Frontend contrato | Base hecha | Hay clientes TypeScript para registrar origins, seleccionar Health Connect y subir batches. |
+| Health Connect | Integracion parcial | Backend exige `source_package` y seleccion unica. Falta lector Android nativo de Alzan que filtre por `DataOrigin`. |
+| Apple HealthKit | Hecho v1 | Existe modulo nativo iOS `AlzanAppleHealth` con HealthKit read-only, permisos, workouts, sleep, biomarcadores, peso/body fat y rutas. Requiere iPhone fisico para datos reales. |
+| Polar | Hecho v1 | OAuth callback publico, registro AccessLink y sync manual de `/v3/exercises` hacia el writer canonico. |
+| Cloud providers | Parcial | Polar ya tiene pull manual. El resto sigue preparado por OAuth/provenance, pero sin jobs/webhooks/backfills. |
+| Frontend contrato | Mejorado | Settings permite conectar/sincronizar Apple Health, Health Connect y Polar; Apple usa modulo nativo propio y Polar usa endpoint cloud. |
 | Seguridad | Mejorada | Tokens nuevos pasan a tabla privada; raw payloads no tienen policy cliente. Falta cifrado fuerte/Vault. |
 | Verificacion | Hecha | Pasaron format, lint, typecheck y `verify:activity-import` con 15/15 checks. |
 
@@ -30,6 +31,7 @@ Este dashboard resume los cambios implementados para la integracion de wearables
 | Frontend local sync | `alzan-fe/src/modules/wearables/` | Cliente HTTP autenticado para `/wearables`. |
 | Frontend Health Connect | `alzan-fe/src/modules/health-connect/` | Helpers para origins, seleccion y batches Android. |
 | Frontend Apple Health | `alzan-fe/src/modules/apple-health/` | Helpers para batches iOS. |
+| Motor nativo Apple Health | `alzan-fe/plugins/withAlzanAppleHealth.js`, `alzan-fe/plugins/alzan-apple-health/` | Config plugin Expo y plantillas Swift/Obj-C versionadas para HealthKit. |
 | UI settings | `alzan-fe/src/screens/settings/ConnectedAppsScreen.tsx` | Cambia Google Fit por Health Connect como integracion futura correcta. |
 | Documentacion | `docs/wearables-integration.md` | Contrato tecnico detallado. |
 
@@ -38,7 +40,7 @@ Este dashboard resume los cambios implementados para la integracion de wearables
 ```mermaid
 flowchart TD
   HC["Android Health Connect\nlectura local futura"] --> FEHC["FE health-connect module\norigins + selected package + batch"]
-  HK["iOS HealthKit\nlectura local futura"] --> FEHK["FE apple-health module\nsourceRevision + batch"]
+  HK["iOS HealthKit\nlectura local nativa"] --> FEHK["FE apple-health module\nsourceRevision + batch"]
   FEHC --> API["POST /wearables/local-sync"]
   FEHK --> API
   API --> CONSENT["Comprobar health_data_consent"]
@@ -138,7 +140,7 @@ Flujo esperado en iOS:
 4. Subir batches a `POST /wearables/local-sync`.
 5. Guardar anchors de `HKAnchoredObjectQuery` en `integration_sync_state`.
 
-Estado actual: el backend y el cliente TypeScript aceptan batches Apple Health. Falta implementar el puente nativo Expo/iOS.
+Estado actual: el backend, el cliente TypeScript y el puente nativo iOS aceptan batches Apple Health. El modulo nativo se instala mediante `withAlzanAppleHealth`, que copia Swift/Obj-C al proyecto iOS generado, enlaza HealthKit/CoreLocation y activa entitlement/usage description. Web no puede acceder a HealthKit; el simulador solo valida compilacion/permisos y los datos reales requieren iPhone fisico.
 
 ## Seguridad y Privacidad
 
@@ -167,7 +169,7 @@ Pendiente recomendado: cifrado fuerte de tokens con Vault/pgsodium o envelope en
 | Pendiente | Motivo |
 |---|---|
 | Lectura nativa Health Connect | Requiere dependencia/modulo Android y permisos reales. |
-| Lectura nativa HealthKit | Requiere modulo iOS/Expo y permisos HealthKit. |
+| Delta sync HealthKit con anchors reales | La v1 hace sync manual por ventana; falta `HKAnchoredObjectQuery` persistente. |
 | Jobs cloud por Garmin/Suunto/Polar/COROS/etc. | La base esta preparada, pero no se implementaron pulls/webhooks. |
 | Procesamiento de deletes | Hay sync state y source ids, pero falta event processor por canal. |
 | Duplicate groups cross-provider | Existe `DedupeService` inicial, pero no tablas de agrupacion finales. |
@@ -195,8 +197,9 @@ Antes Alzan podia guardar actividades, sueño y salud, pero no tenia una capa co
 |---|---|---|---|
 | Wearables DB foundation | `docs/wearables-integration.md`, este dashboard | `supabase/migrations/2026051310*.sql` | Sincronizado |
 | Backend local sync | `docs/wearables-integration.md`, este dashboard | `alzan-be/src/components/wearables/` | Sincronizado |
+| Open Wearables reference | Repo local `open-wearables/` | Solo referencia; sin dependencia runtime | Sincronizado |
+| Polar AccessLink v1 | Este dashboard | `PolarOAuthService`, `PolarAccessLinkService`, `CloudProviderSyncController` | Sincronizado |
 | Health Connect selected origin | `docs/wearables-integration.md`, este dashboard | `ProviderOriginService`, `LocalHealthSyncService` | Sincronizado |
-| Apple Health batch contract | `docs/wearables-integration.md`, este dashboard | `alzan-fe/src/modules/apple-health/`, backend `/wearables/local-sync` | Sincronizado |
-| Native mobile readers | Este dashboard | No existen aun | Pendiente |
-| Cloud provider jobs | Este dashboard | No existen aun | Pendiente |
-
+| Apple Health bridge contract | `docs/wearables-integration.md`, este dashboard | `AlzanAppleHealth`, `appleHealthNative`, backend `/wearables/local-sync` | Sincronizado |
+| Native Health Connect filter | Este dashboard | Backend valida; lector Android Alzan debe filtrar por `DataOrigin` | Pendiente |
+| Cloud provider jobs | Este dashboard | Polar manual sync existe; jobs programados no existen aun | Parcial |

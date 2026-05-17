@@ -9,7 +9,8 @@ import {
   OAuthErrorQueryDto,
   OAuthSuccessQueryDto,
 } from './dto/provider-input.dto';
-import { SupabaseUserAuth } from '../../core/guards/auth.decorator';
+import { PublicAuth, SupabaseUserAuth } from '../../core/guards/auth.decorator';
+import { UserContext, UserCtx } from '../../common/decorators/user-context.decorator';
 
 @ApiTags('Providers')
 @SupabaseUserAuth()
@@ -20,17 +21,20 @@ export class ProvidersController {
   @Get(':provider/authorize')
   @ApiOkResponse({ type: AuthorizationResponseDto })
   public async getAuthorizationUrl(
+    @UserContext() ctx: UserCtx,
     @Param('provider') provider: string,
     @Query() query: GetAuthorizationUrlQueryDto,
   ): Promise<AuthorizationResponseDto> {
     const { user_id: userId, redirect_uri: redirectUri } = query;
     if (!userId) throw new BadRequestException('Missing query parameter: user_id');
+    if (ctx.user.id !== userId) throw new BadRequestException('OAuth user_id mismatch');
     const oauthProvider = this.providersRegistry.getOAuthProvider(provider);
     const { authUrl, state } = await oauthProvider.getAuthorizationUrl(userId, redirectUri);
     return { authorization_url: authUrl, state };
   }
 
   @Get(':provider/callback')
+  @PublicAuth()
   public async oauthCallback(
     @Param('provider') provider: string,
     @Res() res: Response,
@@ -63,6 +67,7 @@ export class ProvidersController {
   }
 
   @Get('success')
+  @PublicAuth()
   @ApiOkResponse({ type: OAuthSuccessResponseDto })
   public oauthSuccess(@Query() query: OAuthSuccessQueryDto): OAuthSuccessResponseDto {
     const { provider, user_id: userId } = query;
@@ -75,6 +80,7 @@ export class ProvidersController {
   }
 
   @Get('error')
+  @PublicAuth()
   @ApiOkResponse({ type: OAuthErrorResponseDto })
   public oauthError(@Query() query: OAuthErrorQueryDto): OAuthErrorResponseDto {
     const { message = 'OAuth authentication failed' } = query;

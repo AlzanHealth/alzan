@@ -33,6 +33,6 @@
         "checkJs": false,
         "tsBuildInfoFile": "./dist/.tsbuildinfo",
         "pretty": true,
-        "resolveJsonModule": true,
-    },
+        "resolveJsonModule": true
+    }
 }

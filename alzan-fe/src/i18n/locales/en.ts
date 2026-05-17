@@ -877,6 +877,10 @@ const en = {
     dark: 'Dark',
     light: 'Light',
     syncAppsDescription: 'Connect your favorite health and sports apps to sync your workouts automatically.',
+    healthDataConsentTitle: 'Health data consent',
+    healthDataConsentMessage:
+      'To connect this integration, Alzan needs your explicit consent to process health data such as workouts, sleep, heart rate, weight, and recovery metrics. You can revoke this later from Privacy settings.',
+    healthDataConsentSaveError: 'Could not save health data consent. Please try again.',
     fileGeneratedSuccess: 'File generated successfully',
     downloadMyData: 'Download my data',
     gdprRightsInfo:
@@ -947,6 +951,8 @@ const en = {
     connect: 'Connect',
     connected: 'Connected',
     disconnected: 'Not connected',
+    sync: 'Sync',
+    lastSync: 'Last sync {{date}}',
     delete: 'delete',
     goalPlaceholder: 'Ex. Run 10K in under 50 mins',
     openSource: 'Open Source Licenses',

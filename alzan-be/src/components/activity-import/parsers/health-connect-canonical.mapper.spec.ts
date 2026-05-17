@@ -185,7 +185,7 @@ function assertNativeZonesAreRespected(): void {
   );
 }
 
-function assertOpenWearablesShapeParses(): void {
+function assertNestedSdkShapeParses(): void {
   const canonical = parseActivityFileToCanonical(
     JSON.stringify({
       provider: 'health_connect',
@@ -208,7 +208,7 @@ function assertOpenWearablesShapeParses(): void {
         ],
       },
     }),
-    'health-connect-open-wearables.json',
+    'health-connect-nested-sdk.json',
   );
 
   assert.equal(canonical.sportType, 'running');
@@ -257,5 +257,5 @@ assertCyclingStreamsParse();
 assertSwimmingAndIndoorSportsDoNotNeedGps();
 assertWalkingAndStrengthMapping();
 assertNativeZonesAreRespected();
-assertOpenWearablesShapeParses();
+assertNestedSdkShapeParses();
 assertHealthMappersWorkWithoutPersistence();

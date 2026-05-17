@@ -62,6 +62,10 @@ export class LocalHealthSyncService {
       result.originsUpserted += 1;
     }
 
+    if (body.source_channel === 'health_connect') {
+      await this.ensureHealthConnectSelection(userId);
+    }
+
     for (const record of body.records) {
       const sourcePackage = this.resolveRecordSourcePackage(body, record);
       if (body.source_channel === 'health_connect')
@@ -93,6 +97,8 @@ export class LocalHealthSyncService {
         status: 'success',
       });
     }
+
+    await this.ensureLocalSdkConnection(userId, provider);
 
     return result;
   }
@@ -238,12 +244,44 @@ export class LocalHealthSyncService {
     if (!data?.health_data_consent) throw new ForbiddenException('HEALTH_DATA_CONSENT_REQUIRED');
   }
 
+  private async ensureLocalSdkConnection(userId: string, provider: WearableProvider): Promise<void> {
+    const now = new Date().toISOString();
+    const { error } = await this.supabaseAdminService.client.from('user_connections').upsert(
+      {
+        user_id: userId,
+        provider,
+        provider_user_id: userId,
+        provider_username: provider,
+        access_token: null,
+        refresh_token: null,
+        token_expires_at: null,
+        scope: 'read',
+        connection_kind: 'local_sdk',
+        status: 'active',
+        revoked_at: null,
+        last_error: null,
+        last_synced_at: now,
+        updated_at: now,
+      },
+      { onConflict: 'user_id,provider' },
+    );
+    if (error) throw new BadRequestException('LOCAL_HEALTH_CONNECTION_UPSERT_FAILED');
+  }
+
   private async assertSelectedHealthConnectPackage(userId: string, sourcePackage: string | null): Promise<void> {
     if (!sourcePackage) throw new BadRequestException('HEALTH_CONNECT_SOURCE_PACKAGE_REQUIRED');
     const selection = await this.providerOriginService.getHealthConnectSelection(userId);
     if (!selection?.sourcePackage) throw new BadRequestException('HEALTH_CONNECT_SOURCE_SELECTION_REQUIRED');
     if (selection.sourcePackage !== sourcePackage)
       throw new ForbiddenException('HEALTH_CONNECT_SOURCE_PACKAGE_MISMATCH');
+  }
+
+  private async ensureHealthConnectSelection(userId: string): Promise<void> {
+    const selected = await this.providerOriginService.getHealthConnectSelection(userId);
+    if (selected?.sourcePackage) return;
+    const origins = await this.providerOriginService.listOrigins(userId, 'health_connect');
+    if (origins.length !== 1) return;
+    await this.providerOriginService.selectHealthConnectOrigin(userId, origins[0].id);
   }
 
   private async upsertOrigin(userId: string, origin: ProviderOriginDto): Promise<void> {

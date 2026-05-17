@@ -16,8 +16,12 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.alzanhealth.app",
       "buildNumber": "1",
+      "entitlements": {
+        "com.apple.developer.healthkit": true
+      },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSHealthShareUsageDescription": "Permite a Alzan leer tus entrenamientos, sueño y métricas de salud para sincronizarlos con tu progreso."
       }
     },
     "android": {
@@ -60,6 +64,7 @@
         }
       ],
       "./plugins/withOptimizedR8",
+      "./plugins/withAlzanAppleHealth",
       "expo-video",
       "@maplibre/maplibre-react-native"
     ],

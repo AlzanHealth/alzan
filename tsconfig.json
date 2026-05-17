@@ -1,10 +1,4 @@
 {
-  // Root tsconfig — does NOT compile anything itself.
-  // Uses TypeScript Project References to point the language server
-  // and tooling at each package's own tsconfig.
-  //
-  // alzan-be: NestJS (CommonJS, ES2023, decorators, strict)
-  // alzan-fe: Expo/React Native (ESNext, bundler resolution, extends expo base)
   "files": [],
   "references": [
     { "path": "./alzan-be" },

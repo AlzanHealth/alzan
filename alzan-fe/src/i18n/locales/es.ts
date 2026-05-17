@@ -887,6 +887,10 @@ export default {
     light: 'Claro',
     syncAppsDescription:
       'Conecta tus aplicaciones de salud y deporte favoritas para sincronizar tus entrenamientos automáticamente.',
+    healthDataConsentTitle: 'Consentimiento de datos de salud',
+    healthDataConsentMessage:
+      'Para conectar esta integración, Alzan necesita tu consentimiento explícito para tratar datos de salud como entrenamientos, sueño, frecuencia cardiaca, peso y métricas de recuperación. Puedes retirarlo más adelante desde Privacidad.',
+    healthDataConsentSaveError: 'No se pudo guardar el consentimiento de datos de salud. Inténtalo de nuevo.',
     fileGeneratedSuccess: 'Archivo generado correctamente',
     downloadMyData: 'Descargar mis datos',
     gdprRightsInfo:
@@ -957,6 +961,8 @@ export default {
     connect: 'Conectar',
     connected: 'Conectado',
     disconnected: 'No conectado',
+    sync: 'Sincronizar',
+    lastSync: 'Última sincronización {{date}}',
     delete: 'eliminar',
     goalPlaceholder: 'Ej. Correr 10K en menos de 50 mins',
     openSource: 'Licencias de Código Abierto',
