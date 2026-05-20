@@ -891,6 +891,7 @@ export default {
     healthDataConsentMessage:
       'Para conectar esta integración, Alzan necesita tu consentimiento explícito para tratar datos de salud como entrenamientos, sueño, frecuencia cardiaca, peso y métricas de recuperación. Puedes retirarlo más adelante desde Privacidad.',
     healthDataConsentSaveError: 'No se pudo guardar el consentimiento de datos de salud. Inténtalo de nuevo.',
+    healthConnectSourceTitle: 'Elige un origen de Health Connect',
     fileGeneratedSuccess: 'Archivo generado correctamente',
     downloadMyData: 'Descargar mis datos',
     gdprRightsInfo:

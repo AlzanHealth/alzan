@@ -8,7 +8,7 @@ import {
 
 type AlzanHealthConnectNativeModule = {
   getAvailableOrigins: () => Promise<HealthConnectDataOrigin[]>;
-  requestReadPermissions: (options: { selectedPackageName: string; syncDaysBack?: number }) => Promise<boolean>;
+  requestReadPermissions: (options: { selectedPackageName?: string; syncDaysBack?: number }) => Promise<boolean>;
   readSyncBatch: (options: {
     selectedPackageName: string;
     syncDaysBack?: number;
@@ -28,11 +28,26 @@ export const syncHealthConnectNow = async (
   options: { selectedPackageName?: string | null; syncDaysBack?: number } = {},
 ) => {
   const nativeModule = getAlzanHealthConnectModule();
-  const origins = await nativeModule.getAvailableOrigins();
+  let origins = await nativeModule.getAvailableOrigins();
   if (origins.length > 0) await registerHealthConnectOrigins(origins);
 
-  const selectedPackageName = options.selectedPackageName ?? (origins.length === 1 ? origins[0]?.packageName : null);
+  let selectedPackageName = options.selectedPackageName ?? (origins.length === 1 ? origins[0]?.packageName : null);
+
   if (!selectedPackageName) {
+    const granted = await nativeModule.requestReadPermissions({
+      syncDaysBack: options.syncDaysBack,
+    });
+    if (!granted) throw new Error('Health Connect permissions were not granted.');
+
+    origins = await nativeModule.getAvailableOrigins();
+    if (origins.length > 0) await registerHealthConnectOrigins(origins);
+    selectedPackageName = origins.length === 1 ? origins[0]?.packageName : null;
+  }
+
+  if (!selectedPackageName) {
+    if (origins.length === 0) {
+      throw new Error('No Health Connect data sources found. Add data from a compatible app, then sync again.');
+    }
     throw new Error('Choose one Health Connect data source before syncing.');
   }
 

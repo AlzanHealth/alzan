@@ -171,6 +171,43 @@ export const ConnectedAppsScreen = () => {
             formatLastSync(healthConnect.lastSyncedAt)
           }
         />
+        {healthConnect.availableOrigins.length > 1 && (
+          <View style={styles.originSelector}>
+            <Text style={[styles.originSelectorTitle, { color: themeColors.textPrimary }]}>
+              {t('settings.healthConnectSourceTitle')}
+            </Text>
+            <View style={styles.originList}>
+              {healthConnect.availableOrigins.map(origin => {
+                const packageName = origin.source_package;
+                if (!packageName) return null;
+                const isSelected = packageName === healthConnect.selectedPackageName;
+                return (
+                  <TouchableOpacity
+                    key={origin.id}
+                    style={[
+                      styles.originButton,
+                      {
+                        borderColor: isSelected ? themeColors.primary : themeColors.border,
+                        backgroundColor: isSelected ? themeColors.primary : 'transparent',
+                      },
+                    ]}
+                    onPress={() => healthConnect.selectOrigin(packageName)}
+                    disabled={healthConnect.isSyncing}
+                  >
+                    <Text
+                      style={[
+                        styles.originButtonText,
+                        { color: isSelected ? themeColors.white : themeColors.textPrimary },
+                      ]}
+                    >
+                      {origin.display_name ?? packageName}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
       </ScrollView>
     </LinearGradient>
   );
@@ -273,4 +310,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   buttonTextDisconnect: {},
+  originSelector: {
+    gap: spacing.s,
+    marginTop: -spacing.s,
+    paddingHorizontal: spacing.s,
+  },
+  originSelectorTitle: {
+    ...typography.caption,
+    fontWeight: '600',
+  },
+  originList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.s,
+  },
+  originButton: {
+    borderWidth: 1,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+  },
+  originButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });

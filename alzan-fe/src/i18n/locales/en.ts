@@ -881,6 +881,7 @@ const en = {
     healthDataConsentMessage:
       'To connect this integration, Alzan needs your explicit consent to process health data such as workouts, sleep, heart rate, weight, and recovery metrics. You can revoke this later from Privacy settings.',
     healthDataConsentSaveError: 'Could not save health data consent. Please try again.',
+    healthConnectSourceTitle: 'Choose one Health Connect source',
     fileGeneratedSuccess: 'File generated successfully',
     downloadMyData: 'Download my data',
     gdprRightsInfo:

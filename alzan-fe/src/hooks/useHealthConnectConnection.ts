@@ -22,7 +22,7 @@ export function useHealthConnectConnection() {
     queryKey: [...QUERY_KEY, user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const [{ data: connection, error }, selection] = await Promise.all([
+      const [{ data: connection, error }, selection, origins] = await Promise.all([
         supabase
           .from('user_connections')
           .select('id, last_synced_at, status')
@@ -30,9 +30,10 @@ export function useHealthConnectConnection() {
           .eq('provider', HEALTH_CONNECT_PROVIDER)
           .maybeSingle(),
         wearablesLocalHealthApi.getHealthConnectSelection(),
+        wearablesLocalHealthApi.listHealthConnectOrigins(),
       ]);
       if (error) throw error;
-      return { connection, selection };
+      return { connection, selection, origins };
     },
     enabled: !!user && isAndroid,
     retry: false,
@@ -40,12 +41,12 @@ export function useHealthConnectConnection() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (selectedPackageName?: string) => {
       if (Platform.OS !== 'android') throw new Error('Health Connect is only available on Android');
       const hasConsent = await ensureHealthDataConsent();
       if (!hasConsent) return;
       await syncHealthConnectNow({
-        selectedPackageName: connectionQuery.data?.selection?.source_package,
+        selectedPackageName: selectedPackageName ?? connectionQuery.data?.selection?.source_package,
         syncDaysBack: 90,
       });
     },
@@ -53,6 +54,7 @@ export function useHealthConnectConnection() {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
     },
     onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
       Alert.alert(t('common.error'), error.message);
     },
   });
@@ -84,6 +86,13 @@ export function useHealthConnectConnection() {
     syncMutation.mutate();
   }, [syncMutation]);
 
+  const selectOrigin = useCallback(
+    (packageName: string) => {
+      syncMutation.mutate(packageName);
+    },
+    [syncMutation],
+  );
+
   const disconnect = useCallback(() => {
     Alert.alert(t('settings.disconnect'), 'Health Connect', [
       { text: t('common.cancel'), style: 'cancel' },
@@ -101,11 +110,13 @@ export function useHealthConnectConnection() {
     isConnecting: syncMutation.isPending,
     isSyncing: syncMutation.isPending,
     isDisconnecting: disconnectMutation.isPending,
+    availableOrigins: connectionQuery.data?.origins ?? [],
     selectedOriginName: connectionQuery.data?.selection?.display_name ?? null,
     selectedPackageName: connectionQuery.data?.selection?.source_package ?? null,
     lastSyncedAt: connectionQuery.data?.connection?.last_synced_at ?? null,
     connect,
     sync,
+    selectOrigin,
     disconnect,
   };
 }
