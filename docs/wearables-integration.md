@@ -10,7 +10,7 @@ Implemented in this branch:
 - Backend NestJS module at `alzan-be/src/components/wearables/`.
 - Local SDK sync endpoint for Apple Health and Health Connect batches.
 - Alzan-owned Apple Health native module `NativeModules.AlzanAppleHealth` for read-only HealthKit sync, installed through `alzan-fe/plugins/withAlzanAppleHealth.js`.
-- Alzan-owned mobile bridge contract for Health Connect; Open Wearables remains reference material only and is not a runtime dependency.
+- Alzan-owned Android Health Connect native module `NativeModules.AlzanHealthConnect` for read-only Health Connect sync, installed through `alzan-fe/plugins/withAlzanHealthConnect.js`.
 - Polar AccessLink v1 manual sync through `POST /wearables/cloud/polar/sync`.
 - Health Connect origin discovery and selected-source persistence.
 - OAuth token hardening for future provider callbacks by moving tokens from visible `user_connections` rows into private `provider_connection_tokens`.
@@ -18,9 +18,9 @@ Implemented in this branch:
 
 Not implemented here:
 
-- A final Alzan-native Android Health Connect reader that filters reads with `DataOrigin(selectedPackage)`.
 - Cloud provider pull jobs, webhooks, and delete event processors.
 - Cross-provider duplicate group tables.
+- Health Connect high-detail records beyond v1 coverage, such as route geometry, laps, speed, power, cadence, distance summaries, calories, VO2 max, SpO2, respiratory rate, temperature, and body fat.
 
 ## Database Foundation
 
@@ -151,7 +151,7 @@ The app calls Alzan-owned native modules and uploads their batches through `POST
 - `NativeModules.AlzanAppleHealth`: requests HealthKit read permissions and returns an `AppleHealthLocalSyncBatch`.
 - `NativeModules.AlzanHealthConnect`: discovers `DataOrigin.packageName`, requests Health Connect read permissions, reads only the selected package, and returns a `HealthConnectLocalSyncBatch`.
 
-The local `open-wearables/` repo remains reference material only. It is not installed, imported, or used by the app/runtime.
+Open Wearables was used as historical reference material only. It is not installed, imported, required as a local folder, or used by the app/runtime.
 
 Apple Health can only be tested through an iOS app build. Web cannot access HealthKit, and the iOS Simulator is useful mainly for compile and permission-flow checks; real Apple Watch/Fitness/Health data requires a physical iPhone with the HealthKit capability enabled for the signing team.
 
@@ -173,6 +173,8 @@ Android Health Connect:
 6. Read records filtered to that `DataOrigin`.
 7. Send batches to `POST /wearables/local-sync`.
 8. Store Health Connect change tokens through `sync_states`.
+
+Health Connect v1 currently reads `StepsRecord`, `HeartRateRecord`, `ExerciseSessionRecord`, `SleepSessionRecord`, `RestingHeartRateRecord`, `HeartRateVariabilityRmssdRecord`, and `WeightRecord`. The native module is intentionally read-only and always applies `dataOriginFilter = setOf(DataOrigin(selectedPackage))` before uploading records.
 
 iOS HealthKit:
 

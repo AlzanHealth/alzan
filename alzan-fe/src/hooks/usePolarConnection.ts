@@ -55,9 +55,7 @@ export function usePolarConnection() {
       const result = await WebBrowser.openAuthSessionAsync(data.authorization_url, redirectUri, {
         showInRecents: true,
       });
-      if (result.type !== 'success' && result.type !== 'dismiss') {
-        throw new Error('OAuth flow was cancelled or failed.');
-      }
+      if (result.type !== 'success') throw new Error('OAuth flow was cancelled or failed.');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
