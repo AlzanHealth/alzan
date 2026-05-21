@@ -3,11 +3,12 @@ const path = require('path');
 
 const { AndroidConfig, withAndroidManifest, withAppBuildGradle, withDangerousMod } = require('expo/config-plugins');
 
-const MODULE_FILES = ['AlzanHealthConnectModule.kt', 'AlzanHealthConnectPackage.kt'];
+const MODULE_FILES = ['AlzanHealthConnectModule.kt', 'AlzanHealthConnectPackage.kt', 'PermissionsRationaleActivity.kt'];
 const HEALTH_CONNECT_DEPENDENCY = 'implementation("androidx.health.connect:connect-client:1.1.0")';
 const COROUTINES_DEPENDENCY = 'implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")';
 const PACKAGE_IMPORT = 'import com.alzanhealth.app.AlzanHealthConnectPackage';
 const PACKAGE_REGISTRATION = 'add(AlzanHealthConnectPackage())';
+const HEALTH_CONNECT_PROVIDER_PACKAGE = 'com.google.android.apps.healthdata';
 
 const HEALTH_CONNECT_PERMISSIONS = [
   'android.permission.health.READ_STEPS',
@@ -59,11 +60,71 @@ function addDependency(buildGradle, dependency) {
   return buildGradle.replace('dependencies {', `dependencies {\n    ${dependency}`);
 }
 
+function ensureHealthConnectPackageQuery(manifest) {
+  const queries = manifest.queries ?? [];
+  const query = queries[0] ?? {};
+  query.package = query.package ?? [];
+
+  const hasHealthConnectPackage = query.package.some(
+    item => item?.$?.['android:name'] === HEALTH_CONNECT_PROVIDER_PACKAGE,
+  );
+  if (!hasHealthConnectPackage) {
+    query.package.push({ $: { 'android:name': HEALTH_CONNECT_PROVIDER_PACKAGE } });
+  }
+
+  if (queries.length === 0) queries.push(query);
+  manifest.queries = queries;
+}
+
+function ensureRationaleActivity(application) {
+  application.activity = application.activity ?? [];
+  const hasRationaleActivity = application.activity.some(
+    activity => activity?.$?.['android:name'] === '.PermissionsRationaleActivity',
+  );
+  if (!hasRationaleActivity) {
+    application.activity.push({
+      $: {
+        'android:name': '.PermissionsRationaleActivity',
+        'android:exported': 'true',
+      },
+      'intent-filter': [
+        {
+          action: [{ $: { 'android:name': 'androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE' } }],
+        },
+      ],
+    });
+  }
+
+  application['activity-alias'] = application['activity-alias'] ?? [];
+  const hasRationaleAlias = application['activity-alias'].some(
+    activityAlias => activityAlias?.$?.['android:name'] === 'ViewPermissionUsageActivity',
+  );
+  if (!hasRationaleAlias) {
+    application['activity-alias'].push({
+      $: {
+        'android:name': 'ViewPermissionUsageActivity',
+        'android:exported': 'true',
+        'android:targetActivity': '.PermissionsRationaleActivity',
+        'android:permission': 'android.permission.START_VIEW_PERMISSION_USAGE',
+      },
+      'intent-filter': [
+        {
+          action: [{ $: { 'android:name': 'android.intent.action.VIEW_PERMISSION_USAGE' } }],
+          category: [{ $: { 'android:name': 'android.intent.category.HEALTH_PERMISSIONS' } }],
+        },
+      ],
+    });
+  }
+}
+
 const withAlzanHealthConnect = config => {
   config = withAndroidManifest(config, modConfig => {
+    ensureHealthConnectPackageQuery(modConfig.modResults.manifest);
     for (const permission of HEALTH_CONNECT_PERMISSIONS) {
       AndroidConfig.Permissions.addPermission(modConfig.modResults, permission);
     }
+    const application = AndroidConfig.Manifest.getMainApplicationOrThrow(modConfig.modResults);
+    ensureRationaleActivity(application);
     return modConfig;
   });
 

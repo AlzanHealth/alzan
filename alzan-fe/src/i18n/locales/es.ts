@@ -891,7 +891,14 @@ export default {
     healthDataConsentMessage:
       'Para conectar esta integración, Alzan necesita tu consentimiento explícito para tratar datos de salud como entrenamientos, sueño, frecuencia cardiaca, peso y métricas de recuperación. Puedes retirarlo más adelante desde Privacidad.',
     healthDataConsentSaveError: 'No se pudo guardar el consentimiento de datos de salud. Inténtalo de nuevo.',
+    permissionPromptTitle: '¿Continuar a {{service}}?',
+    permissionPromptMessage:
+      'Alzan va a abrir los permisos o el inicio de sesión de {{service}}. Puedes cancelar aquí, o usar Atrás o Cancelar en la siguiente pantalla.',
+    continueToPermission: 'Continuar',
     healthConnectSourceTitle: 'Elige un origen de Health Connect',
+    healthConnectNoDataTitle: 'No hay datos en Health Connect',
+    healthConnectNoDataMessage:
+      'Alzan tiene permiso para leer Health Connect, pero este dispositivo aún no tiene registros de una app compatible. Añade pasos, entrenamientos, sueño o peso en Health Connect y vuelve a sincronizar.',
     fileGeneratedSuccess: 'Archivo generado correctamente',
     downloadMyData: 'Descargar mis datos',
     gdprRightsInfo:

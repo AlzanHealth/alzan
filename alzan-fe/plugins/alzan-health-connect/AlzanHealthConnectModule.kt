@@ -2,9 +2,12 @@ package com.alzanhealth.app
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.result.ActivityResultLauncher
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
@@ -19,9 +22,7 @@ import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
-import com.facebook.react.bridge.ActivityEventListener
 import com.facebook.react.bridge.Arguments
-import com.facebook.react.bridge.BaseActivityEventListener
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -29,43 +30,21 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
-import com.facebook.react.modules.core.PermissionAwareActivity
-import com.facebook.react.modules.core.PermissionListener
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
 
 class AlzanHealthConnectModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
   private var pendingPermissionPromise: Promise? = null
-
-  private val activityEventListener: ActivityEventListener =
-    object : BaseActivityEventListener() {
-      override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: android.content.Intent?) {
-        if (requestCode != PERMISSION_REQUEST_CODE) return
-        val promise = pendingPermissionPromise ?: return
-        pendingPermissionPromise = null
-        scope.launch {
-          try {
-            val granted = getClient().permissionController.getGrantedPermissions()
-            promise.resolve(granted.containsAll(readPermissions))
-          } catch (error: Exception) {
-            promise.reject("HEALTH_CONNECT_PERMISSION_CHECK_FAILED", error.message, error)
-          }
-        }
-      }
-    }
-
-  init {
-    reactContext.addActivityEventListener(activityEventListener)
-  }
+  private var pendingPermissionLauncher: ActivityResultLauncher<Set<String>>? = null
 
   override fun getName(): String = "AlzanHealthConnect"
 
@@ -101,12 +80,17 @@ class AlzanHealthConnectModule(private val reactContext: ReactApplicationContext
       try {
         val client = getClient()
         val granted = client.permissionController.getGrantedPermissions()
+        val missing = readPermissions - granted
+        logDebug(
+          "requestReadPermissions androidSdk=${android.os.Build.VERSION.SDK_INT} requested=${readPermissions.joinToString()} granted=${granted.size} missing=${missing.joinToString()}",
+        )
         if (granted.containsAll(readPermissions)) {
+          logDebug("Health Connect permissions already granted.")
           promise.resolve(true)
           return@launch
         }
 
-        val activity = getCurrentActivity()
+        val activity = reactContext.currentActivity
         if (activity == null) {
           promise.reject("HEALTH_CONNECT_ACTIVITY_REQUIRED", "Current Android activity is not available.")
           return@launch
@@ -117,13 +101,10 @@ class AlzanHealthConnectModule(private val reactContext: ReactApplicationContext
         }
 
         pendingPermissionPromise = promise
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-          requestPlatformHealthPermissions(activity)
-        } else {
-          requestHealthConnectAppPermissions(activity)
-        }
+        requestHealthConnectPermissions(activity)
       } catch (error: ActivityNotFoundException) {
         pendingPermissionPromise = null
+        Log.w(TAG, "Health Connect permission activity was not found: ${error.message}", error)
         promise.reject(
           "HEALTH_CONNECT_PERMISSION_ACTIVITY_NOT_FOUND",
           "Health Connect permission screen is not available. Install or update Health Connect, then try again.",
@@ -131,6 +112,7 @@ class AlzanHealthConnectModule(private val reactContext: ReactApplicationContext
         )
       } catch (error: Exception) {
         pendingPermissionPromise = null
+        Log.w(TAG, "Health Connect permission request failed: ${error.message}", error)
         promise.reject("HEALTH_CONNECT_PERMISSION_FAILED", error.message, error)
       }
     }
@@ -180,38 +162,63 @@ class AlzanHealthConnectModule(private val reactContext: ReactApplicationContext
     promise.resolve(null)
   }
 
-  private fun requestPlatformHealthPermissions(activity: Activity) {
-    val permissionActivity =
-      activity as? PermissionAwareActivity
+  private fun requestHealthConnectPermissions(activity: Activity) {
+    val componentActivity =
+      activity as? ComponentActivity
         ?: throw IllegalStateException("Current Android activity cannot request Health Connect permissions.")
-    permissionActivity.requestPermissions(
-      readPermissions.toTypedArray(),
-      PERMISSION_REQUEST_CODE,
-      PermissionListener { requestCode, _, grantResults ->
-        if (requestCode != PERMISSION_REQUEST_CODE) return@PermissionListener false
-        val promise = pendingPermissionPromise ?: return@PermissionListener true
-        pendingPermissionPromise = null
-        scope.launch {
-          try {
-            val granted = getClient().permissionController.getGrantedPermissions()
-            val platformGranted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-            promise.resolve(platformGranted || granted.containsAll(readPermissions))
-          } catch (error: Exception) {
-            promise.reject("HEALTH_CONNECT_PERMISSION_CHECK_FAILED", error.message, error)
-          }
+    val contract = PermissionController.createRequestPermissionResultContract()
+    try {
+      logDebug("Launching Health Connect permission contract.")
+      pendingPermissionLauncher =
+        componentActivity.activityResultRegistry.register("alzan-health-connect-permissions-${System.nanoTime()}", contract) {
+          grantedPermissions ->
+          val promise = pendingPermissionPromise
+          pendingPermissionPromise = null
+          pendingPermissionLauncher?.unregister()
+          pendingPermissionLauncher = null
+
+          if (promise == null) return@register
+          val missing = readPermissions - grantedPermissions
+          logDebug(
+            "Permission contract result granted=${grantedPermissions.size} missing=${missing.joinToString()}",
+          )
+          promise.resolve(missing.isEmpty())
         }
-        true
-      },
-    )
+      pendingPermissionLauncher?.launch(readPermissions)
+    } catch (error: ActivityNotFoundException) {
+      pendingPermissionPromise = null
+      pendingPermissionLauncher?.unregister()
+      pendingPermissionLauncher = null
+      Log.w(TAG, "Permission contract unavailable, opening Health Connect settings fallback: ${error.message}", error)
+      openHealthConnectSettings(activity)
+      throw error
+    } catch (error: SecurityException) {
+      pendingPermissionPromise = null
+      pendingPermissionLauncher?.unregister()
+      pendingPermissionLauncher = null
+      Log.w(TAG, "Health Connect permission contract was denied by Android: ${error.message}", error)
+      openHealthConnectSettings(activity)
+      throw error
+    }
   }
 
-  private fun requestHealthConnectAppPermissions(activity: Activity) {
-    val contract = PermissionController.createRequestPermissionResultContract(HEALTH_CONNECT_PROVIDER_PACKAGE)
-    activity.startActivityForResult(contract.createIntent(reactContext, readPermissions), PERMISSION_REQUEST_CODE)
+  private fun openHealthConnectSettings(activity: Activity) {
+    runCatching {
+      val settingsAction =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+          HEALTH_CONNECT_HOME_SETTINGS_ACTION
+        } else {
+          HEALTH_CONNECT_SETTINGS_ACTION
+        }
+      activity.startActivity(Intent(settingsAction))
+    }.onFailure {
+      Log.w(TAG, "Unable to open Health Connect settings fallback: ${it.message}", it)
+    }
   }
 
   private fun getClient(): HealthConnectClient {
     val status = HealthConnectClient.getSdkStatus(reactContext)
+    logDebug("Health Connect sdkStatus=$status androidSdk=${android.os.Build.VERSION.SDK_INT}")
     if (status == HealthConnectClient.SDK_UNAVAILABLE) {
       throw IllegalStateException("Health Connect is not available on this device.")
     }
@@ -219,6 +226,10 @@ class AlzanHealthConnectModule(private val reactContext: ReactApplicationContext
       throw IllegalStateException("Health Connect is installed but must be updated.")
     }
     return HealthConnectClient.getOrCreate(reactContext)
+  }
+
+  private fun logDebug(message: String) {
+    if (BuildConfig.DEBUG) Log.d(TAG, message)
   }
 
   private suspend fun <T : Record> readRecords(
@@ -523,8 +534,9 @@ class AlzanHealthConnectModule(private val reactContext: ReactApplicationContext
 
   companion object {
     private const val DEFAULT_SYNC_DAYS_BACK = 90
-    private const val PERMISSION_REQUEST_CODE = 62741
-    private const val HEALTH_CONNECT_PROVIDER_PACKAGE = "com.google.android.apps.healthdata"
+    private const val HEALTH_CONNECT_HOME_SETTINGS_ACTION = "android.health.connect.action.HEALTH_HOME_SETTINGS"
+    private const val HEALTH_CONNECT_SETTINGS_ACTION = "androidx.health.ACTION_HEALTH_CONNECT_SETTINGS"
+    private const val TAG = "AlzanHealthConnect"
     private val readPermissions =
       setOf(
         HealthPermission.getReadPermission(StepsRecord::class),

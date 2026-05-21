@@ -881,7 +881,14 @@ const en = {
     healthDataConsentMessage:
       'To connect this integration, Alzan needs your explicit consent to process health data such as workouts, sleep, heart rate, weight, and recovery metrics. You can revoke this later from Privacy settings.',
     healthDataConsentSaveError: 'Could not save health data consent. Please try again.',
+    permissionPromptTitle: 'Continue to {{service}}?',
+    permissionPromptMessage:
+      'Alzan is about to open {{service}} permissions or sign-in. You can cancel here, or use Back or Cancel on the next screen.',
+    continueToPermission: 'Continue',
     healthConnectSourceTitle: 'Choose one Health Connect source',
+    healthConnectNoDataTitle: 'No data found in Health Connect',
+    healthConnectNoDataMessage:
+      'Alzan has permission to read Health Connect, but this device has no records from a compatible app yet. Add steps, workouts, sleep, or weight in Health Connect, then try syncing again.',
     fileGeneratedSuccess: 'File generated successfully',
     downloadMyData: 'Download my data',
     gdprRightsInfo:

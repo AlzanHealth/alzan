@@ -16,6 +16,13 @@ type AlzanHealthConnectNativeModule = {
   disconnect?: () => Promise<void>;
 };
 
+export class HealthConnectNoDataSourcesError extends Error {
+  constructor() {
+    super('No Health Connect data sources found.');
+    this.name = 'HealthConnectNoDataSourcesError';
+  }
+}
+
 const getAlzanHealthConnectModule = (): AlzanHealthConnectNativeModule => {
   const nativeModule = NativeModules.AlzanHealthConnect as AlzanHealthConnectNativeModule | undefined;
   if (!nativeModule) {
@@ -24,29 +31,43 @@ const getAlzanHealthConnectModule = (): AlzanHealthConnectNativeModule => {
   return nativeModule;
 };
 
+const logHealthConnectDebug = (message: string, metadata?: Record<string, unknown>) => {
+  if (!__DEV__) return;
+  if (metadata) {
+    console.info(`[HealthConnect] ${message}`, metadata);
+    return;
+  }
+  console.info(`[HealthConnect] ${message}`);
+};
+
 export const syncHealthConnectNow = async (
   options: { selectedPackageName?: string | null; syncDaysBack?: number } = {},
 ) => {
   const nativeModule = getAlzanHealthConnectModule();
-  let origins = await nativeModule.getAvailableOrigins();
-  if (origins.length > 0) await registerHealthConnectOrigins(origins);
+  let origins: HealthConnectDataOrigin[] = [];
+  let selectedPackageName = options.selectedPackageName?.trim() || null;
 
-  let selectedPackageName = options.selectedPackageName ?? (origins.length === 1 ? origins[0]?.packageName : null);
+  logHealthConnectDebug('Starting sync', {
+    hasSelectedPackage: !!selectedPackageName,
+    syncDaysBack: options.syncDaysBack ?? null,
+  });
 
   if (!selectedPackageName) {
     const granted = await nativeModule.requestReadPermissions({
       syncDaysBack: options.syncDaysBack,
     });
+    logHealthConnectDebug('Initial permission result', { granted });
     if (!granted) throw new Error('Health Connect permissions were not granted.');
 
     origins = await nativeModule.getAvailableOrigins();
+    logHealthConnectDebug('Origins discovered after permission grant', { count: origins.length });
     if (origins.length > 0) await registerHealthConnectOrigins(origins);
     selectedPackageName = origins.length === 1 ? origins[0]?.packageName : null;
   }
 
   if (!selectedPackageName) {
     if (origins.length === 0) {
-      throw new Error('No Health Connect data sources found. Add data from a compatible app, then sync again.');
+      throw new HealthConnectNoDataSourcesError();
     }
     throw new Error('Choose one Health Connect data source before syncing.');
   }
@@ -56,11 +77,23 @@ export const syncHealthConnectNow = async (
     selectedPackageName,
     syncDaysBack: options.syncDaysBack,
   });
+  logHealthConnectDebug('Selected-origin permission result', { granted, selectedPackageName });
   if (!granted) throw new Error('Health Connect permissions were not granted.');
+
+  if (origins.length === 0) {
+    origins = await nativeModule.getAvailableOrigins();
+    logHealthConnectDebug('Origins discovered for selected package', { count: origins.length });
+    if (origins.length > 0) await registerHealthConnectOrigins(origins);
+  }
 
   const batch = await nativeModule.readSyncBatch({
     selectedPackageName,
     syncDaysBack: options.syncDaysBack,
+  });
+  logHealthConnectDebug('Read batch completed', {
+    selectedPackageName,
+    recordCount: batch.records.length,
+    originCount: batch.origins?.length ?? origins.length,
   });
   return uploadHealthConnectBatch({
     ...batch,

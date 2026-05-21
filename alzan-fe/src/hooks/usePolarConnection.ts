@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { Providers } from '../openapi/generated/alzan-be/sdk.gen';
 import { wearablesLocalHealthApi } from '../modules/wearables';
+import { useIntegrationPermissionPrompt } from './useIntegrationPermissionPrompt';
 
 const POLAR_PROVIDER = 'polar';
 const QUERY_KEY = ['polarConnection'];
@@ -15,6 +16,7 @@ export function usePolarConnection() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { confirmPermissionRequest } = useIntegrationPermissionPrompt();
 
   const connectionQuery = useQuery({
     queryKey: [...QUERY_KEY, user?.id],
@@ -46,6 +48,8 @@ export function usePolarConnection() {
   const connectMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('User not authenticated');
+      const canOpenPermissionFlow = await confirmPermissionRequest('Polar');
+      if (!canOpenPermissionFlow) return;
       const redirectUri = 'alzan://oauth/success';
       const { data } = await Providers.getAuthorizationUrl({
         path: { provider: POLAR_PROVIDER },
