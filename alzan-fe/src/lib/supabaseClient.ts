@@ -9,8 +9,18 @@ import { CONFIG } from '../constants/environment';
 
 // const AsyncStorageAdapter = { ... } (Removed unused var)
 
-const supabaseUrl = CONFIG.supabaseUrl;
-const supabaseAnonKey = CONFIG.supabaseAnonKey;
+const requireRuntimeConfig = (value: string | undefined, name: string): string => {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    throw new Error(`${name} is required.`);
+  }
+
+  return trimmed;
+};
+
+const supabaseUrl = requireRuntimeConfig(CONFIG.supabaseUrl, 'EXPO_PUBLIC_SUPABASE_URL');
+const supabaseAnonKey = requireRuntimeConfig(CONFIG.supabaseAnonKey, 'EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {

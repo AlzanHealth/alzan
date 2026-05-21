@@ -88,8 +88,8 @@ raw_payload_id uuid,
 raw_payload jsonb,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT activity_route_points_pkey PRIMARY KEY (id),
-CONSTRAINT activity_route_points_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
 CONSTRAINT activity_route_points_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
+CONSTRAINT activity_route_points_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
 CONSTRAINT activity_route_points_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.activity_session_superset_links (
@@ -795,8 +795,8 @@ used_at timestamp with time zone NOT NULL DEFAULT now(),
 event_bucket_10m timestamp with time zone NOT NULL,
 is_public_eligible boolean NOT NULL DEFAULT false,
 CONSTRAINT recipe_usage_events_pkey PRIMARY KEY (id),
-CONSTRAINT recipe_usage_events_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id),
-CONSTRAINT recipe_usage_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+CONSTRAINT recipe_usage_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT recipe_usage_events_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id)
 );
 CREATE TABLE public.recipes (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -879,9 +879,9 @@ source_package text,
 source_record_id text,
 raw_payload_id uuid,
 CONSTRAINT sleep_biomarker_samples_pkey PRIMARY KEY (id),
-CONSTRAINT sleep_biomarker_samples_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id),
 CONSTRAINT sleep_biomarker_samples_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT sleep_biomarker_samples_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id)
+CONSTRAINT sleep_biomarker_samples_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id),
+CONSTRAINT sleep_biomarker_samples_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.sleep_logs (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -981,9 +981,9 @@ source_package text,
 source_record_id text,
 raw_payload_id uuid,
 CONSTRAINT sleep_stage_intervals_pkey PRIMARY KEY (id),
-CONSTRAINT sleep_stage_intervals_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id),
 CONSTRAINT sleep_stage_intervals_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT sleep_stage_intervals_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id)
+CONSTRAINT sleep_stage_intervals_sleep_session_id_fkey FOREIGN KEY (sleep_session_id) REFERENCES public.sleep_sessions(id),
+CONSTRAINT sleep_stage_intervals_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.social_follows (
 id uuid NOT NULL DEFAULT gen_random_uuid(),

@@ -79,11 +79,11 @@ export function useHealthConnectConnection() {
   });
 
   const connect = useCallback(() => {
-    syncMutation.mutate();
+    syncMutation.mutate(undefined);
   }, [syncMutation]);
 
   const sync = useCallback(() => {
-    syncMutation.mutate();
+    syncMutation.mutate(undefined);
   }, [syncMutation]);
 
   const selectOrigin = useCallback(
