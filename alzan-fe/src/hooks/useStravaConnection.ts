@@ -6,7 +6,6 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { Providers } from '../openapi/generated/alzan-be/sdk.gen';
-import { useIntegrationPermissionPrompt } from './useIntegrationPermissionPrompt';
 
 const STRAVA_PROVIDER = 'strava';
 const QUERY_KEY = ['stravaConnection'];
@@ -15,7 +14,6 @@ export function useStravaConnection() {
   const { user, session } = useAuth();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { confirmPermissionRequest } = useIntegrationPermissionPrompt();
 
   // ── 1. Connection status ─────────────────────────────────────────────────
   const connectionQuery = useQuery({
@@ -40,8 +38,6 @@ export function useStravaConnection() {
   const connectMutation = useMutation({
     mutationFn: async () => {
       if (!user || !session?.access_token) throw new Error('User not authenticated');
-      const canOpenPermissionFlow = await confirmPermissionRequest('Strava');
-      if (!canOpenPermissionFlow) return;
 
       const redirectUri = 'alzan://oauth/success';
       const { data } = await Providers.getAuthorizationUrl({

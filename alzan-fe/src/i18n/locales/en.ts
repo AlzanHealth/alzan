@@ -881,10 +881,12 @@ const en = {
     healthDataConsentMessage:
       'To connect this integration, Alzan needs your explicit consent to process health data such as workouts, sleep, heart rate, weight, and recovery metrics. You can revoke this later from Privacy settings.',
     healthDataConsentSaveError: 'Could not save health data consent. Please try again.',
-    permissionPromptTitle: 'Continue to {{service}}?',
-    permissionPromptMessage:
-      'Alzan is about to open {{service}} permissions or sign-in. You can cancel here, or use Back or Cancel on the next screen.',
-    continueToPermission: 'Continue',
+    permissionSheetTitle: 'Connect {{service}}',
+    permissionSheetHealthDescription:
+      'You are about to open the system permission screen for {{service}}. Review the data types before allowing access. You can cancel here and stay in Alzan.',
+    permissionSheetOAuthDescription:
+      'You are about to open {{service}} sign-in. You can cancel here and stay in Alzan, or continue to authorize the connection.',
+    permissionSheetContinue: 'Continue',
     healthConnectSourceTitle: 'Choose one Health Connect source',
     healthConnectNoDataTitle: 'No data found in Health Connect',
     healthConnectNoDataMessage:

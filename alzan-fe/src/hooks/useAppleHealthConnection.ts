@@ -6,7 +6,6 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { signOutAppleHealth, syncAppleHealthNow } from '../modules/apple-health';
 import { useHealthDataConsent } from './useHealthDataConsent';
-import { useIntegrationPermissionPrompt } from './useIntegrationPermissionPrompt';
 
 const APPLE_HEALTH_PROVIDER = 'apple_health';
 const QUERY_KEY = ['appleHealthConnection'];
@@ -16,7 +15,6 @@ export function useAppleHealthConnection() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { ensureHealthDataConsent } = useHealthDataConsent();
-  const { confirmPermissionRequest } = useIntegrationPermissionPrompt();
 
   const connectionQuery = useQuery({
     queryKey: [...QUERY_KEY, user?.id],
@@ -40,8 +38,6 @@ export function useAppleHealthConnection() {
       if (Platform.OS !== 'ios') throw new Error('Apple Health is only available on iOS');
       const hasConsent = await ensureHealthDataConsent();
       if (!hasConsent) return;
-      const canRequestPermissions = await confirmPermissionRequest('Apple Health');
-      if (!canRequestPermissions) return;
       await syncAppleHealthNow({ syncDaysBack: 90 });
     },
     onSuccess: () => {

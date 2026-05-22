@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabaseClient';
 import { HealthConnectNoDataSourcesError, signOutHealthConnect, syncHealthConnectNow } from '../modules/health-connect';
 import { wearablesLocalHealthApi } from '../modules/wearables';
 import { useHealthDataConsent } from './useHealthDataConsent';
-import { useIntegrationPermissionPrompt } from './useIntegrationPermissionPrompt';
 
 const HEALTH_CONNECT_PROVIDER = 'health_connect';
 const QUERY_KEY = ['healthConnectConnection'];
@@ -17,7 +16,6 @@ export function useHealthConnectConnection() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { ensureHealthDataConsent } = useHealthDataConsent();
-  const { confirmPermissionRequest } = useIntegrationPermissionPrompt();
   const isAndroid = Platform.OS === 'android';
 
   const connectionQuery = useQuery({
@@ -47,8 +45,6 @@ export function useHealthConnectConnection() {
       if (Platform.OS !== 'android') throw new Error('Health Connect is only available on Android');
       const hasConsent = await ensureHealthDataConsent();
       if (!hasConsent) return;
-      const canRequestPermissions = await confirmPermissionRequest('Health Connect');
-      if (!canRequestPermissions) return;
       await syncHealthConnectNow({
         selectedPackageName: selectedPackageName ?? connectionQuery.data?.selection?.source_package,
         syncDaysBack: 90,

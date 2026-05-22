@@ -1,5 +1,15 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  SafeAreaView,
+} from 'react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
 import { useSettingsStyles } from '../../hooks/useSettingsStyles';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +19,12 @@ import { useAppleHealthConnection } from '../../hooks/useAppleHealthConnection';
 import { useHealthConnectConnection } from '../../hooks/useHealthConnectConnection';
 import { usePolarConnection } from '../../hooks/usePolarConnection';
 
+type PermissionFlow = {
+  serviceName: string;
+  description: string;
+  onContinue: () => void;
+};
+
 export const ConnectedAppsScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors } = useSettingsStyles();
@@ -16,8 +32,45 @@ export const ConnectedAppsScreen = () => {
   const appleHealth = useAppleHealthConnection();
   const healthConnect = useHealthConnectConnection();
   const polar = usePolarConnection();
+  const [permissionFlow, setPermissionFlow] = useState<PermissionFlow | null>(null);
   const formatLastSync = (lastSyncedAt?: string | null) =>
     lastSyncedAt ? t('settings.lastSync', { date: new Date(lastSyncedAt).toLocaleDateString() }) : null;
+
+  const openPermissionFlow = useCallback((flow: PermissionFlow) => {
+    setPermissionFlow(flow);
+  }, []);
+
+  const closePermissionFlow = useCallback(() => {
+    setPermissionFlow(null);
+  }, []);
+
+  const continuePermissionFlow = useCallback(() => {
+    const flow = permissionFlow;
+    setPermissionFlow(null);
+    flow?.onContinue();
+  }, [permissionFlow]);
+
+  const openOAuthFlow = useCallback(
+    (serviceName: string, onContinue: () => void) => {
+      openPermissionFlow({
+        serviceName,
+        description: t('settings.permissionSheetOAuthDescription', { service: serviceName }),
+        onContinue,
+      });
+    },
+    [openPermissionFlow, t],
+  );
+
+  const openHealthPermissionFlow = useCallback(
+    (serviceName: string, onContinue: () => void) => {
+      openPermissionFlow({
+        serviceName,
+        description: t('settings.permissionSheetHealthDescription', { service: serviceName }),
+        onContinue,
+      });
+    },
+    [openPermissionFlow, t],
+  );
 
   const AppCard = ({
     name,
@@ -124,7 +177,7 @@ export const ConnectedAppsScreen = () => {
           connected={strava.isConnected}
           isLoading={strava.isLoading}
           isActioning={strava.isConnecting || strava.isDisconnecting}
-          onConnect={strava.connect}
+          onConnect={() => openOAuthFlow('Strava', strava.connect)}
           onDisconnect={strava.disconnect}
         />
 
@@ -138,7 +191,7 @@ export const ConnectedAppsScreen = () => {
           isLoading={polar.isLoading}
           isActioning={polar.isConnecting || polar.isDisconnecting}
           isSyncing={polar.isSyncing}
-          onConnect={polar.connect}
+          onConnect={() => openOAuthFlow('Polar', polar.connect)}
           onDisconnect={polar.disconnect}
           onSync={polar.sync}
           detail={formatLastSync(polar.lastSyncedAt)}
@@ -150,9 +203,9 @@ export const ConnectedAppsScreen = () => {
           isLoading={appleHealth.isLoading}
           isActioning={appleHealth.isConnecting || appleHealth.isDisconnecting}
           isSyncing={appleHealth.isSyncing}
-          onConnect={appleHealth.connect}
+          onConnect={() => openHealthPermissionFlow('Apple Health', appleHealth.connect)}
           onDisconnect={appleHealth.disconnect}
-          onSync={appleHealth.sync}
+          onSync={() => openHealthPermissionFlow('Apple Health', appleHealth.sync)}
           detail={formatLastSync(appleHealth.lastSyncedAt)}
         />
 
@@ -162,9 +215,9 @@ export const ConnectedAppsScreen = () => {
           isLoading={healthConnect.isLoading}
           isActioning={healthConnect.isConnecting || healthConnect.isDisconnecting}
           isSyncing={healthConnect.isSyncing}
-          onConnect={healthConnect.connect}
+          onConnect={() => openHealthPermissionFlow('Health Connect', healthConnect.connect)}
           onDisconnect={healthConnect.disconnect}
-          onSync={healthConnect.sync}
+          onSync={() => openHealthPermissionFlow('Health Connect', healthConnect.sync)}
           detail={
             healthConnect.selectedOriginName ??
             healthConnect.selectedPackageName ??
@@ -209,6 +262,52 @@ export const ConnectedAppsScreen = () => {
           </View>
         )}
       </ScrollView>
+      <Modal
+        visible={permissionFlow !== null}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={closePermissionFlow}
+      >
+        <SafeAreaView style={[styles.permissionModal, { backgroundColor: themeColors.background }]}>
+          <View style={styles.permissionHeader}>
+            <TouchableOpacity
+              style={styles.permissionBackButton}
+              onPress={closePermissionFlow}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.cancel')}
+            >
+              <ArrowLeft size={24} color={themeColors.textPrimary} />
+              <Text style={[styles.permissionCancelText, { color: themeColors.textPrimary }]}>
+                {t('common.cancel')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.permissionContent}>
+            <View style={[styles.permissionIcon, dynamicStyles.iconContainer]}>
+              <Text style={[styles.permissionIconText, { color: themeColors.textSecondary }]}>
+                {permissionFlow?.serviceName[0] ?? 'A'}
+              </Text>
+            </View>
+            <Text style={[styles.permissionTitle, { color: themeColors.textPrimary }]}>
+              {t('settings.permissionSheetTitle', { service: permissionFlow?.serviceName })}
+            </Text>
+            <Text style={[styles.permissionBody, { color: themeColors.textSecondary }]}>
+              {permissionFlow?.description}
+            </Text>
+          </View>
+          <View style={styles.permissionFooter}>
+            <TouchableOpacity
+              style={[styles.permissionContinueButton, { backgroundColor: themeColors.primary }]}
+              onPress={continuePermissionFlow}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.permissionContinueText, { color: themeColors.white }]}>
+                {t('settings.permissionSheetContinue')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </LinearGradient>
   );
 };
@@ -333,5 +432,65 @@ const styles = StyleSheet.create({
   originButtonText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  permissionModal: {
+    flex: 1,
+  },
+  permissionHeader: {
+    minHeight: 56,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.m,
+  },
+  permissionBackButton: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingRight: spacing.m,
+  },
+  permissionCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  permissionContent: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    gap: spacing.m,
+  },
+  permissionIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.s,
+  },
+  permissionIconText: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  permissionTitle: {
+    ...typography.h2,
+  },
+  permissionBody: {
+    ...typography.body,
+    lineHeight: 24,
+  },
+  permissionFooter: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.m,
+  },
+  permissionContinueButton: {
+    minHeight: 52,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionContinueText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

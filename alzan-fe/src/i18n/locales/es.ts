@@ -891,10 +891,12 @@ export default {
     healthDataConsentMessage:
       'Para conectar esta integración, Alzan necesita tu consentimiento explícito para tratar datos de salud como entrenamientos, sueño, frecuencia cardiaca, peso y métricas de recuperación. Puedes retirarlo más adelante desde Privacidad.',
     healthDataConsentSaveError: 'No se pudo guardar el consentimiento de datos de salud. Inténtalo de nuevo.',
-    permissionPromptTitle: '¿Continuar a {{service}}?',
-    permissionPromptMessage:
-      'Alzan va a abrir los permisos o el inicio de sesión de {{service}}. Puedes cancelar aquí, o usar Atrás o Cancelar en la siguiente pantalla.',
-    continueToPermission: 'Continuar',
+    permissionSheetTitle: 'Conectar {{service}}',
+    permissionSheetHealthDescription:
+      'Vas a abrir la pantalla de permisos del sistema para {{service}}. Revisa los tipos de datos antes de permitir el acceso. Puedes cancelar aquí y seguir en Alzan.',
+    permissionSheetOAuthDescription:
+      'Vas a abrir el inicio de sesión de {{service}}. Puedes cancelar aquí y seguir en Alzan, o continuar para autorizar la conexión.',
+    permissionSheetContinue: 'Continuar',
     healthConnectSourceTitle: 'Elige un origen de Health Connect',
     healthConnectNoDataTitle: 'No hay datos en Health Connect',
     healthConnectNoDataMessage:
