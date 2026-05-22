@@ -24,6 +24,91 @@
     }
   },
   {
+    "id": "garmin-running-fit-user-redacted",
+    "provider": "garmin",
+    "sportType": "running",
+    "sportSubtype": "road",
+    "format": "fit",
+    "file": "providers/garmin/running-user-redacted.fit",
+    "sourceKind": "user_redacted",
+    "sourceUrl": "https://developer.garmin.com/fit/overview/",
+    "tolerance": 0.01,
+    "expectedSummary": {
+      "durationSeconds": 4577,
+      "elapsedSeconds": 4577,
+      "caloriesKcal": 928,
+      "distanceM": 13008.57,
+      "avgHeartRate": 168,
+      "maxHeartRate": 189,
+      "minHeartRate": 93,
+      "maxSpeedMps": 2.842,
+      "avgCadence": 83,
+      "maxCadence": 88,
+      "elevationGainM": 224,
+      "elevationLossM": 220,
+      "totalSteps": 6402
+    },
+    "expectedStreams": {
+      "positionMinCount": 1045,
+      "heartRateMinCount": 1045,
+      "speedMinCount": 1045,
+      "distanceMinCount": 1045,
+      "altitudeMinCount": 1045,
+      "cadenceMinCount": 1045
+    },
+    "expectedProviderFields": {
+      "garminFitSport": 1,
+      "garminFitSubSport": 0,
+      "garminManufacturer": 1,
+      "garminProduct": 3869
+    },
+    "expectedDevice": {
+      "name": "Garmin"
+    },
+    "expectedHeartRateZones": [
+      {
+        "zone": 1,
+        "durationSeconds": 57,
+        "percentage": 1
+      },
+      {
+        "zone": 2,
+        "durationSeconds": 74,
+        "percentage": 2
+      },
+      {
+        "zone": 3,
+        "durationSeconds": 2374,
+        "percentage": 52
+      },
+      {
+        "zone": 4,
+        "durationSeconds": 1704,
+        "percentage": 37
+      },
+      {
+        "zone": 5,
+        "durationSeconds": 368,
+        "percentage": 8
+      }
+    ],
+    "expectedLaps": {
+      "exactCount": 14,
+      "items": [
+        {
+          "lapIndex": 1,
+          "distanceM": 1000,
+          "durationSeconds": 363.42,
+          "avgHeartRate": 151,
+          "maxHeartRate": 165
+        }
+      ]
+    },
+    "expectedRoute": {
+      "positionExactCount": 1045
+    }
+  },
+  {
     "id": "garmin-cycling-json",
     "provider": "garmin",
     "sportType": "cycling",
