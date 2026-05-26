@@ -439,6 +439,12 @@ export default {
   health: {
     last: 'Últimos',
     days: 'días',
+    settingsData: 'DATOS',
+    registrationTimesAllCaps: 'HORARIOS DE REGISTRO',
+    registrationTimesHint:
+      'Estas horas se aplican cuando activas los recordatorios correspondientes desde Notificaciones.',
+    logWeight: 'Registrar peso',
+    logSleep: 'Registrar sueño',
     hydration: 'Hidratación',
     waist: 'Cintura',
     calf: 'Gemelo',
@@ -990,6 +996,7 @@ export default {
     app: 'Aplicación',
     sleepReminder: 'Recordatorio para registrar sueño',
     sleep: 'Sueño',
+    hydrationReminder: 'Recordatorio de hidratación',
     reminderDays: 'Elige los días para el recordatorio',
     weightReminder: 'Recordatorio de peso',
     inactivityReminder: 'Recordar si no entrenas en varios días',
@@ -1817,6 +1824,7 @@ export default {
     exportData: 'Exportar Datos',
     nutritionSettings: 'Ajustes de Nutrición',
     workoutSettings: 'Ajustes de Entreno',
+    healthSettings: 'Ajustes de Salud',
     legal: 'Legal',
     support: 'Soporte',
     appearance: 'Apariencia',

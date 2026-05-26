@@ -14,6 +14,7 @@ import { DataExportScreen } from '../screens/settings/DataExportScreen';
 import { DeleteAccountScreen } from '../screens/settings/DeleteAccountScreen';
 import TrainingSettingsScreen from '../screens/training/TrainingSettingsScreen';
 import { NutritionSettingsScreen } from '../screens/nutrition/NutritionSettingsScreen';
+import { HealthSettingsScreen } from '../screens/settings/HealthSettingsScreen';
 import { useTranslation } from 'react-i18next';
 
 export type SettingsStackParamList = {
@@ -30,6 +31,7 @@ export type SettingsStackParamList = {
   DeleteAccount: undefined;
   TrainingSettings: undefined;
   NutritionSettings: undefined;
+  HealthSettings: undefined;
   StatsGlobal: undefined;
 };
 
@@ -97,6 +99,11 @@ export const SettingsNavigator = () => {
         name="NutritionSettings"
         component={NutritionSettingsScreen}
         options={{ title: t('navigation.nutritionSettings') }}
+      />
+      <Stack.Screen
+        name="HealthSettings"
+        component={HealthSettingsScreen}
+        options={{ title: t('navigation.healthSettings') }}
       />
       <Stack.Screen name="DataExport" component={DataExportScreen} options={{ title: t('navigation.exportData') }} />
       <Stack.Screen

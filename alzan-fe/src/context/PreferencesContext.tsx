@@ -40,6 +40,7 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettingsJson = {
     weight_time: '09:00',
     weight_days: [],
     hydration: false,
+    hydration_time: '10:00',
     sleep: false,
     sleep_time: '09:00',
   },

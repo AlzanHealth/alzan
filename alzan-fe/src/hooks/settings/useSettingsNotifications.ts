@@ -35,6 +35,7 @@ export interface NotificationSettings extends NotificationSettingsJson {
     weight_time: string; // HH:mm format
     weight_days: number[]; // 0=Sun, 1=Mon, etc.
     hydration: boolean;
+    hydration_time: string; // HH:mm format
     sleep: boolean;
     sleep_time: string; // HH:mm format
   };
@@ -66,6 +67,7 @@ const DEFAULT_SETTINGS: NotificationSettings = {
     weight_time: '09:00',
     weight_days: [],
     hydration: false,
+    hydration_time: '10:00',
     sleep: false,
     sleep_time: '09:00',
   },
@@ -74,6 +76,15 @@ const DEFAULT_SETTINGS: NotificationSettings = {
     news: false,
     smart_reminders: false,
   },
+};
+
+const getStoredMealReminder = (defaultReminder: MealReminder, storedReminder?: Partial<MealReminder>): MealReminder => {
+  const time = storedReminder?.time;
+  return {
+    ...defaultReminder,
+    ...storedReminder,
+    time: typeof time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : defaultReminder.time,
+  };
 };
 
 export const useSettingsNotifications = () => {
@@ -102,7 +113,13 @@ export const useSettingsNotifications = () => {
         // Deep merge with defaults
         const stored = data.notification_settings;
         setSettings({
-          meals: { ...DEFAULT_SETTINGS.meals, ...stored.meals },
+          meals: {
+            breakfast: getStoredMealReminder(DEFAULT_SETTINGS.meals.breakfast, stored.meals?.breakfast),
+            almuerzo: getStoredMealReminder(DEFAULT_SETTINGS.meals.almuerzo, stored.meals?.almuerzo),
+            lunch: getStoredMealReminder(DEFAULT_SETTINGS.meals.lunch, stored.meals?.lunch),
+            merienda: getStoredMealReminder(DEFAULT_SETTINGS.meals.merienda, stored.meals?.merienda),
+            dinner: getStoredMealReminder(DEFAULT_SETTINGS.meals.dinner, stored.meals?.dinner),
+          },
           training: { ...DEFAULT_SETTINGS.training, ...stored.training },
           health: { ...DEFAULT_SETTINGS.health, ...stored.health },
           app: { ...DEFAULT_SETTINGS.app, ...stored.app },
@@ -177,7 +194,11 @@ export const useSettingsNotifications = () => {
         currentSettings.health.sleep_time,
         currentSettings.health.sleep,
       );
-      await NotificationService.scheduleHealthReminder('hydration', '10:00', currentSettings.health.hydration);
+      await NotificationService.scheduleHealthReminder(
+        'hydration',
+        currentSettings.health.hydration_time,
+        currentSettings.health.hydration,
+      );
 
       console.log('[Notifications] All notifications rescheduled successfully');
     } catch (error) {

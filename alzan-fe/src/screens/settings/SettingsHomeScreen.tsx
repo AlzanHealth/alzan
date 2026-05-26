@@ -16,6 +16,7 @@ import {
   LogOut,
   Dumbbell,
   Apple,
+  Heart,
   ChevronLeft,
   LucideIcon,
 } from 'lucide-react-native';
@@ -178,6 +179,12 @@ export const SettingsHomeScreen = () => {
                 icon={Apple}
                 label={t('tabs.nutrition')}
                 onPress={() => navigation.navigate('NutritionSettings')}
+                {...itemProps}
+              />
+              <SettingsItem
+                icon={Heart}
+                label={t('tabs.health')}
+                onPress={() => navigation.navigate('HealthSettings')}
                 {...itemProps}
                 showDivider={false}
               />

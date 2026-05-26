@@ -67,6 +67,7 @@ export interface NotificationSettingsJson {
     weight_time: string;
     weight_days: number[];
     hydration: boolean;
+    hydration_time: string;
     sleep: boolean;
     sleep_time: string;
   };

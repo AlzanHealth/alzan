@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
@@ -9,20 +9,34 @@ import { Utensils, Dumbbell, Heart, Smartphone, Clock, LucideIcon } from 'lucide
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from '@react-navigation/native';
 
 export const NotificationsSettingsScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useSettingsStyles();
-  const { settings, loading, updateMealReminder, updateTrainingSettings, updateHealthSettings, updateAppSettings } =
-    useSettingsNotifications();
+  const {
+    settings,
+    loading,
+    updateMealReminder,
+    updateTrainingSettings,
+    updateHealthSettings,
+    updateAppSettings,
+    refetch,
+  } = useSettingsNotifications();
 
   // Time Picker State
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [pickerMode, setPickerMode] = useState<'training' | 'weight' | 'sleep' | null>(null);
+  const [pickerMode, setPickerMode] = useState<'training' | null>(null);
   const [tempDate, setTempDate] = useState(new Date());
 
-  const handleOpenTimePicker = (mode: 'training' | 'weight' | 'sleep', timeStr: string) => {
-    setPickerMode(mode);
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
+
+  const handleOpenTimePicker = (timeStr: string) => {
+    setPickerMode('training');
     const [hours, minutes] = timeStr.split(':').map(Number);
     const now = new Date();
     now.setHours(hours || 0, minutes || 0, 0, 0);
@@ -41,13 +55,7 @@ export const NotificationsSettingsScreen = () => {
       const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
       const newTime = `${hours}:${minutes}`;
 
-      if (pickerMode === 'training') {
-        updateTrainingSettings({ scheduled_reminder_time: newTime });
-      } else if (pickerMode === 'weight') {
-        updateHealthSettings({ weight_time: newTime });
-      } else if (pickerMode === 'sleep') {
-        updateHealthSettings({ sleep_time: newTime });
-      }
+      updateTrainingSettings({ scheduled_reminder_time: newTime });
     }
   };
 
@@ -83,6 +91,11 @@ export const NotificationsSettingsScreen = () => {
         <Text style={[styles.toggleLabel, { color: themeColors.textPrimary }]}>{label}</Text>
         {description && (
           <Text style={[styles.toggleDescription, { color: themeColors.textSecondary }]}>{description}</Text>
+        )}
+        {value && time && !onTimePress && (
+          <Text style={[styles.readOnlyTime, { color: themeColors.textSecondary }]}>
+            {t('settings.atTime')} {time}
+          </Text>
         )}
       </View>
       <View style={styles.rightContainer}>
@@ -171,8 +184,7 @@ export const NotificationsSettingsScreen = () => {
         <Text style={[styles.toggleLabel, { color: themeColors.textPrimary }]}>{label}</Text>
         {enabled && (
           <Text style={[styles.mealTimeReadOnly, { color: themeColors.textSecondary }]}>
-            {t('settings.atTime')}
-            {time}
+            {t('settings.atTime')} {time}
           </Text>
         )}
       </View>
@@ -243,7 +255,7 @@ export const NotificationsSettingsScreen = () => {
                 value={settings.training.scheduled_reminder}
                 onToggle={val => updateTrainingSettings({ scheduled_reminder: val })}
                 time={settings.training.scheduled_reminder_time}
-                onTimePress={() => handleOpenTimePicker('training', settings.training.scheduled_reminder_time)}
+                onTimePress={() => handleOpenTimePicker(settings.training.scheduled_reminder_time)}
               />
               <View style={[styles.divider, dynamicStyles.divider]} />
               <ToggleRow
@@ -271,11 +283,9 @@ export const NotificationsSettingsScreen = () => {
                   updateHealthSettings({
                     weight_reminder: val ? 'weekly' : null,
                     weight_days: val ? [0, 1, 2, 3, 4, 5, 6] : [], // Default to All Days
-                    weight_time: val && !settings.health.weight_time ? '09:00' : settings.health.weight_time || '09:00',
                   })
                 }
                 time={settings.health.weight_time}
-                onTimePress={() => handleOpenTimePicker('weight', settings.health.weight_time)}
               />
               {settings.health.weight_reminder !== null && (
                 <DaySelector
@@ -303,7 +313,14 @@ export const NotificationsSettingsScreen = () => {
                 value={settings.health.sleep}
                 onToggle={val => updateHealthSettings({ sleep: val })}
                 time={settings.health.sleep_time}
-                onTimePress={() => handleOpenTimePicker('sleep', settings.health.sleep_time)}
+              />
+              <View style={[styles.divider, dynamicStyles.divider]} />
+              <ToggleRow
+                label={t('health.hydration')}
+                description={t('settings.hydrationReminder')}
+                value={settings.health.hydration}
+                onToggle={val => updateHealthSettings({ hydration: val })}
+                time={settings.health.hydration_time}
               />
             </View>
           </View>
@@ -426,6 +443,10 @@ const styles = StyleSheet.create({
   toggleDescription: {
     fontSize: 13,
     marginTop: 2,
+  },
+  readOnlyTime: {
+    fontSize: 13,
+    marginTop: 4,
   },
   mealRow: {
     flexDirection: 'row',

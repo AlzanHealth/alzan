@@ -188,6 +188,7 @@ export type SettingsStackParamList = {
   DeleteAccount: undefined;
   TrainingSettings: undefined;
   NutritionSettings: undefined;
+  HealthSettings: undefined;
   StatsGlobal: undefined;
 };
 
