@@ -1752,9 +1752,8 @@ export const MealLogFormScreen = () => {
         ingredients: ingredientsPayload,
       });
 
-      // Navigate back to NutritionHome passing the date to persist it
-      // We use 'navigate' instead of 'goBack' to ensure we can pass params
-      navigation.navigate('NutritionHome', { returnDate: date });
+      // Return to NutritionHome preserving the selected day context there
+      navigation.goBack();
     } catch (error) {
       console.error(error);
       Alert.alert(t('common.error'), t('nutrition.saveMealError'));

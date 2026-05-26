@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Settings } from 'lucide-react-native';
@@ -17,7 +17,7 @@ import { usePreferences } from '../../hooks/settings/usePreferences';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { DaySwitcher, DaySwitcherRef } from '../../components/common/DaySwitcher';
-import { NutritionScreenNavigationProp, NutritionStackParamList, TabParamList } from '../../types/navigation.types';
+import { NutritionScreenNavigationProp, TabParamList } from '../../types/navigation.types';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
@@ -57,28 +57,28 @@ export const NutritionHomeScreen = () => {
   const daySwitcherRef = React.useRef<DaySwitcherRef>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
 
-  const route = useRoute<RouteProp<NutritionStackParamList, 'NutritionHome'>>();
+  const resetToToday = React.useCallback(() => {
+    const today = new Date();
+    setSelectedDate(today);
 
-  // 1. Handle "Return Date" from parameters (e.g. after saving a meal)
+    requestAnimationFrame(() => {
+      daySwitcherRef.current?.scrollToCurrentWeek();
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }, []);
+
+  // Keep visible week aligned with the selected day whenever this screen gains focus
   useFocusEffect(
     React.useCallback(() => {
-      if (route.params?.returnDate) {
-        console.log('[NutritionHome] Using return date:', route.params.returnDate);
-        const returnDateObj = new Date(route.params.returnDate);
-        setSelectedDate(returnDateObj);
+      const timeoutId = setTimeout(() => {
+        daySwitcherRef.current?.scrollToDate(selectedDate);
+      }, 50);
 
-        // Scroll to ensure visibility
-        setTimeout(() => {
-          daySwitcherRef.current?.scrollToDate(returnDateObj);
-        }, 100);
-
-        // Clear params immediately to avoid re-using it on tab switch
-        navigation.setParams({ returnDate: undefined });
-      }
-    }, [route.params?.returnDate]),
+      return () => clearTimeout(timeoutId);
+    }, [selectedDate]),
   );
 
-  // 2. Listen for tabPress to reset to Today (User Requirement)
+  // Listen for tabPress to reset to Today (User Requirement)
   React.useEffect(() => {
     // We need to capture the tabPress event from the Tab Navigator.
     // The 'Nutrition' tab renders the 'NutritionNavigator' (Stack).
@@ -87,24 +87,13 @@ export const NutritionHomeScreen = () => {
     const parent = navigation.getParent<BottomTabNavigationProp<TabParamList>>();
     if (parent) {
       const unsubscribe = parent.addListener('tabPress', _e => {
-        // This event fires when the Nutrition tab is pressed.
-        // Even if we are already on this screen, we want to reset to today.
         console.log('[NutritionHome] Tab pressed, resetting to today (Today pressed)');
-
-        const today = new Date();
-        setSelectedDate(today);
-
-        // Scroll to current week/day
-        // Small timeout to allow any nav transitions or state updates to settle
-        requestAnimationFrame(() => {
-          daySwitcherRef.current?.scrollToCurrentWeek();
-          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-        });
+        resetToToday();
       });
 
       return unsubscribe;
     }
-  }, [navigation]);
+  }, [navigation, resetToToday]);
 
   // Data Hooks
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');

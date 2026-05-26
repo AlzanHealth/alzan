@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useMemo, forwardRef, useImperativeHandle, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, useWindowDimensions } from 'react-native';
 import { format, addDays, isSameDay, startOfWeek, startOfDay, addWeeks } from 'date-fns';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
@@ -55,6 +55,7 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
     }, [weeks]);
 
     const flatListRef = useRef<FlatList>(null);
+    const [visibleWeekIndex, setVisibleWeekIndex] = useState(initialIndex);
 
     const scrollToCurrentWeek = () => {
       const idx = getIndexForDate(new Date());
@@ -74,6 +75,12 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
       scrollToCurrentWeek,
       scrollToDate,
     }));
+
+    useEffect(() => {
+      const targetIndex = getIndexForDate(selectedDate);
+      if (targetIndex < 0 || targetIndex === visibleWeekIndex) return;
+      flatListRef.current?.scrollToIndex({ index: targetIndex, animated: true });
+    }, [selectedDate, visibleWeekIndex]);
 
     // NOTE: Initial scroll is handled by `initialScrollIndex` prop of FlatList usually,
     // but getItemLayout is required for it to work reliably.
@@ -134,6 +141,12 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
             setTimeout(() => {
               flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
             }, 500);
+          }}
+          onMomentumScrollEnd={event => {
+            const nextIndex = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+            if (nextIndex >= 0 && nextIndex < weeks.length) {
+              setVisibleWeekIndex(nextIndex);
+            }
           }}
           // Remove extra padding in content container since we handle it in item
           contentContainerStyle={{ paddingHorizontal: 0 }}

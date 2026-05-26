@@ -138,9 +138,7 @@ export type TrainingStackParamList = {
 // ============================================================================
 
 export type NutritionStackParamList = {
-  NutritionHome: {
-    returnDate?: string; // Optional date to return to after adding a meal
-  };
+  NutritionHome: undefined;
   NutritionSettings: undefined;
   MealLogForm: {
     date: string;
