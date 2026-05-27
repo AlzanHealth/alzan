@@ -728,6 +728,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
               style={[
                 styles.phaseIndicator,
                 {
+                  borderRadius: 6,
                   backgroundColor: item.is_group ? themeColors.primary : getPhaseColor(item.phase_type),
                 },
               ]}
@@ -751,7 +752,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         {item.is_group ? (
           <View style={styles.groupContainer}>
             <TouchableOpacity
-              style={styles.repetitionsSelector}
+              style={[styles.repetitionsSelector, { backgroundColor: themeColors.primary + '18' }]}
               onPress={() => {
                 setEditingGroupId(item.id);
                 setRepsModalVisible(true);
@@ -769,7 +770,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   <GlassCard style={[styles.stepCard, styles.childStepInnerCard, dynamicStyles.glassCard]}>
                     <View style={styles.stepHeader}>
                       <View style={styles.stepInfoProps}>
-                        <View style={[styles.phaseIndicator, { backgroundColor: getPhaseColor(child.phase_type) }]} />
+                        <View
+                          style={[
+                            styles.phaseIndicator,
+                            { borderRadius: 6, backgroundColor: getPhaseColor(child.phase_type) },
+                          ]}
+                        />
                         <Text style={[styles.stepTitle, dynamicStyles.label]}>
                           {t(getPhaseLabel(child.phase_type))}
                         </Text>
@@ -941,7 +947,18 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     // Running, cycling and swimming start on main form. Others don't have workout builder.
                   }}
                 >
-                  <View style={[styles.sportIcon, { backgroundColor: SPORT_COLORS[sport.id] || colors.primary }]}>
+                  <View
+                    style={[
+                      styles.sportIcon,
+                      {
+                        backgroundColor: SPORT_COLORS[sport.id] || themeColors.primary,
+                        shadowColor: SPORT_COLORS[sport.id] || themeColors.primary,
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        shadowOffset: { width: 0, height: 4 },
+                      },
+                    ]}
+                  >
                     <SportIcon sport={sport.id} size={32} color="#FFF" />
                   </View>
                   <Text style={[styles.sportName, dynamicStyles.label]}>{sport.label}</Text>
@@ -954,12 +971,32 @@ export const EnduranceWorkoutBuilderScreen = () => {
           <ScrollView contentContainerStyle={styles.mainFormContainer} showsVerticalScrollIndicator={false}>
             {/* Header Avatar and Info */}
             <View style={styles.profileHeader}>
-              <View style={[styles.profileAvatar, { backgroundColor: SPORT_COLORS[sportType] + '15' }]}>
-                <SportIcon sport={sportType} size={48} color={SPORT_COLORS[sportType] || colors.primary} />
+              <View
+                style={[
+                  styles.profileAvatar,
+                  {
+                    backgroundColor: SPORT_COLORS[sportType] + '15',
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    shadowColor: SPORT_COLORS[sportType],
+                    shadowOpacity: 0.2,
+                    shadowRadius: 10,
+                    shadowOffset: { width: 0, height: 4 },
+                  },
+                ]}
+              >
+                <SportIcon sport={sportType} size={42} color={SPORT_COLORS[sportType] || themeColors.primary} />
               </View>
               <View style={styles.profileTextContainer}>
-                <Text style={[styles.profileTitle, { color: themeColors.textPrimary }]}>{getSportTitle()}</Text>
-                <Text style={[styles.profileSubtitle, { color: themeColors.textSecondary }]}>
+                <Text
+                  style={[styles.profileTitle, { color: themeColors.textPrimary, fontSize: 24, fontWeight: '800' }]}
+                >
+                  {getSportTitle()}
+                </Text>
+                <Text
+                  style={[styles.profileSubtitle, { color: themeColors.textSecondary, fontSize: 14, opacity: 0.8 }]}
+                >
                   {t('training.configureGeneralDetails')}
                 </Text>
               </View>
@@ -1040,8 +1077,18 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           key={typeOption.key}
                           style={[
                             styles.chipButton,
-                            isSelected && { backgroundColor: themeColors.primary, borderColor: themeColors.primary },
-                            { borderColor: themeColors.border },
+                            isSelected && {
+                              backgroundColor: themeColors.primary,
+                              borderColor: themeColors.primary,
+                              shadowColor: themeColors.primary,
+                              shadowOpacity: 0.3,
+                              shadowRadius: 8,
+                              shadowOffset: { width: 0, height: 4 },
+                            },
+                            !isSelected && {
+                              borderColor: themeColors.border,
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                            },
                           ]}
                           onPress={() => setEnvironmentType(typeOption.key)}
                         >
@@ -1077,7 +1124,18 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
                 {/* Edit/Design Button */}
                 <TouchableOpacity
-                  style={[styles.designButton, { backgroundColor: themeColors.primary }]}
+                  style={[
+                    styles.designButton,
+                    {
+                      backgroundColor: themeColors.primary,
+                      borderRadius: 20,
+                      paddingVertical: 14,
+                      shadowColor: themeColors.primary,
+                      shadowOpacity: 0.3,
+                      shadowRadius: 10,
+                      shadowOffset: { width: 0, height: 4 },
+                    },
+                  ]}
                   onPress={() => setCurrentView('builder')}
                 >
                   <Zap size={16} color="#FFF" style={{ marginRight: 6 }} />
@@ -1090,11 +1148,27 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 {steps.length > 0 && (
                   <View style={styles.stepsSummaryGrid}>
                     <View style={styles.summaryGridCol}>
-                      <Clock size={16} color="#34C759" style={{ marginBottom: 4 }} />
-                      <Text style={[styles.gridLabel, { color: themeColors.textSecondary }]}>
-                        {t('training.warmup')}
+                      <View
+                        style={{
+                          backgroundColor: 'rgba(52, 199, 89, 0.1)',
+                          padding: 6,
+                          borderRadius: 16,
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Clock size={16} color="#34C759" />
+                      </View>
+                      <Text
+                        style={[
+                          styles.gridLabel,
+                          { color: themeColors.textSecondary, fontSize: 11, letterSpacing: 0.8, fontWeight: '600' },
+                        ]}
+                      >
+                        {t('training.warmup').toUpperCase()}
                       </Text>
-                      <Text style={[styles.gridValue, { color: themeColors.textPrimary }]}>
+                      <Text
+                        style={[styles.gridValue, { color: themeColors.textPrimary, fontSize: 15, fontWeight: '800' }]}
+                      >
                         {summaryBlocks.warmupStr}
                       </Text>
                     </View>
@@ -1105,21 +1179,53 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         { borderLeftWidth: 1, borderRightWidth: 1, borderColor: themeColors.border },
                       ]}
                     >
-                      <Activity size={16} color="#FF9500" style={{ marginBottom: 4 }} />
-                      <Text style={[styles.gridLabel, { color: themeColors.textSecondary }]}>
-                        {t('training.block')}
+                      <View
+                        style={{
+                          backgroundColor: 'rgba(255, 149, 0, 0.1)',
+                          padding: 6,
+                          borderRadius: 16,
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Activity size={16} color="#FF9500" />
+                      </View>
+                      <Text
+                        style={[
+                          styles.gridLabel,
+                          { color: themeColors.textSecondary, fontSize: 11, letterSpacing: 0.8, fontWeight: '600' },
+                        ]}
+                      >
+                        {t('training.block').toUpperCase()}
                       </Text>
-                      <Text style={[styles.gridValue, { color: themeColors.textPrimary }]}>
+                      <Text
+                        style={[styles.gridValue, { color: themeColors.textPrimary, fontSize: 15, fontWeight: '800' }]}
+                      >
                         {summaryBlocks.workStr}
                       </Text>
                     </View>
 
                     <View style={styles.summaryGridCol}>
-                      <Repeat size={16} color="#007AFF" style={{ marginBottom: 4 }} />
-                      <Text style={[styles.gridLabel, { color: themeColors.textSecondary }]}>
-                        {t('training.recovery')}
+                      <View
+                        style={{
+                          backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                          padding: 6,
+                          borderRadius: 16,
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Repeat size={16} color={themeColors.primary} />
+                      </View>
+                      <Text
+                        style={[
+                          styles.gridLabel,
+                          { color: themeColors.textSecondary, fontSize: 11, letterSpacing: 0.8, fontWeight: '600' },
+                        ]}
+                      >
+                        {t('training.recovery').toUpperCase()}
                       </Text>
-                      <Text style={[styles.gridValue, { color: themeColors.textPrimary }]}>
+                      <Text
+                        style={[styles.gridValue, { color: themeColors.textPrimary, fontSize: 15, fontWeight: '800' }]}
+                      >
                         {summaryBlocks.cooldownStr}
                       </Text>
                     </View>
@@ -1210,7 +1316,16 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
             {/* Save Button */}
             <TouchableOpacity
-              style={[styles.saveTemplateBtn, { backgroundColor: themeColors.primary }]}
+              style={[
+                styles.saveTemplateBtn,
+                {
+                  backgroundColor: themeColors.primary,
+                  shadowColor: themeColors.primary,
+                  shadowOpacity: 0.3,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 4 },
+                },
+              ]}
               onPress={handleSave}
             >
               <Text style={styles.saveTemplateBtnText}>{t('training.saveTemplate')}</Text>
@@ -1228,11 +1343,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             >
               {steps.length === 0 ? (
                 <View style={[styles.emptyState, dynamicStyles.emptyState]}>
-                  <Activity
-                    size={48}
-                    color={themeColors.textSecondary}
-                    style={{ opacity: 0.5, marginBottom: spacing.m }}
-                  />
+                  <Activity size={48} color={themeColors.textSecondary} style={{ opacity: 0.5, marginBottom: 16 }} />
                   <Text style={[styles.emptyTitle, dynamicStyles.title]}>{t('training.startRoutine')}</Text>
                   <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
                     {t('training.addIntervalsHint')}{' '}
@@ -1249,13 +1360,25 @@ export const EnduranceWorkoutBuilderScreen = () => {
               )}
 
               <View style={styles.actions}>
-                <TouchableOpacity style={styles.addStepButton} onPress={() => handleAddStepPress(null)}>
+                <TouchableOpacity
+                  style={[
+                    styles.addStepButton,
+                    {
+                      backgroundColor: themeColors.primary,
+                      shadowColor: themeColors.primary,
+                      shadowOpacity: 0.3,
+                      shadowRadius: 10,
+                      shadowOffset: { width: 0, height: 4 },
+                    },
+                  ]}
+                  onPress={() => handleAddStepPress(null)}
+                >
                   <Plus size={20} color="#FFF" />
                   <Text style={styles.addStepButtonText}>{t('training.addStep')}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.addRepButton} onPress={handleAddGroup}>
-                  <Repeat size={20} color={colors.primary} />
+                <TouchableOpacity style={[styles.addRepButton, dynamicStyles.secondaryButton]} onPress={handleAddGroup}>
+                  <Repeat size={20} color={themeColors.primary} />
                 </TouchableOpacity>
               </View>
 
@@ -1305,6 +1428,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
               style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
               onPress={e => e.stopPropagation()}
             >
+              <View style={styles.modalHandle} />
               <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.mainGoal')}</Text>
 
               <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
@@ -1405,6 +1529,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
               style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
               onPress={e => e.stopPropagation()}
             >
+              <View style={styles.modalHandle} />
               <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.surfaceLabel')}</Text>
 
               <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
@@ -1523,7 +1648,6 @@ const styles = StyleSheet.create({
   stepCard: {
     marginBottom: spacing.m,
     padding: spacing.m,
-    backgroundColor: '#FFFFFF',
   },
   childStepCard: {
     marginLeft: spacing.l,
@@ -1573,8 +1697,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginBottom: 8,
   },
-  groupLabel: { ...typography.caption, fontWeight: 'bold', color: colors.primary },
-  groupChildren: { borderLeftWidth: 2, borderLeftColor: '#E0E0E0', paddingLeft: 0 },
+  groupLabel: { ...typography.caption, fontWeight: 'bold' },
+  groupChildren: { borderLeftWidth: 2, paddingLeft: 0 },
   addToGroupBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1645,14 +1769,12 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: '800',
     letterSpacing: -0.5,
   },
   summaryDivider: {
     width: 1,
     height: 30,
-    backgroundColor: 'rgba(0,0,0,0.1)',
     marginHorizontal: spacing.s,
   },
   sportSelectionContainer: {
@@ -1678,7 +1800,6 @@ const styles = StyleSheet.create({
     marginVertical: spacing.s,
     alignItems: 'center',
     padding: spacing.m,
-    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.l,
     borderWidth: 1,
     borderColor: colors.border,
@@ -1796,12 +1917,11 @@ const styles = StyleSheet.create({
     gap: spacing.s,
   },
   chipButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     borderWidth: 1,
-    borderRadius: borderRadius.m,
+    borderRadius: borderRadius.full,
     alignItems: 'center',
-    backgroundColor: 'rgba(150,150,150,0.05)',
   },
   chipText: {
     fontSize: 14,
@@ -1847,7 +1967,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   saveTemplateBtn: {
-    paddingVertical: spacing.m,
+    paddingVertical: 16,
     borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1887,7 +2007,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.m,
     borderWidth: 1,
     borderColor: 'transparent',
-    backgroundColor: 'rgba(150,150,150,0.05)',
     marginBottom: spacing.s,
   },
   goalOptionTitle: {
@@ -1933,6 +2052,7 @@ const styles = StyleSheet.create({
   confirmActionBtnText: {
     color: '#FFF',
     fontWeight: '600',
+    letterSpacing: 0.5,
   },
   surfaceOptionRow: {
     paddingVertical: spacing.m,
@@ -1940,11 +2060,18 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.m,
     borderWidth: 1,
     borderColor: 'transparent',
-    backgroundColor: 'rgba(150,150,150,0.05)',
     marginBottom: spacing.s,
   },
   surfaceOptionText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(150,150,150,0.3)',
+    alignSelf: 'center',
+    marginBottom: 16,
   },
 });
