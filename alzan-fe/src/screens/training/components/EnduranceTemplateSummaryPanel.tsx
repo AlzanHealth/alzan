@@ -27,6 +27,7 @@ interface EnduranceTemplateSummaryPanelProps {
   phaseSummary?: PhaseSummary;
   hasSteps: boolean;
   canDesignWorkout: boolean;
+  compact?: boolean;
   onDesignWorkout?: () => void;
 }
 
@@ -60,6 +61,7 @@ export const EnduranceTemplateSummaryPanel = React.memo(
     phaseSummary,
     hasSteps,
     canDesignWorkout,
+    compact = false,
     onDesignWorkout,
   }: EnduranceTemplateSummaryPanelProps) => {
     const { t } = useTranslation();
@@ -67,10 +69,10 @@ export const EnduranceTemplateSummaryPanel = React.memo(
     const metadata = [goalLabel, environmentLabel, surfaceLabel].filter((value): value is string => !!value);
 
     return (
-      <GlassCard style={[styles.card, { borderColor: colors.border }]}>
-        <View style={styles.header}>
-          <View style={[styles.sportIcon, { backgroundColor: `${sportColor}18` }]}>
-            <SportIcon sport={sportType} size={27} color={sportColor} />
+      <GlassCard style={[styles.card, compact && styles.cardCompact, { borderColor: colors.border }]}>
+        <View style={[styles.header, compact && styles.headerCompact]}>
+          <View style={[styles.sportIcon, compact && styles.sportIconCompact, { backgroundColor: `${sportColor}18` }]}>
+            <SportIcon sport={sportType} size={compact ? 22 : 27} color={sportColor} />
           </View>
           <View style={styles.heading}>
             <Text style={[styles.overline, { color: colors.textSecondary }]}>{t('training.sessionSummary')}</Text>
@@ -83,16 +85,20 @@ export const EnduranceTemplateSummaryPanel = React.memo(
           </View>
         </View>
 
-        <View style={styles.metrics}>
-          <View style={[styles.metric, { backgroundColor: `${colors.primary}0D` }]}>
-            <Clock size={18} color={colors.primary} />
-            <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{durationLabel}</Text>
+        <View style={[styles.metrics, compact && styles.metricsCompact]}>
+          <View style={[styles.metric, compact && styles.metricCompact, { backgroundColor: `${colors.primary}0D` }]}>
+            <Clock size={compact ? 16 : 18} color={colors.primary} />
+            <Text style={[styles.metricValue, compact && styles.metricValueCompact, { color: colors.textPrimary }]}>
+              {durationLabel}
+            </Text>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>{t('training.totalTime')}</Text>
           </View>
           {distanceLabel && (
-            <View style={[styles.metric, { backgroundColor: `${sportColor}12` }]}>
-              <Ruler size={18} color={sportColor} />
-              <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{distanceLabel}</Text>
+            <View style={[styles.metric, compact && styles.metricCompact, { backgroundColor: `${sportColor}12` }]}>
+              <Ruler size={compact ? 16 : 18} color={sportColor} />
+              <Text style={[styles.metricValue, compact && styles.metricValueCompact, { color: colors.textPrimary }]}>
+                {distanceLabel}
+              </Text>
               <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
                 {t('training.distanceParenAllCaps')}
               </Text>
@@ -101,7 +107,7 @@ export const EnduranceTemplateSummaryPanel = React.memo(
         </View>
 
         {phaseSummary && hasSteps && (
-          <View style={[styles.phases, { borderTopColor: colors.border }]}>
+          <View style={[styles.phases, compact && styles.phasesCompact, { borderTopColor: colors.border }]}>
             <PhaseRow
               color={colors.success}
               label={t('training.warmup')}
@@ -137,7 +143,7 @@ export const EnduranceTemplateSummaryPanel = React.memo(
             accessibilityRole="button"
             accessibilityLabel={hasSteps ? t('training.editWorkout') : t('training.designWorkout')}
             activeOpacity={0.86}
-            style={[styles.designButton, { backgroundColor: colors.primary }]}
+            style={[styles.designButton, compact && styles.designButtonCompact, { backgroundColor: colors.primary }]}
             onPress={onDesignWorkout}
           >
             <Zap size={17} color="#FFFFFF" />
@@ -159,10 +165,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: borderRadius.l,
   },
+  cardCompact: {
+    padding: spacing.s,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.m,
+  },
+  headerCompact: {
+    marginBottom: spacing.s,
   },
   sportIcon: {
     width: 54,
@@ -171,6 +183,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.m,
+  },
+  sportIconCompact: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    marginRight: spacing.s,
   },
   heading: {
     flex: 1,
@@ -196,6 +214,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.s,
   },
+  metricsCompact: {
+    gap: 6,
+  },
   metric: {
     flex: 1,
     minHeight: 92,
@@ -203,12 +224,21 @@ const styles = StyleSheet.create({
     padding: spacing.s,
     justifyContent: 'space-between',
   },
+  metricCompact: {
+    minHeight: 75,
+    padding: 7,
+  },
   metricValue: {
     fontSize: 20,
     lineHeight: 24,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     marginTop: spacing.s,
+  },
+  metricValueCompact: {
+    fontSize: 17,
+    lineHeight: 20,
+    marginTop: 5,
   },
   metricLabel: {
     fontSize: 10,
@@ -220,6 +250,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.m,
     paddingTop: spacing.s,
     gap: 2,
+  },
+  phasesCompact: {
+    marginTop: spacing.s,
+    paddingTop: 4,
   },
   phaseRow: {
     flexDirection: 'row',
@@ -255,6 +289,10 @@ const styles = StyleSheet.create({
     gap: spacing.s,
     borderRadius: borderRadius.full,
     marginTop: spacing.m,
+  },
+  designButtonCompact: {
+    minHeight: 44,
+    marginTop: spacing.s,
   },
   designButtonText: {
     ...typography.button,

@@ -906,7 +906,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const summaryBlocks = getSummaryBlocks();
   const structuredSport = sportType ? ['running', 'cycling', 'swimming'].includes(sportType) : false;
 
-  const renderTemplateSummary = (selectedSport: SportType, showEditorAction = true) => {
+  const renderTemplateSummary = (selectedSport: SportType, showEditorAction = true, compact = false) => {
     const formattedDistance = convertDistanceToUi(totalDistance, 2);
     const scheduledDayNames = scheduledDays.map(day => getWeekdayName(day)).join(', ');
 
@@ -934,6 +934,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         }
         hasSteps={steps.length > 0}
         canDesignWorkout={structuredSport && showEditorAction}
+        compact={compact}
         onDesignWorkout={structuredSport && showEditorAction ? () => setCurrentView('builder') : undefined}
       />
     );
@@ -1313,13 +1314,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
             </ScrollView>
 
             {isWideLayout && (
-              <ScrollView
-                style={styles.summarySidePanel}
-                contentContainerStyle={[styles.summarySidePanelContent, { paddingBottom: mainContentBottomPadding }]}
-                showsVerticalScrollIndicator={false}
-              >
-                {renderTemplateSummary(sportType)}
-              </ScrollView>
+              <View style={styles.summarySideColumn}>
+                <ScrollView
+                  style={styles.summarySidePanel}
+                  contentContainerStyle={[styles.summarySidePanelContent, { paddingBottom: mainContentBottomPadding }]}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {renderTemplateSummary(sportType, true, true)}
+                </ScrollView>
+              </View>
             )}
           </View>
         ) : (
@@ -1380,13 +1383,18 @@ export const EnduranceWorkoutBuilderScreen = () => {
             </ScrollView>
 
             {isWideLayout ? (
-              <ScrollView
-                style={styles.summarySidePanel}
-                contentContainerStyle={[styles.summarySidePanelContent, { paddingBottom: builderContentBottomPadding }]}
-                showsVerticalScrollIndicator={false}
-              >
-                {renderTemplateSummary(sportType, false)}
-              </ScrollView>
+              <View style={styles.summarySideColumn}>
+                <ScrollView
+                  style={styles.summarySidePanel}
+                  contentContainerStyle={[
+                    styles.summarySidePanelContent,
+                    { paddingBottom: builderContentBottomPadding },
+                  ]}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {renderTemplateSummary(sportType, false, true)}
+                </ScrollView>
+              </View>
             ) : (
               <View style={[styles.summaryFooterContainer, { bottom: footerBottomPosition }]}>
                 <LiquidGlassFooter style={styles.summaryGlass} borderRadius={30}>
@@ -1678,7 +1686,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignSelf: 'center',
     width: '100%',
-    maxWidth: 1200,
+    maxWidth: 1110,
     gap: spacing.xl,
     paddingHorizontal: spacing.l,
   },
@@ -1906,7 +1914,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignSelf: 'center',
     width: '100%',
-    maxWidth: 1200,
+    maxWidth: 1110,
     gap: spacing.xl,
     paddingHorizontal: spacing.l,
   },
@@ -1918,8 +1926,15 @@ const styles = StyleSheet.create({
     maxWidth: 700,
   },
   summarySidePanel: {
-    width: 340,
+    width: '100%',
     minHeight: 0,
+  },
+  summarySideColumn: {
+    width: 320,
+    maxWidth: 320,
+    minHeight: 0,
+    flexGrow: 0,
+    flexShrink: 0,
   },
   summarySidePanelContent: {
     paddingTop: spacing.s,
