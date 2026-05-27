@@ -74,9 +74,16 @@ function mapWhoopSport(sportName: string | null): CanonicalActivitySportMapping 
       .toLowerCase()
       .replace(/[\s-]+/g, '_') ?? '';
   if (normalised === 'running' || normalised === 'track_field') return { sportType: 'running', sportSubtype: 'road' };
+  if (normalised === 'walking' || normalised === 'walk') return { sportType: 'running', sportSubtype: 'walk' };
   if (normalised === 'cycling') return { sportType: 'cycling', sportSubtype: 'road' };
-  if (normalised === 'spin' || normalised === 'assault_bike') return { sportType: 'cycling', sportSubtype: 'indoor' };
+  if (normalised === 'spin' || normalised === 'spinning') return { sportType: 'cycling', sportSubtype: 'spinning' };
+  if (normalised === 'assault_bike' || normalised === 'indoor_cycling')
+    return { sportType: 'cycling', sportSubtype: 'indoor' };
   if (normalised === 'mountain_biking') return { sportType: 'cycling', sportSubtype: 'trail' };
+  if (normalised === 'gravel_cycling' || normalised === 'gravel_ride')
+    return { sportType: 'cycling', sportSubtype: 'gravel' };
+  if (normalised === 'urban_cycling' || normalised === 'bike_commuting')
+    return { sportType: 'cycling', sportSubtype: 'urban' };
   if (normalised === 'swimming') return { sportType: 'swimming', sportSubtype: null };
   if (normalised === 'soccer' || normalised === 'football') return { sportType: 'football', sportSubtype: 'outdoor' };
   if (normalised === 'basketball') return { sportType: 'basketball', sportSubtype: 'indoor' };

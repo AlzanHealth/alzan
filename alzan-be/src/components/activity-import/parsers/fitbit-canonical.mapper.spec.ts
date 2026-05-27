@@ -64,6 +64,30 @@ function assertFitbitCyclingActivityLogParsesDeviceAndSpeed(): void {
   assert.equal(canonical.device?.model, 'Fitbit Sense 2');
 }
 
+function assertFitbitCyclingModalitiesUseDetailedActivityName(): void {
+  const cases = [
+    { activityName: 'Gravel Bike Ride', expected: 'gravel' },
+    { activityName: 'Mountain Bike Ride', expected: 'trail' },
+    { activityName: 'Spin Indoor Cycling', expected: 'spinning' },
+    { activityName: 'Urban Bike Commute', expected: 'urban' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify({
+        provider: 'fitbit',
+        activityName: testCase.activityName,
+        activityTypeId: 90001,
+        startTime: '2026-05-01T10:00:00.000Z',
+        duration: 1800000,
+      }),
+      `fitbit-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
 function assertFitbitTcxParsesRouteAndHeartRate(): void {
   const tcx = `<?xml version="1.0" encoding="UTF-8"?>
 <TrainingCenterDatabase>
@@ -207,7 +231,7 @@ function assertFitbitZonesAreCalculatedFromHeartRateStream(): void {
   assert.equal(canonical.heartRateZones[0].percentage, 100);
 }
 
-function assertFitbitWalkingMapsToOther(): void {
+function assertFitbitWalkingMapsToRunningWalk(): void {
   const rawJson = JSON.stringify({
     provider: 'fitbit',
     logId: 19018673358,
@@ -219,8 +243,8 @@ function assertFitbitWalkingMapsToOther(): void {
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'fitbit-walk.json');
   assert.equal(canonical.provider, 'fitbit');
-  assert.equal(canonical.sportType, 'other');
-  assert.equal(canonical.sportSubtype, null);
+  assert.equal(canonical.sportType, 'running');
+  assert.equal(canonical.sportSubtype, 'walk');
   assert.equal(canonical.vendorFields.fitbitActivityName, 'Walk');
 }
 
@@ -307,11 +331,12 @@ function assertFitbitHealthParsesWithoutPersistence(): void {
 
 assertFitbitRunningActivityLogParses();
 assertFitbitCyclingActivityLogParsesDeviceAndSpeed();
+assertFitbitCyclingModalitiesUseDetailedActivityName();
 assertFitbitTcxParsesRouteAndHeartRate();
 assertFitbitWorkoutSummaryParsesRunningMetrics();
 assertFitbitCourtAndTeamSportsWithoutGpsDoNotFail();
 assertFitbitNativeHeartRateZonesAreMapped();
 assertFitbitZonesAreCalculatedFromHeartRateStream();
-assertFitbitWalkingMapsToOther();
+assertFitbitWalkingMapsToRunningWalk();
 assertFitbitStrengthJsonUsesFitbitProvider();
 assertFitbitHealthParsesWithoutPersistence();

@@ -96,8 +96,17 @@ const formatHoursAndMinutes = (totalSeconds: number): string => {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const getEnvironmentDisplayLabel = (type: string | null | undefined, t: any) => {
+const getEnvironmentDisplayLabel = (type: string | null | undefined, sportType: string | null | undefined, t: any) => {
   if (!type) return '';
+  if (sportType === 'cycling') {
+    if (type === 'road') return t('training.cyclingTypeRoad');
+    if (type === 'trail') return t('training.cyclingTypeMtb');
+    if (type === 'gravel') return t('training.cyclingTypeGravel');
+    if (type === 'indoor') return t('training.cyclingTypeIndoor');
+    if (type === 'spinning') return t('training.cyclingTypeSpinning');
+    if (type === 'urban') return t('training.cyclingTypeUrban');
+    return type;
+  }
   if (type === 'road' || type === 'aire_libre') return t('training.runningTypeOutdoor');
   if (type === 'indoor' || type === 'cinta') return t('training.runningTypeTreadmill');
   if (type === 'track') return t('training.runningTypeTrack');
@@ -994,7 +1003,7 @@ export const EnduranceSessionsListScreen = () => {
                                   ]}
                                 >
                                   <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
-                                    {getEnvironmentDisplayLabel(session.sport_subtype, t)}
+                                    {getEnvironmentDisplayLabel(session.sport_subtype, session.sport_type, t)}
                                   </Text>
                                 </View>
                               )}

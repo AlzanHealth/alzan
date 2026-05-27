@@ -120,8 +120,18 @@ function mapUltrahumanSport(activity: string | null): CanonicalActivitySportMapp
   const normalised = activity?.trim().toLowerCase().replace(/\s+/g, '_') ?? '';
   if (normalised === 'running' || normalised === 'run') return { sportType: 'running', sportSubtype: 'road' };
   if (normalised === 'trail_running') return { sportType: 'running', sportSubtype: 'trail' };
-  if (normalised === 'cycling' || normalised === 'bike') return { sportType: 'cycling', sportSubtype: 'road' };
-  if (normalised === 'indoor_cycling') return { sportType: 'cycling', sportSubtype: 'indoor' };
+  if (normalised === 'walking' || normalised === 'walk') return { sportType: 'running', sportSubtype: 'walk' };
+  if (normalised.includes('cycling') || normalised.includes('biking') || normalised.includes('bike')) {
+    if (normalised.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
+    if (normalised.includes('gravel')) return { sportType: 'cycling', sportSubtype: 'gravel' };
+    if (normalised.includes('mountain') || normalised.includes('mtb'))
+      return { sportType: 'cycling', sportSubtype: 'trail' };
+    if (normalised.includes('urban') || normalised.includes('commute') || normalised.includes('city'))
+      return { sportType: 'cycling', sportSubtype: 'urban' };
+    if (normalised.includes('indoor') || normalised.includes('trainer'))
+      return { sportType: 'cycling', sportSubtype: 'indoor' };
+    return { sportType: 'cycling', sportSubtype: 'road' };
+  }
   if (normalised === 'swimming' || normalised === 'swim') return { sportType: 'swimming', sportSubtype: null };
   if (normalised === 'soccer' || normalised === 'football') return { sportType: 'football', sportSubtype: 'outdoor' };
   if (normalised === 'basketball') return { sportType: 'basketball', sportSubtype: 'indoor' };

@@ -1,4 +1,5 @@
 import { strict as assert } from 'assert';
+import { parseActivityFileToCanonical } from './activity-import-canonical.parser';
 import { parseStrengthActivityFile, STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from './strength-activity-import.parser';
 import { parseRouteFileWithSummary } from './route-import.parser';
 
@@ -164,8 +165,31 @@ function assertSuuntoJsonKeepsNativeAutoLapDurations(): void {
   assert.equal(Math.round(parsed.details.customSplits[2].avgHeartRate ?? 0), 164);
 }
 
+function assertGenericCyclingTerrainIsNotLost(): void {
+  const cases = [
+    { sportType: 'Gravel cycling', expected: 'gravel' },
+    { sportType: 'Mountain bike', expected: 'trail' },
+    { sportType: 'Indoor spin ride', expected: 'spinning' },
+    { sportType: 'Urban bike commute', expected: 'urban' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify({
+        sport_type: testCase.sportType,
+        start_time: '2026-05-01T08:00:00Z',
+        duration_s: 1800,
+      }),
+      `generic-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
 assertSuuntoStrengthJsonParses();
 assertClearEnduranceStrengthJsonIsRejected();
 assertSuuntoDistanceActivityIsRejectedForStrength();
 assertGpxRouteParses();
 assertSuuntoJsonKeepsNativeAutoLapDurations();
+assertGenericCyclingTerrainIsNotLost();

@@ -133,6 +133,30 @@ function assertPolarCyclingJsonParsesPowerAndCadence(): void {
   assert.equal(canonical.summary.maxPowerW, 240);
 }
 
+function assertPolarCyclingDetailedSportMapsTerrain(): void {
+  const cases = [
+    { detailedSportInfo: 'GRAVEL_CYCLING', expected: 'gravel' },
+    { detailedSportInfo: 'MOUNTAIN_BIKING', expected: 'trail' },
+    { detailedSportInfo: 'SPINNING', expected: 'spinning' },
+    { detailedSportInfo: 'CITY_CYCLING', expected: 'urban' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parsePolarActivityFileToCanonical(
+      JSON.stringify({
+        provider: 'polar',
+        sport: 'CYCLING',
+        detailed_sport_info: testCase.detailedSportInfo,
+        start_time: '2026-05-01T12:00:00Z',
+        duration: 'PT30M',
+      }),
+      `polar-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
 function assertPolarSwimmingStoresVendorFields(): void {
   const rawJson = JSON.stringify({
     provider: 'polar',
@@ -215,7 +239,7 @@ function assertPolarStrengthJsonUsesPolarProvider(): void {
   assert.equal(summary.maxHeartRate, 142);
 }
 
-function assertPolarWalkingMapsToOther(): void {
+function assertPolarWalkingMapsToRunningWalk(): void {
   const rawJson = JSON.stringify({
     provider: 'polar',
     sport: 'WALKING',
@@ -225,8 +249,8 @@ function assertPolarWalkingMapsToOther(): void {
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'polar-walk.json');
   assert.equal(canonical.provider, 'polar');
-  assert.equal(canonical.sportType, 'other');
-  assert.equal(canonical.sportSubtype, null);
+  assert.equal(canonical.sportType, 'running');
+  assert.equal(canonical.sportSubtype, 'walk');
   assert.equal(canonical.vendorFields.polarSport, 'WALKING');
 }
 
@@ -277,9 +301,10 @@ function assertPolarHealthParsesWithoutPersistence(): void {
 assertPolarV3RunningJsonParses();
 assertPolarV4TrainingSessionParses();
 assertPolarCyclingJsonParsesPowerAndCadence();
+assertPolarCyclingDetailedSportMapsTerrain();
 assertPolarSwimmingStoresVendorFields();
 assertPolarPadelWithoutGpsDoesNotFail();
 assertPolarZonesAreCalculatedWhenNativeMissing();
 assertPolarStrengthJsonUsesPolarProvider();
-assertPolarWalkingMapsToOther();
+assertPolarWalkingMapsToRunningWalk();
 assertPolarHealthParsesWithoutPersistence();

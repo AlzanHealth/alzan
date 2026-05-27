@@ -98,7 +98,7 @@ const SUUNTO_ACTIVITY_ID_MAP = new Map<number, CanonicalActivitySportMapping>([
   [0, { sportType: 'other', sportSubtype: 'outdoor' }],
   [1, { sportType: 'running', sportSubtype: 'road' }],
   [2, { sportType: 'cycling', sportSubtype: 'road' }],
-  [10, { sportType: 'cycling', sportSubtype: 'outdoor' }],
+  [10, { sportType: 'cycling', sportSubtype: 'trail' }], // Mountain Biking
   [11, { sportType: 'hiking', sportSubtype: 'trail' }],
   [21, { sportType: 'swimming', sportSubtype: 'pool' }],
   [22, { sportType: 'running', sportSubtype: 'trail' }],
@@ -113,7 +113,7 @@ const SUUNTO_ACTIVITY_ID_MAP = new Map<number, CanonicalActivitySportMapping>([
   [70, { sportType: 'hiking', sportSubtype: 'trail' }],
   [75, { sportType: 'padel', sportSubtype: 'outdoor' }],
   [85, { sportType: 'swimming', sportSubtype: 'open_water' }],
-  [99, { sportType: 'cycling', sportSubtype: 'outdoor' }],
+  [99, { sportType: 'cycling', sportSubtype: 'gravel' }], // Gravel Biking
   [103, { sportType: 'running', sportSubtype: 'track' }],
   [104, { sportType: 'strength', sportSubtype: 'indoor' }],
 ]);
@@ -219,6 +219,9 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   }
   if (fitSport === 2) {
     if (fitSubSport === 6) return { sportType: 'cycling', sportSubtype: 'indoor' };
+    if (fitSubSport === 7) return { sportType: 'cycling', sportSubtype: 'trail' };
+    if (fitSubSport === 46) return { sportType: 'cycling', sportSubtype: 'gravel' };
+    if (fitSubSport === 17) return { sportType: 'cycling', sportSubtype: 'spinning' };
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (fitSport === 5) {
@@ -243,7 +246,30 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   if (sportName.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (sportName.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (sportName.includes('swim')) return { sportType: 'swimming', sportSubtype: 'pool' };
-  if (sportName.includes('cycl')) return { sportType: 'cycling', sportSubtype: 'road' };
+  if (sportName.includes('cycl') || sportName.includes('bike') || sportName.includes('bici')) {
+    if (sportName.includes('indoor') || sportName.includes('rodillo') || sportName.includes('trainer')) {
+      if (sportName.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
+      return { sportType: 'cycling', sportSubtype: 'indoor' };
+    }
+    if (sportName.includes('spin')) {
+      return { sportType: 'cycling', sportSubtype: 'spinning' };
+    }
+    if (sportName.includes('gravel')) {
+      return { sportType: 'cycling', sportSubtype: 'gravel' };
+    }
+    if (sportName.includes('mtb') || sportName.includes('mountain') || sportName.includes('montaña')) {
+      return { sportType: 'cycling', sportSubtype: 'trail' };
+    }
+    if (
+      sportName.includes('urban') ||
+      sportName.includes('commute') ||
+      sportName.includes('city') ||
+      sportName.includes('urbano')
+    ) {
+      return { sportType: 'cycling', sportSubtype: 'urban' };
+    }
+    return { sportType: 'cycling', sportSubtype: 'road' };
+  }
   if (sportName.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
   if (sportName.includes('run')) {
     if (sportName.includes('indoor') || sportName.includes('treadmill') || sportName.includes('cinta')) {

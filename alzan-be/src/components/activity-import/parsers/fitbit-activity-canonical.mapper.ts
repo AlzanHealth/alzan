@@ -143,11 +143,18 @@ function normaliseSpeedMps(value: unknown): number | null {
 }
 
 function mapFitbitSport(activityTypeId: number | null, activityName: string | null): CanonicalActivitySportMapping {
+  const normalised = activityName?.trim().toLowerCase() ?? '';
   if (activityTypeId != null && FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId]) {
     const mapped = FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId];
-    if (mapped.sportType !== 'other' || !activityName?.toLowerCase().includes('padel')) return mapped;
+    const hasDetailedCyclingName =
+      mapped.sportType === 'cycling' &&
+      ['spin', 'gravel', 'mountain', 'mtb', 'urban', 'commute', 'city', 'indoor', 'trainer'].some(detail =>
+        normalised.includes(detail),
+      );
+    const hasDetailedOtherName =
+      mapped.sportType === 'other' && (normalised.includes('padel') || normalised.includes('walk'));
+    if (!hasDetailedCyclingName && !hasDetailedOtherName) return mapped;
   }
-  const normalised = activityName?.trim().toLowerCase() ?? '';
   if (normalised.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
@@ -174,9 +181,17 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
     }
     return { sportType: 'running', sportSubtype: 'road' };
   }
-  if (normalised.includes('indoor cycling')) return { sportType: 'cycling', sportSubtype: 'indoor' };
-  if (normalised.includes('bike') || normalised.includes('cycling'))
+  if (normalised.includes('bike') || normalised.includes('cycling')) {
+    if (normalised.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
+    if (normalised.includes('gravel')) return { sportType: 'cycling', sportSubtype: 'gravel' };
+    if (normalised.includes('mountain') || normalised.includes('mtb'))
+      return { sportType: 'cycling', sportSubtype: 'trail' };
+    if (normalised.includes('urban') || normalised.includes('commute') || normalised.includes('city'))
+      return { sportType: 'cycling', sportSubtype: 'urban' };
+    if (normalised.includes('indoor') || normalised.includes('trainer'))
+      return { sportType: 'cycling', sportSubtype: 'indoor' };
     return { sportType: 'cycling', sportSubtype: 'road' };
+  }
   if (normalised.includes('swim')) return { sportType: 'swimming', sportSubtype: null };
   if (normalised.includes('strength') || normalised.includes('weight'))
     return { sportType: 'strength', sportSubtype: 'indoor' };

@@ -111,6 +111,31 @@ function assertCyclingStreamsParse(): void {
   assert.equal(canonical.summary.avgCadence, 88);
 }
 
+function assertCyclingModalitiesUseSessionMetadata(): void {
+  const cases = [
+    { exerciseType: 'EXERCISE_SESSION_TYPE_BIKING_STATIONARY', title: 'Trainer', expected: 'indoor' },
+    { exerciseType: 'EXERCISE_SESSION_TYPE_BIKING', title: 'Gravel ride', expected: 'gravel' },
+    { exerciseType: 'EXERCISE_SESSION_TYPE_BIKING', title: 'Spin class', expected: 'spinning' },
+    { exerciseType: 'EXERCISE_SESSION_TYPE_BIKING', title: 'MTB ride', expected: 'trail' },
+    { exerciseType: 'EXERCISE_SESSION_TYPE_BIKING', title: 'Urban commute', expected: 'urban' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify(
+        buildHealthConnectWorkout({
+          exerciseType: testCase.exerciseType,
+          title: testCase.title,
+          exerciseRoute: undefined,
+        }),
+      ),
+      `health-connect-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
 function assertSwimmingAndIndoorSportsDoNotNeedGps(): void {
   const swimming = parseActivityFileToCanonical(
     JSON.stringify(buildHealthConnectWorkout({ exerciseType: 'EXERCISE_SESSION_TYPE_SWIMMING_POOL', route: [] })),
@@ -146,7 +171,8 @@ function assertWalkingAndStrengthMapping(): void {
     JSON.stringify(buildHealthConnectWorkout({ exerciseType: 'EXERCISE_SESSION_TYPE_WALKING', title: 'Walk' })),
     'health-connect-walk.json',
   );
-  assert.equal(walking.sportType, 'other');
+  assert.equal(walking.sportType, 'running');
+  assert.equal(walking.sportSubtype, 'walk');
   assert.equal(walking.vendorFields.healthConnectExerciseType, 'EXERCISE_SESSION_TYPE_WALKING');
 
   const strength = parseStrengthActivityFile(
@@ -254,6 +280,7 @@ function assertHealthMappersWorkWithoutPersistence(): void {
 assertFixtureUsesSpecificMapper();
 assertRunningWithRouteAndRecordsParses();
 assertCyclingStreamsParse();
+assertCyclingModalitiesUseSessionMetadata();
 assertSwimmingAndIndoorSportsDoNotNeedGps();
 assertWalkingAndStrengthMapping();
 assertNativeZonesAreRespected();

@@ -35,6 +35,7 @@ Use package-level commands that mirror CI as closely as local execution safely a
 
 - `pnpm --prefix alzan-be run format:check`
 - `pnpm --prefix alzan-be run lint:check`
+- `pnpm --prefix alzan-be run verify:activity-import`
 
 ### FE parity steps
 

@@ -106,6 +106,30 @@ function assertAppleHealthCyclingPowerCadenceSpeed(): void {
   assert.equal(canonical.streams.speed.length, 2);
 }
 
+function assertAppleHealthCyclingModalitiesUseWorkoutMetadata(): void {
+  const cases = [
+    { title: 'Gravel bike ride', expected: 'gravel' },
+    { title: 'Mountain bike training', expected: 'trail' },
+    { title: 'Indoor spin class', expected: 'spinning' },
+    { title: 'Urban bike commute', expected: 'urban' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify({
+        provider: 'apple_health',
+        workoutActivityType: 'HKWorkoutActivityTypeCycling',
+        title: testCase.title,
+        startDate: '2026-05-01T08:00:00Z',
+        endDate: '2026-05-01T09:00:00Z',
+      }),
+      `apple-health-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
 function assertAppleHealthSwimmingVendorFields(): void {
   const rawJson = JSON.stringify({
     provider: 'apple_health',
@@ -156,7 +180,7 @@ function assertAppleHealthSportsWithoutGpsDoNotFail(): void {
   }
 }
 
-function assertAppleHealthWalkingMapsToOther(): void {
+function assertAppleHealthWalkingMapsToRunningWalk(): void {
   const canonical = parseActivityFileToCanonical(
     JSON.stringify({
       provider: 'apple_health',
@@ -167,7 +191,8 @@ function assertAppleHealthWalkingMapsToOther(): void {
     }),
     'apple-health-walking.json',
   );
-  assert.equal(canonical.sportType, 'other');
+  assert.equal(canonical.sportType, 'running');
+  assert.equal(canonical.sportSubtype, 'walk');
   assert.equal(canonical.vendorFields.appleHealthWorkoutActivityType, 'HKWorkoutActivityTypeWalking');
 }
 
@@ -309,9 +334,10 @@ function assertAppleHealthRecoveryMapsWithoutPersistence(): void {
 assertAppleHealthFixtureUsesProviderMapper();
 assertAppleHealthRunningRouteAndRecords();
 assertAppleHealthCyclingPowerCadenceSpeed();
+assertAppleHealthCyclingModalitiesUseWorkoutMetadata();
 assertAppleHealthSwimmingVendorFields();
 assertAppleHealthSportsWithoutGpsDoNotFail();
-assertAppleHealthWalkingMapsToOther();
+assertAppleHealthWalkingMapsToRunningWalk();
 assertAppleHealthStrengthParsesInStrengthFlow();
 assertAppleHealthDailyActivityMapsWithoutPersistence();
 assertAppleHealthSleepMapsWithoutPersistence();

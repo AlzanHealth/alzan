@@ -132,12 +132,28 @@ function mapStravaSport(
     }
     return { sportType: 'running', sportSubtype: trainer ? 'indoor' : 'road' };
   }
-  if (normalised === 'mountainbikeride' || normalised === 'gravelride' || normalised === 'emountainbikeride') {
+  if (normalised === 'mountainbikeride' || normalised === 'emountainbikeride') {
     return { sportType: 'cycling', sportSubtype: 'trail' };
   }
-  if (normalised === 'virtualride') return { sportType: 'cycling', sportSubtype: 'indoor' };
+  if (normalised === 'gravelride') {
+    return { sportType: 'cycling', sportSubtype: 'gravel' };
+  }
+  if (normalised === 'virtualride') {
+    return { sportType: 'cycling', sportSubtype: 'indoor' };
+  }
   if (normalised === 'ride' || normalised === 'ebikeride') {
-    return { sportType: 'cycling', sportSubtype: trainer ? 'indoor' : 'road' };
+    const nameLower = (name ?? '').toLowerCase();
+    if (trainer) {
+      if (nameLower.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
+      return { sportType: 'cycling', sportSubtype: 'indoor' };
+    }
+    if (nameLower.includes('spin')) {
+      return { sportType: 'cycling', sportSubtype: 'spinning' };
+    }
+    if (nameLower.includes('urban') || nameLower.includes('commute') || nameLower.includes('city')) {
+      return { sportType: 'cycling', sportSubtype: 'urban' };
+    }
+    return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (normalised === 'swim') return { sportType: 'swimming', sportSubtype: null };
   if (normalised === 'soccer' || normalised === 'football') return { sportType: 'football', sportSubtype: 'outdoor' };

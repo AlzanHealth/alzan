@@ -125,6 +125,16 @@ export const EnduranceSessionDetailScreen = () => {
 
   const getEnvironmentDisplayLabel = (type?: string | null) => {
     if (!type) return '';
+    const sport = session?.sport_type || template?.sport_type;
+    if (sport === 'cycling') {
+      if (type === 'road') return t('training.cyclingTypeRoad');
+      if (type === 'trail') return t('training.cyclingTypeMtb');
+      if (type === 'gravel') return t('training.cyclingTypeGravel');
+      if (type === 'indoor') return t('training.cyclingTypeIndoor');
+      if (type === 'spinning') return t('training.cyclingTypeSpinning');
+      if (type === 'urban') return t('training.cyclingTypeUrban');
+      return type;
+    }
     if (type === 'road' || type === 'aire_libre') return t('training.runningTypeOutdoor');
     if (type === 'indoor' || type === 'cinta') return t('training.runningTypeTreadmill');
     if (type === 'track') return t('training.runningTypeTrack');
@@ -135,6 +145,16 @@ export const EnduranceSessionDetailScreen = () => {
   };
 
   const getRunningSurfaces = () => {
+    const sport = session?.sport_type || template?.sport_type;
+    if (sport === 'cycling') {
+      return [
+        { key: 'road', label: t('training.cyclingTerrainRoad') },
+        { key: 'trail', label: t('training.cyclingTerrainMtb') },
+        { key: 'gravel', label: t('training.cyclingTerrainGravel') },
+        { key: 'track', label: t('training.cyclingTerrainTrack') },
+        { key: 'indoor', label: t('training.cyclingTerrainIndoor') },
+      ];
+    }
     return [
       { key: 'asfalto', label: t('training.surfaceAsphalt') },
       { key: 'pista', label: t('training.surfaceTrack') },

@@ -95,7 +95,11 @@ function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
   if (normalised === 'trail_running' || normalised.includes('trail'))
     return { sportType: 'running', sportSubtype: 'trail' };
   if (normalised.includes('track')) return { sportType: 'running', sportSubtype: 'track' };
-  if (normalised.includes('treadmill') || normalised.includes('indoor'))
+  if (
+    normalised.includes('treadmill') ||
+    normalised.includes('indoor_running') ||
+    (normalised.includes('indoor') && (normalised.includes('run') || normalised.includes('jogging')))
+  )
     return { sportType: 'running', sportSubtype: 'indoor' };
   if (normalised.includes('running') || normalised.includes('run') || normalised.includes('jogging')) {
     if (
@@ -110,9 +114,22 @@ function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
     }
     return { sportType: 'running', sportSubtype: 'road' };
   }
-  if (normalised === 'cycling') return { sportType: 'cycling', sportSubtype: 'road' };
-  if (normalised === 'mountain_biking') return { sportType: 'cycling', sportSubtype: 'trail' };
-  if (normalised === 'indoor_cycling') return { sportType: 'cycling', sportSubtype: 'indoor' };
+  if (
+    normalised.includes('cycling') ||
+    normalised.includes('biking') ||
+    normalised.includes('bike') ||
+    normalised.includes('spin')
+  ) {
+    if (normalised.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
+    if (normalised.includes('gravel')) return { sportType: 'cycling', sportSubtype: 'gravel' };
+    if (normalised.includes('mountain') || normalised.includes('mtb'))
+      return { sportType: 'cycling', sportSubtype: 'trail' };
+    if (normalised.includes('urban') || normalised.includes('commute') || normalised.includes('city'))
+      return { sportType: 'cycling', sportSubtype: 'urban' };
+    if (normalised.includes('indoor') || normalised.includes('trainer'))
+      return { sportType: 'cycling', sportSubtype: 'indoor' };
+    return { sportType: 'cycling', sportSubtype: 'road' };
+  }
   if (normalised === 'swimming') return { sportType: 'swimming', sportSubtype: null };
   if (normalised === 'soccer' || normalised === 'football') return { sportType: 'football', sportSubtype: 'outdoor' };
   if (normalised === 'basketball') return { sportType: 'basketball', sportSubtype: 'indoor' };

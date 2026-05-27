@@ -198,11 +198,20 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
     }
     return { sportType: 'running', sportSubtype: 'road' };
   }
-  if (sport.includes('INDOOR_CYCLING') || sport.includes('SPINNING')) {
+  if (sport.includes('INDOOR_CYCLING')) {
     return { sportType: 'cycling', sportSubtype: 'indoor' };
   }
-  if (sport.includes('MOUNTAIN_BIKING') || sport.includes('GRAVEL')) {
+  if (sport.includes('SPINNING')) {
+    return { sportType: 'cycling', sportSubtype: 'spinning' };
+  }
+  if (sport.includes('GRAVEL')) {
+    return { sportType: 'cycling', sportSubtype: 'gravel' };
+  }
+  if (sport.includes('MOUNTAIN_BIKING')) {
     return { sportType: 'cycling', sportSubtype: 'trail' };
+  }
+  if (sport.includes('CITY_CYCLING') || sport.includes('URBAN_CYCLING')) {
+    return { sportType: 'cycling', sportSubtype: 'urban' };
   }
   if (sport.includes('CYCLING') || sport.includes('BIKING') || sport.includes('E_BIKE')) {
     return { sportType: 'cycling', sportSubtype: 'road' };

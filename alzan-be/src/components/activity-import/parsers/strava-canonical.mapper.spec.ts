@@ -94,6 +94,31 @@ function assertStravaCyclingJsonParsesStreams(): void {
   assert.deepEqual(canonical.vendorFields.stravaGradeSmooth, [0.5, 1.2, 0.8]);
 }
 
+function assertStravaCyclingModalitiesArePreserved(): void {
+  const cases: Array<{ sportType: string; name?: string; trainer?: boolean; expected: string }> = [
+    { sportType: 'GravelRide', expected: 'gravel' },
+    { sportType: 'MountainBikeRide', expected: 'trail' },
+    { sportType: 'Ride', name: 'Spin class', trainer: true, expected: 'spinning' },
+    { sportType: 'Ride', name: 'Urban commute', expected: 'urban' },
+  ];
+
+  for (const testCase of cases) {
+    const canonical = parseStravaActivityJsonToCanonical(
+      JSON.stringify({
+        provider: 'strava',
+        sport_type: testCase.sportType,
+        name: testCase.name,
+        trainer: testCase.trainer,
+        start_date: '2026-05-01T13:00:00Z',
+        moving_time: 120,
+      }),
+      `strava-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
 function assertStravaRouteParseUsesStreamLatLng(): void {
   const rawJson = JSON.stringify({
     provider: 'strava',
@@ -199,7 +224,7 @@ function assertStravaHeartRateZonesAreCalculatedFromStream(): void {
   assert.equal(canonical.heartRateZones[0].percentage, 100);
 }
 
-function assertStravaWalkDoesNotPretendToBeHiking(): void {
+function assertStravaWalkUsesRunningWalkSubtype(): void {
   const rawJson = JSON.stringify({
     provider: 'strava',
     sport_type: 'Walk',
@@ -209,16 +234,17 @@ function assertStravaWalkDoesNotPretendToBeHiking(): void {
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'strava-walk.json', { estimatedMaxHeartRate: 190 });
   assert.equal(canonical.provider, 'strava');
-  assert.equal(canonical.sportType, 'other');
-  assert.equal(canonical.sportSubtype, null);
+  assert.equal(canonical.sportType, 'running');
+  assert.equal(canonical.sportSubtype, 'walk');
   assert.equal(canonical.vendorFields.stravaSportType, 'Walk');
 }
 
 assertStravaRunningJsonParsesSummary();
 assertStravaCyclingJsonParsesStreams();
+assertStravaCyclingModalitiesArePreserved();
 assertStravaRouteParseUsesStreamLatLng();
 assertStravaRouteParseUsesSummaryPolylineWithoutStreams();
 assertStravaPadelWithoutGpsDoesNotFail();
 assertStravaNativeHeartRateZonesAreUsed();
 assertStravaHeartRateZonesAreCalculatedFromStream();
-assertStravaWalkDoesNotPretendToBeHiking();
+assertStravaWalkUsesRunningWalkSubtype();

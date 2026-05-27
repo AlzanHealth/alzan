@@ -140,8 +140,22 @@ function mapAppleHealthSport(
     return { sportType: 'running', sportSubtype: 'road' };
   }
   if (normalised.includes('walking')) return { sportType: 'running', sportSubtype: 'walk' };
-  if (normalised.includes('cycling') || normalised.includes('handcycling'))
+  if (normalised.includes('cycling') || normalised.includes('handcycling')) {
+    if (normalised.includes('indoor') || normalised.includes('spin')) {
+      if (normalised.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
+      return { sportType: 'cycling', sportSubtype: 'indoor' };
+    }
+    if (normalised.includes('mountain') || normalised.includes('mtb')) {
+      return { sportType: 'cycling', sportSubtype: 'trail' };
+    }
+    if (normalised.includes('gravel')) {
+      return { sportType: 'cycling', sportSubtype: 'gravel' };
+    }
+    if (normalised.includes('urban') || normalised.includes('city') || normalised.includes('commute')) {
+      return { sportType: 'cycling', sportSubtype: 'urban' };
+    }
     return { sportType: 'cycling', sportSubtype: 'road' };
+  }
   if (normalised.includes('swimming') || normalised.includes('waterfitness'))
     return { sportType: 'swimming', sportSubtype: null };
   if (normalised.includes('soccer')) return { sportType: 'football', sportSubtype: 'outdoor' };

@@ -112,6 +112,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   // Modals visibility
   const [goalModalVisible, setGoalModalVisible] = useState(false);
   const [surfaceModalVisible, setSurfaceModalVisible] = useState(false);
+  const [typeModalVisible, setTypeModalVisible] = useState(false);
 
   // Step Modals
   const [modalVisible, setModalVisible] = useState(false);
@@ -241,10 +242,41 @@ export const EnduranceWorkoutBuilderScreen = () => {
   // Goal options mapping helper
   const isCustomGoal = (goal?: string) => {
     if (!goal) return false;
-    return !['resistencia', 'velocidad', 'tempo_umbral', 'tirada_larga', 'recuperacion', 'test'].includes(goal);
+    const standardKeys =
+      sportType === 'cycling'
+        ? ['resistencia', 'potencia', 'velocidad', 'ruta_larga', 'recuperacion', 'tecnica']
+        : ['resistencia', 'velocidad', 'tempo_umbral', 'tirada_larga', 'recuperacion', 'test'];
+    return !standardKeys.includes(goal);
   };
 
   const getStructuredGoals = () => {
+    if (sportType === 'cycling') {
+      return [
+        {
+          key: 'resistencia',
+          title: t('training.goalCyclingResistenciaTitle'),
+          desc: t('training.goalCyclingResistenciaDesc'),
+        },
+        { key: 'potencia', title: t('training.goalCyclingPotenciaTitle'), desc: t('training.goalCyclingPotenciaDesc') },
+        {
+          key: 'velocidad',
+          title: t('training.goalCyclingVelocidadTitle'),
+          desc: t('training.goalCyclingVelocidadDesc'),
+        },
+        {
+          key: 'ruta_larga',
+          title: t('training.goalCyclingRutaLargaTitle'),
+          desc: t('training.goalCyclingRutaLargaDesc'),
+        },
+        {
+          key: 'recuperacion',
+          title: t('training.goalCyclingRecuperacionTitle'),
+          desc: t('training.goalCyclingRecuperacionDesc'),
+        },
+        { key: 'tecnica', title: t('training.goalCyclingTecnicaTitle'), desc: t('training.goalCyclingTecnicaDesc') },
+        { key: 'custom', title: t('training.goalCustomTitle'), desc: t('training.goalCustomDesc') },
+      ];
+    }
     return [
       { key: 'resistencia', title: t('training.goalResistenciaTitle'), desc: t('training.goalResistenciaDesc') },
       { key: 'velocidad', title: t('training.goalVelocidadTitle'), desc: t('training.goalVelocidadDesc') },
@@ -265,14 +297,42 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return goal;
   };
 
-  // Surface options
+  // Surface / Terrain options
   const getRunningSurfaces = () => {
+    if (sportType === 'cycling') {
+      return [
+        { key: 'road', label: t('training.cyclingTerrainRoad') },
+        { key: 'trail', label: t('training.cyclingTerrainMtb') },
+        { key: 'gravel', label: t('training.cyclingTerrainGravel') },
+        { key: 'track', label: t('training.cyclingTerrainTrack') },
+        { key: 'indoor', label: t('training.cyclingTerrainIndoor') },
+      ];
+    }
     return [
       { key: 'asfalto', label: t('training.surfaceAsphalt') },
       { key: 'pista', label: t('training.surfaceTrack') },
       { key: 'tierra', label: t('training.surfaceDirt') },
       { key: 'hierba', label: t('training.surfaceGrass') },
       { key: 'cinta', label: t('training.surfaceTreadmill') },
+    ];
+  };
+
+  const getWorkoutTypes = () => {
+    if (sportType === 'cycling') {
+      return [
+        { key: 'road', label: t('training.cyclingTypeRoad') },
+        { key: 'trail', label: t('training.cyclingTypeMtb') },
+        { key: 'gravel', label: t('training.cyclingTypeGravel') },
+        { key: 'indoor', label: t('training.cyclingTypeIndoor') },
+        { key: 'spinning', label: t('training.cyclingTypeSpinning') },
+        { key: 'urban', label: t('training.cyclingTypeUrban') },
+      ];
+    }
+    return [
+      { key: 'road', label: t('training.runningTypeOutdoor') },
+      { key: 'indoor', label: t('training.runningTypeTreadmill') },
+      { key: 'race', label: t('training.runningTypeRace') },
+      { key: 'walk', label: t('training.runningTypeWalk') },
     ];
   };
 
@@ -283,6 +343,25 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const getEnvironmentDisplayLabel = (environment?: string | null) => {
+    if (!environment) return '';
+    if (sportType === 'cycling') {
+      switch (environment) {
+        case 'road':
+          return t('training.cyclingTypeRoad');
+        case 'trail':
+          return t('training.cyclingTypeMtb');
+        case 'gravel':
+          return t('training.cyclingTypeGravel');
+        case 'indoor':
+          return t('training.cyclingTypeIndoor');
+        case 'spinning':
+          return t('training.cyclingTypeSpinning');
+        case 'urban':
+          return t('training.cyclingTypeUrban');
+        default:
+          return environment;
+      }
+    }
     switch (environment) {
       case 'road':
       case 'aire_libre':
@@ -295,7 +374,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       case 'walk':
         return t('training.runningTypeWalk');
       default:
-        return '';
+        return environment;
     }
   };
 
@@ -492,7 +571,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (!name.trim()) {
       missingFields.push('name');
     }
-    if (sportType === 'running' && !environmentType) {
+    if ((sportType === 'running' || sportType === 'cycling') && !environmentType) {
       missingFields.push('type');
     }
     if (!trainingGoal) {
@@ -916,8 +995,14 @@ export const EnduranceWorkoutBuilderScreen = () => {
         sportLabel={getSportTitle()}
         sportColor={SPORT_COLORS[selectedSport] || themeColors.primary}
         goalLabel={trainingGoal ? getGoalDisplayLabel(trainingGoal) : undefined}
-        environmentLabel={selectedSport === 'running' ? getEnvironmentDisplayLabel(environmentType) : undefined}
-        surfaceLabel={selectedSport === 'running' ? getSurfaceDisplayLabel(surface) : undefined}
+        environmentLabel={
+          selectedSport === 'running' || selectedSport === 'cycling'
+            ? getEnvironmentDisplayLabel(environmentType)
+            : undefined
+        }
+        surfaceLabel={
+          selectedSport === 'running' || selectedSport === 'cycling' ? getSurfaceDisplayLabel(surface) : undefined
+        }
         scheduleLabel={scheduledDayNames ? t('training.plannedForDays', { days: scheduledDayNames }) : undefined}
         durationLabel={
           structuredSport ? formatTime(Math.round(totalDuration)) : `${parseInt(manualDuration, 10) || 0} min`
@@ -1166,54 +1251,30 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   />
                 </View>
 
-                {/* Environment Type chips */}
-                {sportType === 'running' && (
-                  <View style={styles.segmentedRow}>
-                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary, marginBottom: 8 }]}>
+                {/* Environment Type selector */}
+                {(sportType === 'running' || sportType === 'cycling') && (
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setTypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.workoutTypeLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
                       {t('training.workoutTypeLabel')}
                     </Text>
-                    <View style={styles.chipsContainer}>
-                      {[
-                        { key: 'road', label: t('training.runningTypeOutdoor') },
-                        { key: 'indoor', label: t('training.runningTypeTreadmill') },
-                        { key: 'race', label: t('training.runningTypeRace') },
-                        { key: 'walk', label: t('training.runningTypeWalk') },
-                      ].map(typeOption => {
-                        const isSelected =
-                          environmentType === typeOption.key ||
-                          (typeOption.key === 'road' && environmentType === 'aire_libre') ||
-                          (typeOption.key === 'indoor' && environmentType === 'cinta');
-                        return (
-                          <TouchableOpacity
-                            key={typeOption.key}
-                            style={[
-                              styles.chipButton,
-                              isSelected && {
-                                backgroundColor: themeColors.primary,
-                                borderColor: themeColors.primary,
-                              },
-                              !isSelected && {
-                                borderColor: themeColors.border,
-                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                              },
-                            ]}
-                            onPress={() => setEnvironmentType(typeOption.key)}
-                            accessibilityRole="button"
-                            accessibilityState={{ selected: isSelected }}
-                          >
-                            <Text
-                              style={[
-                                styles.chipText,
-                                isSelected ? { color: '#FFF' } : { color: themeColors.textPrimary },
-                              ]}
-                            >
-                              {typeOption.label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: environmentType ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {environmentType ? getEnvironmentDisplayLabel(environmentType) : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 )}
               </GlassCard>
 
@@ -1252,7 +1313,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
               )}
 
               {/* Block 3: Configuración */}
-              {sportType === 'running' && (
+              {(sportType === 'running' || sportType === 'cycling') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
                     {t('navigation.workoutSettings').toUpperCase()}
@@ -1263,10 +1324,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     style={styles.formRow}
                     onPress={() => setSurfaceModalVisible(true)}
                     accessibilityRole="button"
-                    accessibilityLabel={t('training.surfaceLabel')}
+                    accessibilityLabel={
+                      sportType === 'cycling' ? t('training.terrainLabel') : t('training.surfaceLabel')
+                    }
                   >
                     <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
-                      {t('training.surfaceLabel')}
+                      {sportType === 'cycling' ? t('training.terrainLabel') : t('training.surfaceLabel')}
                     </Text>
                     <View style={styles.rowRightValue}>
                       <Text
@@ -1281,10 +1344,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     </View>
                   </TouchableOpacity>
 
-                  {/* Zapatillas (Coming Soon) */}
+                  {/* Zapatillas / Bicicleta (Coming Soon) */}
                   <View style={[styles.formRow, { borderBottomWidth: 0, opacity: 0.5 }]}>
                     <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
-                      {t('training.shoesLabel')}
+                      {sportType === 'cycling' ? t('training.bikeLabel') : t('training.shoesLabel')}
                     </Text>
                     <View style={styles.rowRightValue}>
                       <Text style={[styles.rowValueText, { color: themeColors.textSecondary }]}>
@@ -1535,6 +1598,73 @@ export const EnduranceWorkoutBuilderScreen = () => {
           </Pressable>
         </Modal>
 
+        {/* Type Selector Modal */}
+        <Modal
+          animationType={isWideLayout ? 'fade' : 'slide'}
+          transparent={true}
+          visible={typeModalVisible}
+          onRequestClose={() => setTypeModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setTypeModalVisible(false)}
+          >
+            <Pressable
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                {t('training.workoutTypeLabel')}
+              </Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getWorkoutTypes().map(typeOption => {
+                  const isSelected = environmentType === typeOption.key;
+                  return (
+                    <TouchableOpacity
+                      key={typeOption.key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setEnvironmentType(typeOption.key);
+                        setTypeModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {typeOption.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setTypeModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
         {/* Surface Selector Modal */}
         <Modal
           animationType={isWideLayout ? 'fade' : 'slide'}
@@ -1555,7 +1685,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
               onPress={e => e.stopPropagation()}
             >
               <View style={styles.modalHandle} />
-              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.surfaceLabel')}</Text>
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                {sportType === 'cycling' ? t('training.terrainLabel') : t('training.surfaceLabel')}
+              </Text>
 
               <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
                 {getRunningSurfaces().map(surf => {

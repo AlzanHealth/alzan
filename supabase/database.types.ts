@@ -4533,6 +4533,9 @@ export type Database = {
         | "open_water"
         | "race"
         | "walk"
+        | "gravel"
+        | "spinning"
+        | "urban"
       sport_type_enum:
         | "basketball"
         | "padel"
@@ -4855,6 +4858,9 @@ export const Constants = {
         "open_water",
         "race",
         "walk",
+        "gravel",
+        "spinning",
+        "urban",
       ],
       sport_type_enum: [
         "basketball",

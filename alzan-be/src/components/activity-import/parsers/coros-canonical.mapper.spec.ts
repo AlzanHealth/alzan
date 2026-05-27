@@ -201,6 +201,7 @@ function assertCorosCyclingSwimmingWalkingStrength(): void {
     'coros-bike.json',
   );
   assert.equal(cycling.sportType, 'cycling');
+  assert.equal(cycling.sportSubtype, 'gravel');
   assert.equal(cycling.summary.avgPowerW, 240);
   const swim = parseCorosActivityFileToCanonical(
     buildCorosWorkout({ activityType: 'Pool Swim', swimmingMetrics: { strokeCount: 420 } }),
@@ -209,7 +210,8 @@ function assertCorosCyclingSwimmingWalkingStrength(): void {
   assert.equal(swim.sportSubtype, 'pool');
   assert.deepEqual(swim.vendorFields.swimmingMetrics, { strokeCount: 420 });
   const walking = parseCorosActivityFileToCanonical(buildCorosWorkout({ activityType: 'Walk' }), 'coros-walk.json');
-  assert.equal(walking.sportType, 'other');
+  assert.equal(walking.sportType, 'running');
+  assert.equal(walking.sportSubtype, 'walk');
   assert.equal(walking.vendorFields.corosSport, 'Walk');
   const strength = parseStrengthActivityFile(
     buildCorosWorkout({ activityType: 'Strength Training', route: [], distanceM: null }),

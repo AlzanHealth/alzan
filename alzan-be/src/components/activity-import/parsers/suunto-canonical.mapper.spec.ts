@@ -192,6 +192,18 @@ function assertSuuntoSportMapping(): void {
     sportType: 'cycling',
     sportSubtype: 'road',
   });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 10 }), {
+    sportType: 'cycling',
+    sportSubtype: 'trail',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 99 }), {
+    sportType: 'cycling',
+    sportSubtype: 'gravel',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 2, fitSubSport: 17 }), {
+    sportType: 'cycling',
+    sportSubtype: 'spinning',
+  });
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 21 }), {
     sportType: 'swimming',
     sportSubtype: 'pool',

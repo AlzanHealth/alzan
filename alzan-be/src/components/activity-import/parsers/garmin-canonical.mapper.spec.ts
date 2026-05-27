@@ -1,5 +1,8 @@
 import { strict as assert } from 'assert';
-import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
+import {
+  mapGarminActivityToCanonicalSport,
+  parseGarminActivityFileToCanonical,
+} from './garmin-activity-canonical.mapper';
 import {
   mapGarminDailyActivityToCanonical,
   mapGarminRecoveryToCanonical,
@@ -292,9 +295,17 @@ function assertGarminHealthParsesWithoutPersistence(): void {
   assert.equal(recovery.stressState, 24);
 }
 
+function assertGarminCyclingModalitiesAreCanonical(): void {
+  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 7 }).sportSubtype, 'trail');
+  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 46 }).sportSubtype, 'gravel');
+  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 17 }).sportSubtype, 'spinning');
+  assert.equal(mapGarminActivityToCanonicalSport({ activityType: 'Urban cycling commute' }).sportSubtype, 'urban');
+}
+
 assertGarminRunningFitParsesAsRoute();
 assertGarminFitCalculatesZonesWithoutNativeZones();
 assertGarminPadelWithoutGpsDoesNotFail();
 assertGarminStrengthFitUsesGarminProvider();
 assertGarminJsonActivityDetailsParses();
 assertGarminHealthParsesWithoutPersistence();
+assertGarminCyclingModalitiesAreCanonical();

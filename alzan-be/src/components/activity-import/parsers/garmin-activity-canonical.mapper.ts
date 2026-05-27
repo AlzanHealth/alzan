@@ -512,6 +512,9 @@ export function mapGarminActivityToCanonicalSport(params: {
   }
   if (fitSport === 2) {
     if (fitSubSport === 6) return { sportType: 'cycling', sportSubtype: 'indoor' };
+    if (fitSubSport === 7) return { sportType: 'cycling', sportSubtype: 'trail' }; // Mountain Biking
+    if (fitSubSport === 46) return { sportType: 'cycling', sportSubtype: 'gravel' };
+    if (fitSubSport === 17) return { sportType: 'cycling', sportSubtype: 'spinning' };
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (fitSport === 5) {
@@ -535,10 +538,30 @@ export function mapGarminActivityToCanonicalSport(params: {
   if (activityType.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (activityType.includes('open water')) return { sportType: 'swimming', sportSubtype: 'open_water' };
   if (activityType.includes('swim')) return { sportType: 'swimming', sportSubtype: 'pool' };
-  if (activityType.includes('indoor cycling') || activityType.includes('bike indoor'))
-    return { sportType: 'cycling', sportSubtype: 'indoor' };
-  if (activityType.includes('bike') || activityType.includes('cycling'))
+  if (activityType.includes('bike') || activityType.includes('cycling') || activityType.includes('ciclismo')) {
+    if (activityType.includes('indoor') || activityType.includes('rodillo') || activityType.includes('trainer')) {
+      if (activityType.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
+      return { sportType: 'cycling', sportSubtype: 'indoor' };
+    }
+    if (activityType.includes('spin')) {
+      return { sportType: 'cycling', sportSubtype: 'spinning' };
+    }
+    if (activityType.includes('gravel')) {
+      return { sportType: 'cycling', sportSubtype: 'gravel' };
+    }
+    if (activityType.includes('mountain') || activityType.includes('mtb')) {
+      return { sportType: 'cycling', sportSubtype: 'trail' };
+    }
+    if (
+      activityType.includes('urban') ||
+      activityType.includes('commute') ||
+      activityType.includes('city') ||
+      activityType.includes('urbano')
+    ) {
+      return { sportType: 'cycling', sportSubtype: 'urban' };
+    }
     return { sportType: 'cycling', sportSubtype: 'road' };
+  }
   if (activityType.includes('trail')) return { sportType: 'running', sportSubtype: 'trail' };
   if (activityType.includes('track')) return { sportType: 'running', sportSubtype: 'track' };
   if (activityType.includes('treadmill') || activityType.includes('indoor run'))

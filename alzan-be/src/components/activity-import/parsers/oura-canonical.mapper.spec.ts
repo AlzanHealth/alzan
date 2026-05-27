@@ -55,6 +55,31 @@ function assertOuraHikingFixtureUsesProviderMapper(): void {
   assert.equal(parsed.summary.avgHeartRate, 116);
 }
 
+function assertOuraCyclingModalitiesArePreserved(): void {
+  const cases = [
+    { activity: 'indoor_cycling', expected: 'indoor' },
+    { activity: 'gravel_cycling', expected: 'gravel' },
+    { activity: 'spinning', expected: 'spinning' },
+    { activity: 'mountain_biking', expected: 'trail' },
+    { activity: 'urban_cycling', expected: 'urban' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify({
+        provider: 'oura',
+        id: `oura-${testCase.expected}`,
+        activity: testCase.activity,
+        start_datetime: '2026-05-01T07:00:00Z',
+        end_datetime: '2026-05-01T08:00:00Z',
+      }),
+      `oura-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
 function assertOuraCourtAndTeamSportsWithoutGpsDoNotFail(): void {
   const sports = [
     { activity: 'padel', expected: 'padel' },
@@ -78,7 +103,7 @@ function assertOuraCourtAndTeamSportsWithoutGpsDoNotFail(): void {
   }
 }
 
-function assertOuraWalkingMapsToOther(): void {
+function assertOuraWalkingMapsToRunningWalk(): void {
   const rawJson = JSON.stringify({
     provider: 'oura',
     id: 'walk-1',
@@ -88,8 +113,8 @@ function assertOuraWalkingMapsToOther(): void {
     distance: 1600,
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'oura-walk.json');
-  assert.equal(canonical.sportType, 'other');
-  assert.equal(canonical.sportSubtype, null);
+  assert.equal(canonical.sportType, 'running');
+  assert.equal(canonical.sportSubtype, 'walk');
   assert.equal(canonical.vendorFields.ouraActivity, 'walking');
 }
 
@@ -226,8 +251,9 @@ function assertOuraRecoveryMapsWithoutPersistence(): void {
 
 assertOuraRunningWorkoutParses();
 assertOuraHikingFixtureUsesProviderMapper();
+assertOuraCyclingModalitiesArePreserved();
 assertOuraCourtAndTeamSportsWithoutGpsDoNotFail();
-assertOuraWalkingMapsToOther();
+assertOuraWalkingMapsToRunningWalk();
 assertOuraStrengthParsesInStrengthFlow();
 assertOuraHeartRateSamplesBuildStreamAndZones();
 assertOuraDailyActivityMapsWithoutPersistence();

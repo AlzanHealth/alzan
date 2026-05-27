@@ -143,10 +143,20 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
     return { sportType: 'running', sportSubtype: 'road' };
   }
   if (text.includes('indoor') && (text.includes('bike') || text.includes('cycling'))) {
+    if (text.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
     return { sportType: 'cycling', sportSubtype: 'indoor' };
   }
-  if (text.includes('mtb') || text.includes('mountain') || text.includes('gravel')) {
+  if (text.includes('spin')) {
+    return { sportType: 'cycling', sportSubtype: 'spinning' };
+  }
+  if (text.includes('gravel')) {
+    return { sportType: 'cycling', sportSubtype: 'gravel' };
+  }
+  if (text.includes('mtb') || text.includes('mountain')) {
     return { sportType: 'cycling', sportSubtype: 'trail' };
+  }
+  if (text.includes('urban') || text.includes('commute') || text.includes('city')) {
+    return { sportType: 'cycling', sportSubtype: 'urban' };
   }
   if (text.includes('bike') || text.includes('cycling')) return { sportType: 'cycling', sportSubtype: 'road' };
   if (text.includes('strength') || text.includes('weight') || text.includes('functional')) {

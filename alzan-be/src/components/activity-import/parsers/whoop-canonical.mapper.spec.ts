@@ -112,6 +112,25 @@ function assertWhoopSportsWithoutGpsDoNotFail(): void {
   }
 }
 
+function assertWhoopCyclingModalitiesArePreserved(): void {
+  const cases = [
+    { sportName: 'Spin', expected: 'spinning' },
+    { sportName: 'Indoor Cycling', expected: 'indoor' },
+    { sportName: 'Gravel Ride', expected: 'gravel' },
+    { sportName: 'Mountain Biking', expected: 'trail' },
+    { sportName: 'Bike Commuting', expected: 'urban' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify(buildWhoopWorkout({ sport_name: testCase.sportName })),
+      `whoop-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
 function assertWhoopStrengthParsesInStrengthFlow(): void {
   const parsed = parseStrengthActivityFile(
     JSON.stringify(
@@ -140,13 +159,13 @@ function assertWhoopStrengthParsesInStrengthFlow(): void {
   assert.equal(parsed.heartRateZones[0].zone, 1);
 }
 
-function assertWhoopWalkingMapsToOther(): void {
+function assertWhoopWalkingMapsToRunningWalk(): void {
   const canonical = parseActivityFileToCanonical(
     JSON.stringify(buildWhoopWorkout({ sport_name: 'Walking' })),
     'whoop-walking.json',
   );
-  assert.equal(canonical.sportType, 'other');
-  assert.equal(canonical.sportSubtype, null);
+  assert.equal(canonical.sportType, 'running');
+  assert.equal(canonical.sportSubtype, 'walk');
   assert.equal(canonical.vendorFields.whoopSportName, 'Walking');
 }
 
@@ -235,8 +254,9 @@ function assertWhoopCycleMapsWithoutPersistence(): void {
 assertWhoopWorkoutMapsOfficialShape();
 assertWhoopFixtureNoLongerUsesGenericMapper();
 assertWhoopSportsWithoutGpsDoNotFail();
+assertWhoopCyclingModalitiesArePreserved();
 assertWhoopStrengthParsesInStrengthFlow();
-assertWhoopWalkingMapsToOther();
+assertWhoopWalkingMapsToRunningWalk();
 assertWhoopSleepMapsWithoutPersistence();
 assertWhoopRecoveryMapsWithoutPersistence();
 assertWhoopCycleMapsWithoutPersistence();

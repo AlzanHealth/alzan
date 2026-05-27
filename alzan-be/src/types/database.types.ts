@@ -4434,7 +4434,19 @@ export type Database = {
         | 'deep'
         | 'rem'
         | 'core';
-      sport_subtype_enum: 'road' | 'trail' | 'track' | 'indoor' | 'outdoor' | 'pool' | 'open_water' | 'race' | 'walk';
+      sport_subtype_enum:
+        | 'road'
+        | 'trail'
+        | 'track'
+        | 'indoor'
+        | 'outdoor'
+        | 'pool'
+        | 'open_water'
+        | 'race'
+        | 'walk'
+        | 'gravel'
+        | 'spinning'
+        | 'urban';
       sport_type_enum:
         | 'basketball'
         | 'padel'
@@ -4670,7 +4682,20 @@ export const Constants = {
       recipe_usage_context_enum: ['meal_log', 'planner', 'quick_add'],
       recipe_visibility_enum: ['private', 'public'],
       sleep_stage_enum: ['unknown', 'awake', 'awake_in_bed', 'out_of_bed', 'sleeping', 'light', 'deep', 'rem', 'core'],
-      sport_subtype_enum: ['road', 'trail', 'track', 'indoor', 'outdoor', 'pool', 'open_water', 'race', 'walk'],
+      sport_subtype_enum: [
+        'road',
+        'trail',
+        'track',
+        'indoor',
+        'outdoor',
+        'pool',
+        'open_water',
+        'race',
+        'walk',
+        'gravel',
+        'spinning',
+        'urban',
+      ],
       sport_type_enum: [
         'basketball',
         'padel',

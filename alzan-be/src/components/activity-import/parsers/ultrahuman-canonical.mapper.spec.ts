@@ -98,7 +98,32 @@ function assertUltrahumanSportsWithoutGpsDoNotFail(): void {
   }
 }
 
-function assertUltrahumanWalkingMapsToOther(): void {
+function assertUltrahumanCyclingModalitiesArePreserved(): void {
+  const cases = [
+    { activity: 'indoor_cycling', expected: 'indoor' },
+    { activity: 'gravel_cycling', expected: 'gravel' },
+    { activity: 'spinning_cycling', expected: 'spinning' },
+    { activity: 'mountain_biking', expected: 'trail' },
+    { activity: 'urban_cycling', expected: 'urban' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify({
+        provider: 'ultrahuman',
+        id: `uh-${testCase.expected}`,
+        activity: testCase.activity,
+        start_datetime: '2026-05-01T18:00:00Z',
+        end_datetime: '2026-05-01T19:00:00Z',
+      }),
+      `ultrahuman-${testCase.expected}.json`,
+    );
+    assert.equal(canonical.sportType, 'cycling');
+    assert.equal(canonical.sportSubtype, testCase.expected);
+  }
+}
+
+function assertUltrahumanWalkingMapsToRunningWalk(): void {
   const rawJson = JSON.stringify({
     provider: 'ultrahuman',
     id: 'walk-1',
@@ -108,8 +133,8 @@ function assertUltrahumanWalkingMapsToOther(): void {
     steps: 1800,
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'ultrahuman-walking.json');
-  assert.equal(canonical.sportType, 'other');
-  assert.equal(canonical.sportSubtype, null);
+  assert.equal(canonical.sportType, 'running');
+  assert.equal(canonical.sportSubtype, 'walk');
   assert.equal(canonical.vendorFields.ultrahumanActivity, 'walking');
 }
 
@@ -223,7 +248,8 @@ function assertUltrahumanMetabolicMapsWithoutPersistence(): void {
 assertUltrahumanDailyMetricsFixtureUsesProviderMapper();
 assertUltrahumanMetricsEnvelopeParsesMovementAndRecovery();
 assertUltrahumanSportsWithoutGpsDoNotFail();
-assertUltrahumanWalkingMapsToOther();
+assertUltrahumanCyclingModalitiesArePreserved();
+assertUltrahumanWalkingMapsToRunningWalk();
 assertUltrahumanStrengthParsesInStrengthFlow();
 assertUltrahumanSleepMapsWithoutPersistence();
 assertUltrahumanRecoveryMapsWithoutPersistence();
