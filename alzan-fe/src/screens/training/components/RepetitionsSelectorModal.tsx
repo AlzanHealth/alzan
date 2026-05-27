@@ -176,7 +176,12 @@ export const RepetitionsSelectorModal = ({
             {/* Header */}
             <View style={styles.header}>
               {mode === 'wheel' ? (
-                <TouchableOpacity onPress={() => setMode('grid')} style={styles.backBtn}>
+                <TouchableOpacity
+                  onPress={() => setMode('grid')}
+                  style={styles.backBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.back')}
+                >
                   <Text style={[styles.backText, { color: colors.primary }]}>{t('common.back')}</Text>
                 </TouchableOpacity>
               ) : (
@@ -189,7 +194,12 @@ export const RepetitionsSelectorModal = ({
                 {mode === 'wheel' ? t('training.selectNumber') : t('training.repetitions')}
               </Text>
 
-              <TouchableOpacity onPress={onClose} style={[styles.closeBtn, dynamicStyles.closeBtn]}>
+              <TouchableOpacity
+                onPress={onClose}
+                style={[styles.closeBtn, dynamicStyles.closeBtn]}
+                accessibilityRole="button"
+                accessibilityLabel={t('training.close')}
+              >
                 <X size={18} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -214,6 +224,8 @@ export const RepetitionsSelectorModal = ({
                         onSelect(value);
                         onClose();
                       }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
                     >
                       <Text
                         style={[styles.optionText, dynamicStyles.optionText, isSelected && styles.optionTextSelected]}
@@ -224,7 +236,12 @@ export const RepetitionsSelectorModal = ({
                   );
                 })}
                 {/* Custom "..." Button */}
-                <TouchableOpacity style={[styles.optionBtn, dynamicStyles.optionBtn]} onPress={() => setMode('wheel')}>
+                <TouchableOpacity
+                  style={[styles.optionBtn, dynamicStyles.optionBtn]}
+                  onPress={() => setMode('wheel')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('training.selectNumber')}
+                >
                   <MoreHorizontal size={20} color={colors.textPrimary} />
                 </TouchableOpacity>
               </View>
@@ -271,7 +288,12 @@ export const RepetitionsSelectorModal = ({
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <TouchableOpacity style={[styles.confirmBtn, dynamicStyles.confirmBtn]} onPress={handleWheelConfirm}>
+                <TouchableOpacity
+                  style={[styles.confirmBtn, dynamicStyles.confirmBtn]}
+                  onPress={handleWheelConfirm}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('training.confirm')}
+                >
                   <Text style={styles.confirmText}>{t('training.confirm')}</Text>
                 </TouchableOpacity>
               </View>
@@ -316,6 +338,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backBtn: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
     paddingHorizontal: spacing.s,
   },
   backText: {
@@ -328,9 +353,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },

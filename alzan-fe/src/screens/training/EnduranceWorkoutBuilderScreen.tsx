@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -30,6 +31,7 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 import { EnduranceStepEditorModal } from './components/EnduranceStepEditorModal';
+import { EnduranceTemplateSummaryPanel } from './components/EnduranceTemplateSummaryPanel';
 import { WeekDaySelector } from '../../components/training/WeekDaySelector';
 import { RepetitionsSelectorModal } from './components/RepetitionsSelectorModal';
 import { useEnduranceWorkoutBuilder, BuilderStep } from '../../hooks/useEnduranceWorkoutBuilder';
@@ -74,9 +76,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isWideLayout = width >= 960;
 
-  const footerBottomPosition = Math.max(20, 125 - insets.bottom);
-  const contentBottomPadding = 125 + 100 + 20;
+  const tabBarClearance = 112 + insets.bottom;
+  const footerBottomPosition = Math.max(112, tabBarClearance);
+  const mainContentBottomPadding = tabBarClearance + spacing.xl;
+  const builderContentBottomPadding = isWideLayout ? tabBarClearance + spacing.xl : footerBottomPosition + 112;
 
   const getWeekdayName = (dayIndex: number) => {
     const baseSunday = new Date(2024, 0, 7); // Sunday
@@ -274,6 +280,23 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (!surf) return '';
     const match = getRunningSurfaces().find(s => s.key === surf);
     return match ? match.label : surf;
+  };
+
+  const getEnvironmentDisplayLabel = (environment?: string | null) => {
+    switch (environment) {
+      case 'road':
+      case 'aire_libre':
+        return t('training.runningTypeOutdoor');
+      case 'indoor':
+      case 'cinta':
+        return t('training.runningTypeTreadmill');
+      case 'race':
+        return t('training.runningTypeRace');
+      case 'walk':
+        return t('training.runningTypeWalk');
+      default:
+        return '';
+    }
   };
 
   // Helper to estimate missing values
@@ -739,11 +762,21 @@ export const EnduranceWorkoutBuilderScreen = () => {
           </View>
           <View style={styles.stepActions}>
             {!item.is_group && (
-              <TouchableOpacity onPress={() => handleEditStep(item)} style={styles.stepActionBtn}>
+              <TouchableOpacity
+                onPress={() => handleEditStep(item)}
+                style={styles.stepActionBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.edit')}
+              >
                 <Text style={styles.editLabel}>{t('common.edit')}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => handleStepMenu(item, index)} style={styles.stepActionBtn}>
+            <TouchableOpacity
+              onPress={() => handleStepMenu(item, index)}
+              style={styles.stepActionBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.optionsTitle')}
+            >
               <MoreVertical size={18} color={themeColors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -757,6 +790,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 setEditingGroupId(item.id);
                 setRepsModalVisible(true);
               }}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.repetitions')}
             >
               <Repeat size={14} color={themeColors.primary} />
               <Text style={[styles.groupLabel, { color: themeColors.primary }]}>
@@ -787,12 +822,16 @@ export const EnduranceWorkoutBuilderScreen = () => {
                             handleEditStep(child);
                           }}
                           style={styles.stepActionBtn}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('common.edit')}
                         >
                           <Text style={styles.editLabel}>{t('common.edit')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => handleDeleteStep(child.id, true, item.id)}
                           style={styles.stepActionBtn}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('common.delete')}
                         >
                           <Trash2 size={16} color={colors.danger} />
                         </TouchableOpacity>
@@ -821,7 +860,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   </GlassCard>
                 </View>
               ))}
-              <TouchableOpacity style={styles.addToGroupBtn} onPress={() => handleAddStepPress(item.id)}>
+              <TouchableOpacity
+                style={styles.addToGroupBtn}
+                onPress={() => handleAddStepPress(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={t('training.addToBlock')}
+              >
                 <Plus size={14} color={themeColors.primary} />
                 <Text style={[styles.addToGroupText, { color: themeColors.primary }]}>{t('training.addToBlock')}</Text>
               </TouchableOpacity>
@@ -860,6 +904,40 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const summaryBlocks = getSummaryBlocks();
+  const structuredSport = sportType ? ['running', 'cycling', 'swimming'].includes(sportType) : false;
+
+  const renderTemplateSummary = (selectedSport: SportType, showEditorAction = true) => {
+    const formattedDistance = convertDistanceToUi(totalDistance, 2);
+    const scheduledDayNames = scheduledDays.map(day => getWeekdayName(day)).join(', ');
+
+    return (
+      <EnduranceTemplateSummaryPanel
+        sportType={selectedSport}
+        sportLabel={getSportTitle()}
+        sportColor={SPORT_COLORS[selectedSport] || themeColors.primary}
+        goalLabel={trainingGoal ? getGoalDisplayLabel(trainingGoal) : undefined}
+        environmentLabel={selectedSport === 'running' ? getEnvironmentDisplayLabel(environmentType) : undefined}
+        surfaceLabel={selectedSport === 'running' ? getSurfaceDisplayLabel(surface) : undefined}
+        scheduleLabel={scheduledDayNames ? t('training.plannedForDays', { days: scheduledDayNames }) : undefined}
+        durationLabel={
+          structuredSport ? formatTime(Math.round(totalDuration)) : `${parseInt(manualDuration, 10) || 0} min`
+        }
+        distanceLabel={structuredSport ? `${formattedDistance.value} ${formattedDistance.unit}` : undefined}
+        phaseSummary={
+          structuredSport
+            ? {
+                warmup: summaryBlocks.warmupStr,
+                work: summaryBlocks.workStr,
+                recovery: summaryBlocks.cooldownStr,
+              }
+            : undefined
+        }
+        hasSteps={steps.length > 0}
+        canDesignWorkout={structuredSport && showEditorAction}
+        onDesignWorkout={structuredSport && showEditorAction ? () => setCurrentView('builder') : undefined}
+      />
+    );
+  };
 
   return (
     <LinearGradient
@@ -884,11 +962,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
               }
             }}
             style={styles.headerButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
           >
             <ArrowLeft size={24} color={themeColors.textPrimary} />
           </TouchableOpacity>
 
-          <View style={{ flex: 1, alignItems: 'center' }}>
+          <View style={styles.headerCenter}>
             <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>
               {isHydratingEditTemplate
                 ? t('training.editTemplate')
@@ -910,13 +990,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 }
               }}
               style={styles.headerButton}
+              accessibilityRole="button"
+              accessibilityLabel={currentView === 'builder' ? t('training.confirm') : t('common.save')}
             >
               <Text style={styles.saveText}>
                 {currentView === 'builder' ? t('training.confirm') : t('common.save')}
               </Text>
             </TouchableOpacity>
           )}
-          {!sportType && <View style={{ width: 40 }} />}
+          {!sportType && <View style={styles.headerPlaceholder} />}
         </View>
 
         {isHydratingEditTemplate ? (
@@ -925,10 +1007,16 @@ export const EnduranceWorkoutBuilderScreen = () => {
           </View>
         ) : !sportType ? (
           /* Sport Selection Grid */
-          <ScrollView contentContainerStyle={styles.sportSelectionContainer}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.sportSelectionContainer,
+              isWideLayout && styles.sportSelectionContainerWide,
+              { paddingBottom: mainContentBottomPadding },
+            ]}
+          >
             <Text style={[styles.sportSelectionTitle, dynamicStyles.title]}>{t('training.planWorkoutQuery')}</Text>
 
-            <View style={styles.sportGrid}>
+            <View style={[styles.sportGrid, isWideLayout && styles.sportGridWide]}>
               {[
                 { id: 'running', label: t('constants.running') },
                 { id: 'cycling', label: t('constants.cycling') },
@@ -941,11 +1029,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
               ].map(sport => (
                 <TouchableOpacity
                   key={sport.id}
-                  style={[styles.sportCard, dynamicStyles.card]}
+                  style={[styles.sportCard, isWideLayout && styles.sportCardWide, dynamicStyles.card]}
                   onPress={() => {
                     setSportType(sport.id as SportType);
                     // Running, cycling and swimming start on main form. Others don't have workout builder.
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel={sport.label}
                 >
                   <View
                     style={[
@@ -953,9 +1043,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       {
                         backgroundColor: SPORT_COLORS[sport.id] || themeColors.primary,
                         shadowColor: SPORT_COLORS[sport.id] || themeColors.primary,
-                        shadowOpacity: 0.3,
-                        shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.14,
+                        shadowRadius: 5,
+                        shadowOffset: { width: 0, height: 2 },
                       },
                     ]}
                   >
@@ -968,377 +1058,280 @@ export const EnduranceWorkoutBuilderScreen = () => {
           </ScrollView>
         ) : currentView === 'main' ? (
           /* Main Redesigned Form View */
-          <ScrollView contentContainerStyle={styles.mainFormContainer} showsVerticalScrollIndicator={false}>
-            {/* Header Avatar and Info */}
-            <View style={styles.profileHeader}>
-              <View
-                style={[
-                  styles.profileAvatar,
-                  {
-                    backgroundColor: SPORT_COLORS[sportType] + '15',
-                    width: 80,
-                    height: 80,
-                    borderRadius: 40,
-                    shadowColor: SPORT_COLORS[sportType],
-                    shadowOpacity: 0.2,
-                    shadowRadius: 10,
-                    shadowOffset: { width: 0, height: 4 },
-                  },
-                ]}
-              >
-                <SportIcon sport={sportType} size={42} color={SPORT_COLORS[sportType] || themeColors.primary} />
-              </View>
-              <View style={styles.profileTextContainer}>
-                <Text
-                  style={[styles.profileTitle, { color: themeColors.textPrimary, fontSize: 24, fontWeight: '800' }]}
-                >
-                  {getSportTitle()}
-                </Text>
-                <Text
-                  style={[styles.profileSubtitle, { color: themeColors.textSecondary, fontSize: 14, opacity: 0.8 }]}
-                >
-                  {t('training.configureGeneralDetails')}
-                </Text>
-              </View>
-            </View>
-
-            {/* Block 1: Información General */}
-            <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
-              <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
-                {t('training.general').toUpperCase()}
-              </Text>
-
-              {/* Template Name input */}
-              <View style={styles.formRow}>
-                <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.templateName')}</Text>
-                <TextInput
-                  style={[styles.rowInput, { color: themeColors.textPrimary }]}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder={t('training.intervalsExample')}
-                  placeholderTextColor={themeColors.textSecondary}
-                  textAlign="right"
-                />
-              </View>
-
-              {/* Goal Selector */}
-              <TouchableOpacity style={styles.formRow} onPress={() => setGoalModalVisible(true)}>
-                <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.mainGoal')}</Text>
-                <View style={styles.rowRightValue}>
-                  <Text
-                    style={[
-                      styles.rowValueText,
-                      { color: trainingGoal ? themeColors.textPrimary : themeColors.textSecondary },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {trainingGoal ? getGoalDisplayLabel(trainingGoal) : t('common.select')}
-                  </Text>
-                  <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
-                </View>
-              </TouchableOpacity>
-
-              {/* Description Input */}
-              <View style={[styles.formRow, { flexDirection: 'column', alignItems: 'stretch', borderBottomWidth: 0 }]}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('settings.description')}</Text>
-                  <Text style={{ color: themeColors.textSecondary, fontSize: 11 }}>{description.length}/150</Text>
-                </View>
-                <TextInput
-                  style={[styles.rowTextArea, { color: themeColors.textPrimary, borderColor: themeColors.border }]}
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder={t('training.descriptionPlaceholder')}
-                  placeholderTextColor={themeColors.textSecondary}
-                  multiline
-                  maxLength={150}
-                />
-              </View>
-
-              {/* Environment Type chips */}
-              {sportType === 'running' && (
-                <View style={styles.segmentedRow}>
-                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary, marginBottom: 8 }]}>
-                    {t('training.workoutTypeLabel')}
-                  </Text>
-                  <View style={styles.chipsContainer}>
-                    {[
-                      { key: 'road', label: t('training.runningTypeOutdoor') },
-                      { key: 'indoor', label: t('training.runningTypeTreadmill') },
-                      { key: 'race', label: t('training.runningTypeRace') },
-                      { key: 'walk', label: t('training.runningTypeWalk') },
-                    ].map(typeOption => {
-                      const isSelected =
-                        environmentType === typeOption.key ||
-                        (typeOption.key === 'road' && environmentType === 'aire_libre') ||
-                        (typeOption.key === 'indoor' && environmentType === 'cinta');
-                      return (
-                        <TouchableOpacity
-                          key={typeOption.key}
-                          style={[
-                            styles.chipButton,
-                            isSelected && {
-                              backgroundColor: themeColors.primary,
-                              borderColor: themeColors.primary,
-                              shadowColor: themeColors.primary,
-                              shadowOpacity: 0.3,
-                              shadowRadius: 8,
-                              shadowOffset: { width: 0, height: 4 },
-                            },
-                            !isSelected && {
-                              borderColor: themeColors.border,
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                            },
-                          ]}
-                          onPress={() => setEnvironmentType(typeOption.key)}
-                        >
-                          <Text
-                            style={[
-                              styles.chipText,
-                              isSelected ? { color: '#FFF' } : { color: themeColors.textPrimary },
-                            ]}
-                          >
-                            {typeOption.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
-            </GlassCard>
-
-            {/* Block 2: Entreno Específico */}
-            {['running', 'cycling', 'swimming'].includes(sportType) && (
-              <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
-                <View style={styles.blockHeaderRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
-                      {t('training.sportsTemplate').toUpperCase()}
-                    </Text>
-                    <Text style={[styles.blockSubtitle, { color: themeColors.textSecondary }]}>
-                      {t('training.addIntervalsHint')} {getSportTitle().toLowerCase()}.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Edit/Design Button */}
-                <TouchableOpacity
+          <View style={[styles.responsiveLayout, isWideLayout && styles.responsiveLayoutWide]}>
+            <ScrollView
+              style={[styles.mainColumn, isWideLayout && styles.mainColumnWide]}
+              contentContainerStyle={[
+                styles.mainFormContainer,
+                isWideLayout && styles.mainFormContainerWide,
+                { paddingBottom: mainContentBottomPadding },
+              ]}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Header Avatar and Info */}
+              <View style={styles.profileHeader}>
+                <View
                   style={[
-                    styles.designButton,
+                    styles.profileAvatar,
                     {
-                      backgroundColor: themeColors.primary,
-                      borderRadius: 20,
-                      paddingVertical: 14,
-                      shadowColor: themeColors.primary,
-                      shadowOpacity: 0.3,
-                      shadowRadius: 10,
-                      shadowOffset: { width: 0, height: 4 },
+                      backgroundColor: SPORT_COLORS[sportType] + '15',
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      shadowColor: SPORT_COLORS[sportType],
+                      shadowOpacity: 0.1,
+                      shadowRadius: 7,
+                      shadowOffset: { width: 0, height: 2 },
                     },
                   ]}
-                  onPress={() => setCurrentView('builder')}
                 >
-                  <Zap size={16} color="#FFF" style={{ marginRight: 6 }} />
-                  <Text style={styles.designButtonText}>
-                    {steps.length > 0 ? t('training.editWorkout') : t('training.designWorkout')}
+                  <SportIcon sport={sportType} size={42} color={SPORT_COLORS[sportType] || themeColors.primary} />
+                </View>
+                <View style={styles.profileTextContainer}>
+                  <Text
+                    style={[styles.profileTitle, { color: themeColors.textPrimary, fontSize: 24, fontWeight: '800' }]}
+                  >
+                    {getSportTitle()}
                   </Text>
-                </TouchableOpacity>
+                  <Text
+                    style={[styles.profileSubtitle, { color: themeColors.textSecondary, fontSize: 14, opacity: 0.8 }]}
+                  >
+                    {t('training.configureGeneralDetails')}
+                  </Text>
+                </View>
+              </View>
 
-                {/* Grid Summary */}
-                {steps.length > 0 && (
-                  <View style={styles.stepsSummaryGrid}>
-                    <View style={styles.summaryGridCol}>
-                      <View
-                        style={{
-                          backgroundColor: 'rgba(52, 199, 89, 0.1)',
-                          padding: 6,
-                          borderRadius: 16,
-                          marginBottom: 6,
-                        }}
-                      >
-                        <Clock size={16} color="#34C759" />
-                      </View>
-                      <Text
-                        style={[
-                          styles.gridLabel,
-                          { color: themeColors.textSecondary, fontSize: 11, letterSpacing: 0.8, fontWeight: '600' },
-                        ]}
-                      >
-                        {t('training.warmup').toUpperCase()}
-                      </Text>
-                      <Text
-                        style={[styles.gridValue, { color: themeColors.textPrimary, fontSize: 15, fontWeight: '800' }]}
-                      >
-                        {summaryBlocks.warmupStr}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={[
-                        styles.summaryGridCol,
-                        { borderLeftWidth: 1, borderRightWidth: 1, borderColor: themeColors.border },
-                      ]}
-                    >
-                      <View
-                        style={{
-                          backgroundColor: 'rgba(255, 149, 0, 0.1)',
-                          padding: 6,
-                          borderRadius: 16,
-                          marginBottom: 6,
-                        }}
-                      >
-                        <Activity size={16} color="#FF9500" />
-                      </View>
-                      <Text
-                        style={[
-                          styles.gridLabel,
-                          { color: themeColors.textSecondary, fontSize: 11, letterSpacing: 0.8, fontWeight: '600' },
-                        ]}
-                      >
-                        {t('training.block').toUpperCase()}
-                      </Text>
-                      <Text
-                        style={[styles.gridValue, { color: themeColors.textPrimary, fontSize: 15, fontWeight: '800' }]}
-                      >
-                        {summaryBlocks.workStr}
-                      </Text>
-                    </View>
-
-                    <View style={styles.summaryGridCol}>
-                      <View
-                        style={{
-                          backgroundColor: 'rgba(0, 122, 255, 0.1)',
-                          padding: 6,
-                          borderRadius: 16,
-                          marginBottom: 6,
-                        }}
-                      >
-                        <Repeat size={16} color={themeColors.primary} />
-                      </View>
-                      <Text
-                        style={[
-                          styles.gridLabel,
-                          { color: themeColors.textSecondary, fontSize: 11, letterSpacing: 0.8, fontWeight: '600' },
-                        ]}
-                      >
-                        {t('training.recovery').toUpperCase()}
-                      </Text>
-                      <Text
-                        style={[styles.gridValue, { color: themeColors.textPrimary, fontSize: 15, fontWeight: '800' }]}
-                      >
-                        {summaryBlocks.cooldownStr}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              </GlassCard>
-            )}
-
-            {/* Manual Duration (for simple sports) */}
-            {!['running', 'cycling', 'swimming'].includes(sportType) && (
+              {/* Block 1: Información General */}
               <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                 <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
-                  {t('training.duration').toUpperCase()}
+                  {t('training.general').toUpperCase()}
                 </Text>
+
+                {/* Template Name input */}
                 <View style={styles.formRow}>
                   <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
-                    {t('training.estimatedDurationMin')}
+                    {t('training.templateName')}
                   </Text>
                   <TextInput
                     style={[styles.rowInput, { color: themeColors.textPrimary }]}
-                    keyboardType="numeric"
-                    placeholder="60"
-                    value={manualDuration}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={t('training.intervalsExample')}
                     placeholderTextColor={themeColors.textSecondary}
-                    onChangeText={setManualDuration}
                     textAlign="right"
                   />
                 </View>
-                <Text style={[styles.helperDescription, { color: themeColors.textSecondary, marginTop: 8 }]}>
-                  {t('training.planningInfoOnly')}
-                </Text>
-              </GlassCard>
-            )}
 
-            {/* Block 3: Configuración */}
-            {sportType === 'running' && (
-              <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
-                <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
-                  {t('navigation.workoutSettings').toUpperCase()}
-                </Text>
-
-                {/* Surface Selector */}
-                <TouchableOpacity style={styles.formRow} onPress={() => setSurfaceModalVisible(true)}>
-                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
-                    {t('training.surfaceLabel')}
-                  </Text>
+                {/* Goal Selector */}
+                <TouchableOpacity
+                  style={styles.formRow}
+                  onPress={() => setGoalModalVisible(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('training.mainGoal')}
+                >
+                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.mainGoal')}</Text>
                   <View style={styles.rowRightValue}>
                     <Text
                       style={[
                         styles.rowValueText,
-                        { color: surface ? themeColors.textPrimary : themeColors.textSecondary },
+                        { color: trainingGoal ? themeColors.textPrimary : themeColors.textSecondary },
                       ]}
+                      numberOfLines={1}
                     >
-                      {surface ? getSurfaceDisplayLabel(surface) : t('common.select')}
+                      {trainingGoal ? getGoalDisplayLabel(trainingGoal) : t('common.select')}
                     </Text>
                     <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
                   </View>
                 </TouchableOpacity>
 
-                {/* Zapatillas (Coming Soon) */}
-                <View style={[styles.formRow, { borderBottomWidth: 0, opacity: 0.5 }]}>
-                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.shoesLabel')}</Text>
-                  <View style={styles.rowRightValue}>
-                    <Text style={[styles.rowValueText, { color: themeColors.textSecondary }]}>
-                      {t('training.comingSoon')}
+                {/* Description Input */}
+                <View
+                  style={[styles.formRow, { flexDirection: 'column', alignItems: 'stretch', borderBottomWidth: 0 }]}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('settings.description')}
                     </Text>
-                    <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    <Text style={{ color: themeColors.textSecondary, fontSize: 11 }}>{description.length}/150</Text>
                   </View>
+                  <TextInput
+                    style={[styles.rowTextArea, { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                    value={description}
+                    onChangeText={setDescription}
+                    placeholder={t('training.descriptionPlaceholder')}
+                    placeholderTextColor={themeColors.textSecondary}
+                    multiline
+                    maxLength={150}
+                  />
+                </View>
+
+                {/* Environment Type chips */}
+                {sportType === 'running' && (
+                  <View style={styles.segmentedRow}>
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary, marginBottom: 8 }]}>
+                      {t('training.workoutTypeLabel')}
+                    </Text>
+                    <View style={styles.chipsContainer}>
+                      {[
+                        { key: 'road', label: t('training.runningTypeOutdoor') },
+                        { key: 'indoor', label: t('training.runningTypeTreadmill') },
+                        { key: 'race', label: t('training.runningTypeRace') },
+                        { key: 'walk', label: t('training.runningTypeWalk') },
+                      ].map(typeOption => {
+                        const isSelected =
+                          environmentType === typeOption.key ||
+                          (typeOption.key === 'road' && environmentType === 'aire_libre') ||
+                          (typeOption.key === 'indoor' && environmentType === 'cinta');
+                        return (
+                          <TouchableOpacity
+                            key={typeOption.key}
+                            style={[
+                              styles.chipButton,
+                              isSelected && {
+                                backgroundColor: themeColors.primary,
+                                borderColor: themeColors.primary,
+                              },
+                              !isSelected && {
+                                borderColor: themeColors.border,
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                              },
+                            ]}
+                            onPress={() => setEnvironmentType(typeOption.key)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
+                          >
+                            <Text
+                              style={[
+                                styles.chipText,
+                                isSelected ? { color: '#FFF' } : { color: themeColors.textPrimary },
+                              ]}
+                            >
+                              {typeOption.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </GlassCard>
+
+              {structuredSport && !isWideLayout && (
+                <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>
+              )}
+
+              {/* Manual Duration (for simple sports) */}
+              {!['running', 'cycling', 'swimming'].includes(sportType) && (
+                <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+                  <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                    {t('training.duration').toUpperCase()}
+                  </Text>
+                  <View style={styles.formRow}>
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.estimatedDurationMin')}
+                    </Text>
+                    <TextInput
+                      style={[styles.rowInput, { color: themeColors.textPrimary }]}
+                      keyboardType="numeric"
+                      placeholder="60"
+                      value={manualDuration}
+                      placeholderTextColor={themeColors.textSecondary}
+                      onChangeText={setManualDuration}
+                      textAlign="right"
+                    />
+                  </View>
+                  <Text style={[styles.helperDescription, { color: themeColors.textSecondary, marginTop: 8 }]}>
+                    {t('training.planningInfoOnly')}
+                  </Text>
+                </GlassCard>
+              )}
+
+              {!structuredSport && !isWideLayout && (
+                <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>
+              )}
+
+              {/* Block 3: Configuración */}
+              {sportType === 'running' && (
+                <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+                  <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                    {t('navigation.workoutSettings').toUpperCase()}
+                  </Text>
+
+                  {/* Surface Selector */}
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSurfaceModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.surfaceLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.surfaceLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: surface ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {surface ? getSurfaceDisplayLabel(surface) : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Zapatillas (Coming Soon) */}
+                  <View style={[styles.formRow, { borderBottomWidth: 0, opacity: 0.5 }]}>
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.shoesLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text style={[styles.rowValueText, { color: themeColors.textSecondary }]}>
+                        {t('training.comingSoon')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </View>
+                </GlassCard>
+              )}
+
+              {/* Block 4: Programación */}
+              <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+                <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                  {t('training.scheduleForWeekday').toUpperCase()}
+                </Text>
+                <View style={{ marginTop: 8 }}>
+                  <WeekDaySelector
+                    selectedDays={scheduledDays}
+                    onDaysChange={setScheduledDays}
+                    isRecurring={isRecurring}
+                    onToggleRecurring={() => setIsRecurring(!isRecurring)}
+                    singleSelect={true}
+                  />
                 </View>
               </GlassCard>
+            </ScrollView>
+
+            {isWideLayout && (
+              <ScrollView
+                style={styles.summarySidePanel}
+                contentContainerStyle={[styles.summarySidePanelContent, { paddingBottom: mainContentBottomPadding }]}
+                showsVerticalScrollIndicator={false}
+              >
+                {renderTemplateSummary(sportType)}
+              </ScrollView>
             )}
-
-            {/* Block 4: Programación */}
-            <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
-              <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
-                {t('training.scheduleForWeekday').toUpperCase()}
-              </Text>
-              <View style={{ marginTop: 8 }}>
-                <WeekDaySelector
-                  selectedDays={scheduledDays}
-                  onDaysChange={setScheduledDays}
-                  isRecurring={isRecurring}
-                  onToggleRecurring={() => setIsRecurring(!isRecurring)}
-                  singleSelect={true}
-                />
-              </View>
-            </GlassCard>
-
-            {/* Save Button */}
-            <TouchableOpacity
-              style={[
-                styles.saveTemplateBtn,
-                {
-                  backgroundColor: themeColors.primary,
-                  shadowColor: themeColors.primary,
-                  shadowOpacity: 0.3,
-                  shadowRadius: 10,
-                  shadowOffset: { width: 0, height: 4 },
-                },
-              ]}
-              onPress={handleSave}
-            >
-              <Text style={styles.saveTemplateBtnText}>{t('training.saveTemplate')}</Text>
-            </TouchableOpacity>
-
-            <View style={{ height: contentBottomPadding }} />
-          </ScrollView>
+          </View>
         ) : (
           /* Steps Builder View */
-          <View style={styles.content}>
+          <View style={[styles.content, isWideLayout && styles.builderLayoutWide]}>
             <ScrollView
-              style={styles.scrollContainer}
-              contentContainerStyle={[styles.listContent, { paddingBottom: contentBottomPadding }]}
+              style={[styles.scrollContainer, isWideLayout && styles.builderColumnWide]}
+              contentContainerStyle={[
+                styles.listContent,
+                isWideLayout && styles.listContentWide,
+                { paddingBottom: builderContentBottomPadding },
+              ]}
               showsVerticalScrollIndicator={true}
             >
               {steps.length === 0 ? (
@@ -1365,67 +1358,84 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     styles.addStepButton,
                     {
                       backgroundColor: themeColors.primary,
-                      shadowColor: themeColors.primary,
-                      shadowOpacity: 0.3,
-                      shadowRadius: 10,
-                      shadowOffset: { width: 0, height: 4 },
                     },
                   ]}
                   onPress={() => handleAddStepPress(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('training.addStep')}
                 >
                   <Plus size={20} color="#FFF" />
                   <Text style={styles.addStepButtonText}>{t('training.addStep')}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.addRepButton, dynamicStyles.secondaryButton]} onPress={handleAddGroup}>
+                <TouchableOpacity
+                  style={[styles.addRepButton, dynamicStyles.secondaryButton]}
+                  onPress={handleAddGroup}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('training.repetitions')}
+                >
                   <Repeat size={20} color={themeColors.primary} />
                 </TouchableOpacity>
               </View>
-
-              <View style={{ height: contentBottomPadding }} />
             </ScrollView>
 
-            {/* Summary Footer */}
-            <View style={[styles.summaryFooterContainer, { bottom: footerBottomPosition }]}>
-              <LiquidGlassFooter style={styles.summaryGlass} borderRadius={30}>
-                <View style={styles.summaryContent}>
-                  <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>{t('training.totalTime')}</Text>
-                    <View style={styles.summaryValueContainer}>
-                      <Clock size={16} color={themeColors.textPrimary} style={{ marginRight: 6 }} />
-                      <Text style={[styles.summaryValue, { color: themeColors.textPrimary }]}>
-                        {formatTime(Math.round(totalDuration))}
-                      </Text>
+            {isWideLayout ? (
+              <ScrollView
+                style={styles.summarySidePanel}
+                contentContainerStyle={[styles.summarySidePanelContent, { paddingBottom: builderContentBottomPadding }]}
+                showsVerticalScrollIndicator={false}
+              >
+                {renderTemplateSummary(sportType, false)}
+              </ScrollView>
+            ) : (
+              <View style={[styles.summaryFooterContainer, { bottom: footerBottomPosition }]}>
+                <LiquidGlassFooter style={styles.summaryGlass} borderRadius={30}>
+                  <View style={styles.summaryContent}>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>{t('training.totalTime')}</Text>
+                      <View style={styles.summaryValueContainer}>
+                        <Clock size={16} color={themeColors.textPrimary} style={{ marginRight: 6 }} />
+                        <Text style={[styles.summaryValue, { color: themeColors.textPrimary }]}>
+                          {formatTime(Math.round(totalDuration))}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={[styles.summaryDivider, { backgroundColor: themeColors.border }]} />
+
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>{t('training.distanceParenAllCaps')}</Text>
+                      <View style={styles.summaryValueContainer}>
+                        <Activity size={16} color={themeColors.textPrimary} style={{ marginRight: 6 }} />
+                        <Text style={[styles.summaryValue, { color: themeColors.textPrimary }]}>
+                          {convertDistanceToUi(totalDistance, 2).value} {convertDistanceToUi(totalDistance, 2).unit}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-
-                  <View style={styles.summaryDivider} />
-
-                  <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>{t('training.distanceParenAllCaps')}</Text>
-                    <View style={styles.summaryValueContainer}>
-                      <Activity size={16} color={themeColors.textPrimary} style={{ marginRight: 6 }} />
-                      <Text style={[styles.summaryValue, { color: themeColors.textPrimary }]}>
-                        {convertDistanceToUi(totalDistance, 2).value} {convertDistanceToUi(totalDistance, 2).unit}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </LiquidGlassFooter>
-            </View>
+                </LiquidGlassFooter>
+              </View>
+            )}
           </View>
         )}
 
         {/* Goal Selector Modal */}
         <Modal
-          animationType="slide"
+          animationType={isWideLayout ? 'fade' : 'slide'}
           transparent={true}
           visible={goalModalVisible}
           onRequestClose={() => setGoalModalVisible(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setGoalModalVisible(false)}>
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setGoalModalVisible(false)}
+          >
             <Pressable
-              style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
               onPress={e => e.stopPropagation()}
             >
               <View style={styles.modalHandle} />
@@ -1519,14 +1529,21 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
         {/* Surface Selector Modal */}
         <Modal
-          animationType="slide"
+          animationType={isWideLayout ? 'fade' : 'slide'}
           transparent={true}
           visible={surfaceModalVisible}
           onRequestClose={() => setSurfaceModalVisible(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setSurfaceModalVisible(false)}>
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setSurfaceModalVisible(false)}
+          >
             <Pressable
-              style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
               onPress={e => e.stopPropagation()}
             >
               <View style={styles.modalHandle} />
@@ -1624,6 +1641,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    minHeight: 0,
   },
   header: {
     flexDirection: 'row',
@@ -1634,11 +1652,41 @@ const styles = StyleSheet.create({
   headerTitle: { ...typography.h4, fontWeight: 'bold', color: colors.textPrimary },
   saveText: { ...typography.body, color: colors.primary, fontWeight: 'bold' },
   headerButton: {
+    minWidth: 52,
+    minHeight: 44,
     padding: spacing.s,
+    justifyContent: 'center',
   },
-  content: { flex: 1 },
-  scrollContainer: { flex: 1 },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerPlaceholder: {
+    width: 52,
+    height: 44,
+  },
+  content: { flex: 1, minHeight: 0 },
+  scrollContainer: { flex: 1, minHeight: 0 },
   listContent: { padding: spacing.m },
+  listContentWide: {
+    paddingHorizontal: 0,
+    paddingTop: spacing.s,
+  },
+  builderLayoutWide: {
+    flexDirection: 'row',
+    minHeight: 0,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 1200,
+    gap: spacing.xl,
+    paddingHorizontal: spacing.l,
+  },
+  builderColumnWide: {
+    flex: 1,
+    minHeight: 0,
+    maxWidth: 700,
+  },
   loadingState: {
     flex: 1,
     alignItems: 'center',
@@ -1676,7 +1724,11 @@ const styles = StyleSheet.create({
     gap: spacing.s,
   },
   stepActionBtn: {
-    padding: 4,
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: spacing.s,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stepInfoProps: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   phaseIndicator: { width: 12, height: 12, borderRadius: 2, marginRight: 8 },
@@ -1779,8 +1831,13 @@ const styles = StyleSheet.create({
   },
   sportSelectionContainer: {
     padding: spacing.m,
-    paddingBottom: 100,
     alignItems: 'center',
+  },
+  sportSelectionContainerWide: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 960,
+    paddingTop: spacing.xl,
   },
   sportSelectionTitle: {
     ...typography.h3,
@@ -1794,6 +1851,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: spacing.l,
+  },
+  sportGridWide: {
+    maxWidth: 760,
   },
   sportCard: {
     width: '40%',
@@ -1812,6 +1872,11 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  sportCardWide: {
+    width: 168,
+    minHeight: 132,
+    justifyContent: 'center',
+  },
   sportIcon: {
     width: 64,
     height: 64,
@@ -1827,6 +1892,40 @@ const styles = StyleSheet.create({
   },
   mainFormContainer: {
     padding: spacing.m,
+  },
+  mainFormContainerWide: {
+    paddingHorizontal: 0,
+    paddingTop: spacing.s,
+  },
+  responsiveLayout: {
+    flex: 1,
+    minHeight: 0,
+  },
+  responsiveLayoutWide: {
+    flexDirection: 'row',
+    overflow: 'hidden',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: 1200,
+    gap: spacing.xl,
+    paddingHorizontal: spacing.l,
+  },
+  mainColumn: {
+    flex: 1,
+    minHeight: 0,
+  },
+  mainColumnWide: {
+    maxWidth: 700,
+  },
+  summarySidePanel: {
+    width: 340,
+    minHeight: 0,
+  },
+  summarySidePanelContent: {
+    paddingTop: spacing.s,
+  },
+  compactSummary: {
+    marginBottom: spacing.l,
   },
   profileHeader: {
     flexDirection: 'row',
@@ -1858,20 +1957,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.l,
     borderRadius: borderRadius.l,
   },
-  blockHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.m,
-  },
   blockTitle: {
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: 1,
     marginBottom: 6,
-  },
-  blockSubtitle: {
-    fontSize: 12,
   },
   formRow: {
     flexDirection: 'row',
@@ -1917,6 +2007,8 @@ const styles = StyleSheet.create({
     gap: spacing.s,
   },
   chipButton: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderWidth: 1,
@@ -1927,61 +2019,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  designButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: borderRadius.m,
-    marginTop: spacing.s,
-    marginBottom: spacing.m,
-  },
-  designButtonText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  stepsSummaryGrid: {
-    flexDirection: 'row',
-    marginTop: spacing.xs,
-    paddingTop: spacing.s,
-    borderTopWidth: 1,
-    borderColor: 'rgba(150,150,150,0.1)',
-  },
-  summaryGridCol: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xs,
-  },
-  gridLabel: {
-    fontSize: 10,
-    marginBottom: 4,
-  },
-  gridValue: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
   helperDescription: {
     fontSize: 12,
     lineHeight: 16,
-  },
-  saveTemplateBtn: {
-    paddingVertical: 16,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.s,
-  },
-  saveTemplateBtnText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
+  },
+  modalOverlayWide: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.l,
   },
   modalCard: {
     borderTopLeftRadius: 24,
@@ -1993,6 +2043,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 10,
+  },
+  modalCardWide: {
+    width: '100%',
+    maxWidth: 560,
+    borderRadius: 24,
+    maxHeight: '84%',
   },
   modalTitle: {
     fontSize: 18,
