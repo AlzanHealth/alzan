@@ -106,12 +106,32 @@ function cloneEmptyStreams(): CanonicalActivityStreams {
   };
 }
 
-function mapStravaSport(rawSportType: string | null, trainer: boolean | null): CanonicalActivitySportMapping {
+function mapStravaSport(
+  rawSportType: string | null,
+  trainer: boolean | null,
+  workoutType?: number | null,
+  name?: string | null,
+): CanonicalActivitySportMapping {
   const sportType = rawSportType?.trim() ?? '';
   const normalised = sportType.toLowerCase();
+  if (normalised === 'walk') return { sportType: 'running', sportSubtype: 'walk' };
   if (normalised === 'trailrun') return { sportType: 'running', sportSubtype: 'trail' };
   if (normalised === 'virtualrun') return { sportType: 'running', sportSubtype: 'indoor' };
-  if (normalised === 'run') return { sportType: 'running', sportSubtype: trainer ? 'indoor' : 'road' };
+  if (normalised === 'run') {
+    if (workoutType === 3) return { sportType: 'running', sportSubtype: 'race' };
+    const nameLower = (name || '').toLowerCase();
+    if (
+      nameLower.includes('carrera') ||
+      nameLower.includes('race') ||
+      nameLower.includes('maratón') ||
+      nameLower.includes('maraton') ||
+      nameLower.includes('competition') ||
+      nameLower.includes('competición')
+    ) {
+      return { sportType: 'running', sportSubtype: 'race' };
+    }
+    return { sportType: 'running', sportSubtype: trainer ? 'indoor' : 'road' };
+  }
   if (normalised === 'mountainbikeride' || normalised === 'gravelride' || normalised === 'emountainbikeride') {
     return { sportType: 'cycling', sportSubtype: 'trail' };
   }
@@ -482,7 +502,9 @@ export function parseStravaActivityJsonToCanonical(
   if (!isRecord(parsed)) throw new Error('Invalid Strava JSON file.');
   const sportType = readStravaSportType(parsed);
   const trainer = readBoolean(parsed.trainer);
-  const sport = mapStravaSport(sportType, trainer);
+  const workoutType = readNumber(parsed.workout_type) ?? readNumber(parsed.workoutType);
+  const name = readString(parsed.name);
+  const sport = mapStravaSport(sportType, trainer, workoutType, name);
   const startedAt = normaliseTimestamp(parsed.start_date);
   const durationSeconds = readNumber(parsed.moving_time) ?? readNumber(parsed.elapsed_time);
   const elapsedSeconds = readNumber(parsed.elapsed_time) ?? durationSeconds;

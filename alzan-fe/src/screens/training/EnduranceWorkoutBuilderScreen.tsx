@@ -9,6 +9,8 @@ import {
   ActionSheetIOS,
   Platform,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -25,7 +27,7 @@ import {
   Trash2,
   MoreVertical,
   ArrowLeft,
-  Trophy,
+  ChevronRight,
 } from 'lucide-react-native';
 import { EnduranceStepEditorModal } from './components/EnduranceStepEditorModal';
 import { WeekDaySelector } from '../../components/training/WeekDaySelector';
@@ -40,9 +42,8 @@ import { LiquidGlassFooter } from '../../components/common/LiquidGlassFooter';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SportIcon } from '../../components/icons/SportIcon';
 import { SPORT_COLORS } from '../../theme/sportColors';
-import { SPORT_GOALS } from '../../constants/sports';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
-import { DurationType, PhaseType, SportType, TargetType, WorkoutGoal } from '../../types/requests.types';
+import { DurationType, PhaseType, SportType, TargetType } from '../../types/requests.types';
 import { Nullable } from '../../types/common.types';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
@@ -72,46 +73,47 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const { saveWorkout } = useEnduranceWorkoutBuilder();
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
-  // Dynamic tab bar height with safe fallback
   const insets = useSafeAreaInsets();
 
-  // Custom Floating Tab Bar = 75 (height) + 30 (bottom) = 105
-  // Target Visual Position = 105 + 20 (gap) = 125 from screen bottom
-  // Since this is inside SafeAreaView, we subtract insets.bottom
   const footerBottomPosition = Math.max(20, 125 - insets.bottom);
+  const contentBottomPadding = 125 + 100 + 20;
 
-  const contentBottomPadding = 125 + 100 + 20; // 125 + footer height + extra gap
   const getWeekdayName = (dayIndex: number) => {
     const baseSunday = new Date(2024, 0, 7); // Sunday
     return format(addDays(baseSunday, dayIndex), 'EEEE', { locale: getDateFnsLocale() });
   };
 
-  // Edit mode: check if templateId is passed
   const templateId = route.params?.templateId;
   const isEditMode = !!templateId;
 
-  // Wizard State
-  const [wizardStep, setWizardStep] = useState<1 | 2>(1);
+  // View state: 'main' (Form) | 'builder' (Steps List editor)
+  const [currentView, setCurrentView] = useState<'main' | 'builder'>('main');
 
   // Data State
   const [steps, setSteps] = useState<Step[]>([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [trainingGoal, setTrainingGoal] = useState<WorkoutGoal | undefined>(undefined);
+  const [trainingGoal, setTrainingGoal] = useState<string | undefined>(undefined);
+  const [customGoalText, setCustomGoalText] = useState('');
   const [sportType, setSportType] = useState<Nullable<SportType>>(route.params?.sportType || null);
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
-  const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null); // Track original day for edit mode
+  const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [manualDuration, setManualDuration] = useState<string>(''); // For 'other' sports
+  const [manualDuration, setManualDuration] = useState<string>('');
+  const [environmentType, setEnvironmentType] = useState<string | null>(null);
+  const [surface, setSurface] = useState<string | null>(null);
 
-  // Modal State
+  // Modals visibility
+  const [goalModalVisible, setGoalModalVisible] = useState(false);
+  const [surfaceModalVisible, setSurfaceModalVisible] = useState(false);
+
+  // Step Modals
   const [modalVisible, setModalVisible] = useState(false);
   const [editingStep, setEditingStep] = useState<Step | null>(null);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [repsModalVisible, setRepsModalVisible] = useState(false);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
-  // Helpers (Moved inside to access hooks/state if needed, though formatTime is static)
   const formatTime = (seconds: number) => {
     if (seconds >= 3600) {
       const hours = Math.floor(seconds / 3600);
@@ -128,8 +130,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const formatTarget = (step: Step) => {
     if (step.target_type === 'pace') {
       const paceSeconds = step.target_min || 0;
-      // Convert s/km -> speed m/s -> UI unit
-      // Hook expects m/s
       const speedMps = paceSeconds ? 1000 / paceSeconds : 0;
       if (!speedMps) return '';
 
@@ -140,16 +140,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return `Zona ${step.target_min || step.target_max || '?'}`;
     }
     if (step.target_type === 'speed') {
-      // Standardizing speed target storage to m/s?
-      // If stored as km/h (legacy), we need to know.
-      // If we standardized EnduranceStepEditorModal to store as km/h for legacy reasons:
       const val = step.target_min || 0;
-      // convertSpeedToUi expects m/s
-      // assuming val is km/h
       const mps = val / 3.6;
       const { label } = convertSpeedToUi(mps, sportType!);
-      // Label might include "km/h" or "mph"
-      // If formatTarget wants just value + unit:
       return label;
     }
     if (step.target_type === 'none') return '';
@@ -180,11 +173,20 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (existingTemplate) {
       setName(existingTemplate.base_name || '');
       setDescription(existingTemplate.description || '');
-      setTrainingGoal(existingTemplate.workout_goal || 'resistencia');
+
+      const goalValue = existingTemplate.workout_goal || undefined;
+      setTrainingGoal(goalValue);
+      if (goalValue && isCustomGoal(goalValue)) {
+        setCustomGoalText(goalValue);
+      }
+
       setSportType((existingTemplate.sport_type as SportType) || 'running');
+      setEnvironmentType(existingTemplate.environment_type || null);
+      setSurface(existingTemplate.surface || null);
+
       if (existingTemplate.scheduled_day !== null && existingTemplate.scheduled_day !== undefined) {
         setScheduledDays([existingTemplate.scheduled_day]);
-        setOriginalScheduledDay(existingTemplate.scheduled_day); // Store original for comparison
+        setOriginalScheduledDay(existingTemplate.scheduled_day);
       } else {
         setScheduledDays([]);
         setOriginalScheduledDay(null);
@@ -230,39 +232,75 @@ export const EnduranceWorkoutBuilderScreen = () => {
     }
   }, [existingTemplate]);
 
+  // Goal options mapping helper
+  const isCustomGoal = (goal?: string) => {
+    if (!goal) return false;
+    return !['resistencia', 'velocidad', 'tempo_umbral', 'tirada_larga', 'recuperacion', 'test'].includes(goal);
+  };
+
+  const getStructuredGoals = () => {
+    return [
+      { key: 'resistencia', title: t('training.goalResistenciaTitle'), desc: t('training.goalResistenciaDesc') },
+      { key: 'velocidad', title: t('training.goalVelocidadTitle'), desc: t('training.goalVelocidadDesc') },
+      { key: 'tempo_umbral', title: t('training.goalTempoTitle'), desc: t('training.goalTempoDesc') },
+      { key: 'tirada_larga', title: t('training.goalTiradaLargaTitle'), desc: t('training.goalTiradaLargaDesc') },
+      { key: 'recuperacion', title: t('training.goalRecuperacionTitle'), desc: t('training.goalRecuperacionDesc') },
+      { key: 'test', title: t('training.goalTestTitle'), desc: t('training.goalTestDesc') },
+      { key: 'custom', title: t('training.goalCustomTitle'), desc: t('training.goalCustomDesc') },
+    ];
+  };
+
+  const getGoalDisplayLabel = (goal?: string) => {
+    if (!goal) return '';
+    const match = getStructuredGoals().find(g => g.key === goal);
+    if (match && match.key !== 'custom') {
+      return match.title;
+    }
+    return goal;
+  };
+
+  // Surface options
+  const getRunningSurfaces = () => {
+    return [
+      { key: 'asfalto', label: t('training.surfaceAsphalt') },
+      { key: 'pista', label: t('training.surfaceTrack') },
+      { key: 'tierra', label: t('training.surfaceDirt') },
+      { key: 'hierba', label: t('training.surfaceGrass') },
+      { key: 'cinta', label: t('training.surfaceTreadmill') },
+    ];
+  };
+
+  const getSurfaceDisplayLabel = (surf?: string | null) => {
+    if (!surf) return '';
+    const match = getRunningSurfaces().find(s => s.key === surf);
+    return match ? match.label : surf;
+  };
+
   // Helper to estimate missing values
   const getStepEstimates = (step: Step): { duration: number; distance: number } => {
     let duration = 0;
     let distance = 0;
 
-    // 1. Get known values
     if (step.duration_type === 'time') duration = step.duration_s || 0;
     if (step.duration_type === 'distance') distance = step.distance_m || 0;
 
-    // 2. Estimate missing if valid target exists
     if (step.target_type === 'pace' && step.target_min && step.target_min > 0) {
-      // Pace is in seconds per unit (km or 100m)
       const isSwim = sportType === 'swimming';
       const unitMeters = isSwim ? 100 : 1000;
       const secsPerUnit = step.target_min;
 
       if (step.duration_type === 'distance' && distance > 0) {
-        // Time = (Dist / Unit) * Pace
-        duration = (distance / unitMeters) * secsPerUnit; // seconds
+        duration = (distance / unitMeters) * secsPerUnit;
       } else if (step.duration_type === 'time' && duration > 0) {
-        // Dist = (Time / Pace) * Unit
-        distance = (duration / secsPerUnit) * unitMeters; // meters
+        distance = (duration / secsPerUnit) * unitMeters;
       }
     } else if (step.target_type === 'speed' && step.target_min && step.target_min > 0) {
-      // Speed is in km/h
       const kmh = step.target_min;
-      const mps = (kmh * 1000) / 3600; // meters per second
+      const mps = (kmh * 1000) / 3600;
 
       if (step.duration_type === 'distance' && distance > 0) {
-        // Time = Dist / Speed
         duration = distance / mps;
       } else if (step.duration_type === 'time' && duration > 0) {
-        // Dist = Time * Speed
         distance = duration * mps;
       }
     }
@@ -296,6 +334,60 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   const { totalDuration, totalDistance } = calculateSummary();
 
+  const getSummaryBlocks = () => {
+    let warmupStr = '--';
+    let workStr = '--';
+    let cooldownStr = '--';
+
+    const warmupStep = steps.find(s => s.phase_type === 'warmup');
+    if (warmupStep) {
+      warmupStr =
+        warmupStep.duration_type === 'distance'
+          ? `${convertDistanceToUi(warmupStep.distance_m || 0, 0).value} ${convertDistanceToUi(warmupStep.distance_m || 0, 0).unit}`
+          : warmupStep.duration_type === 'time'
+            ? `${Math.round((warmupStep.duration_s || 0) / 60)} min`
+            : t('training.lapButton');
+    }
+
+    const groupStep = steps.find(s => s.is_group);
+    if (groupStep) {
+      const rep = groupStep.repetitions || 1;
+      const firstChild = groupStep.children?.[0];
+      let val = '';
+      if (firstChild) {
+        val =
+          firstChild.duration_type === 'distance'
+            ? `${firstChild.distance_m || 0}m`
+            : firstChild.duration_type === 'time'
+              ? formatTime(firstChild.duration_s || 0)
+              : 'Lap';
+      }
+      workStr = `${rep}x${val}`;
+    } else {
+      const intervalStep = steps.find(s => s.phase_type === 'interval');
+      if (intervalStep) {
+        workStr =
+          intervalStep.duration_type === 'distance'
+            ? `${convertDistanceToUi(intervalStep.distance_m || 0, 1).value} ${convertDistanceToUi(intervalStep.distance_m || 0, 1).unit}`
+            : intervalStep.duration_type === 'time'
+              ? formatTime(intervalStep.duration_s || 0)
+              : 'Lap';
+      }
+    }
+
+    const cooldownStep = steps.find(s => s.phase_type === 'cooldown' || s.phase_type === 'recovery');
+    if (cooldownStep) {
+      cooldownStr =
+        cooldownStep.duration_type === 'distance'
+          ? `${convertDistanceToUi(cooldownStep.distance_m || 0, 0).value} ${convertDistanceToUi(cooldownStep.distance_m || 0, 0).unit}`
+          : cooldownStep.duration_type === 'time'
+            ? `${Math.round((cooldownStep.duration_s || 0) / 60)} min`
+            : 'Lap';
+    }
+
+    return { warmupStr, workStr, cooldownStr };
+  };
+
   const renderEstimatedValue = (step: Step) => {
     const { duration, distance } = getStepEstimates(step);
 
@@ -311,54 +403,46 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   const executeSave = async () => {
     try {
-      // Logic for One-Off scheduling vs Recurring
-      // If isRecurring is FALSE but scheduledDays has items -> It's a one-off plan for next occurrences
       const isOneOff = !isRecurring && scheduledDays.length > 0;
-
-      // Prepare data for Template (recurring day is saved ONLY if isRecurring is true)
-      // LIMITATION: DB only supports one day for recurring. We take the first one.
       const templateScheduledDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
+
+      const finalGoal = trainingGoal === 'custom' ? customGoalText : trainingGoal;
 
       const result = await saveWorkout.mutateAsync({
         data: {
           base_name: name,
           description,
           sport_type: sportType || 'running',
-          workout_goal: trainingGoal,
+          workout_goal: finalGoal,
           total_duration_s: ['running', 'cycling', 'swimming'].includes(sportType || '')
             ? Math.round(totalDuration)
             : (parseInt(manualDuration) || 0) * 60,
           total_distance_m: Math.round(totalDistance),
           scheduled_day: templateScheduledDay,
+          environment_type: environmentType,
+          surface: surface,
         },
         steps: steps as BuilderStep[],
-        templateId: templateId, // Pass templateId for edit mode
+        templateId: templateId,
       });
 
-      // Handle One-Off Plan Creation (Multi-Day Support)
       if (isOneOff && user) {
-        // Iterate through ALL selected days
         for (const day of scheduledDays) {
-          // Calculate next occurrence of this specific day
           let targetDate = new Date();
-          // Safety loop to find next occurrence
           for (let i = 0; i < 7; i++) {
             if (targetDate.getDay() === day) break;
             targetDate = addDays(targetDate, 1);
           }
           const formattedDate = format(targetDate, 'yyyy-MM-dd');
 
-          // Insert into workout_plans
           const { error: planError } = await supabase.from('workout_plans').insert({
             user_id: user.id,
             planned_date: formattedDate,
-            endurance_template_id: result.id, // Use the ID returned from saveWorkout
+            endurance_template_id: result.id,
           });
 
           if (planError) {
             console.error(`Error creating one-off plan for day ${day}:`, planError);
-          } else {
-            console.log(`Plan created for day ${day}:`, formattedDate);
           }
         }
       }
@@ -381,24 +465,77 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const handleSave = async () => {
-    if (!name) {
-      Alert.alert(t('common.error'), t('training.workoutNameRequired'));
+    const missingFields: string[] = [];
+    if (!name.trim()) {
+      missingFields.push('name');
+    }
+    if (sportType === 'running' && !environmentType) {
+      missingFields.push('type');
+    }
+    if (!trainingGoal) {
+      missingFields.push('goal');
+    }
+
+    if (missingFields.length > 0) {
+      const fieldLabels = missingFields.map(f => {
+        if (f === 'name') return t('training.fieldName');
+        if (f === 'type') return t('training.fieldType');
+        return t('training.fieldGoal');
+      });
+
+      let fieldsText = '';
+      if (fieldLabels.length === 1) {
+        fieldsText = fieldLabels[0];
+      } else if (fieldLabels.length === 2) {
+        fieldsText = `${fieldLabels[0]} ${t('common.and')} ${fieldLabels[1]}`;
+      } else {
+        const last = fieldLabels.pop();
+        fieldsText = `${fieldLabels.join(', ')} ${t('common.and')} ${last}`;
+      }
+
+      Alert.alert(t('training.validationErrorTitle'), t('training.validationErrorMessage', { fields: fieldsText }));
       return;
     }
 
-    // VALIDATION: If Recurring is checked, a day MUST be selected
     if (isRecurring && scheduledDays.length === 0) {
       Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
       return;
     }
 
-    // Check if day changed in edit mode
-    const newDay = scheduledDays.length > 0 ? scheduledDays[0] : null;
-    const dayChanged = isEditMode && originalScheduledDay !== null && newDay !== originalScheduledDay;
+    const effectiveNewDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
+    const dayChanged =
+      isEditMode && originalScheduledDay !== null && isRecurring && effectiveNewDay !== originalScheduledDay;
+    const recurrenceRemoved = isEditMode && originalScheduledDay !== null && !isRecurring;
 
-    if (dayChanged) {
+    if (recurrenceRemoved) {
+      Alert.alert(t('training.recurrenceRemovedTitle'), t('training.recurrenceRemovedMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('training.confirm'),
+          style: 'destructive',
+          onPress: async () => {
+            if (user && templateId) {
+              const today = format(new Date(), 'yyyy-MM-dd');
+              const { data: matchingPlans, error: selectError } = await supabase
+                .from('workout_plans')
+                .select('id, planned_date, completed_at')
+                .eq('endurance_template_id', templateId)
+                .eq('user_id', user.id)
+                .gte('planned_date', today)
+                .is('completed_at', null);
+
+              if (!selectError && matchingPlans && matchingPlans.length > 0) {
+                const idsToDelete = matchingPlans.map(p => p.id);
+                await supabase.from('workout_plans').delete().in('id', idsToDelete);
+              }
+            }
+            await executeSave();
+          },
+        },
+      ]);
+    } else if (dayChanged) {
       const oldDayName = getWeekdayName(originalScheduledDay);
-      const newDayName = newDay !== null ? getWeekdayName(newDay) : t('training.none');
+      const newDayName = effectiveNewDay !== null ? getWeekdayName(effectiveNewDay) : t('training.none');
 
       Alert.alert(
         t('training.dayChangeTitle'),
@@ -409,39 +546,26 @@ export const EnduranceWorkoutBuilderScreen = () => {
             text: t('training.confirm'),
             style: 'destructive',
             onPress: async () => {
-              // Delete future workout_plans for the old day ONLY
-              // Only delete plans that:
-              // 1. Are for this template
-              // 2. Are in the future
-              // 3. Fall on the OLD day of the week (originalScheduledDay)
-              // 4. Are NOT completed
               if (user && templateId && originalScheduledDay !== null) {
                 const today = format(new Date(), 'yyyy-MM-dd');
-
-                // Fetch all future plans for this template
                 const { data: matchingPlans, error: selectError } = await supabase
                   .from('workout_plans')
                   .select('id, planned_date, completed_at')
                   .eq('endurance_template_id', templateId)
                   .eq('user_id', user.id)
                   .gte('planned_date', today)
-                  .is('completed_at', null); // Only non-completed
+                  .is('completed_at', null);
 
                 if (!selectError && matchingPlans && matchingPlans.length > 0) {
-                  // Filter to only those that match the old day of week
                   const plansToDelete = matchingPlans.filter(plan => {
-                    const planDate = new Date(plan.planned_date + 'T00:00:00'); // Avoid timezone issues
-                    const planDayOfWeek = planDate.getDay(); // 0 = Sunday
+                    const planDate = new Date(plan.planned_date + 'T00:00:00');
+                    const planDayOfWeek = planDate.getDay();
                     return planDayOfWeek === originalScheduledDay;
                   });
 
                   if (plansToDelete.length > 0) {
                     const idsToDelete = plansToDelete.map(p => p.id);
-                    const { error: deleteError } = await supabase.from('workout_plans').delete().in('id', idsToDelete);
-
-                    if (deleteError) {
-                      console.error('Error deleting future plans:', deleteError);
-                    }
+                    await supabase.from('workout_plans').delete().in('id', idsToDelete);
                   }
                 }
               }
@@ -468,7 +592,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   const handleSaveStep = (newStep: Step) => {
     if (editingStep) {
-      // Update existing
       if (activeGroupId) {
         setSteps(prev =>
           prev.map(s => {
@@ -482,7 +605,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
         setSteps(prev => updateStepInTree(prev, newStep));
       }
     } else {
-      // Create new
       if (activeGroupId) {
         setSteps(prev =>
           prev.map(s => {
@@ -508,7 +630,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
     });
   };
 
-  // Group helper
   const handleAddGroup = () => {
     const newGroup: Step = {
       id: Math.random().toString(),
@@ -727,33 +848,31 @@ export const EnduranceWorkoutBuilderScreen = () => {
     );
   };
 
+  const getSportTitle = () => {
+    if (!sportType) return '';
+    return t(`constants.${sportType}`);
+  };
+
+  const summaryBlocks = getSummaryBlocks();
+
   return (
     <LinearGradient
       colors={[themeColors.gradientStart || themeColors.background, themeColors.gradientEnd || themeColors.background]}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
-        {/* Normal Header */}
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => {
-              // Logic for Back Button
-              // 1. If currently selecting sport (wizardStep 1, no sportType) -> Go Back to Home
-              if (wizardStep === 1 && !sportType) {
+              if (currentView === 'builder') {
+                setCurrentView('main');
+              } else if (!sportType) {
                 navigation.goBack();
-              }
-              // 2. If sport selected but in "Simple" mode (not endurance) -> Clear sport, go back to selection
-              else if (!['running', 'cycling', 'swimming'].includes(sportType || '')) {
+              } else if (!['running', 'cycling', 'swimming'].includes(sportType)) {
                 setSportType(null);
-                setWizardStep(1); // Reset just in case
-              }
-              // 3. If in step 1 of Endurance Builder (sportType set) -> Clear sport, go back to selection
-              else if (wizardStep === 1 && sportType && !isEditMode) {
+              } else if (sportType && !isEditMode) {
                 setSportType(null);
-              }
-              // 4. If in step 2 (Settings) of Endurance Builder -> Go back to Step 1
-              else if (wizardStep === 2) {
-                setWizardStep(1);
               } else {
                 navigation.goBack();
               }
@@ -769,25 +888,26 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 ? t('training.editTemplate')
                 : !sportType
                   ? t('training.chooseSport')
-                  : wizardStep === 1
-                    ? isEditMode
-                      ? t('training.editSession')
-                      : t('training.designSession')
-                    : isEditMode
-                      ? t('training.editTemplate')
-                      : t('training.saveTemplate')}
+                  : currentView === 'builder'
+                    ? t('training.designSession')
+                    : `${t('training.templates')} ${getSportTitle()}`}
             </Text>
           </View>
 
           {sportType && (
             <TouchableOpacity
               onPress={() => {
-                if (wizardStep === 1) setWizardStep(2);
-                else handleSave();
+                if (currentView === 'builder') {
+                  setCurrentView('main');
+                } else {
+                  handleSave();
+                }
               }}
               style={styles.headerButton}
             >
-              <Text style={styles.saveText}>{wizardStep === 1 ? t('common.next') : t('common.save')}</Text>
+              <Text style={styles.saveText}>
+                {currentView === 'builder' ? t('training.confirm') : t('common.save')}
+              </Text>
             </TouchableOpacity>
           )}
           {!sportType && <View style={{ width: 40 }} />}
@@ -798,6 +918,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             <ActivityIndicator size="large" color={themeColors.primary} />
           </View>
         ) : !sportType ? (
+          /* Sport Selection Grid */
           <ScrollView contentContainerStyle={styles.sportSelectionContainer}>
             <Text style={[styles.sportSelectionTitle, dynamicStyles.title]}>{t('training.planWorkoutQuery')}</Text>
 
@@ -817,9 +938,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   style={[styles.sportCard, dynamicStyles.card]}
                   onPress={() => {
                     setSportType(sport.id as SportType);
-                    if (!['running', 'cycling', 'swimming'].includes(sport.id)) {
-                      setWizardStep(2);
-                    }
+                    // Running, cycling and swimming start on main form. Others don't have workout builder.
                   }}
                 >
                   <View style={[styles.sportIcon, { backgroundColor: SPORT_COLORS[sport.id] || colors.primary }]}>
@@ -830,214 +949,508 @@ export const EnduranceWorkoutBuilderScreen = () => {
               ))}
             </View>
           </ScrollView>
-        ) : (
-          <>
-            {wizardStep === 1 ? (
-              // If we are in step 1 but sport is one of the "simple" ones (which theoretically auto-skip,
-              // but if user goes 'back' from step 2 they might land here), we should redirect or show simple view.
-              // Ideally the auto-skip handles it, but let's handle the view just in case.
-              !['running', 'cycling', 'swimming'].includes(sportType || '') ? (
-                <View style={styles.content}>
-                  <View style={styles.emptyState}>
-                    <Trophy size={64} color={themeColors.primary} style={{ marginBottom: spacing.m }} />
-                    <Text style={[styles.emptyTitle, dynamicStyles.title]}>
-                      {t('training.sessionOf')}
-                      {sportType.charAt(0).toUpperCase() + sportType.slice(1)}
-                    </Text>
-                    <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                      {t('training.configureGeneralDetails')}
-                    </Text>
-                    <TouchableOpacity
-                      style={[styles.addStepButton, { marginTop: spacing.xl, maxWidth: 200 }]}
-                      onPress={() => setWizardStep(2)}
-                    >
-                      <Text style={styles.addStepButtonText}>{t('common.next')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                // Endurance Builder (Run/Bike/Swim)
-                <View style={styles.content}>
-                  <ScrollView
-                    style={styles.scrollContainer}
-                    contentContainerStyle={[styles.listContent, { paddingBottom: contentBottomPadding }]}
-                    showsVerticalScrollIndicator={true}
+        ) : currentView === 'main' ? (
+          /* Main Redesigned Form View */
+          <ScrollView contentContainerStyle={styles.mainFormContainer} showsVerticalScrollIndicator={false}>
+            {/* Header Avatar and Info */}
+            <View style={styles.profileHeader}>
+              <View style={[styles.profileAvatar, { backgroundColor: SPORT_COLORS[sportType] + '15' }]}>
+                <SportIcon sport={sportType} size={48} color={SPORT_COLORS[sportType] || colors.primary} />
+              </View>
+              <View style={styles.profileTextContainer}>
+                <Text style={[styles.profileTitle, { color: themeColors.textPrimary }]}>{getSportTitle()}</Text>
+                <Text style={[styles.profileSubtitle, { color: themeColors.textSecondary }]}>
+                  {t('training.configureGeneralDetails')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Block 1: Información General */}
+            <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+              <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                {t('training.general').toUpperCase()}
+              </Text>
+
+              {/* Template Name input */}
+              <View style={styles.formRow}>
+                <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.templateName')}</Text>
+                <TextInput
+                  style={[styles.rowInput, { color: themeColors.textPrimary }]}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder={t('training.intervalsExample')}
+                  placeholderTextColor={themeColors.textSecondary}
+                  textAlign="right"
+                />
+              </View>
+
+              {/* Goal Selector */}
+              <TouchableOpacity style={styles.formRow} onPress={() => setGoalModalVisible(true)}>
+                <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.mainGoal')}</Text>
+                <View style={styles.rowRightValue}>
+                  <Text
+                    style={[
+                      styles.rowValueText,
+                      { color: trainingGoal ? themeColors.textPrimary : themeColors.textSecondary },
+                    ]}
+                    numberOfLines={1}
                   >
-                    {steps.length === 0 ? (
-                      <View style={[styles.emptyState, dynamicStyles.emptyState]}>
-                        <Activity
-                          size={48}
-                          color={themeColors.textSecondary}
-                          style={{ opacity: 0.5, marginBottom: spacing.m }}
-                        />
-                        <Text style={[styles.emptyTitle, dynamicStyles.title]}>{t('training.startRoutine')}</Text>
-                        <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                          {t('training.addIntervalsHint')}{' '}
-                          {sportType === 'swimming'
-                            ? t('training.swimming')
-                            : sportType === 'cycling'
-                              ? t('training.cycling')
-                              : t('constants.running')}
-                          .
-                        </Text>
-                      </View>
-                    ) : (
-                      <>{steps.map((item, index) => renderStepItem(item, index))}</>
-                    )}
-
-                    <View style={styles.actions}>
-                      <TouchableOpacity style={styles.addStepButton} onPress={() => handleAddStepPress(null)}>
-                        <Plus size={20} color="#FFF" />
-                        <Text style={styles.addStepButtonText}>{t('training.addStep')}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.addRepButton} onPress={handleAddGroup}>
-                        <Repeat size={20} color={colors.primary} />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Dynamic spacer for floating footer */}
-                    <View style={{ height: contentBottomPadding }} />
-                  </ScrollView>
-
-                  {/* Footer Summary - Liquid Glass */}
-                  <View style={[styles.summaryFooterContainer, { bottom: footerBottomPosition }]}>
-                    <LiquidGlassFooter style={styles.summaryGlass} borderRadius={30}>
-                      <View style={styles.summaryContent}>
-                        <View style={styles.summaryItem}>
-                          <Text style={styles.summaryLabel}>{t('training.totalTime')}</Text>
-                          <View style={styles.summaryValueContainer}>
-                            <Clock size={16} color={themeColors.textPrimary} style={{ marginRight: 6 }} />
-                            <Text style={[styles.summaryValue, { color: themeColors.textPrimary }]}>
-                              {formatTime(Math.round(totalDuration))}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View style={styles.summaryDivider} />
-
-                        <View style={styles.summaryItem}>
-                          <Text style={styles.summaryLabel}>{t('training.distanceParenAllCaps')}</Text>
-                          <View style={styles.summaryValueContainer}>
-                            <Activity size={16} color={themeColors.textPrimary} style={{ marginRight: 6 }} />
-                            <Text style={[styles.summaryValue, { color: themeColors.textPrimary }]}>
-                              {convertDistanceToUi(totalDistance, 2).value} {convertDistanceToUi(totalDistance, 2).unit}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </LiquidGlassFooter>
-                  </View>
+                    {trainingGoal ? getGoalDisplayLabel(trainingGoal) : t('common.select')}
+                  </Text>
+                  <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
                 </View>
-              )
-            ) : (
-              <ScrollView contentContainerStyle={styles.formContent}>
-                <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('training.templateName')}</Text>
-                  <TextInput
-                    style={[styles.input, dynamicStyles.input]}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder={t('training.intervalsExample')}
-                    placeholderTextColor={themeColors.textSecondary}
-                  />
+              </TouchableOpacity>
+
+              {/* Description Input */}
+              <View style={[styles.formRow, { flexDirection: 'column', alignItems: 'stretch', borderBottomWidth: 0 }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('settings.description')}</Text>
+                  <Text style={{ color: themeColors.textSecondary, fontSize: 11 }}>{description.length}/150</Text>
                 </View>
+                <TextInput
+                  style={[styles.rowTextArea, { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder={t('training.descriptionPlaceholder')}
+                  placeholderTextColor={themeColors.textSecondary}
+                  multiline
+                  maxLength={150}
+                />
+              </View>
 
-                <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('training.mainGoal')}</Text>
-                  <View style={styles.goalSelector}>
-                    <View style={styles.goalSelector}>
-                      {(SPORT_GOALS[sportType] || []).map(goal => {
-                        // Convert goal string to user's preferred unit
-                        const convertGoalLabel = (label: string): string => {
-                          // Match patterns like "5 km", "21 km", "400 m"
-                          const kmMatch = label.match(/^(\d+)\s*km$/i);
-                          const mMatch = label.match(/^(\d+)\s*m$/i);
-
-                          if (kmMatch) {
-                            const km = parseInt(kmMatch[1], 10);
-                            const converted = convertDistanceToUi(km * 1000, 0); // Convert km to meters
-                            return `${converted.value} ${converted.unit}`;
-                          }
-                          if (mMatch) {
-                            return label; // Keep meters as-is (swimming)
-                          }
-                          return label; // Fallback
-                        };
-
-                        const displayLabel = convertGoalLabel(goal);
-
-                        return (
-                          <TouchableOpacity
-                            key={goal}
-                            style={[styles.goalChip, trainingGoal === goal && styles.activeGoalChip]}
-                            onPress={() => setTrainingGoal(goal === trainingGoal ? undefined : trainingGoal)}
+              {/* Environment Type chips */}
+              {sportType === 'running' && (
+                <View style={styles.segmentedRow}>
+                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary, marginBottom: 8 }]}>
+                    {t('training.workoutTypeLabel')}
+                  </Text>
+                  <View style={styles.chipsContainer}>
+                    {[
+                      { key: 'road', label: t('training.runningTypeOutdoor') },
+                      { key: 'indoor', label: t('training.runningTypeTreadmill') },
+                      { key: 'race', label: t('training.runningTypeRace') },
+                      { key: 'walk', label: t('training.runningTypeWalk') },
+                    ].map(typeOption => {
+                      const isSelected =
+                        environmentType === typeOption.key ||
+                        (typeOption.key === 'road' && environmentType === 'aire_libre') ||
+                        (typeOption.key === 'indoor' && environmentType === 'cinta');
+                      return (
+                        <TouchableOpacity
+                          key={typeOption.key}
+                          style={[
+                            styles.chipButton,
+                            isSelected && { backgroundColor: themeColors.primary, borderColor: themeColors.primary },
+                            { borderColor: themeColors.border },
+                          ]}
+                          onPress={() => setEnvironmentType(typeOption.key)}
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              isSelected ? { color: '#FFF' } : { color: themeColors.textPrimary },
+                            ]}
                           >
-                            <Text
-                              style={[
-                                styles.goalText,
-                                trainingGoal === goal && styles.activeGoalText,
-                                {
-                                  color: trainingGoal === goal ? '#FFF' : themeColors.textSecondary,
-                                },
-                              ]}
-                            >
-                              {displayLabel}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
+                            {typeOption.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </GlassCard>
+
+            {/* Block 2: Entreno Específico */}
+            {['running', 'cycling', 'swimming'].includes(sportType) && (
+              <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+                <View style={styles.blockHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                      {t('training.sportsTemplate').toUpperCase()}
+                    </Text>
+                    <Text style={[styles.blockSubtitle, { color: themeColors.textSecondary }]}>
+                      {t('training.addIntervalsHint')} {getSportTitle().toLowerCase()}.
+                    </Text>
                   </View>
                 </View>
 
-                <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('settings.description')}</Text>
-                  <TextInput
-                    style={[styles.input, styles.textArea, dynamicStyles.input]}
-                    value={description}
-                    onChangeText={setDescription}
-                    placeholder={t('training.descriptionPlaceholder')}
-                    placeholderTextColor={themeColors.textSecondary}
-                    multiline
-                  />
-                </View>
+                {/* Edit/Design Button */}
+                <TouchableOpacity
+                  style={[styles.designButton, { backgroundColor: themeColors.primary }]}
+                  onPress={() => setCurrentView('builder')}
+                >
+                  <Zap size={16} color="#FFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.designButtonText}>
+                    {steps.length > 0 ? t('training.editWorkout') : t('training.designWorkout')}
+                  </Text>
+                </TouchableOpacity>
 
-                {/* Manual Duration Input for 'Other' sports */}
-                {['running', 'cycling', 'swimming'].indexOf(sportType || '') === -1 && (
-                  <View style={styles.formGroup}>
-                    <Text style={[styles.label, { color: themeColors.textSecondary }]}>
-                      {t('training.estimatedDurationMin')}
-                    </Text>
-                    <TextInput
-                      style={[styles.input, dynamicStyles.input]}
-                      keyboardType="numeric"
-                      placeholder="60"
-                      value={manualDuration}
-                      placeholderTextColor={themeColors.textSecondary}
-                      onChangeText={setManualDuration}
-                    />
-                    <Text style={[styles.helperDescription, { color: themeColors.textSecondary }]}>
-                      {t('training.planningInfoOnly')}
-                    </Text>
+                {/* Grid Summary */}
+                {steps.length > 0 && (
+                  <View style={styles.stepsSummaryGrid}>
+                    <View style={styles.summaryGridCol}>
+                      <Clock size={16} color="#34C759" style={{ marginBottom: 4 }} />
+                      <Text style={[styles.gridLabel, { color: themeColors.textSecondary }]}>
+                        {t('training.warmup')}
+                      </Text>
+                      <Text style={[styles.gridValue, { color: themeColors.textPrimary }]}>
+                        {summaryBlocks.warmupStr}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.summaryGridCol,
+                        { borderLeftWidth: 1, borderRightWidth: 1, borderColor: themeColors.border },
+                      ]}
+                    >
+                      <Activity size={16} color="#FF9500" style={{ marginBottom: 4 }} />
+                      <Text style={[styles.gridLabel, { color: themeColors.textSecondary }]}>
+                        {t('training.block')}
+                      </Text>
+                      <Text style={[styles.gridValue, { color: themeColors.textPrimary }]}>
+                        {summaryBlocks.workStr}
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryGridCol}>
+                      <Repeat size={16} color="#007AFF" style={{ marginBottom: 4 }} />
+                      <Text style={[styles.gridLabel, { color: themeColors.textSecondary }]}>
+                        {t('training.recovery')}
+                      </Text>
+                      <Text style={[styles.gridValue, { color: themeColors.textPrimary }]}>
+                        {summaryBlocks.cooldownStr}
+                      </Text>
+                    </View>
                   </View>
                 )}
+              </GlassCard>
+            )}
 
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>{t('training.scheduleForWeekday')}</Text>
-                  <WeekDaySelector
-                    selectedDays={scheduledDays}
-                    onDaysChange={setScheduledDays}
-                    isRecurring={isRecurring}
-                    onToggleRecurring={() => setIsRecurring(!isRecurring)}
-                    singleSelect={true}
+            {/* Manual Duration (for simple sports) */}
+            {!['running', 'cycling', 'swimming'].includes(sportType) && (
+              <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+                <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                  {t('training.duration').toUpperCase()}
+                </Text>
+                <View style={styles.formRow}>
+                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                    {t('training.estimatedDurationMin')}
+                  </Text>
+                  <TextInput
+                    style={[styles.rowInput, { color: themeColors.textPrimary }]}
+                    keyboardType="numeric"
+                    placeholder="60"
+                    value={manualDuration}
+                    placeholderTextColor={themeColors.textSecondary}
+                    onChangeText={setManualDuration}
+                    textAlign="right"
                   />
                 </View>
-              </ScrollView>
+                <Text style={[styles.helperDescription, { color: themeColors.textSecondary, marginTop: 8 }]}>
+                  {t('training.planningInfoOnly')}
+                </Text>
+              </GlassCard>
             )}
-          </>
+
+            {/* Block 3: Configuración */}
+            {sportType === 'running' && (
+              <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+                <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                  {t('navigation.workoutSettings').toUpperCase()}
+                </Text>
+
+                {/* Surface Selector */}
+                <TouchableOpacity style={styles.formRow} onPress={() => setSurfaceModalVisible(true)}>
+                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                    {t('training.surfaceLabel')}
+                  </Text>
+                  <View style={styles.rowRightValue}>
+                    <Text
+                      style={[
+                        styles.rowValueText,
+                        { color: surface ? themeColors.textPrimary : themeColors.textSecondary },
+                      ]}
+                    >
+                      {surface ? getSurfaceDisplayLabel(surface) : t('common.select')}
+                    </Text>
+                    <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Zapatillas (Coming Soon) */}
+                <View style={[styles.formRow, { borderBottomWidth: 0, opacity: 0.5 }]}>
+                  <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.shoesLabel')}</Text>
+                  <View style={styles.rowRightValue}>
+                    <Text style={[styles.rowValueText, { color: themeColors.textSecondary }]}>
+                      {t('training.comingSoon')}
+                    </Text>
+                    <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                  </View>
+                </View>
+              </GlassCard>
+            )}
+
+            {/* Block 4: Programación */}
+            <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+              <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                {t('training.scheduleForWeekday').toUpperCase()}
+              </Text>
+              <View style={{ marginTop: 8 }}>
+                <WeekDaySelector
+                  selectedDays={scheduledDays}
+                  onDaysChange={setScheduledDays}
+                  isRecurring={isRecurring}
+                  onToggleRecurring={() => setIsRecurring(!isRecurring)}
+                  singleSelect={true}
+                />
+              </View>
+            </GlassCard>
+
+            {/* Save Button */}
+            <TouchableOpacity
+              style={[styles.saveTemplateBtn, { backgroundColor: themeColors.primary }]}
+              onPress={handleSave}
+            >
+              <Text style={styles.saveTemplateBtnText}>{t('training.saveTemplate')}</Text>
+            </TouchableOpacity>
+
+            <View style={{ height: contentBottomPadding }} />
+          </ScrollView>
+        ) : (
+          /* Steps Builder View */
+          <View style={styles.content}>
+            <ScrollView
+              style={styles.scrollContainer}
+              contentContainerStyle={[styles.listContent, { paddingBottom: contentBottomPadding }]}
+              showsVerticalScrollIndicator={true}
+            >
+              {steps.length === 0 ? (
+                <View style={[styles.emptyState, dynamicStyles.emptyState]}>
+                  <Activity
+                    size={48}
+                    color={themeColors.textSecondary}
+                    style={{ opacity: 0.5, marginBottom: spacing.m }}
+                  />
+                  <Text style={[styles.emptyTitle, dynamicStyles.title]}>{t('training.startRoutine')}</Text>
+                  <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
+                    {t('training.addIntervalsHint')}{' '}
+                    {sportType === 'swimming'
+                      ? t('training.swimming')
+                      : sportType === 'cycling'
+                        ? t('training.cycling')
+                        : t('constants.running')}
+                    .
+                  </Text>
+                </View>
+              ) : (
+                <>{steps.map((item, index) => renderStepItem(item, index))}</>
+              )}
+
+              <View style={styles.actions}>
+                <TouchableOpacity style={styles.addStepButton} onPress={() => handleAddStepPress(null)}>
+                  <Plus size={20} color="#FFF" />
+                  <Text style={styles.addStepButtonText}>{t('training.addStep')}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.addRepButton} onPress={handleAddGroup}>
+                  <Repeat size={20} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ height: contentBottomPadding }} />
+            </ScrollView>
+
+            {/* Summary Footer */}
+            <View style={[styles.summaryFooterContainer, { bottom: footerBottomPosition }]}>
+              <LiquidGlassFooter style={styles.summaryGlass} borderRadius={30}>
+                <View style={styles.summaryContent}>
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>{t('training.totalTime')}</Text>
+                    <View style={styles.summaryValueContainer}>
+                      <Clock size={16} color={themeColors.textPrimary} style={{ marginRight: 6 }} />
+                      <Text style={[styles.summaryValue, { color: themeColors.textPrimary }]}>
+                        {formatTime(Math.round(totalDuration))}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.summaryDivider} />
+
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>{t('training.distanceParenAllCaps')}</Text>
+                    <View style={styles.summaryValueContainer}>
+                      <Activity size={16} color={themeColors.textPrimary} style={{ marginRight: 6 }} />
+                      <Text style={[styles.summaryValue, { color: themeColors.textPrimary }]}>
+                        {convertDistanceToUi(totalDistance, 2).value} {convertDistanceToUi(totalDistance, 2).unit}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </LiquidGlassFooter>
+            </View>
+          </View>
         )}
 
+        {/* Goal Selector Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={goalModalVisible}
+          onRequestClose={() => setGoalModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setGoalModalVisible(false)}>
+            <Pressable
+              style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
+              onPress={e => e.stopPropagation()}
+            >
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.mainGoal')}</Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getStructuredGoals().map(goal => {
+                  const isSelected =
+                    trainingGoal === goal.key ||
+                    (goal.key === 'custom' && trainingGoal !== undefined && isCustomGoal(trainingGoal));
+
+                  return (
+                    <View key={goal.key}>
+                      <TouchableOpacity
+                        style={[
+                          styles.goalOptionRow,
+                          isSelected && {
+                            backgroundColor: themeColors.primary + '15',
+                            borderColor: themeColors.primary,
+                          },
+                        ]}
+                        onPress={() => {
+                          if (goal.key === 'custom') {
+                            setTrainingGoal('custom');
+                          } else {
+                            setTrainingGoal(goal.key);
+                            setGoalModalVisible(false);
+                          }
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.goalOptionTitle,
+                            { color: themeColors.textPrimary },
+                            isSelected && { color: themeColors.primary },
+                          ]}
+                        >
+                          {goal.title}
+                        </Text>
+                        <Text style={[styles.goalOptionDesc, { color: themeColors.textSecondary }]}>{goal.desc}</Text>
+                      </TouchableOpacity>
+
+                      {goal.key === 'custom' && trainingGoal === 'custom' && (
+                        <View style={styles.customGoalInputContainer}>
+                          <TextInput
+                            style={[
+                              styles.customGoalInput,
+                              { color: themeColors.textPrimary, borderColor: themeColors.border },
+                            ]}
+                            value={customGoalText}
+                            onChangeText={setCustomGoalText}
+                            placeholder={t('training.goalCustomDesc')}
+                            placeholderTextColor={themeColors.textSecondary}
+                          />
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border }]}
+                  onPress={() => setGoalModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+
+                {trainingGoal === 'custom' && (
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, styles.confirmActionBtn, { backgroundColor: themeColors.primary }]}
+                    onPress={() => {
+                      if (!customGoalText.trim()) {
+                        Alert.alert(t('common.error'), t('training.workoutNameRequired'));
+                        return;
+                      }
+                      setTrainingGoal(customGoalText.trim());
+                      setGoalModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.confirmActionBtnText}>{t('training.confirm')}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Surface Selector Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={surfaceModalVisible}
+          onRequestClose={() => setSurfaceModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setSurfaceModalVisible(false)}>
+            <Pressable
+              style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
+              onPress={e => e.stopPropagation()}
+            >
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.surfaceLabel')}</Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getRunningSurfaces().map(surf => {
+                  const isSelected = surface === surf.key;
+                  return (
+                    <TouchableOpacity
+                      key={surf.key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setSurface(surf.key);
+                        setSurfaceModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {surf.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setSurfaceModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Builder Step Modals */}
         <EnduranceStepEditorModal
           visible={modalVisible}
           initialStep={editingStep}
@@ -1065,7 +1478,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
   );
 };
 
-// Utils
 const getPhaseColor = (phase: PhaseType) => {
   switch (phase) {
     case 'warmup':
@@ -1084,7 +1496,6 @@ const getPhaseColor = (phase: PhaseType) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // Background handled by LinearGradient
   },
   safeArea: {
     flex: 1,
@@ -1094,39 +1505,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: spacing.m,
-    // backgroundColor: '#FFFFFF', // Removed for transparent look
   },
-  cancelText: { ...typography.body, color: colors.primary },
   headerTitle: { ...typography.h4, fontWeight: 'bold', color: colors.textPrimary },
   saveText: { ...typography.body, color: colors.primary, fontWeight: 'bold' },
   headerButton: {
     padding: spacing.s,
   },
-
-  wizardProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.l,
-    backgroundColor: '#F5F5F5',
-  },
-  wizardStep: { alignItems: 'center', marginHorizontal: spacing.m },
-  stepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#E0E0E0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  stepCircleActive: { backgroundColor: colors.primary },
-  stepNumber: { ...typography.caption, fontWeight: 'bold', color: colors.textSecondary },
-  stepNumberActive: { color: '#FFFFFF' },
-  stepLabel: { ...typography.caption, color: colors.textSecondary },
-  stepLabelActive: { color: colors.primary, fontWeight: 'bold' },
-  stepLine: { height: 1, backgroundColor: '#E0E0E0', flex: 1, maxWidth: 50 },
-
   content: { flex: 1 },
   scrollContainer: { flex: 1 },
   listContent: { padding: spacing.m },
@@ -1136,7 +1520,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
   },
-
   stepCard: {
     marginBottom: spacing.m,
     padding: spacing.m,
@@ -1175,11 +1558,9 @@ const styles = StyleSheet.create({
   phaseIndicator: { width: 12, height: 12, borderRadius: 2, marginRight: 8 },
   stepTitle: { ...typography.body, fontWeight: 'bold' },
   editLabel: { ...typography.caption, color: colors.primary },
-
   stepDetails: { gap: 4 },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailText: { ...typography.body, color: colors.textSecondary },
-
   groupContainer: { marginTop: 8 },
   repetitionsSelector: {
     flexDirection: 'row',
@@ -1201,43 +1582,15 @@ const styles = StyleSheet.create({
     marginLeft: spacing.l,
   },
   addToGroupText: { ...typography.caption, color: colors.primary, marginLeft: 6 },
-
   actions: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.m,
   },
-
-  formContent: { padding: spacing.m },
-  formGroup: { marginBottom: spacing.l },
-  label: { ...typography.caption, marginBottom: 8, fontWeight: '600' },
-  input: {
-    backgroundColor: '#FFFFFF',
-    padding: spacing.m,
-    borderRadius: borderRadius.m,
-    fontSize: 16,
-  },
-  textArea: { height: 100, textAlignVertical: 'top' },
-
-  goalSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  goalChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  activeGoalChip: { backgroundColor: colors.primary, borderColor: colors.primary },
-  goalText: { ...typography.caption, color: colors.textSecondary },
-  activeGoalText: { color: '#FFFFFF', fontWeight: 'bold' },
-
-  // New Styles
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
   emptyTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.s },
   emptyText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
-
   addStepButton: {
     flex: 1,
     flexDirection: 'row',
@@ -1258,18 +1611,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: spacing.m,
   },
-
-  // Footer Summary styles
   summaryFooterContainer: {
     position: 'absolute',
-    bottom: 90, // Above tab bar
+    bottom: 90,
     left: spacing.m,
     right: spacing.m,
     zIndex: 100,
   },
   summaryGlass: {
     borderRadius: 30,
-    // LiquidBackground adds shadows/blur
   },
   summaryContent: {
     flexDirection: 'row',
@@ -1294,7 +1644,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryValue: {
-    fontSize: 20, // Bigger
+    fontSize: 20,
     fontWeight: '700',
     color: '#000',
     letterSpacing: -0.5,
@@ -1305,16 +1655,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.1)',
     marginHorizontal: spacing.s,
   },
-
-  // Day selector styles
-  // WeekDaySelector handles its own styles now
-  helperDescription: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.s },
-
-  // Sport Selection Styles
   sportSelectionContainer: {
     padding: spacing.m,
-    // flex: 1, // Remove flex: 1 to ensure scroll works properly
-    paddingBottom: 100, // Add padding for bottom
+    paddingBottom: 100,
     alignItems: 'center',
   },
   sportSelectionTitle: {
@@ -1360,5 +1703,248 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontWeight: 'bold',
     color: colors.textPrimary,
+  },
+  mainFormContainer: {
+    padding: spacing.m,
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.l,
+    marginTop: spacing.s,
+  },
+  profileAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.m,
+  },
+  profileTextContainer: {
+    flex: 1,
+  },
+  profileTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  profileSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  formBlock: {
+    padding: spacing.m,
+    marginBottom: spacing.l,
+    borderRadius: borderRadius.l,
+  },
+  blockHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.m,
+  },
+  blockTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  blockSubtitle: {
+    fontSize: 12,
+  },
+  formRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.m,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(150,150,150,0.1)',
+  },
+  rowLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  rowInput: {
+    flex: 1,
+    fontSize: 15,
+    textAlign: 'right',
+    padding: 0,
+    marginLeft: spacing.m,
+  },
+  rowRightValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rowValueText: {
+    fontSize: 15,
+  },
+  rowTextArea: {
+    height: 80,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    padding: spacing.s,
+    fontSize: 14,
+    textAlignVertical: 'top',
+    marginTop: 4,
+  },
+  segmentedRow: {
+    paddingTop: spacing.m,
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.s,
+  },
+  chipButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    alignItems: 'center',
+    backgroundColor: 'rgba(150,150,150,0.05)',
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  designButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: borderRadius.m,
+    marginTop: spacing.s,
+    marginBottom: spacing.m,
+  },
+  designButtonText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  stepsSummaryGrid: {
+    flexDirection: 'row',
+    marginTop: spacing.xs,
+    paddingTop: spacing.s,
+    borderTopWidth: 1,
+    borderColor: 'rgba(150,150,150,0.1)',
+  },
+  summaryGridCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xs,
+  },
+  gridLabel: {
+    fontSize: 10,
+    marginBottom: 4,
+  },
+  gridValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  helperDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  saveTemplateBtn: {
+    paddingVertical: spacing.m,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.s,
+  },
+  saveTemplateBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.l,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: spacing.m,
+  },
+  goalsScroll: {
+    marginBottom: spacing.l,
+  },
+  goalOptionRow: {
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(150,150,150,0.05)',
+    marginBottom: spacing.s,
+  },
+  goalOptionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  goalOptionDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  customGoalInputContainer: {
+    paddingHorizontal: spacing.s,
+    marginBottom: spacing.m,
+  },
+  customGoalInput: {
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    padding: spacing.m,
+    fontSize: 15,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: spacing.m,
+  },
+  modalActionBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  cancelActionBtn: {
+    backgroundColor: 'transparent',
+  },
+  cancelActionBtnText: {
+    fontWeight: '600',
+  },
+  confirmActionBtn: {
+    // Background dynamic
+  },
+  confirmActionBtnText: {
+    color: '#FFF',
+    fontWeight: '600',
+  },
+  surfaceOptionRow: {
+    paddingVertical: spacing.m,
+    paddingHorizontal: spacing.l,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(150,150,150,0.05)',
+    marginBottom: spacing.s,
+  },
+  surfaceOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

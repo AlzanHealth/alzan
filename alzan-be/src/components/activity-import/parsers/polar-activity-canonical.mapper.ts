@@ -160,7 +160,7 @@ function pushPositionSample(
 
 function mapPolarSport(rawSport: string | null, rawDetailed: string | null): CanonicalActivitySportMapping {
   const sport = `${rawDetailed ?? ''} ${rawSport ?? ''}`.toUpperCase();
-  if (sport.includes('WALKING')) return { sportType: 'other', sportSubtype: null };
+  if (sport.includes('WALKING')) return { sportType: 'running', sportSubtype: 'walk' };
   if (sport.includes('PADEL')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (sport.includes('TENNIS')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (sport.includes('BASKETBALL')) return { sportType: 'basketball', sportSubtype: 'indoor' };
@@ -185,6 +185,17 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
     return { sportType: 'running', sportSubtype: 'track' };
   }
   if (sport.includes('RUNNING') || sport.includes('JOGGING') || sport.includes('ULTRARUNNING')) {
+    if (
+      sport.includes('RACE') ||
+      sport.includes('CARRERA') ||
+      sport.includes('MARATHON') ||
+      sport.includes('MARATON') ||
+      sport.includes('MARATÓN') ||
+      sport.includes('COMPETITION') ||
+      sport.includes('COMPETICIÓN')
+    ) {
+      return { sportType: 'running', sportSubtype: 'race' };
+    }
     return { sportType: 'running', sportSubtype: 'road' };
   }
   if (sport.includes('INDOOR_CYCLING') || sport.includes('SPINNING')) {

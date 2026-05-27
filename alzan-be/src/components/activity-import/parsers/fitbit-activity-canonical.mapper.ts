@@ -148,6 +148,7 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
     if (mapped.sportType !== 'other' || !activityName?.toLowerCase().includes('padel')) return mapped;
   }
   const normalised = activityName?.trim().toLowerCase() ?? '';
+  if (normalised.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
@@ -155,8 +156,24 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
     return { sportType: 'football', sportSubtype: 'outdoor' };
   if (normalised.includes('hike') || normalised.includes('hiking'))
     return { sportType: 'hiking', sportSubtype: 'trail' };
-  if (normalised.includes('treadmill')) return { sportType: 'running', sportSubtype: 'indoor' };
-  if (normalised.includes('run')) return { sportType: 'running', sportSubtype: 'road' };
+  if (normalised.includes('treadmill') || normalised.includes('indoor run'))
+    return { sportType: 'running', sportSubtype: 'indoor' };
+  if (normalised.includes('trail run') || normalised.includes('mountain run'))
+    return { sportType: 'running', sportSubtype: 'trail' };
+  if (normalised.includes('track run')) return { sportType: 'running', sportSubtype: 'track' };
+  if (normalised.includes('run')) {
+    if (
+      normalised.includes('race') ||
+      normalised.includes('carrera') ||
+      normalised.includes('maraton') ||
+      normalised.includes('maratón') ||
+      normalised.includes('competition') ||
+      normalised.includes('competición')
+    ) {
+      return { sportType: 'running', sportSubtype: 'race' };
+    }
+    return { sportType: 'running', sportSubtype: 'road' };
+  }
   if (normalised.includes('indoor cycling')) return { sportType: 'cycling', sportSubtype: 'indoor' };
   if (normalised.includes('bike') || normalised.includes('cycling'))
     return { sportType: 'cycling', sportSubtype: 'road' };

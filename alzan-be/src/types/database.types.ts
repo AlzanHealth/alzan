@@ -1386,40 +1386,46 @@ export type Database = {
           base_name: string;
           created_at: string;
           description: string | null;
+          environment_type: string | null;
           id: string;
           scheduled_day: number | null;
           sport_type: Database['public']['Enums']['sport_type_enum'];
+          surface: string | null;
           total_distance_m: number | null;
           total_duration_s: number | null;
           updated_at: string;
           user_id: string;
-          workout_goal: Database['public']['Enums']['workout_goal_enum'] | null;
+          workout_goal: string | null;
         };
         Insert: {
           base_name: string;
           created_at?: string;
           description?: string | null;
+          environment_type?: string | null;
           id?: string;
           scheduled_day?: number | null;
           sport_type: Database['public']['Enums']['sport_type_enum'];
+          surface?: string | null;
           total_distance_m?: number | null;
           total_duration_s?: number | null;
           updated_at?: string;
           user_id: string;
-          workout_goal?: Database['public']['Enums']['workout_goal_enum'] | null;
+          workout_goal?: string | null;
         };
         Update: {
           base_name?: string;
           created_at?: string;
           description?: string | null;
+          environment_type?: string | null;
           id?: string;
           scheduled_day?: number | null;
           sport_type?: Database['public']['Enums']['sport_type_enum'];
+          surface?: string | null;
           total_distance_m?: number | null;
           total_duration_s?: number | null;
           updated_at?: string;
           user_id?: string;
-          workout_goal?: Database['public']['Enums']['workout_goal_enum'] | null;
+          workout_goal?: string | null;
         };
         Relationships: [
           {
@@ -4428,7 +4434,7 @@ export type Database = {
         | 'deep'
         | 'rem'
         | 'core';
-      sport_subtype_enum: 'road' | 'trail' | 'track' | 'indoor' | 'outdoor' | 'pool' | 'open_water';
+      sport_subtype_enum: 'road' | 'trail' | 'track' | 'indoor' | 'outdoor' | 'pool' | 'open_water' | 'race' | 'walk';
       sport_type_enum:
         | 'basketball'
         | 'padel'
@@ -4664,7 +4670,7 @@ export const Constants = {
       recipe_usage_context_enum: ['meal_log', 'planner', 'quick_add'],
       recipe_visibility_enum: ['private', 'public'],
       sleep_stage_enum: ['unknown', 'awake', 'awake_in_bed', 'out_of_bed', 'sleeping', 'light', 'deep', 'rem', 'core'],
-      sport_subtype_enum: ['road', 'trail', 'track', 'indoor', 'outdoor', 'pool', 'open_water'],
+      sport_subtype_enum: ['road', 'trail', 'track', 'indoor', 'outdoor', 'pool', 'open_water', 'race', 'walk'],
       sport_type_enum: [
         'basketball',
         'padel',

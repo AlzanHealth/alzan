@@ -95,6 +95,18 @@ const formatHoursAndMinutes = (totalSeconds: number): string => {
   return `${hours}:${minutes.toString().padStart(2, '0')}`;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const getEnvironmentDisplayLabel = (type: string | null | undefined, t: any) => {
+  if (!type) return '';
+  if (type === 'road' || type === 'aire_libre') return t('training.runningTypeOutdoor');
+  if (type === 'indoor' || type === 'cinta') return t('training.runningTypeTreadmill');
+  if (type === 'track') return t('training.runningTypeTrack');
+  if (type === 'trail') return t('training.runningTypeTrail');
+  if (type === 'race') return t('training.runningTypeRace');
+  if (type === 'walk') return t('training.runningTypeWalk');
+  return type;
+};
+
 // Helper component for filter options
 const FilterOption: React.FC<{
   label: string;
@@ -974,6 +986,18 @@ export const EnduranceSessionsListScreen = () => {
                                     })
                                   : ''}
                               </Text>
+                              {session.sport_subtype && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
+                                    {getEnvironmentDisplayLabel(session.sport_subtype, t)}
+                                  </Text>
+                                </View>
+                              )}
                               {hasRoute && (
                                 <View
                                   style={[
@@ -1218,6 +1242,15 @@ const styles = StyleSheet.create({
   activeBadgeText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  subtypeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  subtypeBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   routeBadge: {
     width: 20,

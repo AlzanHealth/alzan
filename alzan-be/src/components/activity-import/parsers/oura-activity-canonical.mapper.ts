@@ -91,8 +91,25 @@ function pushHeartRateSample(
 
 function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
   const normalised = activity?.trim().toLowerCase() ?? '';
-  if (normalised === 'running') return { sportType: 'running', sportSubtype: 'road' };
-  if (normalised === 'trail_running') return { sportType: 'running', sportSubtype: 'trail' };
+  if (normalised.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
+  if (normalised === 'trail_running' || normalised.includes('trail'))
+    return { sportType: 'running', sportSubtype: 'trail' };
+  if (normalised.includes('track')) return { sportType: 'running', sportSubtype: 'track' };
+  if (normalised.includes('treadmill') || normalised.includes('indoor'))
+    return { sportType: 'running', sportSubtype: 'indoor' };
+  if (normalised.includes('running') || normalised.includes('run') || normalised.includes('jogging')) {
+    if (
+      normalised.includes('race') ||
+      normalised.includes('carrera') ||
+      normalised.includes('maraton') ||
+      normalised.includes('maratón') ||
+      normalised.includes('competition') ||
+      normalised.includes('competición')
+    ) {
+      return { sportType: 'running', sportSubtype: 'race' };
+    }
+    return { sportType: 'running', sportSubtype: 'road' };
+  }
   if (normalised === 'cycling') return { sportType: 'cycling', sportSubtype: 'road' };
   if (normalised === 'mountain_biking') return { sportType: 'cycling', sportSubtype: 'trail' };
   if (normalised === 'indoor_cycling') return { sportType: 'cycling', sportSubtype: 'indoor' };

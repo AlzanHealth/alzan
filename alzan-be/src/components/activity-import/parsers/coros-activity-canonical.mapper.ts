@@ -116,7 +116,7 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
     readString(record.mode) ??
     readString(record.type);
   const text = normaliseSportText(rawSport);
-  if (text.includes('walk')) return { sportType: 'other', sportSubtype: null };
+  if (text.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
   if (text.includes('padel'))
     return { sportType: 'padel', sportSubtype: text.includes('indoor') ? 'indoor' : 'outdoor' };
   if (text.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
@@ -129,7 +129,19 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
   if (text.includes('trail') && text.includes('run')) return { sportType: 'running', sportSubtype: 'trail' };
   if (text.includes('track') && text.includes('run')) return { sportType: 'running', sportSubtype: 'track' };
   if (text.includes('indoor') && text.includes('run')) return { sportType: 'running', sportSubtype: 'indoor' };
-  if (text.includes('run')) return { sportType: 'running', sportSubtype: 'road' };
+  if (text.includes('run')) {
+    if (
+      text.includes('race') ||
+      text.includes('carrera') ||
+      text.includes('maraton') ||
+      text.includes('maratón') ||
+      text.includes('competition') ||
+      text.includes('competición')
+    ) {
+      return { sportType: 'running', sportSubtype: 'race' };
+    }
+    return { sportType: 'running', sportSubtype: 'road' };
+  }
   if (text.includes('indoor') && (text.includes('bike') || text.includes('cycling'))) {
     return { sportType: 'cycling', sportSubtype: 'indoor' };
   }

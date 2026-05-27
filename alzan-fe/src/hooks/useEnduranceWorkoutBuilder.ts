@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { propagateTrainingPlans } from '../modules/training/services/trainingCopyService';
-import { DurationType, PhaseType, SportType, TargetType, WorkoutGoal } from '../types/requests.types';
+import { DurationType, PhaseType, SportType, TargetType } from '../types/requests.types';
 
 export interface BuilderStep {
   id: string; // temp or real id
@@ -23,10 +23,12 @@ export interface BuilderTemplateData {
   base_name: string;
   description?: string;
   sport_type: SportType;
-  workout_goal?: WorkoutGoal;
+  workout_goal?: string | null;
   total_duration_s?: number;
   total_distance_m?: number;
   scheduled_day?: number | null; // 0 = Sunday, 1 = Monday, etc.
+  environment_type?: string | null;
+  surface?: string | null;
 }
 
 export const useEnduranceWorkoutBuilder = () => {
@@ -68,6 +70,8 @@ export const useEnduranceWorkoutBuilder = () => {
               total_distance_m: data.total_distance_m,
               workout_goal: data.workout_goal,
               scheduled_day: data.scheduled_day,
+              environment_type: data.environment_type,
+              surface: data.surface,
               updated_at: new Date().toISOString(),
             })
             .eq('id', templateId);
@@ -95,6 +99,8 @@ export const useEnduranceWorkoutBuilder = () => {
               total_distance_m: data.total_distance_m,
               workout_goal: data.workout_goal,
               scheduled_day: data.scheduled_day,
+              environment_type: data.environment_type,
+              surface: data.surface,
             })
             .select()
             .single();

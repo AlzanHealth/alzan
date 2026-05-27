@@ -56,6 +56,8 @@ import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImporte
 import { Tooltip } from '../../components/common/Tooltip';
 import { RouteMap } from '../../components/common/RouteMap';
 import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strengthActivityImportService';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabaseClient';
 
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
@@ -104,6 +106,49 @@ export const EnduranceSessionDetailScreen = () => {
   const { data: laps } = useSessionLaps(session?.id);
   const { data: heartRateZones } = useSessionHeartRateZones(session?.id);
   const { data: importedStrengthSummary } = useSessionImportedStrengthSummary(session?.id);
+
+  // Fetch template details to get surface and environment type
+  const { data: template } = useQuery({
+    queryKey: ['enduranceTemplateDetail', session?.endurance_template_id],
+    queryFn: async () => {
+      if (!session?.endurance_template_id) return null;
+      const { data, error } = await supabase
+        .from('endurance_workout_templates')
+        .select('*')
+        .eq('id', session.endurance_template_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!session?.endurance_template_id,
+  });
+
+  const getEnvironmentDisplayLabel = (type?: string | null) => {
+    if (!type) return '';
+    if (type === 'road' || type === 'aire_libre') return t('training.runningTypeOutdoor');
+    if (type === 'indoor' || type === 'cinta') return t('training.runningTypeTreadmill');
+    if (type === 'track') return t('training.runningTypeTrack');
+    if (type === 'trail') return t('training.runningTypeTrail');
+    if (type === 'race') return t('training.runningTypeRace');
+    if (type === 'walk') return t('training.runningTypeWalk');
+    return type;
+  };
+
+  const getRunningSurfaces = () => {
+    return [
+      { key: 'asfalto', label: t('training.surfaceAsphalt') },
+      { key: 'pista', label: t('training.surfaceTrack') },
+      { key: 'tierra', label: t('training.surfaceDirt') },
+      { key: 'hierba', label: t('training.surfaceGrass') },
+      { key: 'cinta', label: t('training.surfaceTreadmill') },
+    ];
+  };
+
+  const getSurfaceDisplayLabel = (surf?: string | null) => {
+    if (!surf) return '';
+    const match = getRunningSurfaces().find(s => s.key === surf);
+    return match ? match.label : surf;
+  };
 
   const formatSplitDistanceBucketLabel = useCallback((splitDistanceM: number) => {
     const distanceKm = splitDistanceM / 1000;
@@ -873,6 +918,34 @@ export const EnduranceSessionDetailScreen = () => {
                 locale: getDateFnsLocale(),
               })}
             </Text>
+            {(session.sport_subtype || template?.surface || template?.environment_type) && (
+              <View style={styles.metadataTagsContainer}>
+                {(session.sport_subtype || template?.environment_type) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(0,122,255,0.15)' : 'rgba(0,122,255,0.08)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: themeColors.primary }]}>
+                      {getEnvironmentDisplayLabel(session.sport_subtype || template?.environment_type)}
+                    </Text>
+                  </View>
+                )}
+                {template?.surface && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                      {getSurfaceDisplayLabel(template.surface)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Route Map — shown only for endurance sessions with a polyline */}
@@ -1514,6 +1587,21 @@ const styles = StyleSheet.create({
   mainHeader: {
     alignItems: 'center',
     marginBottom: spacing.l,
+  },
+  metadataTagsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.s,
+    marginTop: spacing.s,
+  },
+  metadataTag: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: borderRadius.s,
+  },
+  metadataTagText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   iconContainer: {
     backgroundColor: colors.surface,

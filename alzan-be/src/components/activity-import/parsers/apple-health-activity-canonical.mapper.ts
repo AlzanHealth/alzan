@@ -98,8 +98,48 @@ function mapAppleHealthSport(
     .join(' ');
   const normalised = normaliseType(combined);
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
-  if (normalised.includes('running') || normalised.includes('trackandfield'))
+  if (normalised.includes('running') || normalised.includes('trackandfield')) {
+    const isIndoor =
+      normalised.includes('indoor') ||
+      normalised.includes('treadmill') ||
+      normalised.includes('cinta') ||
+      (isRecord(metadata) &&
+        (metadata.HKIndoorWorkout === true ||
+          metadata.HKIndoorWorkout === 1 ||
+          metadata.HKIndoorWorkout === '1' ||
+          String(metadata.HKIndoorWorkout).toLowerCase() === 'true'));
+    if (isIndoor) return { sportType: 'running', sportSubtype: 'indoor' };
+
+    const nameLower = [title, isRecord(metadata) ? readString(metadata.activityName) : null]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    if (
+      nameLower.includes('race') ||
+      nameLower.includes('carrera') ||
+      nameLower.includes('maratón') ||
+      nameLower.includes('maraton') ||
+      nameLower.includes('competition') ||
+      nameLower.includes('competición')
+    ) {
+      return { sportType: 'running', sportSubtype: 'race' };
+    }
+    if (
+      nameLower.includes('trail') ||
+      nameLower.includes('sendero') ||
+      nameLower.includes('montaña') ||
+      nameLower.includes('mountain')
+    ) {
+      return { sportType: 'running', sportSubtype: 'trail' };
+    }
+    if (nameLower.includes('track') || nameLower.includes('pista') || nameLower.includes('atletismo')) {
+      return { sportType: 'running', sportSubtype: 'track' };
+    }
+
     return { sportType: 'running', sportSubtype: 'road' };
+  }
+  if (normalised.includes('walking')) return { sportType: 'running', sportSubtype: 'walk' };
   if (normalised.includes('cycling') || normalised.includes('handcycling'))
     return { sportType: 'cycling', sportSubtype: 'road' };
   if (normalised.includes('swimming') || normalised.includes('waterfitness'))

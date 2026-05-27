@@ -203,9 +203,18 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   const fitSubSport = params.fitSubSport != null ? Math.round(params.fitSubSport) : null;
 
   if (fitSport === 1) {
+    const isRace =
+      params.sportName &&
+      (params.sportName.toLowerCase().includes('carrera') ||
+        params.sportName.toLowerCase().includes('race') ||
+        params.sportName.toLowerCase().includes('maratón') ||
+        params.sportName.toLowerCase().includes('maraton') ||
+        params.sportName.toLowerCase().includes('competition') ||
+        params.sportName.toLowerCase().includes('competición'));
     if (fitSubSport === 3) return { sportType: 'running', sportSubtype: 'trail' };
     if (fitSubSport === 4) return { sportType: 'running', sportSubtype: 'track' };
     if (fitSubSport === 1) return { sportType: 'running', sportSubtype: 'indoor' };
+    if (isRace) return { sportType: 'running', sportSubtype: 'race' };
     return { sportType: 'running', sportSubtype: 'road' };
   }
   if (fitSport === 2) {
@@ -222,6 +231,7 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   if (fitSport === 10 && fitSubSport === 20) return { sportType: 'strength', sportSubtype: 'indoor' };
   if (fitSport === 10) return { sportType: 'gym', sportSubtype: 'indoor' };
   if (fitSport === 17) return { sportType: 'hiking', sportSubtype: 'trail' };
+  if (fitSport === 11) return { sportType: 'running', sportSubtype: 'walk' };
   if (fitSport === 64 && fitSubSport === 85) return { sportType: 'padel', sportSubtype: 'outdoor' };
 
   const sportName = params.sportName?.toLowerCase() ?? '';
@@ -234,7 +244,29 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   if (sportName.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (sportName.includes('swim')) return { sportType: 'swimming', sportSubtype: 'pool' };
   if (sportName.includes('cycl')) return { sportType: 'cycling', sportSubtype: 'road' };
-  if (sportName.includes('run')) return { sportType: 'running', sportSubtype: 'road' };
+  if (sportName.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
+  if (sportName.includes('run')) {
+    if (sportName.includes('indoor') || sportName.includes('treadmill') || sportName.includes('cinta')) {
+      return { sportType: 'running', sportSubtype: 'indoor' };
+    }
+    if (sportName.includes('trail') || sportName.includes('mountain') || sportName.includes('montaña')) {
+      return { sportType: 'running', sportSubtype: 'trail' };
+    }
+    if (sportName.includes('track') || sportName.includes('pista') || sportName.includes('atletismo')) {
+      return { sportType: 'running', sportSubtype: 'track' };
+    }
+    if (
+      sportName.includes('race') ||
+      sportName.includes('carrera') ||
+      sportName.includes('maratón') ||
+      sportName.includes('maraton') ||
+      sportName.includes('competition') ||
+      sportName.includes('competición')
+    ) {
+      return { sportType: 'running', sportSubtype: 'race' };
+    }
+    return { sportType: 'running', sportSubtype: 'road' };
+  }
   if (sportName.includes('gym') || sportName.includes('strength'))
     return { sportType: 'strength', sportSubtype: 'indoor' };
 

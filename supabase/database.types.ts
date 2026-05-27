@@ -1422,40 +1422,46 @@ export type Database = {
           base_name: string
           created_at: string
           description: string | null
+          environment_type: string | null
           id: string
           scheduled_day: number | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
+          surface: string | null
           total_distance_m: number | null
           total_duration_s: number | null
           updated_at: string
           user_id: string
-          workout_goal: Database["public"]["Enums"]["workout_goal_enum"] | null
+          workout_goal: string | null
         }
         Insert: {
           base_name: string
           created_at?: string
           description?: string | null
+          environment_type?: string | null
           id?: string
           scheduled_day?: number | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
+          surface?: string | null
           total_distance_m?: number | null
           total_duration_s?: number | null
           updated_at?: string
           user_id: string
-          workout_goal?: Database["public"]["Enums"]["workout_goal_enum"] | null
+          workout_goal?: string | null
         }
         Update: {
           base_name?: string
           created_at?: string
           description?: string | null
+          environment_type?: string | null
           id?: string
           scheduled_day?: number | null
           sport_type?: Database["public"]["Enums"]["sport_type_enum"]
+          surface?: string | null
           total_distance_m?: number | null
           total_duration_s?: number | null
           updated_at?: string
           user_id?: string
-          workout_goal?: Database["public"]["Enums"]["workout_goal_enum"] | null
+          workout_goal?: string | null
         }
         Relationships: [
           {
@@ -4525,6 +4531,8 @@ export type Database = {
         | "outdoor"
         | "pool"
         | "open_water"
+        | "race"
+        | "walk"
       sport_type_enum:
         | "basketball"
         | "padel"
@@ -4845,6 +4853,8 @@ export const Constants = {
         "outdoor",
         "pool",
         "open_water",
+        "race",
+        "walk",
       ],
       sport_type_enum: [
         "basketball",
