@@ -103,9 +103,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [trainingGoal, setTrainingGoal] = useState<string | undefined>(undefined);
-  const [customGoalText, setCustomGoalText] = useState('');
   const [sportType, setSportType] = useState<Nullable<SportType>>(route.params?.sportType || null);
-  const showSummary = sportType !== 'football' && sportType !== 'tennis';
+  const showSummary = sportType !== 'football' && sportType !== 'tennis' && sportType !== 'padel';
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -202,9 +201,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
       const goalValue = existingTemplate.workout_goal || undefined;
       setTrainingGoal(goalValue);
-      if (goalValue && isCustomGoal(goalValue)) {
-        setCustomGoalText(goalValue);
-      }
 
       setSportType((existingTemplate.sport_type as SportType) || 'running');
       setEnvironmentType(existingTemplate.environment_type || null);
@@ -273,7 +269,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const goalOptions = sportType ? getOptions(sportType, 'goal') : [];
   const modalityOptions = sportType ? getOptions(sportType, 'modality') : [];
   const terrainOptions = sportType ? getOptions(sportType, 'terrain') : [];
-  const baseLoadOptions = sportType === 'football' || sportType === 'tennis' ? getOptions(sportType, 'base_load') : [];
+  const baseLoadOptions = ['football', 'tennis', 'padel'].includes(sportType || '')
+    ? getOptions(sportType, 'base_load')
+    : [];
   const hasModalityOptions = modalityOptions.length > 0;
   const hasTerrainOptions = terrainOptions.length > 0;
 
@@ -288,27 +286,18 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (surface !== nextSurface) setSurface(nextSurface);
   }, [environmentType, modalityOptions, sportCatalogOptions.length, sportType, surface, terrainOptions]);
 
-  // Goal options mapping helper
-  const isCustomGoal = (goal?: string) => {
-    if (!goal) return false;
-    return !goalOptions.some(option => option.option_key === goal);
-  };
-
   const getStructuredGoals = () => {
-    return [
-      ...goalOptions.map(option => ({
-        key: option.option_key,
-        title: getOptionLabel(sportType, option.option_key, 'goal'),
-        desc: '',
-      })),
-      { key: 'custom', title: t('training.goalCustomTitle'), desc: t('training.goalCustomDesc') },
-    ];
+    return goalOptions.map(option => ({
+      key: option.option_key,
+      title: getOptionLabel(sportType, option.option_key, 'goal'),
+      desc: '',
+    }));
   };
 
   const getGoalDisplayLabel = (goal?: string) => {
     if (!goal) return '';
     const match = getStructuredGoals().find(g => g.key === goal);
-    if (match && match.key !== 'custom') {
+    if (match) {
       return match.title;
     }
     return goal;
@@ -452,7 +441,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       const isOneOff = !isRecurring && scheduledDays.length > 0;
       const templateScheduledDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
 
-      const finalGoal = trainingGoal === 'custom' ? customGoalText : trainingGoal;
+      const finalGoal = trainingGoal;
 
       const result = await saveWorkout.mutateAsync({
         data: {
@@ -470,9 +459,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
           pool_type: poolType,
           stroke: stroke,
           football_session_type: sportType === 'football' ? footballSessionType : null,
-          base_load: sportType === 'football' || sportType === 'tennis' ? baseLoad : null,
+          base_load: ['football', 'tennis', 'padel'].includes(sportType || '') ? baseLoad : null,
           boots_used: sportType === 'football' ? bootsUsed : null,
-          racket_used: sportType === 'tennis' ? racketUsed : null,
+          racket_used: ['tennis', 'padel'].includes(sportType || '') ? racketUsed : null,
           rival: sportType === 'football' ? rival : null,
           notes: sportType === 'football' ? notes : null,
         },
@@ -1247,8 +1236,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 )}
               </GlassCard>
 
-              {/* Block 2: Detalles de la plantilla (Football and Tennis) */}
-              {(sportType === 'football' || sportType === 'tennis') && (
+              {/* Block 2: Detalles de la plantilla (Football, Tennis and Padel) */}
+              {(sportType === 'football' || sportType === 'tennis' || sportType === 'padel') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
                     {t('training.templateDetails').toUpperCase()}
@@ -1279,7 +1268,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       accessibilityLabel={t('training.surfaceLabel')}
                     >
                       <MaterialCommunityIcons
-                        name={sportType === 'football' ? 'grass' : 'rhombus-split'}
+                        name={
+                          sportType === 'football' ? 'grass' : sportType === 'tennis' ? 'rhombus-split' : 'tennis-ball'
+                        }
                         size={24}
                         color={SPORT_COLORS[sportType] || themeColors.primary}
                         style={{ marginBottom: 6 }}
@@ -1373,7 +1364,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       }}
                     >
                       <MaterialCommunityIcons
-                        name={sportType === 'tennis' ? 'tennis' : 'shoe-cleat'}
+                        name={sportType === 'tennis' ? 'tennis' : sportType === 'padel' ? 'tennis-ball' : 'shoe-cleat'}
                         size={24}
                         color={SPORT_COLORS[sportType] || themeColors.primary}
                         style={{ marginBottom: 6 }}
@@ -1388,7 +1379,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           color: themeColors.textSecondary,
                         }}
                       >
-                        {sportType === 'tennis' ? t('training.racketLabel') : t('training.bootsLabel')}
+                        {sportType === 'tennis'
+                          ? t('training.racketLabel')
+                          : sportType === 'padel'
+                            ? t('training.palaLabel')
+                            : t('training.bootsLabel')}
                       </Text>
                       <Text
                         style={{
@@ -1410,12 +1405,14 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>
               )}
 
-              {!structuredSport && sportType !== 'football' && sportType !== 'tennis' && !isWideLayout && (
-                <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>
-              )}
+              {!structuredSport &&
+                sportType !== 'football' &&
+                sportType !== 'tennis' &&
+                sportType !== 'padel' &&
+                !isWideLayout && <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>}
 
               {/* Block 3: Configuración */}
-              {((hasTerrainOptions && sportType !== 'football' && sportType !== 'tennis') ||
+              {((hasTerrainOptions && sportType !== 'football' && sportType !== 'tennis' && sportType !== 'padel') ||
                 sportType === 'swimming') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
@@ -1703,9 +1700,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
               <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
                 {getStructuredGoals().map(goal => {
-                  const isSelected =
-                    trainingGoal === goal.key ||
-                    (goal.key === 'custom' && trainingGoal !== undefined && isCustomGoal(trainingGoal));
+                  const isSelected = trainingGoal === goal.key;
 
                   return (
                     <View key={goal.key}>
@@ -1718,12 +1713,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           },
                         ]}
                         onPress={() => {
-                          if (goal.key === 'custom') {
-                            setTrainingGoal('custom');
-                          } else {
-                            setTrainingGoal(goal.key);
-                            setGoalModalVisible(false);
-                          }
+                          setTrainingGoal(goal.key);
+                          setGoalModalVisible(false);
                         }}
                       >
                         <Text
@@ -1739,21 +1730,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           <Text style={[styles.goalOptionDesc, { color: themeColors.textSecondary }]}>{goal.desc}</Text>
                         ) : null}
                       </TouchableOpacity>
-
-                      {goal.key === 'custom' && trainingGoal === 'custom' && (
-                        <View style={styles.customGoalInputContainer}>
-                          <TextInput
-                            style={[
-                              styles.customGoalInput,
-                              { color: themeColors.textPrimary, borderColor: themeColors.border },
-                            ]}
-                            value={customGoalText}
-                            onChangeText={setCustomGoalText}
-                            placeholder={t('training.goalCustomDesc')}
-                            placeholderTextColor={themeColors.textSecondary}
-                          />
-                        </View>
-                      )}
                     </View>
                   );
                 })}
@@ -1761,29 +1737,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
               <View style={styles.modalActionRow}>
                 <TouchableOpacity
-                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border }]}
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
                   onPress={() => setGoalModalVisible(false)}
                 >
                   <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
                     {t('common.cancel')}
                   </Text>
                 </TouchableOpacity>
-
-                {trainingGoal === 'custom' && (
-                  <TouchableOpacity
-                    style={[styles.modalActionBtn, styles.confirmActionBtn, { backgroundColor: themeColors.primary }]}
-                    onPress={() => {
-                      if (!customGoalText.trim()) {
-                        Alert.alert(t('common.error'), t('training.workoutNameRequired'));
-                        return;
-                      }
-                      setTrainingGoal(customGoalText.trim());
-                      setGoalModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.confirmActionBtnText}>{t('training.confirm')}</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             </Pressable>
           </Pressable>

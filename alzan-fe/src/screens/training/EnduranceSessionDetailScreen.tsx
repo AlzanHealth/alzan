@@ -611,6 +611,20 @@ export const EnduranceSessionDetailScreen = () => {
         value: t('training.comingSoon'),
       });
     }
+    if (session.sport_type === 'padel') {
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'padel-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      secondaryMetrics.push({
+        key: 'padel-racket',
+        label: t('training.palaLabel'),
+        value: t('training.comingSoon'),
+      });
+    }
   }
 
   const handleImportedMetricInfoPress = useCallback(

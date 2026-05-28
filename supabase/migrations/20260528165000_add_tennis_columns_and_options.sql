@@ -25,16 +25,15 @@ VALUES
   ('tennis', 'modality', 'training', 'training.sportOptionTraining', 'training.modalityLabel', 30),
   ('tennis', 'modality', 'match', 'training.sportOptionMatch', 'training.modalityLabel', 40);
 
--- Goals: Partido, Técnica, Bandeja/Volea, Resistencia, Velocidad, Saque
+-- Goals: Partido, Técnica, Saque, Resistencia, Velocidad
 INSERT INTO "public"."sport_catalog_options"
   ("sport_type", "option_type", "option_key", "translation_key", "group_translation_key", "sort_order")
 VALUES
   ('tennis', 'goal', 'match', 'training.sportOptionMatch', 'training.mainGoal', 10),
   ('tennis', 'goal', 'technique', 'training.sportOptionTechnique', 'training.mainGoal', 20),
-  ('tennis', 'goal', 'bandeja_volley', 'training.sportOptionBandejaVolley', 'training.mainGoal', 30),
+  ('tennis', 'goal', 'serve', 'training.sportOptionServe', 'training.mainGoal', 30),
   ('tennis', 'goal', 'endurance', 'training.sportOptionEndurance', 'training.mainGoal', 40),
-  ('tennis', 'goal', 'speed', 'training.sportOptionSpeed', 'training.mainGoal', 50),
-  ('tennis', 'goal', 'serve', 'training.sportOptionServe', 'training.mainGoal', 60);
+  ('tennis', 'goal', 'speed', 'training.sportOptionSpeed', 'training.mainGoal', 50);
 
 -- Terrains/Surfaces: Clay, Hard court, Grass, Indoor court
 INSERT INTO "public"."sport_catalog_options"
