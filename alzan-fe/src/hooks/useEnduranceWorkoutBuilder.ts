@@ -29,6 +29,8 @@ export interface BuilderTemplateData {
   scheduled_day?: number | null; // 0 = Sunday, 1 = Monday, etc.
   environment_type?: string | null;
   surface?: string | null;
+  pool_type?: string | null;
+  stroke?: string | null;
 }
 
 export const useEnduranceWorkoutBuilder = () => {
@@ -72,6 +74,8 @@ export const useEnduranceWorkoutBuilder = () => {
               scheduled_day: data.scheduled_day,
               environment_type: data.environment_type,
               surface: data.surface,
+              pool_type: data.pool_type,
+              stroke: data.stroke,
               updated_at: new Date().toISOString(),
             })
             .eq('id', templateId);
@@ -101,6 +105,8 @@ export const useEnduranceWorkoutBuilder = () => {
               scheduled_day: data.scheduled_day,
               environment_type: data.environment_type,
               surface: data.surface,
+              pool_type: data.pool_type,
+              stroke: data.stroke,
             })
             .select()
             .single();

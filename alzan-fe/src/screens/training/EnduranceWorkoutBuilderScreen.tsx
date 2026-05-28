@@ -110,11 +110,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [manualDuration, setManualDuration] = useState<string>('');
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
   const [surface, setSurface] = useState<string | null>(null);
+  const [poolType, setPoolType] = useState<string | null>(null);
+  const [stroke, setStroke] = useState<string | null>(null);
 
   // Modals visibility
   const [goalModalVisible, setGoalModalVisible] = useState(false);
   const [surfaceModalVisible, setSurfaceModalVisible] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
+  const [poolTypeModalVisible, setPoolTypeModalVisible] = useState(false);
+  const [strokeModalVisible, setStrokeModalVisible] = useState(false);
 
   // Step Modals
   const [modalVisible, setModalVisible] = useState(false);
@@ -192,6 +196,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
       setSportType((existingTemplate.sport_type as SportType) || 'running');
       setEnvironmentType(existingTemplate.environment_type || null);
       setSurface(existingTemplate.surface || null);
+      setPoolType(existingTemplate.pool_type || null);
+      setStroke(existingTemplate.stroke || null);
 
       if (existingTemplate.scheduled_day !== null && existingTemplate.scheduled_day !== undefined) {
         setScheduledDays([existingTemplate.scheduled_day]);
@@ -437,6 +443,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
           scheduled_day: templateScheduledDay,
           environment_type: environmentType,
           surface: surface,
+          pool_type: poolType,
+          stroke: stroke,
         },
         steps: steps as BuilderStep[],
         templateId: templateId,
@@ -485,7 +493,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (!name.trim()) {
       missingFields.push('name');
     }
-    if ((sportType === 'running' || sportType === 'cycling') && !environmentType) {
+    if ((sportType === 'running' || sportType === 'cycling' || sportType === 'swimming') && !environmentType) {
       missingFields.push('type');
     }
     if (!trainingGoal) {
@@ -1223,35 +1231,122 @@ export const EnduranceWorkoutBuilderScreen = () => {
               )}
 
               {/* Block 3: Configuración */}
-              {hasTerrainOptions && (
+              {(hasTerrainOptions || sportType === 'swimming') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
                     {t('navigation.workoutSettings').toUpperCase()}
                   </Text>
 
-                  {/* Surface Selector */}
-                  <TouchableOpacity
-                    style={styles.formRow}
-                    onPress={() => setSurfaceModalVisible(true)}
-                    accessibilityRole="button"
-                    accessibilityLabel={getGroupLabel(sportType, 'terrain')}
-                  >
-                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
-                      {getGroupLabel(sportType, 'terrain')}
-                    </Text>
-                    <View style={styles.rowRightValue}>
-                      <Text
-                        style={[
-                          styles.rowValueText,
-                          { color: surface ? themeColors.textPrimary : themeColors.textSecondary },
-                        ]}
-                      >
-                        {surface ? getSurfaceDisplayLabel(surface) : t('common.select')}
+                  {/* Surface Selector (for running/cycling) */}
+                  {hasTerrainOptions && (
+                    <TouchableOpacity
+                      style={styles.formRow}
+                      onPress={() => setSurfaceModalVisible(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel={getGroupLabel(sportType, 'terrain')}
+                    >
+                      <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                        {getGroupLabel(sportType, 'terrain')}
                       </Text>
-                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
-                    </View>
-                  </TouchableOpacity>
+                      <View style={styles.rowRightValue}>
+                        <Text
+                          style={[
+                            styles.rowValueText,
+                            { color: surface ? themeColors.textPrimary : themeColors.textSecondary },
+                          ]}
+                        >
+                          {surface ? getSurfaceDisplayLabel(surface) : t('common.select')}
+                        </Text>
+                        <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                      </View>
+                    </TouchableOpacity>
+                  )}
 
+                  {/* Swimming-specific options */}
+                  {sportType === 'swimming' && (
+                    <>
+                      {/* Stroke Selector */}
+                      <TouchableOpacity
+                        style={styles.formRow}
+                        onPress={() => setStrokeModalVisible(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('training.strokeLabel')}
+                      >
+                        <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                          {t('training.strokeLabel')}
+                        </Text>
+                        <View style={styles.rowRightValue}>
+                          <Text
+                            style={[
+                              styles.rowValueText,
+                              { color: stroke ? themeColors.textPrimary : themeColors.textSecondary },
+                            ]}
+                          >
+                            {stroke ? getOptionLabel(sportType, stroke, 'stroke') : t('common.select')}
+                          </Text>
+                          <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                        </View>
+                      </TouchableOpacity>
+
+                      {/* Material (Equipment) - Coming soon */}
+                      <View style={[styles.formRow, { opacity: 0.5 }]}>
+                        <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                          {t('training.materialLabel')}
+                        </Text>
+                        <View style={styles.rowRightValue}>
+                          <Text style={[styles.rowValueText, { color: themeColors.textSecondary }]}>
+                            {t('training.comingSoon')}
+                          </Text>
+                          <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                        </View>
+                      </View>
+
+                      {/* Pool Type (only active if modality is 'pool') */}
+                      <TouchableOpacity
+                        style={[
+                          styles.formRow,
+                          { borderBottomWidth: 0 },
+                          environmentType !== 'pool' && { opacity: 0.5 },
+                        ]}
+                        onPress={() => {
+                          if (environmentType === 'pool') {
+                            setPoolTypeModalVisible(true);
+                          }
+                        }}
+                        disabled={environmentType !== 'pool'}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('training.poolTypeLabel')}
+                      >
+                        <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                          {t('training.poolTypeLabel')}
+                        </Text>
+                        <View style={styles.rowRightValue}>
+                          <Text
+                            style={[
+                              styles.rowValueText,
+                              {
+                                color:
+                                  poolType && environmentType === 'pool'
+                                    ? themeColors.textPrimary
+                                    : themeColors.textSecondary,
+                              },
+                            ]}
+                          >
+                            {environmentType === 'pool'
+                              ? poolType
+                                ? getOptionLabel(sportType, poolType, 'pool_type')
+                                : t('common.select')
+                              : t('training.onlyActiveForPool')}
+                          </Text>
+                          {environmentType === 'pool' && (
+                            <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  {/* Shoes / Bike details */}
                   {['running', 'cycling'].includes(sportType) && (
                     <View style={[styles.formRow, { borderBottomWidth: 0, opacity: 0.5 }]}>
                       <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
@@ -1545,6 +1640,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       ]}
                       onPress={() => {
                         setEnvironmentType(typeOption.option_key);
+                        if (sportType === 'swimming' && typeOption.option_key !== 'pool') {
+                          setPoolType(null);
+                        }
                         setTypeModalVisible(false);
                       }}
                     >
@@ -1633,6 +1731,136 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
                   onPress={() => setSurfaceModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Pool Type Selector Modal */}
+        <Modal
+          animationType={isWideLayout ? 'fade' : 'slide'}
+          transparent={true}
+          visible={poolTypeModalVisible}
+          onRequestClose={() => setPoolTypeModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setPoolTypeModalVisible(false)}
+          >
+            <Pressable
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.poolTypeLabel')}</Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getOptions(sportType, 'pool_type').map(opt => {
+                  const isSelected = poolType === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setPoolType(opt.option_key);
+                        setPoolTypeModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'pool_type')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setPoolTypeModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Stroke Selector Modal */}
+        <Modal
+          animationType={isWideLayout ? 'fade' : 'slide'}
+          transparent={true}
+          visible={strokeModalVisible}
+          onRequestClose={() => setStrokeModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setStrokeModalVisible(false)}
+          >
+            <Pressable
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.strokeLabel')}</Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getOptions(sportType, 'stroke').map(opt => {
+                  const isSelected = stroke === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setStroke(opt.option_key);
+                        setStrokeModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'stroke')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setStrokeModalVisible(false)}
                 >
                   <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
                     {t('common.cancel')}

@@ -449,6 +449,7 @@ export type Database = {
           max_temp_c: number | null;
           min_heart_rate: number | null;
           name: string | null;
+          pool_type: string | null;
           provider: Database['public']['Enums']['provider_enum'];
           provider_activity_id: string | null;
           pte: number | null;
@@ -467,6 +468,7 @@ export type Database = {
           start_time: string;
           started_at_local: string | null;
           status: Database['public']['Enums']['activity_status_enum'];
+          stroke: string | null;
           timezone: string | null;
           total_reps: number | null;
           total_sets: number | null;
@@ -505,6 +507,7 @@ export type Database = {
           max_temp_c?: number | null;
           min_heart_rate?: number | null;
           name?: string | null;
+          pool_type?: string | null;
           provider?: Database['public']['Enums']['provider_enum'];
           provider_activity_id?: string | null;
           pte?: number | null;
@@ -523,6 +526,7 @@ export type Database = {
           start_time?: string;
           started_at_local?: string | null;
           status?: Database['public']['Enums']['activity_status_enum'];
+          stroke?: string | null;
           timezone?: string | null;
           total_reps?: number | null;
           total_sets?: number | null;
@@ -561,6 +565,7 @@ export type Database = {
           max_temp_c?: number | null;
           min_heart_rate?: number | null;
           name?: string | null;
+          pool_type?: string | null;
           provider?: Database['public']['Enums']['provider_enum'];
           provider_activity_id?: string | null;
           pte?: number | null;
@@ -579,6 +584,7 @@ export type Database = {
           start_time?: string;
           started_at_local?: string | null;
           status?: Database['public']['Enums']['activity_status_enum'];
+          stroke?: string | null;
           timezone?: string | null;
           total_reps?: number | null;
           total_sets?: number | null;
@@ -1388,8 +1394,10 @@ export type Database = {
           description: string | null;
           environment_type: string | null;
           id: string;
+          pool_type: string | null;
           scheduled_day: number | null;
           sport_type: Database['public']['Enums']['sport_type_enum'];
+          stroke: string | null;
           surface: string | null;
           total_distance_m: number | null;
           total_duration_s: number | null;
@@ -1403,8 +1411,10 @@ export type Database = {
           description?: string | null;
           environment_type?: string | null;
           id?: string;
+          pool_type?: string | null;
           scheduled_day?: number | null;
           sport_type: Database['public']['Enums']['sport_type_enum'];
+          stroke?: string | null;
           surface?: string | null;
           total_distance_m?: number | null;
           total_duration_s?: number | null;
@@ -1418,8 +1428,10 @@ export type Database = {
           description?: string | null;
           environment_type?: string | null;
           id?: string;
+          pool_type?: string | null;
           scheduled_day?: number | null;
           sport_type?: Database['public']['Enums']['sport_type_enum'];
+          stroke?: string | null;
           surface?: string | null;
           total_distance_m?: number | null;
           total_duration_s?: number | null;

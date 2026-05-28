@@ -5,12 +5,12 @@ import { supabase } from '../lib/supabaseClient';
 import { Row, SportType } from '../types/requests.types';
 import { TranslationKey } from '../i18n/locales/en';
 
-export type SportCatalogOptionType = 'goal' | 'modality' | 'terrain';
+export type SportCatalogOptionType = 'goal' | 'modality' | 'terrain' | 'pool_type' | 'stroke';
 export type SportCatalogOption = Row<'sport_catalog_options'>;
 
 type OptionsBySport = Partial<Record<SportType, Partial<Record<SportCatalogOptionType, SportCatalogOption[]>>>>;
 
-const OPTION_TYPES: SportCatalogOptionType[] = ['goal', 'modality', 'terrain'];
+const OPTION_TYPES: SportCatalogOptionType[] = ['goal', 'modality', 'terrain', 'pool_type', 'stroke'];
 
 const isSportCatalogOptionType = (value: string): value is SportCatalogOptionType =>
   OPTION_TYPES.includes(value as SportCatalogOptionType);

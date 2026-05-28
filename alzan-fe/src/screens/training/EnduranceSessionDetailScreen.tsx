@@ -925,6 +925,40 @@ export const EnduranceSessionDetailScreen = () => {
                     </Text>
                   </View>
                 )}
+                {(session.sport_type || template?.sport_type) === 'swimming' &&
+                  (session.pool_type || template?.pool_type) && (
+                    <View
+                      style={[
+                        styles.metadataTag,
+                        { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                      ]}
+                    >
+                      <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                        {getOptionLabel(
+                          session.sport_type || template?.sport_type,
+                          session.pool_type || template?.pool_type,
+                          'pool_type',
+                        )}
+                      </Text>
+                    </View>
+                  )}
+                {(session.sport_type || template?.sport_type) === 'swimming' &&
+                  (session.stroke || template?.stroke) && (
+                    <View
+                      style={[
+                        styles.metadataTag,
+                        { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                      ]}
+                    >
+                      <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                        {getOptionLabel(
+                          session.sport_type || template?.sport_type,
+                          session.stroke || template?.stroke,
+                          'stroke',
+                        )}
+                      </Text>
+                    </View>
+                  )}
               </View>
             )}
           </View>

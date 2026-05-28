@@ -70,6 +70,7 @@ Confirm or decide and write these values first:
 2. Sport Catalog Options
 - Insert or update the sport's goals, modalities, and terrains in the `sport_catalog_options` table via a database migration.
 - Ensure that the options represent the dynamic configuration of the sport, separating goals, modalities, and terrains using the correct `option_type` value (`goal`, `modality`, or `terrain`).
+- Avoid inserting generic `'custom'` options in option types unless explicitly requested, as they complicate standard option flows and validations.
 - Assign descriptive and structured translation keys (e.g. `training.sportOptionPower`) and specify appropriate `sort_order` values.
 
 3. Check dependent tables and contracts
@@ -106,6 +107,7 @@ Confirm or decide and write these values first:
   - Health Connect
   - COROS
   - generic mapper fallback.
+- Ensure mappers classify the incoming provider activity type to the correct canonical `sportType` and `sportSubtype` (e.g. mapping pool vs open water swimming, or gravel/spinning/mtb cycling).
 - Review `Google Fit legacy` only when the change touches historical Google Fit payloads, compatibility contracts, or a reintroduced Google Fit mapper; it is not present in the current activity-provider dispatcher.
 - Do not restrict the review to the provider mentioned in the request or the mapper that first exposed a bug.
 - Ensure canonical parser and route parser include the sport where applicable.
@@ -124,7 +126,7 @@ Confirm or decide and write these values first:
 
 1. Core sport identity (mandatory)
 - Add or confirm unique color in `SPORT_COLORS`.
-- Add or confirm icon mapping in `SportIcon` (and any secondary icon map used in Alzan cards).
+- Add or confirm icon mapping in `SportIcon` using native `MaterialCommunityIcons` from `@expo/vector-icons` (do not switch to custom SVGs unless explicitly requested, to preserve mobile visual familiarity).
 - Add or confirm config entry in `SPORTS_CONFIG`:
   - label key,
   - required input fields,
@@ -134,6 +136,7 @@ Confirm or decide and write these values first:
 2. Sport Catalog Hook Usage
 - Verify that screens displaying sport goals, modalities, or terrains (e.g., endurance builder, session details, templates list, calendar summaries) fetch their options dynamically using the `useSportCatalog` hook (`getOptions`, `getOptionLabel`, `getGroupLabel`).
 - Avoid hardcoding arrays or structures of goals/modalities/terrains on any UI screen.
+- If a screen contains fields that depend on modality (e.g. pool length dependent on pool modality), keep the field visible but disable it (e.g. set `opacity: 0.5` and disable actions) rather than hiding it entirely to maintain consistent card/form layouts.
 - Ensure any legacy or compatibility options mapping is added/updated in the `LEGACY_TRANSLATION_KEYS` map within `alzan-fe/src/hooks/useSportCatalog.ts` if needed.
 
 3. Training screens and flows
