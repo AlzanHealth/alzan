@@ -1140,7 +1140,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     style={[styles.rowInput, { color: themeColors.textPrimary }]}
                     value={name}
                     onChangeText={setName}
-                    placeholder={t('training.intervalsExample')}
+                    placeholder={sportType ? t(`training.exampleName_${sportType}`) : t('training.intervalsExample')}
                     placeholderTextColor={themeColors.textSecondary}
                     textAlign="right"
                   />
