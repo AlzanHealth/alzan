@@ -871,26 +871,36 @@ export const GymRoutineEditorScreen = () => {
               </>
             ) : (
               <>
-                {/* Builder summary strip */}
-                <View style={[styles.builderSummaryStrip, { backgroundColor: `${themeColors.primary}0A` }]}>
-                  <View style={[styles.builderChip, { backgroundColor: `${themeColors.primary}18` }]}>
-                    <Dumbbell size={13} color={themeColors.primary} />
-                    <Text style={[styles.builderChipText, { color: themeColors.primary }]}>
-                      {exercises.length} {t('training.totalExercises').toLowerCase()}
-                    </Text>
-                  </View>
-                  <View style={[styles.builderChip, { backgroundColor: `${themeColors.primary}18` }]}>
-                    <InfinityIcon size={13} color={themeColors.primary} />
-                    <Text style={[styles.builderChipText, { color: themeColors.primary }]}>
-                      {exercises.reduce((acc, curr) => acc + (curr.target_sets || 0), 0)}{' '}
-                      {t('training.totalSets').toLowerCase()}
-                    </Text>
+                <View style={styles.builderSummaryStrip}>
+                  <View style={styles.builderMetricsRow}>
+                    <View style={[styles.builderMetricCard, { backgroundColor: `${themeColors.primary}0A` }]}>
+                      <View style={styles.builderMetricTopRow}>
+                        <Dumbbell size={14} color={themeColors.primary} />
+                        <Text style={[styles.builderMetricValue, { color: themeColors.textPrimary }]}>
+                          {exercises.length}
+                        </Text>
+                      </View>
+                      <Text style={[styles.builderMetricLabel, { color: themeColors.textSecondary }]}>
+                        {t('training.totalExercises').toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={[styles.builderMetricCard, { backgroundColor: `${themeColors.primary}12` }]}>
+                      <View style={styles.builderMetricTopRow}>
+                        <InfinityIcon size={14} color={themeColors.primary} />
+                        <Text style={[styles.builderMetricValue, { color: themeColors.textPrimary }]}>
+                          {exercises.reduce((acc, curr) => acc + (curr.target_sets || 0), 0)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.builderMetricLabel, { color: themeColors.textSecondary }]}>
+                        {t('training.totalSets').toUpperCase()}
+                      </Text>
+                    </View>
                   </View>
                   <TouchableOpacity
                     onPress={handleAddExercise}
-                    style={[styles.builderChip, styles.builderAddChip, { backgroundColor: themeColors.primary }]}
+                    style={[styles.builderAddChip, { backgroundColor: themeColors.primary }]}
                   >
-                    <Plus size={13} color="#FFFFFF" />
+                    <Plus size={16} color="#FFFFFF" />
                     <Text style={[styles.builderChipText, { color: '#FFFFFF' }]}>{t('nutrition.add')}</Text>
                   </TouchableOpacity>
                 </View>
@@ -1536,26 +1546,53 @@ const styles = StyleSheet.create({
   builderSummaryStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.s,
-    paddingVertical: 10,
-    paddingHorizontal: spacing.s,
-    borderRadius: borderRadius.m,
+    justifyContent: 'space-between',
     marginBottom: spacing.m,
+    gap: 12,
   },
-  builderChip: {
+  builderMetricsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: borderRadius.full,
+    gap: 10,
+    flex: 1,
+  },
+  builderMetricCard: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 10,
+    justifyContent: 'center',
+  },
+  builderMetricTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  builderMetricValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  builderMetricLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginTop: 4,
   },
   builderAddChip: {
-    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   builderChipText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
   exercisesHeader: {
     flexDirection: 'row',
@@ -2036,22 +2073,22 @@ const styles = StyleSheet.create({
   },
   summaryMetricCard: {
     flex: 1,
-    minHeight: 92,
+    minHeight: 76,
     borderRadius: borderRadius.m,
-    padding: spacing.s,
+    padding: 12,
     justifyContent: 'space-between',
   },
   summaryMetricValue: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
-    marginTop: spacing.s,
+    marginTop: 8,
   },
   summaryMetricLabel: {
-    fontSize: 10,
-    letterSpacing: 0.8,
-    fontWeight: '600',
+    fontSize: 9,
+    letterSpacing: 0.5,
+    fontWeight: '700',
   },
   designButton: {
     minHeight: 48,
