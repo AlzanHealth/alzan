@@ -853,13 +853,27 @@ export const GymRoutineEditorScreen = () => {
               </>
             ) : (
               <>
-                <View style={styles.exercisesHeader}>
-                  <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>
-                    {t('training.exercises')} ({exercises.length})
-                  </Text>
-                  <TouchableOpacity onPress={handleAddExercise} style={styles.addBtn}>
-                    <Plus size={20} color={themeColors.primary} />
-                    <Text style={[styles.addBtnText, { color: themeColors.primary }]}>{t('nutrition.add')}</Text>
+                {/* Builder summary strip */}
+                <View style={[styles.builderSummaryStrip, { backgroundColor: `${themeColors.primary}0A` }]}>
+                  <View style={[styles.builderChip, { backgroundColor: `${themeColors.primary}18` }]}>
+                    <Dumbbell size={13} color={themeColors.primary} />
+                    <Text style={[styles.builderChipText, { color: themeColors.primary }]}>
+                      {exercises.length} {t('training.totalExercises').toLowerCase()}
+                    </Text>
+                  </View>
+                  <View style={[styles.builderChip, { backgroundColor: `${themeColors.primary}18` }]}>
+                    <InfinityIcon size={13} color={themeColors.primary} />
+                    <Text style={[styles.builderChipText, { color: themeColors.primary }]}>
+                      {exercises.reduce((acc, curr) => acc + (curr.target_sets || 0), 0)}{' '}
+                      {t('training.totalSets').toLowerCase()}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={handleAddExercise}
+                    style={[styles.builderChip, styles.builderAddChip, { backgroundColor: themeColors.primary }]}
+                  >
+                    <Plus size={13} color="#FFFFFF" />
+                    <Text style={[styles.builderChipText, { color: '#FFFFFF' }]}>{t('nutrition.add')}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -963,31 +977,49 @@ export const GymRoutineEditorScreen = () => {
                               ]}
                             />
                             <View style={styles.exerciseCardContent}>
-                              <View style={styles.exerciseHeader}>
-                                <View style={styles.exerciseInfo}>
-                                  <Text style={[styles.exerciseName, dynamicStyles.title]}>
-                                    {getExerciseDisplayName(item.exercise)}
+                              {/* Exercise name row with index badge */}
+                              <View style={styles.exerciseNameRow}>
+                                <View
+                                  style={[
+                                    styles.exerciseIndexBadge,
+                                    { backgroundColor: isWarmupExercise ? '#FF950020' : `${themeColors.primary}18` },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.exerciseIndexText,
+                                      { color: isWarmupExercise ? '#FF9500' : themeColors.primary },
+                                    ]}
+                                  >
+                                    {isWarmupExercise ? 'W' : index + 1}
                                   </Text>
                                 </View>
-                                <View style={styles.actionButtonsRow}>
-                                  <View style={styles.moveButtons}>
-                                    {index > 0 && (
-                                      <TouchableOpacity
-                                        onPress={() => handleMoveExercise(index, 'up')}
-                                        style={styles.moveBtn}
-                                      >
-                                        <ChevronUp size={20} color={themeColors.textSecondary} />
-                                      </TouchableOpacity>
-                                    )}
-                                    {index < exercises.length - 1 && (
-                                      <TouchableOpacity
-                                        onPress={() => handleMoveExercise(index, 'down')}
-                                        style={styles.moveBtn}
-                                      >
-                                        <ChevronDown size={20} color={themeColors.textSecondary} />
-                                      </TouchableOpacity>
-                                    )}
-                                  </View>
+                                <Text style={[styles.exerciseName, dynamicStyles.title]} numberOfLines={2}>
+                                  {getExerciseDisplayName(item.exercise)}
+                                </Text>
+                              </View>
+
+                              {/* Action buttons row */}
+                              <View style={styles.exerciseActionsBar}>
+                                <View style={styles.moveButtons}>
+                                  {index > 0 && (
+                                    <TouchableOpacity
+                                      onPress={() => handleMoveExercise(index, 'up')}
+                                      style={[styles.actionBtn, { backgroundColor: `${themeColors.textSecondary}0D` }]}
+                                    >
+                                      <ChevronUp size={16} color={themeColors.textSecondary} />
+                                    </TouchableOpacity>
+                                  )}
+                                  {index < exercises.length - 1 && (
+                                    <TouchableOpacity
+                                      onPress={() => handleMoveExercise(index, 'down')}
+                                      style={[styles.actionBtn, { backgroundColor: `${themeColors.textSecondary}0D` }]}
+                                    >
+                                      <ChevronDown size={16} color={themeColors.textSecondary} />
+                                    </TouchableOpacity>
+                                  )}
+                                </View>
+                                <View style={styles.exerciseActionsRight}>
                                   <TouchableOpacity
                                     onPress={() => toggleExerciseWarmup(index)}
                                     style={[
@@ -1004,19 +1036,29 @@ export const GymRoutineEditorScreen = () => {
                                       {t('training.warmup')}
                                     </Text>
                                   </TouchableOpacity>
-                                  <TouchableOpacity onPress={() => setHelpModalVisible(true)} style={styles.deleteBtn}>
-                                    <HelpCircle size={18} color={themeColors.textSecondary} />
+                                  <TouchableOpacity onPress={() => setHelpModalVisible(true)} style={styles.actionBtn}>
+                                    <HelpCircle size={16} color={themeColors.textSecondary} />
                                   </TouchableOpacity>
                                   <TouchableOpacity
                                     onPress={() => handleRemoveExercise(index)}
-                                    style={styles.deleteBtn}
+                                    style={[styles.actionBtn, { backgroundColor: `${themeColors.danger}0D` }]}
                                   >
-                                    <Trash2 size={18} color={themeColors.danger} />
+                                    <Trash2 size={16} color={themeColors.danger} />
                                   </TouchableOpacity>
                                 </View>
                               </View>
 
-                              <View style={styles.targetsRow}>
+                              {/* Targets grid */}
+                              <View
+                                style={[
+                                  styles.targetsRow,
+                                  {
+                                    backgroundColor: `${themeColors.textSecondary}06`,
+                                    borderRadius: borderRadius.m,
+                                    padding: spacing.s,
+                                  },
+                                ]}
+                              >
                                 <View style={styles.targetField}>
                                   <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
                                     {t('training.setsLabel')}
@@ -1169,11 +1211,17 @@ export const GymRoutineEditorScreen = () => {
                 })}
 
                 <TouchableOpacity
-                  style={[styles.addLargeBtn, { borderColor: themeColors.border }]}
+                  style={[
+                    styles.addLargeBtn,
+                    { borderColor: themeColors.primary + '30', backgroundColor: `${themeColors.primary}08` },
+                  ]}
                   onPress={handleAddExercise}
+                  activeOpacity={0.7}
                 >
-                  <Plus size={24} color={themeColors.textSecondary} />
-                  <Text style={[styles.addLargeBtnText, { color: themeColors.textSecondary }]}>
+                  <View style={[styles.addLargeIconCircle, { backgroundColor: `${themeColors.primary}18` }]}>
+                    <Plus size={20} color={themeColors.primary} />
+                  </View>
+                  <Text style={[styles.addLargeBtnText, { color: themeColors.primary }]}>
                     {t('training.addExercise')}
                   </Text>
                 </TouchableOpacity>
@@ -1445,6 +1493,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1, // Added border for better visibility if dynamicStyle provides border color
   },
+  builderSummaryStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.s,
+    borderRadius: borderRadius.m,
+    marginBottom: spacing.m,
+  },
+  builderChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: borderRadius.full,
+  },
+  builderAddChip: {
+    marginLeft: 'auto',
+  },
+  builderChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   exercisesHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1465,7 +1537,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   exerciseCard: {
-    marginBottom: spacing.m,
+    marginBottom: spacing.s,
     padding: spacing.m,
     overflow: 'hidden',
   },
@@ -1475,6 +1547,35 @@ const styles = StyleSheet.create({
   exerciseCardSuperset: {
     borderWidth: 2,
     borderLeftWidth: 3,
+  },
+  exerciseNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  exerciseIndexBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exerciseIndexText: {
+    fontSize: 13,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  exerciseActionsBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  exerciseActionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   exerciseHeader: {
     flexDirection: 'row',
@@ -1486,7 +1587,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.s,
-    flex: 1, // Allow text to take available space
+    flex: 1,
     marginRight: spacing.s,
   },
   exerciseCardContent: {
@@ -1504,10 +1605,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.m,
   },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   moveButtons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
   },
   moveBtn: {
     padding: 4,
@@ -1518,14 +1626,15 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 16,
     fontWeight: '600',
+    flex: 1,
   },
   warmupExerciseToggle: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(153,153,153,0.4)',
+    borderColor: 'rgba(153,153,153,0.35)',
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    minWidth: 76,
+    paddingVertical: 5,
+    minWidth: 64,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1534,19 +1643,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,149,0,0.12)',
   },
   warmupExerciseToggleText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   targetsRow: {
     flexDirection: 'row',
-    gap: spacing.m,
+    gap: spacing.s,
   },
   targetField: {
     flex: 1,
   },
   targetLabel: {
-    fontSize: 11,
-    marginBottom: 2,
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    marginBottom: 3,
+    textAlign: 'center',
   },
   targetInput: {
     borderRadius: borderRadius.s,
@@ -1559,15 +1672,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.l,
-    borderWidth: 1,
-    borderRadius: borderRadius.m,
+    paddingVertical: spacing.m,
+    paddingHorizontal: spacing.l,
+    borderWidth: 1.5,
+    borderRadius: borderRadius.l,
     borderStyle: 'dashed',
-    marginTop: spacing.s,
+    marginTop: spacing.m,
+    gap: 10,
+  },
+  addLargeIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addLargeBtnText: {
-    marginLeft: spacing.s,
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: '600',
   },
   supersetConnectorContainer: {
     flexDirection: 'row',
