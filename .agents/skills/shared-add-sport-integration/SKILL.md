@@ -67,19 +67,24 @@ Confirm or decide and write these values first:
 1. Enums and migrations
 - Update `sport_type_enum` and `sport_subtype_enum` only when required by the addition or modification.
 
-2. Check dependent tables and contracts
+2. Sport Catalog Options
+- Insert or update the sport's goals, modalities, and terrains in the `sport_catalog_options` table via a database migration.
+- Ensure that the options represent the dynamic configuration of the sport, separating goals, modalities, and terrains using the correct `option_type` value (`goal`, `modality`, or `terrain`).
+- Assign descriptive and structured translation keys (e.g. `training.sportOptionPower`) and specify appropriate `sort_order` values.
+
+3. Check dependent tables and contracts
 - Validate usage in:
   - `activity_sessions`,
   - `endurance_workout_templates`,
   - goal/config tables and references using sport enums.
 
-3. Regenerate and sync types
+4. Regenerate and sync types
 - Regenerate and verify:
   - `supabase/database.types.ts`,
   - `supabase/requests.types.ts`,
   - FE/BE derived type files using `SportType`/`SportSubtype`.
 
-4. Seed coverage
+5. Seed coverage
 - Add or update minimal seed rows/fixtures to verify:
   - manual session for the new or modified sport,
   - template rows if applicable,
@@ -126,7 +131,12 @@ Confirm or decide and write these values first:
   - metric logic,
   - display formatting behavior.
 
-2. Training screens and flows
+2. Sport Catalog Hook Usage
+- Verify that screens displaying sport goals, modalities, or terrains (e.g., endurance builder, session details, templates list, calendar summaries) fetch their options dynamically using the `useSportCatalog` hook (`getOptions`, `getOptionLabel`, `getGroupLabel`).
+- Avoid hardcoding arrays or structures of goals/modalities/terrains on any UI screen.
+- Ensure any legacy or compatibility options mapping is added/updated in the `LEGACY_TRANSLATION_KEYS` map within `alzan-fe/src/hooks/useSportCatalog.ts` if needed.
+
+3. Training screens and flows
 - Review all sport-dependent surfaces and update those affected by the behavior change:
   - activity type selector,
   - endurance builder,
@@ -137,14 +147,15 @@ Confirm or decide and write these values first:
   - training home cards,
   - Alzan home highlights if applicable.
 
-3. Template decision
+4. Template decision
 - If structured endurance is needed:
   - include in template creation and step flows.
 - If simple sport:
   - ensure manual duration/distance flow is coherent.
 
-4. i18n
+5. i18n
 - Add ES/EN keys for sport name and related labels/messages.
+- Include translations for all option keys inserted into the `sport_catalog_options` table.
 - Avoid hardcoded strings.
 
 ## Phase E - Stats, ranking, exports
@@ -223,6 +234,9 @@ Conditional legacy check:
 
 - Sport added in FE but missing in DB enum.
 - Enum migrated but Supabase types were not regenerated.
+- Sport options missing from `sport_catalog_options` database table.
+- Option keys added in `sport_catalog_options` but missing translations in `en.ts` or `es.ts`.
+- Options hardcoded in UI screens instead of using the `useSportCatalog` hook.
 - Color/icon not configured, leading to generic fallback visuals.
 - Provider mapper incomplete, silently mapping to `other`.
 - Existing sport changed in one mapper or UI surface without checking the remaining integrations.
