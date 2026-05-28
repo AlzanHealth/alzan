@@ -210,7 +210,7 @@ function assertSuuntoSportMapping(): void {
   });
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 33 }), {
     sportType: 'football',
-    sportSubtype: 'outdoor',
+    sportSubtype: 'football_11',
   });
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 34 }), {
     sportType: 'tennis',

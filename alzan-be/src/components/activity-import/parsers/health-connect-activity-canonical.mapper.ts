@@ -242,7 +242,12 @@ function mapHealthConnectSport(workout: JsonRecord): CanonicalActivitySportMappi
   if (normalised.includes('swimmingpool')) return { sportType: 'swimming', sportSubtype: 'pool' };
   if (normalised.includes('swimmingopenwater')) return { sportType: 'swimming', sportSubtype: 'open_water' };
   if (normalised.includes('swimming')) return { sportType: 'swimming', sportSubtype: null };
-  if (normalised.includes('soccer')) return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (normalised.includes('soccer') || normalised.includes('football')) {
+    if (normalised.includes('futsal') || normalised.includes('sala') || normalised.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (normalised.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (normalised.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised.includes('hiking')) return { sportType: 'hiking', sportSubtype: 'trail' };

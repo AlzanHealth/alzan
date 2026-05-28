@@ -165,7 +165,10 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
   if (sport.includes('TENNIS')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (sport.includes('BASKETBALL')) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (sport.includes('SOCCER') || sport.includes('FUTSAL') || sport.includes('TEAMSPORTS_FOOTBALL')) {
-    return { sportType: 'football', sportSubtype: 'outdoor' };
+    if (sport.includes('FUTSAL') || sport.includes('SALA') || sport.includes('INDOOR')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
   }
   if (sport.includes('HIKING') || sport.includes('MOUNTAINEERING')) {
     return { sportType: 'hiking', sportSubtype: 'trail' };

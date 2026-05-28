@@ -31,6 +31,11 @@ export interface BuilderTemplateData {
   surface?: string | null;
   pool_type?: string | null;
   stroke?: string | null;
+  football_session_type?: string | null;
+  base_load?: string | null;
+  boots_used?: string | null;
+  rival?: string | null;
+  notes?: string | null;
 }
 
 export const useEnduranceWorkoutBuilder = () => {
@@ -76,6 +81,11 @@ export const useEnduranceWorkoutBuilder = () => {
               surface: data.surface,
               pool_type: data.pool_type,
               stroke: data.stroke,
+              football_session_type: data.football_session_type,
+              base_load: data.base_load,
+              boots_used: data.boots_used,
+              rival: data.rival,
+              notes: data.notes,
               updated_at: new Date().toISOString(),
             })
             .eq('id', templateId);
@@ -107,6 +117,11 @@ export const useEnduranceWorkoutBuilder = () => {
               surface: data.surface,
               pool_type: data.pool_type,
               stroke: data.stroke,
+              football_session_type: data.football_session_type,
+              base_load: data.base_load,
+              boots_used: data.boots_used,
+              rival: data.rival,
+              notes: data.notes,
             })
             .select()
             .single();

@@ -15,7 +15,7 @@ interface ParseFitbitActivityOptions {
 }
 
 const FITBIT_ACTIVITY_TYPE_BY_ID: Record<number, CanonicalActivitySportMapping> = {
-  15: { sportType: 'football', sportSubtype: 'outdoor' },
+  15: { sportType: 'football', sportSubtype: 'football_11' },
   16: { sportType: 'basketball', sportSubtype: 'indoor' },
   27: { sportType: 'tennis', sportSubtype: 'outdoor' },
   82: { sportType: 'swimming', sportSubtype: null },
@@ -159,8 +159,12 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
-  if (normalised.includes('soccer') || normalised.includes('football'))
-    return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (normalised.includes('soccer') || normalised.includes('football')) {
+    if (normalised.includes('futsal') || normalised.includes('sala') || normalised.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (normalised.includes('hike') || normalised.includes('hiking'))
     return { sportType: 'hiking', sportSubtype: 'trail' };
   if (normalised.includes('treadmill') || normalised.includes('indoor run'))

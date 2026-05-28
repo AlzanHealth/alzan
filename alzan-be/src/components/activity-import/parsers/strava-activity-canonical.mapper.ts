@@ -156,7 +156,13 @@ function mapStravaSport(
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (normalised === 'swim') return { sportType: 'swimming', sportSubtype: null };
-  if (normalised === 'soccer' || normalised === 'football') return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (normalised === 'soccer' || normalised === 'football') {
+    const combinedName = (name || '').toLowerCase();
+    if (combinedName.includes('futsal') || combinedName.includes('sala') || combinedName.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (normalised === 'basketball') return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (normalised === 'tennis') return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised === 'padel') return { sportType: 'padel', sportSubtype: 'outdoor' };

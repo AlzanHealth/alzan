@@ -435,6 +435,8 @@ export type Database = {
           avg_power_w: number | null
           avg_speed_m_per_s: number | null
           avg_temp_c: number | null
+          base_load: string | null
+          boots_used: string | null
           calories_kcal: number | null
           created_at: string
           description: string | null
@@ -447,6 +449,7 @@ export type Database = {
           ended_at_local: string | null
           endurance_template_id: string | null
           epoc: number | null
+          football_session_type: string | null
           id: string
           imported_at: string | null
           max_cadence: number | null
@@ -455,12 +458,14 @@ export type Database = {
           max_temp_c: number | null
           min_heart_rate: number | null
           name: string | null
+          notes: string | null
           pool_type: string | null
           provider: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id: string | null
           pte: number | null
           raw_payload_id: string | null
           recovery_time_s: number | null
+          rival: string | null
           route_polyline: string | null
           rpe: number | null
           source: Database["public"]["Enums"]["activity_source_enum"]
@@ -475,6 +480,7 @@ export type Database = {
           started_at_local: string | null
           status: Database["public"]["Enums"]["activity_status_enum"]
           stroke: string | null
+          surface: string | null
           timezone: string | null
           total_reps: number | null
           total_sets: number | null
@@ -493,6 +499,8 @@ export type Database = {
           avg_power_w?: number | null
           avg_speed_m_per_s?: number | null
           avg_temp_c?: number | null
+          base_load?: string | null
+          boots_used?: string | null
           calories_kcal?: number | null
           created_at?: string
           description?: string | null
@@ -505,6 +513,7 @@ export type Database = {
           ended_at_local?: string | null
           endurance_template_id?: string | null
           epoc?: number | null
+          football_session_type?: string | null
           id?: string
           imported_at?: string | null
           max_cadence?: number | null
@@ -513,12 +522,14 @@ export type Database = {
           max_temp_c?: number | null
           min_heart_rate?: number | null
           name?: string | null
+          notes?: string | null
           pool_type?: string | null
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
           pte?: number | null
           raw_payload_id?: string | null
           recovery_time_s?: number | null
+          rival?: string | null
           route_polyline?: string | null
           rpe?: number | null
           source?: Database["public"]["Enums"]["activity_source_enum"]
@@ -533,6 +544,7 @@ export type Database = {
           started_at_local?: string | null
           status?: Database["public"]["Enums"]["activity_status_enum"]
           stroke?: string | null
+          surface?: string | null
           timezone?: string | null
           total_reps?: number | null
           total_sets?: number | null
@@ -551,6 +563,8 @@ export type Database = {
           avg_power_w?: number | null
           avg_speed_m_per_s?: number | null
           avg_temp_c?: number | null
+          base_load?: string | null
+          boots_used?: string | null
           calories_kcal?: number | null
           created_at?: string
           description?: string | null
@@ -563,6 +577,7 @@ export type Database = {
           ended_at_local?: string | null
           endurance_template_id?: string | null
           epoc?: number | null
+          football_session_type?: string | null
           id?: string
           imported_at?: string | null
           max_cadence?: number | null
@@ -571,12 +586,14 @@ export type Database = {
           max_temp_c?: number | null
           min_heart_rate?: number | null
           name?: string | null
+          notes?: string | null
           pool_type?: string | null
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
           pte?: number | null
           raw_payload_id?: string | null
           recovery_time_s?: number | null
+          rival?: string | null
           route_polyline?: string | null
           rpe?: number | null
           source?: Database["public"]["Enums"]["activity_source_enum"]
@@ -591,6 +608,7 @@ export type Database = {
           started_at_local?: string | null
           status?: Database["public"]["Enums"]["activity_status_enum"]
           stroke?: string | null
+          surface?: string | null
           timezone?: string | null
           total_reps?: number | null
           total_sets?: number | null
@@ -1419,12 +1437,17 @@ export type Database = {
       }
       endurance_workout_templates: {
         Row: {
+          base_load: string | null
           base_name: string
+          boots_used: string | null
           created_at: string
           description: string | null
           environment_type: string | null
+          football_session_type: string | null
           id: string
+          notes: string | null
           pool_type: string | null
+          rival: string | null
           scheduled_day: number | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
           stroke: string | null
@@ -1436,12 +1459,17 @@ export type Database = {
           workout_goal: string | null
         }
         Insert: {
+          base_load?: string | null
           base_name: string
+          boots_used?: string | null
           created_at?: string
           description?: string | null
           environment_type?: string | null
+          football_session_type?: string | null
           id?: string
+          notes?: string | null
           pool_type?: string | null
+          rival?: string | null
           scheduled_day?: number | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
           stroke?: string | null
@@ -1453,12 +1481,17 @@ export type Database = {
           workout_goal?: string | null
         }
         Update: {
+          base_load?: string | null
           base_name?: string
+          boots_used?: string | null
           created_at?: string
           description?: string | null
           environment_type?: string | null
+          football_session_type?: string | null
           id?: string
+          notes?: string | null
           pool_type?: string | null
+          rival?: string | null
           scheduled_day?: number | null
           sport_type?: Database["public"]["Enums"]["sport_type_enum"]
           stroke?: string | null

@@ -43,6 +43,7 @@ import { addDays, format } from 'date-fns';
 import { LiquidGlassFooter } from '../../components/common/LiquidGlassFooter';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SportIcon } from '../../components/icons/SportIcon';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
@@ -104,6 +105,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [trainingGoal, setTrainingGoal] = useState<string | undefined>(undefined);
   const [customGoalText, setCustomGoalText] = useState('');
   const [sportType, setSportType] = useState<Nullable<SportType>>(route.params?.sportType || null);
+  const showSummary = sportType !== 'football';
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -113,12 +115,20 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [poolType, setPoolType] = useState<string | null>(null);
   const [stroke, setStroke] = useState<string | null>(null);
 
+  // Football-specific state
+  const [footballSessionType, setFootballSessionType] = useState<string>('match');
+  const [baseLoad, setBaseLoad] = useState<string | null>(null);
+  const [bootsUsed, setBootsUsed] = useState<string | null>(null);
+  const [rival, setRival] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+
   // Modals visibility
   const [goalModalVisible, setGoalModalVisible] = useState(false);
   const [surfaceModalVisible, setSurfaceModalVisible] = useState(false);
   const [typeModalVisible, setTypeModalVisible] = useState(false);
   const [poolTypeModalVisible, setPoolTypeModalVisible] = useState(false);
   const [strokeModalVisible, setStrokeModalVisible] = useState(false);
+  const [baseLoadModalVisible, setBaseLoadModalVisible] = useState(false);
 
   // Step Modals
   const [modalVisible, setModalVisible] = useState(false);
@@ -199,6 +209,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
       setPoolType(existingTemplate.pool_type || null);
       setStroke(existingTemplate.stroke || null);
 
+      // Football hydration
+      setFootballSessionType(existingTemplate.football_session_type || 'match');
+      setBaseLoad(existingTemplate.base_load || null);
+      setBootsUsed(existingTemplate.boots_used || null);
+      setRival(existingTemplate.rival || '');
+      setNotes(existingTemplate.notes || '');
+
       if (existingTemplate.scheduled_day !== null && existingTemplate.scheduled_day !== undefined) {
         setScheduledDays([existingTemplate.scheduled_day]);
         setOriginalScheduledDay(existingTemplate.scheduled_day);
@@ -250,6 +267,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const goalOptions = sportType ? getOptions(sportType, 'goal') : [];
   const modalityOptions = sportType ? getOptions(sportType, 'modality') : [];
   const terrainOptions = sportType ? getOptions(sportType, 'terrain') : [];
+  const baseLoadOptions = sportType === 'football' ? getOptions(sportType, 'base_load') : [];
   const hasModalityOptions = modalityOptions.length > 0;
   const hasTerrainOptions = terrainOptions.length > 0;
 
@@ -445,6 +463,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
           surface: surface,
           pool_type: poolType,
           stroke: stroke,
+          football_session_type: sportType === 'football' ? footballSessionType : null,
+          base_load: sportType === 'football' ? baseLoad : null,
+          boots_used: sportType === 'football' ? bootsUsed : null,
+          rival: sportType === 'football' ? rival : null,
+          notes: sportType === 'football' ? notes : null,
         },
         steps: steps as BuilderStep[],
         templateId: templateId,
@@ -1062,12 +1085,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
           </ScrollView>
         ) : currentView === 'main' ? (
           /* Main Redesigned Form View */
-          <View style={[styles.responsiveLayout, isWideLayout && styles.responsiveLayoutWide]}>
+          <View style={[styles.responsiveLayout, isWideLayout && showSummary && styles.responsiveLayoutWide]}>
             <ScrollView
-              style={[styles.mainColumn, isWideLayout && styles.mainColumnWide]}
+              style={[styles.mainColumn, isWideLayout && showSummary && styles.mainColumnWide]}
               contentContainerStyle={[
                 styles.mainFormContainer,
-                isWideLayout && styles.mainFormContainerWide,
+                isWideLayout && showSummary && styles.mainFormContainerWide,
                 { paddingBottom: mainContentBottomPadding },
               ]}
               showsVerticalScrollIndicator={false}
@@ -1172,7 +1195,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 {/* Environment Type selector */}
                 {hasModalityOptions && (
                   <TouchableOpacity
-                    style={styles.formRow}
+                    style={[
+                      styles.formRow,
+                      ['running', 'cycling', 'swimming'].includes(sportType) && { borderBottomWidth: 0 },
+                    ]}
                     onPress={() => setTypeModalVisible(true)}
                     accessibilityRole="button"
                     accessibilityLabel={getGroupLabel(sportType, 'modality')}
@@ -1194,19 +1220,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     </View>
                   </TouchableOpacity>
                 )}
-              </GlassCard>
 
-              {structuredSport && !isWideLayout && (
-                <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>
-              )}
-
-              {/* Manual Duration (for simple sports) */}
-              {!['running', 'cycling', 'swimming'].includes(sportType) && (
-                <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
-                  <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
-                    {t('training.duration').toUpperCase()}
-                  </Text>
-                  <View style={styles.formRow}>
+                {/* Estimated Duration (for simple/manual sports, placed under Modality/Environment selector) */}
+                {!['running', 'cycling', 'swimming'].includes(sportType) && (
+                  <View style={[styles.formRow, { borderBottomWidth: 0 }]}>
                     <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
                       {t('training.estimatedDurationMin')}
                     </Text>
@@ -1220,18 +1237,178 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       textAlign="right"
                     />
                   </View>
-                  <Text style={[styles.helperDescription, { color: themeColors.textSecondary, marginTop: 8 }]}>
-                    {t('training.planningInfoOnly')}
+                )}
+              </GlassCard>
+
+              {/* Block 2: Detalles de la plantilla (Football only) */}
+              {sportType === 'football' && (
+                <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+                  <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                    {t('training.templateDetails').toUpperCase()}
                   </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      gap: spacing.s,
+                      marginTop: spacing.s,
+                    }}
+                  >
+                    {/* Col 1: Superficie (Surface) */}
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: themeColors.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 90,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                      }}
+                      onPress={() => setSurfaceModalVisible(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('training.surfaceLabel')}
+                    >
+                      <MaterialCommunityIcons
+                        name="grass"
+                        size={24}
+                        color={SPORT_COLORS.football}
+                        style={{ marginBottom: 6 }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '600',
+                          textTransform: 'uppercase',
+                          marginBottom: 6,
+                          textAlign: 'center',
+                          color: themeColors.textSecondary,
+                        }}
+                      >
+                        {t('training.surfaceLabel')}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '700',
+                          textAlign: 'center',
+                          color: surface ? themeColors.textPrimary : themeColors.textSecondary,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {surface ? getSurfaceDisplayLabel(surface) : t('common.select')}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Col 2: Carga base */}
+                    <TouchableOpacity
+                      style={{
+                        flex: 1,
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: themeColors.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 90,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                      }}
+                      onPress={() => setBaseLoadModalVisible(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('training.loadLabel')}
+                    >
+                      <MaterialCommunityIcons
+                        name="chart-bell-curve-cumulative"
+                        size={24}
+                        color={SPORT_COLORS.football}
+                        style={{ marginBottom: 6 }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '600',
+                          textTransform: 'uppercase',
+                          marginBottom: 6,
+                          textAlign: 'center',
+                          color: themeColors.textSecondary,
+                        }}
+                      >
+                        {t('training.loadLabel')}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '700',
+                          textAlign: 'center',
+                          color: baseLoad ? themeColors.textPrimary : themeColors.textSecondary,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {baseLoad ? getOptionLabel(sportType, baseLoad, 'base_load') : t('common.select')}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Col 3: Bota utilizada - Coming Soon */}
+                    <View
+                      style={{
+                        flex: 1,
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: themeColors.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 90,
+                        opacity: 0.5,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="shoe-cleat"
+                        size={24}
+                        color={SPORT_COLORS.football}
+                        style={{ marginBottom: 6 }}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '600',
+                          textTransform: 'uppercase',
+                          marginBottom: 6,
+                          textAlign: 'center',
+                          color: themeColors.textSecondary,
+                        }}
+                      >
+                        {t('training.bootsLabel')}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '700',
+                          textAlign: 'center',
+                          color: themeColors.textSecondary,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {t('training.comingSoon')}
+                      </Text>
+                    </View>
+                  </View>
                 </GlassCard>
               )}
 
-              {!structuredSport && !isWideLayout && (
+              {structuredSport && !isWideLayout && (
+                <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>
+              )}
+
+              {!structuredSport && sportType !== 'football' && !isWideLayout && (
                 <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>
               )}
 
               {/* Block 3: Configuración */}
-              {(hasTerrainOptions || sportType === 'swimming') && (
+              {((hasTerrainOptions && sportType !== 'football') || sportType === 'swimming') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
                     {t('navigation.workoutSettings').toUpperCase()}
@@ -1380,7 +1557,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
               </GlassCard>
             </ScrollView>
 
-            {isWideLayout && (
+            {isWideLayout && showSummary && (
               <View style={styles.summarySideColumn}>
                 <ScrollView
                   style={styles.summarySidePanel}
@@ -1861,6 +2038,71 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
                   onPress={() => setStrokeModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Base Load Selector Modal */}
+        <Modal
+          animationType={isWideLayout ? 'fade' : 'slide'}
+          transparent={true}
+          visible={baseLoadModalVisible}
+          onRequestClose={() => setBaseLoadModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setBaseLoadModalVisible(false)}
+          >
+            <Pressable
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.loadLabel')}</Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {baseLoadOptions.map(opt => {
+                  const isSelected = baseLoad === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setBaseLoad(opt.option_key);
+                        setBaseLoadModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'base_load')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setBaseLoadModalVisible(false)}
                 >
                   <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
                     {t('common.cancel')}

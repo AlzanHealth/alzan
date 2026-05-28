@@ -564,6 +564,39 @@ export const EnduranceSessionDetailScreen = () => {
         value: `${recoveryHours} h`,
       });
     }
+    if (session.sport_type === 'football') {
+      if (session.football_session_type) {
+        secondaryMetrics.push({
+          key: 'football-session-type',
+          label: t('training.sessionTypeLabel'),
+          value:
+            session.football_session_type === 'match'
+              ? t('training.matchLabel')
+              : session.football_session_type === 'training'
+                ? t('training.trainingLabel')
+                : t('training.pachangaLabel'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'football-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      if (session.rival) {
+        secondaryMetrics.push({
+          key: 'football-rival',
+          label: t('training.rivalLabel'),
+          value: session.rival,
+        });
+      }
+      secondaryMetrics.push({
+        key: 'football-boots',
+        label: t('training.bootsLabel'),
+        value: t('training.comingSoon'),
+      });
+    }
   }
 
   const handleImportedMetricInfoPress = useCallback(
@@ -899,7 +932,7 @@ export const EnduranceSessionDetailScreen = () => {
                 locale: getDateFnsLocale(),
               })}
             </Text>
-            {(session.sport_subtype || template?.surface || template?.environment_type) && (
+            {(session.sport_subtype || session.surface || template?.surface || template?.environment_type) && (
               <View style={styles.metadataTagsContainer}>
                 {(session.sport_subtype || template?.environment_type) && (
                   <View
@@ -913,7 +946,7 @@ export const EnduranceSessionDetailScreen = () => {
                     </Text>
                   </View>
                 )}
-                {template?.surface && (
+                {(session.surface || template?.surface) && (
                   <View
                     style={[
                       styles.metadataTag,
@@ -921,7 +954,7 @@ export const EnduranceSessionDetailScreen = () => {
                     ]}
                   >
                     <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
-                      {getSurfaceDisplayLabel(template.surface)}
+                      {getSurfaceDisplayLabel(session.surface || template?.surface)}
                     </Text>
                   </View>
                 )}
@@ -1119,6 +1152,17 @@ export const EnduranceSessionDetailScreen = () => {
                     <Text style={[styles.secondaryMetricValue, dynamicStyles.title]}>{metric.value}</Text>
                   </View>
                 ))}
+              </GlassCard>
+            </View>
+          )}
+
+          {!isGymSession && (session.notes || template?.notes) && (
+            <View style={styles.sectionContainer}>
+              <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>{t('training.notesLabel')}</Text>
+              <GlassCard style={[styles.stepsCard, dynamicStyles.glassCard, { padding: spacing.m }]}>
+                <Text style={{ color: themeColors.textPrimary, fontSize: 14, lineHeight: 20 }}>
+                  {session.notes || template?.notes}
+                </Text>
               </GlassCard>
             </View>
           )}

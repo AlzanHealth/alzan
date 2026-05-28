@@ -101,8 +101,12 @@ function mapSportNameToCanonical(rawSportName: string | null): CanonicalActivity
   const sportName = rawSportName?.toLowerCase() ?? '';
   if (sportName.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (sportName.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
-  if (sportName.includes('football') || sportName.includes('soccer'))
-    return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (sportName.includes('football') || sportName.includes('soccer')) {
+    if (sportName.includes('futsal') || sportName.includes('sala') || sportName.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (sportName.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (sportName.includes('hiking') || sportName.includes('hike')) return { sportType: 'hiking', sportSubtype: 'trail' };
   if (sportName.includes('pool') && sportName.includes('swim')) return { sportType: 'swimming', sportSubtype: 'pool' };

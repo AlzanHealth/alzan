@@ -86,7 +86,12 @@ function mapWhoopSport(sportName: string | null): CanonicalActivitySportMapping 
   if (normalised === 'urban_cycling' || normalised === 'bike_commuting')
     return { sportType: 'cycling', sportSubtype: 'urban' };
   if (normalised === 'swimming') return { sportType: 'swimming', sportSubtype: null };
-  if (normalised === 'soccer' || normalised === 'football') return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (normalised.includes('soccer') || normalised.includes('football') || normalised.includes('futsal')) {
+    if (normalised.includes('futsal') || normalised.includes('sala') || normalised.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (normalised === 'basketball') return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (normalised === 'tennis') return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised === 'padel' || normalised === 'paddle_tennis') return { sportType: 'padel', sportSubtype: 'outdoor' };

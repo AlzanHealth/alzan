@@ -522,7 +522,12 @@ export function mapGarminActivityToCanonicalSport(params: {
     return { sportType: 'swimming', sportSubtype: 'pool' };
   }
   if (fitSport === 6) return { sportType: 'basketball', sportSubtype: 'indoor' };
-  if (fitSport === 7) return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (fitSport === 7) {
+    if (combinedText.includes('futsal') || combinedText.includes('sala') || combinedText.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (fitSport === 8) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (fitSport === 4 || fitSport === 37 || fitSubSport === 20) return { sportType: 'strength', sportSubtype: 'indoor' };
   if (fitSport === 17) return { sportType: 'hiking', sportSubtype: 'trail' };
@@ -532,8 +537,12 @@ export function mapGarminActivityToCanonicalSport(params: {
   if (activityType.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (activityType.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (activityType.includes('hike')) return { sportType: 'hiking', sportSubtype: 'trail' };
-  if (activityType.includes('soccer') || activityType.includes('football'))
-    return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (activityType.includes('soccer') || activityType.includes('football')) {
+    if (activityType.includes('futsal') || activityType.includes('sala') || activityType.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (activityType.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (activityType.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (activityType.includes('open water')) return { sportType: 'swimming', sportSubtype: 'open_water' };

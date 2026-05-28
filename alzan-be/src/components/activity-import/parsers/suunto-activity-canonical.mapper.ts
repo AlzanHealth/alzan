@@ -103,7 +103,7 @@ const SUUNTO_ACTIVITY_ID_MAP = new Map<number, CanonicalActivitySportMapping>([
   [21, { sportType: 'swimming', sportSubtype: 'pool' }],
   [22, { sportType: 'running', sportSubtype: 'trail' }],
   [23, { sportType: 'strength', sportSubtype: 'indoor' }],
-  [33, { sportType: 'football', sportSubtype: 'outdoor' }],
+  [33, { sportType: 'football', sportSubtype: 'football_11' }],
   [34, { sportType: 'tennis', sportSubtype: 'outdoor' }],
   [35, { sportType: 'basketball', sportSubtype: 'indoor' }],
   [52, { sportType: 'cycling', sportSubtype: 'indoor_trainer' }],
@@ -196,7 +196,16 @@ export function mapSuuntoActivityToCanonicalSport(params: {
 }): CanonicalActivitySportMapping {
   if (params.activityId != null) {
     const mappedActivityId = SUUNTO_ACTIVITY_ID_MAP.get(Math.round(params.activityId));
-    if (mappedActivityId) return mappedActivityId;
+    if (mappedActivityId) {
+      if (mappedActivityId.sportType === 'football') {
+        const sportName = params.sportName?.toLowerCase() ?? '';
+        if (sportName.includes('futsal') || sportName.includes('sala') || sportName.includes('indoor')) {
+          return { sportType: 'football', sportSubtype: 'futsal' };
+        }
+        return { sportType: 'football', sportSubtype: 'football_11' };
+      }
+      return mappedActivityId;
+    }
   }
 
   const fitSport = params.fitSport != null ? Math.round(params.fitSport) : null;
@@ -229,7 +238,13 @@ export function mapSuuntoActivityToCanonicalSport(params: {
     return { sportType: 'swimming', sportSubtype: 'pool' };
   }
   if (fitSport === 6) return { sportType: 'basketball', sportSubtype: 'indoor' };
-  if (fitSport === 7) return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (fitSport === 7) {
+    const sportName = params.sportName?.toLowerCase() ?? '';
+    if (sportName.includes('futsal') || sportName.includes('sala') || sportName.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (fitSport === 8) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (fitSport === 10 && fitSubSport === 20) return { sportType: 'strength', sportSubtype: 'indoor' };
   if (fitSport === 10) return { sportType: 'gym', sportSubtype: 'indoor' };
@@ -241,8 +256,12 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   if (sportName.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (sportName.includes('hiking') || sportName.includes('trekking'))
     return { sportType: 'hiking', sportSubtype: 'trail' };
-  if (sportName.includes('football') || sportName.includes('soccer'))
-    return { sportType: 'football', sportSubtype: 'outdoor' };
+  if (sportName.includes('football') || sportName.includes('soccer') || sportName.includes('futsal')) {
+    if (sportName.includes('futsal') || sportName.includes('sala') || sportName.includes('indoor')) {
+      return { sportType: 'football', sportSubtype: 'futsal' };
+    }
+    return { sportType: 'football', sportSubtype: 'football_11' };
+  }
   if (sportName.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (sportName.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (sportName.includes('swim')) return { sportType: 'swimming', sportSubtype: 'pool' };
