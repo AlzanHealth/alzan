@@ -104,7 +104,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [description, setDescription] = useState('');
   const [trainingGoal, setTrainingGoal] = useState<string | undefined>(undefined);
   const [sportType, setSportType] = useState<Nullable<SportType>>(route.params?.sportType || null);
-  const showSummary = sportType !== 'football' && sportType !== 'tennis' && sportType !== 'padel';
+  const showSummary =
+    sportType !== 'football' && sportType !== 'tennis' && sportType !== 'padel' && sportType !== 'hiking';
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -269,7 +270,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const goalOptions = sportType ? getOptions(sportType, 'goal') : [];
   const modalityOptions = sportType ? getOptions(sportType, 'modality') : [];
   const terrainOptions = sportType ? getOptions(sportType, 'terrain') : [];
-  const baseLoadOptions = ['football', 'tennis', 'padel'].includes(sportType || '')
+  const baseLoadOptions = ['football', 'tennis', 'padel', 'hiking'].includes(sportType || '')
     ? getOptions(sportType, 'base_load')
     : [];
   const hasModalityOptions = modalityOptions.length > 0;
@@ -459,8 +460,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
           pool_type: poolType,
           stroke: stroke,
           football_session_type: sportType === 'football' ? footballSessionType : null,
-          base_load: ['football', 'tennis', 'padel'].includes(sportType || '') ? baseLoad : null,
-          boots_used: sportType === 'football' ? bootsUsed : null,
+          base_load: ['football', 'tennis', 'padel', 'hiking'].includes(sportType || '') ? baseLoad : null,
+          boots_used: sportType === 'football' || sportType === 'hiking' ? bootsUsed : null,
           racket_used: ['tennis', 'padel'].includes(sportType || '') ? racketUsed : null,
           rival: sportType === 'football' ? rival : null,
           notes: sportType === 'football' ? notes : null,
@@ -1236,8 +1237,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 )}
               </GlassCard>
 
-              {/* Block 2: Detalles de la plantilla (Football, Tennis and Padel) */}
-              {(sportType === 'football' || sportType === 'tennis' || sportType === 'padel') && (
+              {/* Block 2: Detalles de la plantilla (Football, Tennis, Padel and Hiking) */}
+              {(sportType === 'football' ||
+                sportType === 'tennis' ||
+                sportType === 'padel' ||
+                sportType === 'hiking') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
                     {t('training.templateDetails').toUpperCase()}
@@ -1269,7 +1273,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     >
                       <MaterialCommunityIcons
                         name={
-                          sportType === 'football' ? 'grass' : sportType === 'tennis' ? 'rhombus-split' : 'tennis-ball'
+                          sportType === 'football'
+                            ? 'grass'
+                            : sportType === 'tennis'
+                              ? 'rhombus-split'
+                              : sportType === 'padel'
+                                ? 'tennis-ball'
+                                : 'image-filter-hdr'
                         }
                         size={24}
                         color={SPORT_COLORS[sportType] || themeColors.primary}
@@ -1364,7 +1374,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       }}
                     >
                       <MaterialCommunityIcons
-                        name={sportType === 'tennis' ? 'tennis' : sportType === 'padel' ? 'tennis-ball' : 'shoe-cleat'}
+                        name={
+                          sportType === 'tennis'
+                            ? 'tennis'
+                            : sportType === 'padel'
+                              ? 'tennis-ball'
+                              : sportType === 'hiking'
+                                ? 'shoe-sneaker'
+                                : 'shoe-cleat'
+                        }
                         size={24}
                         color={SPORT_COLORS[sportType] || themeColors.primary}
                         style={{ marginBottom: 6 }}
@@ -1383,7 +1401,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           ? t('training.racketLabel')
                           : sportType === 'padel'
                             ? t('training.palaLabel')
-                            : t('training.bootsLabel')}
+                            : sportType === 'hiking'
+                              ? t('training.shoesLabel')
+                              : t('training.bootsLabel')}
                       </Text>
                       <Text
                         style={{
@@ -1409,10 +1429,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== 'football' &&
                 sportType !== 'tennis' &&
                 sportType !== 'padel' &&
+                sportType !== 'hiking' &&
                 !isWideLayout && <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>}
 
               {/* Block 3: Configuración */}
-              {((hasTerrainOptions && sportType !== 'football' && sportType !== 'tennis' && sportType !== 'padel') ||
+              {((hasTerrainOptions &&
+                sportType !== 'football' &&
+                sportType !== 'tennis' &&
+                sportType !== 'padel' &&
+                sportType !== 'hiking') ||
                 sportType === 'swimming') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>

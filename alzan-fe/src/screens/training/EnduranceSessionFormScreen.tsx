@@ -885,7 +885,10 @@ export const EnduranceSessionFormScreen = () => {
           Alert.alert(t('training.missingDataTitle'), t('training.durationRequiredForSport'));
           return;
         }
-        if ((sportType === 'football' || sportType === 'tennis' || sportType === 'padel') && !sportSubtype) {
+        if (
+          (sportType === 'football' || sportType === 'tennis' || sportType === 'padel' || sportType === 'hiking') &&
+          !sportSubtype
+        ) {
           Alert.alert(t('training.missingDataTitle'), t('training.modalityRequired'));
           return;
         }
@@ -941,16 +944,16 @@ export const EnduranceSessionFormScreen = () => {
 
       const payload: ActivitySessionInsert | ActivitySessionUpdate = {
         sport_type: (sportType === 'gym' ? 'strength' : sportType) as SportType,
-        sport_subtype: ['swimming', 'football', 'tennis', 'padel'].includes(sportType) ? sportSubtype : null,
+        sport_subtype: ['swimming', 'football', 'tennis', 'padel', 'hiking'].includes(sportType) ? sportSubtype : null,
         pool_type: sportType === 'swimming' ? poolType : null,
         stroke: sportType === 'swimming' ? stroke : null,
         football_session_type: sportType === 'football' ? footballSessionType : null,
-        base_load: ['football', 'tennis', 'padel'].includes(sportType) ? baseLoad : null,
-        boots_used: sportType === 'football' ? 'coming_soon' : null,
+        base_load: ['football', 'tennis', 'padel', 'hiking'].includes(sportType) ? baseLoad : null,
+        boots_used: ['football', 'hiking'].includes(sportType) ? 'coming_soon' : null,
         racket_used: ['tennis', 'padel'].includes(sportType) ? 'coming_soon' : null,
         rival: sportType === 'football' ? rival || null : null,
         notes: sportType === 'football' ? notes || null : null,
-        surface: ['football', 'tennis', 'padel'].includes(sportType) ? surface : null,
+        surface: ['football', 'tennis', 'padel', 'hiking'].includes(sportType) ? surface : null,
         name: name || (isGymMode ? t('constants.gymTitle') : t('alzan.activity')),
         start_time: startDateTime,
         end_time: endTime, // Critical to mark session as finished
@@ -1828,6 +1831,101 @@ export const EnduranceSessionFormScreen = () => {
                   {/* Pala Used - Coming soon */}
                   <View style={[styles.formRow, { borderBottomWidth: 0, opacity: 0.5 }]}>
                     <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.palaLabel')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text style={[styles.rowValueText, { color: themeColors.textSecondary }]}>
+                        {t('training.comingSoon')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Hiking Specific Configuration Block */}
+              {sportType === 'hiking' && (
+                <View
+                  style={[
+                    {
+                      marginBottom: spacing.m,
+                      paddingHorizontal: spacing.m,
+                      paddingVertical: spacing.s,
+                      borderRadius: borderRadius.m,
+                    },
+                    dynamicStyles.glassCard,
+                  ]}
+                >
+                  {/* Modality (sport_subtype) */}
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSportSubtypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.modalityLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.modalityLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: sportSubtype ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {sportSubtype ? getOptionLabel(sportType, sportSubtype, 'modality') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Base Load Selector */}
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setBaseLoadModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.loadLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.loadLabel')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: baseLoad ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {baseLoad ? getOptionLabel(sportType, baseLoad, 'base_load') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Surface Selector */}
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSurfaceModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.surfaceLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.surfaceLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: surface ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {surface ? getOptionLabel(sportType, surface, 'terrain') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Zapatillas Used - Coming soon */}
+                  <View style={[styles.formRow, { borderBottomWidth: 0, opacity: 0.5 }]}>
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.shoesLabel')}
+                    </Text>
                     <View style={styles.rowRightValue}>
                       <Text style={[styles.rowValueText, { color: themeColors.textSecondary }]}>
                         {t('training.comingSoon')}

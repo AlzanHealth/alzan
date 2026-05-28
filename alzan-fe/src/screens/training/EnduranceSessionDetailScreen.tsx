@@ -625,6 +625,20 @@ export const EnduranceSessionDetailScreen = () => {
         value: t('training.comingSoon'),
       });
     }
+    if (session.sport_type === 'hiking') {
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'hiking-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      secondaryMetrics.push({
+        key: 'hiking-boots',
+        label: t('training.shoesLabel'),
+        value: t('training.comingSoon'),
+      });
+    }
   }
 
   const handleImportedMetricInfoPress = useCallback(
