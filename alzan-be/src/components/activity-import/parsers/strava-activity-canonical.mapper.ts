@@ -114,9 +114,9 @@ function mapStravaSport(
 ): CanonicalActivitySportMapping {
   const sportType = rawSportType?.trim() ?? '';
   const normalised = sportType.toLowerCase();
-  if (normalised === 'walk') return { sportType: 'running', sportSubtype: 'walk' };
+  if (normalised === 'walk') return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (normalised === 'trailrun') return { sportType: 'running', sportSubtype: 'trail' };
-  if (normalised === 'virtualrun') return { sportType: 'running', sportSubtype: 'indoor' };
+  if (normalised === 'virtualrun') return { sportType: 'running', sportSubtype: 'treadmill' };
   if (normalised === 'run') {
     if (workoutType === 3) return { sportType: 'running', sportSubtype: 'race' };
     const nameLower = (name || '').toLowerCase();
@@ -130,22 +130,22 @@ function mapStravaSport(
     ) {
       return { sportType: 'running', sportSubtype: 'race' };
     }
-    return { sportType: 'running', sportSubtype: trainer ? 'indoor' : 'road' };
+    return { sportType: 'running', sportSubtype: trainer ? 'treadmill' : 'outdoor' };
   }
   if (normalised === 'mountainbikeride' || normalised === 'emountainbikeride') {
-    return { sportType: 'cycling', sportSubtype: 'trail' };
+    return { sportType: 'cycling', sportSubtype: 'mtb' };
   }
   if (normalised === 'gravelride') {
     return { sportType: 'cycling', sportSubtype: 'gravel' };
   }
   if (normalised === 'virtualride') {
-    return { sportType: 'cycling', sportSubtype: 'indoor' };
+    return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
   }
   if (normalised === 'ride' || normalised === 'ebikeride') {
     const nameLower = (name ?? '').toLowerCase();
     if (trainer) {
       if (nameLower.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
-      return { sportType: 'cycling', sportSubtype: 'indoor' };
+      return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
     }
     if (nameLower.includes('spin')) {
       return { sportType: 'cycling', sportSubtype: 'spinning' };

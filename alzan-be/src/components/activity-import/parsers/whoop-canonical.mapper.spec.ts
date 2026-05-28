@@ -42,7 +42,7 @@ function assertWhoopWorkoutMapsOfficialShape(): void {
   const canonical = parseActivityFileToCanonical(JSON.stringify(buildWhoopWorkout()), 'whoop-running.json');
   assert.equal(canonical.provider, 'whoop');
   assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'road');
+  assert.equal(canonical.sportSubtype, 'outdoor');
   assert.equal(canonical.providerActivityId, 'ecfc6a15-4661-442f-a9a4-f160dd7afae8');
   assert.equal(canonical.summary.durationSeconds, 3600);
   assert.equal(canonical.summary.caloriesKcal, 420);
@@ -115,9 +115,9 @@ function assertWhoopSportsWithoutGpsDoNotFail(): void {
 function assertWhoopCyclingModalitiesArePreserved(): void {
   const cases = [
     { sportName: 'Spin', expected: 'spinning' },
-    { sportName: 'Indoor Cycling', expected: 'indoor' },
+    { sportName: 'Indoor Cycling', expected: 'indoor_trainer' },
     { sportName: 'Gravel Ride', expected: 'gravel' },
-    { sportName: 'Mountain Biking', expected: 'trail' },
+    { sportName: 'Mountain Biking', expected: 'mtb' },
     { sportName: 'Bike Commuting', expected: 'urban' },
   ] as const;
 
@@ -159,13 +159,13 @@ function assertWhoopStrengthParsesInStrengthFlow(): void {
   assert.equal(parsed.heartRateZones[0].zone, 1);
 }
 
-function assertWhoopWalkingMapsToRunningWalk(): void {
+function assertWhoopWalkingMapsToHikingUrbanWalk(): void {
   const canonical = parseActivityFileToCanonical(
     JSON.stringify(buildWhoopWorkout({ sport_name: 'Walking' })),
     'whoop-walking.json',
   );
-  assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'walk');
+  assert.equal(canonical.sportType, 'hiking');
+  assert.equal(canonical.sportSubtype, 'urban_walk');
   assert.equal(canonical.vendorFields.whoopSportName, 'Walking');
 }
 
@@ -256,7 +256,7 @@ assertWhoopFixtureNoLongerUsesGenericMapper();
 assertWhoopSportsWithoutGpsDoNotFail();
 assertWhoopCyclingModalitiesArePreserved();
 assertWhoopStrengthParsesInStrengthFlow();
-assertWhoopWalkingMapsToRunningWalk();
+assertWhoopWalkingMapsToHikingUrbanWalk();
 assertWhoopSleepMapsWithoutPersistence();
 assertWhoopRecoveryMapsWithoutPersistence();
 assertWhoopCycleMapsWithoutPersistence();

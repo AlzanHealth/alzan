@@ -109,7 +109,7 @@ function assertAppleHealthCyclingPowerCadenceSpeed(): void {
 function assertAppleHealthCyclingModalitiesUseWorkoutMetadata(): void {
   const cases = [
     { title: 'Gravel bike ride', expected: 'gravel' },
-    { title: 'Mountain bike training', expected: 'trail' },
+    { title: 'Mountain bike training', expected: 'mtb' },
     { title: 'Indoor spin class', expected: 'spinning' },
     { title: 'Urban bike commute', expected: 'urban' },
   ] as const;
@@ -180,7 +180,7 @@ function assertAppleHealthSportsWithoutGpsDoNotFail(): void {
   }
 }
 
-function assertAppleHealthWalkingMapsToRunningWalk(): void {
+function assertAppleHealthWalkingMapsToHikingUrbanWalk(): void {
   const canonical = parseActivityFileToCanonical(
     JSON.stringify({
       provider: 'apple_health',
@@ -191,8 +191,8 @@ function assertAppleHealthWalkingMapsToRunningWalk(): void {
     }),
     'apple-health-walking.json',
   );
-  assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'walk');
+  assert.equal(canonical.sportType, 'hiking');
+  assert.equal(canonical.sportSubtype, 'urban_walk');
   assert.equal(canonical.vendorFields.appleHealthWorkoutActivityType, 'HKWorkoutActivityTypeWalking');
 }
 
@@ -337,7 +337,7 @@ assertAppleHealthCyclingPowerCadenceSpeed();
 assertAppleHealthCyclingModalitiesUseWorkoutMetadata();
 assertAppleHealthSwimmingVendorFields();
 assertAppleHealthSportsWithoutGpsDoNotFail();
-assertAppleHealthWalkingMapsToRunningWalk();
+assertAppleHealthWalkingMapsToHikingUrbanWalk();
 assertAppleHealthStrengthParsesInStrengthFlow();
 assertAppleHealthDailyActivityMapsWithoutPersistence();
 assertAppleHealthSleepMapsWithoutPersistence();

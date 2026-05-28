@@ -31,7 +31,7 @@ function assertStravaRunningJsonParsesSummary(): void {
   assert.equal(canonical.sourceFileType, 'json');
   assert.equal(canonical.providerActivityId, '123456');
   assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'road');
+  assert.equal(canonical.sportSubtype, 'outdoor');
   assert.equal(canonical.summary.durationSeconds, 1680);
   assert.equal(canonical.summary.elapsedSeconds, 1800);
   assert.equal(canonical.summary.distanceM, 5200);
@@ -97,7 +97,7 @@ function assertStravaCyclingJsonParsesStreams(): void {
 function assertStravaCyclingModalitiesArePreserved(): void {
   const cases: Array<{ sportType: string; name?: string; trainer?: boolean; expected: string }> = [
     { sportType: 'GravelRide', expected: 'gravel' },
-    { sportType: 'MountainBikeRide', expected: 'trail' },
+    { sportType: 'MountainBikeRide', expected: 'mtb' },
     { sportType: 'Ride', name: 'Spin class', trainer: true, expected: 'spinning' },
     { sportType: 'Ride', name: 'Urban commute', expected: 'urban' },
   ];
@@ -224,7 +224,7 @@ function assertStravaHeartRateZonesAreCalculatedFromStream(): void {
   assert.equal(canonical.heartRateZones[0].percentage, 100);
 }
 
-function assertStravaWalkUsesRunningWalkSubtype(): void {
+function assertStravaWalkUsesHikingUrbanWalkSubtype(): void {
   const rawJson = JSON.stringify({
     provider: 'strava',
     sport_type: 'Walk',
@@ -234,8 +234,8 @@ function assertStravaWalkUsesRunningWalkSubtype(): void {
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'strava-walk.json', { estimatedMaxHeartRate: 190 });
   assert.equal(canonical.provider, 'strava');
-  assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'walk');
+  assert.equal(canonical.sportType, 'hiking');
+  assert.equal(canonical.sportSubtype, 'urban_walk');
   assert.equal(canonical.vendorFields.stravaSportType, 'Walk');
 }
 
@@ -247,4 +247,4 @@ assertStravaRouteParseUsesSummaryPolylineWithoutStreams();
 assertStravaPadelWithoutGpsDoesNotFail();
 assertStravaNativeHeartRateZonesAreUsed();
 assertStravaHeartRateZonesAreCalculatedFromStream();
-assertStravaWalkUsesRunningWalkSubtype();
+assertStravaWalkUsesHikingUrbanWalkSubtype();

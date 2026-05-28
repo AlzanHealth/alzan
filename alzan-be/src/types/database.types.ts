@@ -462,7 +462,7 @@ export type Database = {
           source_provider_key: string | null;
           source_record_id: string | null;
           source_updated_at: string | null;
-          sport_subtype: Database['public']['Enums']['sport_subtype_enum'] | null;
+          sport_subtype: string | null;
           sport_type: Database['public']['Enums']['sport_type_enum'];
           start_time: string;
           started_at_local: string | null;
@@ -518,7 +518,7 @@ export type Database = {
           source_provider_key?: string | null;
           source_record_id?: string | null;
           source_updated_at?: string | null;
-          sport_subtype?: Database['public']['Enums']['sport_subtype_enum'] | null;
+          sport_subtype?: string | null;
           sport_type: Database['public']['Enums']['sport_type_enum'];
           start_time?: string;
           started_at_local?: string | null;
@@ -574,7 +574,7 @@ export type Database = {
           source_provider_key?: string | null;
           source_record_id?: string | null;
           source_updated_at?: string | null;
-          sport_subtype?: Database['public']['Enums']['sport_subtype_enum'] | null;
+          sport_subtype?: string | null;
           sport_type?: Database['public']['Enums']['sport_type_enum'];
           start_time?: string;
           started_at_local?: string | null;
@@ -3431,6 +3431,45 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      sport_catalog_options: {
+        Row: {
+          created_at: string;
+          group_translation_key: string;
+          id: string;
+          is_active: boolean;
+          is_template_selectable: boolean;
+          option_key: string;
+          option_type: string;
+          sort_order: number;
+          sport_type: Database['public']['Enums']['sport_type_enum'];
+          translation_key: string;
+        };
+        Insert: {
+          created_at?: string;
+          group_translation_key: string;
+          id?: string;
+          is_active?: boolean;
+          is_template_selectable?: boolean;
+          option_key: string;
+          option_type: string;
+          sort_order?: number;
+          sport_type: Database['public']['Enums']['sport_type_enum'];
+          translation_key: string;
+        };
+        Update: {
+          created_at?: string;
+          group_translation_key?: string;
+          id?: string;
+          is_active?: boolean;
+          is_template_selectable?: boolean;
+          option_key?: string;
+          option_type?: string;
+          sort_order?: number;
+          sport_type?: Database['public']['Enums']['sport_type_enum'];
+          translation_key?: string;
+        };
+        Relationships: [];
       };
       step_intervals: {
         Row: {

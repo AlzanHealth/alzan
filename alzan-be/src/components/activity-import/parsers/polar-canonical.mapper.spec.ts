@@ -43,7 +43,7 @@ function assertPolarV3RunningJsonParses(): void {
   assert.equal(canonical.provider, 'polar');
   assert.equal(canonical.providerActivityId, '2AC312F');
   assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'road');
+  assert.equal(canonical.sportSubtype, 'outdoor');
   assert.equal(canonical.summary.startedAt, '2026-05-01T08:00:00.000Z');
   assert.equal(canonical.summary.durationSeconds, 2100);
   assert.equal(canonical.summary.distanceM, 6200);
@@ -136,7 +136,7 @@ function assertPolarCyclingJsonParsesPowerAndCadence(): void {
 function assertPolarCyclingDetailedSportMapsTerrain(): void {
   const cases = [
     { detailedSportInfo: 'GRAVEL_CYCLING', expected: 'gravel' },
-    { detailedSportInfo: 'MOUNTAIN_BIKING', expected: 'trail' },
+    { detailedSportInfo: 'MOUNTAIN_BIKING', expected: 'mtb' },
     { detailedSportInfo: 'SPINNING', expected: 'spinning' },
     { detailedSportInfo: 'CITY_CYCLING', expected: 'urban' },
   ] as const;
@@ -249,8 +249,8 @@ function assertPolarWalkingMapsToRunningWalk(): void {
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'polar-walk.json');
   assert.equal(canonical.provider, 'polar');
-  assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'walk');
+  assert.equal(canonical.sportType, 'hiking');
+  assert.equal(canonical.sportSubtype, 'urban_walk');
   assert.equal(canonical.vendorFields.polarSport, 'WALKING');
 }
 

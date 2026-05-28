@@ -19,14 +19,14 @@ const FITBIT_ACTIVITY_TYPE_BY_ID: Record<number, CanonicalActivitySportMapping> 
   16: { sportType: 'basketball', sportSubtype: 'indoor' },
   27: { sportType: 'tennis', sportSubtype: 'outdoor' },
   82: { sportType: 'swimming', sportSubtype: null },
-  91: { sportType: 'running', sportSubtype: 'indoor' },
+  91: { sportType: 'running', sportSubtype: 'treadmill' },
   1071: { sportType: 'hiking', sportSubtype: 'trail' },
-  2131: { sportType: 'running', sportSubtype: 'indoor' },
+  2131: { sportType: 'running', sportSubtype: 'treadmill' },
   3000: { sportType: 'strength', sportSubtype: 'indoor' },
   90001: { sportType: 'cycling', sportSubtype: 'road' },
-  90009: { sportType: 'running', sportSubtype: 'road' },
+  90009: { sportType: 'running', sportSubtype: 'outdoor' },
   90013: { sportType: 'other', sportSubtype: null },
-  90024: { sportType: 'cycling', sportSubtype: 'indoor' },
+  90024: { sportType: 'cycling', sportSubtype: 'indoor_trainer' },
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -155,7 +155,7 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
       mapped.sportType === 'other' && (normalised.includes('padel') || normalised.includes('walk'));
     if (!hasDetailedCyclingName && !hasDetailedOtherName) return mapped;
   }
-  if (normalised.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
+  if (normalised.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
@@ -164,7 +164,7 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
   if (normalised.includes('hike') || normalised.includes('hiking'))
     return { sportType: 'hiking', sportSubtype: 'trail' };
   if (normalised.includes('treadmill') || normalised.includes('indoor run'))
-    return { sportType: 'running', sportSubtype: 'indoor' };
+    return { sportType: 'running', sportSubtype: 'treadmill' };
   if (normalised.includes('trail run') || normalised.includes('mountain run'))
     return { sportType: 'running', sportSubtype: 'trail' };
   if (normalised.includes('track run')) return { sportType: 'running', sportSubtype: 'track' };
@@ -179,17 +179,17 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
     ) {
       return { sportType: 'running', sportSubtype: 'race' };
     }
-    return { sportType: 'running', sportSubtype: 'road' };
+    return { sportType: 'running', sportSubtype: 'outdoor' };
   }
   if (normalised.includes('bike') || normalised.includes('cycling')) {
     if (normalised.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
     if (normalised.includes('gravel')) return { sportType: 'cycling', sportSubtype: 'gravel' };
     if (normalised.includes('mountain') || normalised.includes('mtb'))
-      return { sportType: 'cycling', sportSubtype: 'trail' };
+      return { sportType: 'cycling', sportSubtype: 'mtb' };
     if (normalised.includes('urban') || normalised.includes('commute') || normalised.includes('city'))
       return { sportType: 'cycling', sportSubtype: 'urban' };
     if (normalised.includes('indoor') || normalised.includes('trainer'))
-      return { sportType: 'cycling', sportSubtype: 'indoor' };
+      return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (normalised.includes('swim')) return { sportType: 'swimming', sportSubtype: null };

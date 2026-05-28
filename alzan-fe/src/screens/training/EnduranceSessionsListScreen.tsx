@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { Alert } from '../../components/common/Alert';
 import { ActivityCalendarView, type ActivityCalendarViewState } from './components/ActivityCalendarView';
+import { useSportCatalog } from '../../hooks/useSportCatalog';
 
 type FilterPreset = 'all' | 'week' | 'month' | 'three_months' | 'custom';
 
@@ -95,27 +96,6 @@ const formatHoursAndMinutes = (totalSeconds: number): string => {
   return `${hours}:${minutes.toString().padStart(2, '0')}`;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const getEnvironmentDisplayLabel = (type: string | null | undefined, sportType: string | null | undefined, t: any) => {
-  if (!type) return '';
-  if (sportType === 'cycling') {
-    if (type === 'road') return t('training.cyclingTypeRoad');
-    if (type === 'trail') return t('training.cyclingTypeMtb');
-    if (type === 'gravel') return t('training.cyclingTypeGravel');
-    if (type === 'indoor') return t('training.cyclingTypeIndoor');
-    if (type === 'spinning') return t('training.cyclingTypeSpinning');
-    if (type === 'urban') return t('training.cyclingTypeUrban');
-    return type;
-  }
-  if (type === 'road' || type === 'aire_libre') return t('training.runningTypeOutdoor');
-  if (type === 'indoor' || type === 'cinta') return t('training.runningTypeTreadmill');
-  if (type === 'track') return t('training.runningTypeTrack');
-  if (type === 'trail') return t('training.runningTypeTrail');
-  if (type === 'race') return t('training.runningTypeRace');
-  if (type === 'walk') return t('training.runningTypeWalk');
-  return type;
-};
-
 // Helper component for filter options
 const FilterOption: React.FC<{
   label: string;
@@ -147,6 +127,7 @@ export const EnduranceSessionsListScreen = () => {
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const { convertDistanceToUi, convertSpeedToUi, convertWeightToUi } = useUnitConversion();
+  const { getOptionLabel } = useSportCatalog();
 
   // Date filter state
   const [dateFilter, setDateFilter] = useState<DateFilter>({ preset: 'all' });
@@ -1003,7 +984,7 @@ export const EnduranceSessionsListScreen = () => {
                                   ]}
                                 >
                                   <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
-                                    {getEnvironmentDisplayLabel(session.sport_subtype, session.sport_type, t)}
+                                    {getOptionLabel(session.sport_type, session.sport_subtype, 'modality')}
                                   </Text>
                                 </View>
                               )}

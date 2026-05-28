@@ -30,7 +30,7 @@ function assertFitbitRunningActivityLogParses(): void {
   assert.equal(canonical.provider, 'fitbit');
   assert.equal(canonical.providerActivityId, '12345678');
   assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'road');
+  assert.equal(canonical.sportSubtype, 'outdoor');
   assert.equal(canonical.summary.startedAt, '2026-05-01T05:30:00.000Z');
   assert.equal(canonical.summary.durationSeconds, 3600);
   assert.equal(canonical.summary.elapsedSeconds, 3600);
@@ -67,7 +67,7 @@ function assertFitbitCyclingActivityLogParsesDeviceAndSpeed(): void {
 function assertFitbitCyclingModalitiesUseDetailedActivityName(): void {
   const cases = [
     { activityName: 'Gravel Bike Ride', expected: 'gravel' },
-    { activityName: 'Mountain Bike Ride', expected: 'trail' },
+    { activityName: 'Mountain Bike Ride', expected: 'mtb' },
     { activityName: 'Spin Indoor Cycling', expected: 'spinning' },
     { activityName: 'Urban Bike Commute', expected: 'urban' },
   ] as const;
@@ -243,8 +243,8 @@ function assertFitbitWalkingMapsToRunningWalk(): void {
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'fitbit-walk.json');
   assert.equal(canonical.provider, 'fitbit');
-  assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'walk');
+  assert.equal(canonical.sportType, 'hiking');
+  assert.equal(canonical.sportSubtype, 'urban_walk');
   assert.equal(canonical.vendorFields.fitbitActivityName, 'Walk');
 }
 

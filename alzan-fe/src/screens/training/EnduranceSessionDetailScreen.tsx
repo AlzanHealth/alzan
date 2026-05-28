@@ -58,6 +58,7 @@ import { RouteMap } from '../../components/common/RouteMap';
 import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strengthActivityImportService';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
+import { useSportCatalog } from '../../hooks/useSportCatalog';
 
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
@@ -68,6 +69,7 @@ export const EnduranceSessionDetailScreen = () => {
   const [session, setSession] = useState<ActivitySession | undefined>(initialSession);
   const { preferences, toDisplayWeight } = useUserPreferences();
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
+  const { getOptionLabel } = useSportCatalog();
   const updateSet = useUpdateWorkoutSet();
   const applyStrengthActivityImport = useApplyStrengthActivityImport();
 
@@ -123,52 +125,11 @@ export const EnduranceSessionDetailScreen = () => {
     enabled: !!session?.endurance_template_id,
   });
 
-  const getEnvironmentDisplayLabel = (type?: string | null) => {
-    if (!type) return '';
-    const sport = session?.sport_type || template?.sport_type;
-    if (sport === 'cycling') {
-      if (type === 'road') return t('training.cyclingTypeRoad');
-      if (type === 'trail') return t('training.cyclingTypeMtb');
-      if (type === 'gravel') return t('training.cyclingTypeGravel');
-      if (type === 'indoor') return t('training.cyclingTypeIndoor');
-      if (type === 'spinning') return t('training.cyclingTypeSpinning');
-      if (type === 'urban') return t('training.cyclingTypeUrban');
-      return type;
-    }
-    if (type === 'road' || type === 'aire_libre') return t('training.runningTypeOutdoor');
-    if (type === 'indoor' || type === 'cinta') return t('training.runningTypeTreadmill');
-    if (type === 'track') return t('training.runningTypeTrack');
-    if (type === 'trail') return t('training.runningTypeTrail');
-    if (type === 'race') return t('training.runningTypeRace');
-    if (type === 'walk') return t('training.runningTypeWalk');
-    return type;
-  };
+  const getEnvironmentDisplayLabel = (type?: string | null) =>
+    getOptionLabel(session?.sport_type || template?.sport_type, type, 'modality');
 
-  const getRunningSurfaces = () => {
-    const sport = session?.sport_type || template?.sport_type;
-    if (sport === 'cycling') {
-      return [
-        { key: 'road', label: t('training.cyclingTerrainRoad') },
-        { key: 'trail', label: t('training.cyclingTerrainMtb') },
-        { key: 'gravel', label: t('training.cyclingTerrainGravel') },
-        { key: 'track', label: t('training.cyclingTerrainTrack') },
-        { key: 'indoor', label: t('training.cyclingTerrainIndoor') },
-      ];
-    }
-    return [
-      { key: 'asfalto', label: t('training.surfaceAsphalt') },
-      { key: 'pista', label: t('training.surfaceTrack') },
-      { key: 'tierra', label: t('training.surfaceDirt') },
-      { key: 'hierba', label: t('training.surfaceGrass') },
-      { key: 'cinta', label: t('training.surfaceTreadmill') },
-    ];
-  };
-
-  const getSurfaceDisplayLabel = (surf?: string | null) => {
-    if (!surf) return '';
-    const match = getRunningSurfaces().find(s => s.key === surf);
-    return match ? match.label : surf;
-  };
+  const getSurfaceDisplayLabel = (surf?: string | null) =>
+    getOptionLabel(template?.sport_type || session?.sport_type, surf, 'terrain');
 
   const formatSplitDistanceBucketLabel = useCallback((splitDistanceM: number) => {
     const distanceKm = splitDistanceM / 1000;

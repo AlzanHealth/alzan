@@ -91,7 +91,7 @@ function pushHeartRateSample(
 
 function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
   const normalised = activity?.trim().toLowerCase() ?? '';
-  if (normalised.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
+  if (normalised.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (normalised === 'trail_running' || normalised.includes('trail'))
     return { sportType: 'running', sportSubtype: 'trail' };
   if (normalised.includes('track')) return { sportType: 'running', sportSubtype: 'track' };
@@ -100,7 +100,7 @@ function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
     normalised.includes('indoor_running') ||
     (normalised.includes('indoor') && (normalised.includes('run') || normalised.includes('jogging')))
   )
-    return { sportType: 'running', sportSubtype: 'indoor' };
+    return { sportType: 'running', sportSubtype: 'treadmill' };
   if (normalised.includes('running') || normalised.includes('run') || normalised.includes('jogging')) {
     if (
       normalised.includes('race') ||
@@ -112,7 +112,7 @@ function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
     ) {
       return { sportType: 'running', sportSubtype: 'race' };
     }
-    return { sportType: 'running', sportSubtype: 'road' };
+    return { sportType: 'running', sportSubtype: 'outdoor' };
   }
   if (
     normalised.includes('cycling') ||
@@ -123,11 +123,11 @@ function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
     if (normalised.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
     if (normalised.includes('gravel')) return { sportType: 'cycling', sportSubtype: 'gravel' };
     if (normalised.includes('mountain') || normalised.includes('mtb'))
-      return { sportType: 'cycling', sportSubtype: 'trail' };
+      return { sportType: 'cycling', sportSubtype: 'mtb' };
     if (normalised.includes('urban') || normalised.includes('commute') || normalised.includes('city'))
       return { sportType: 'cycling', sportSubtype: 'urban' };
     if (normalised.includes('indoor') || normalised.includes('trainer'))
-      return { sportType: 'cycling', sportSubtype: 'indoor' };
+      return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (normalised === 'swimming') return { sportType: 'swimming', sportSubtype: null };

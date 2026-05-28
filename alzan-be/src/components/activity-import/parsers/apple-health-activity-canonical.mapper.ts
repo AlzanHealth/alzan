@@ -108,7 +108,7 @@ function mapAppleHealthSport(
           metadata.HKIndoorWorkout === 1 ||
           metadata.HKIndoorWorkout === '1' ||
           String(metadata.HKIndoorWorkout).toLowerCase() === 'true'));
-    if (isIndoor) return { sportType: 'running', sportSubtype: 'indoor' };
+    if (isIndoor) return { sportType: 'running', sportSubtype: 'treadmill' };
 
     const nameLower = [title, isRecord(metadata) ? readString(metadata.activityName) : null]
       .filter(Boolean)
@@ -137,16 +137,16 @@ function mapAppleHealthSport(
       return { sportType: 'running', sportSubtype: 'track' };
     }
 
-    return { sportType: 'running', sportSubtype: 'road' };
+    return { sportType: 'running', sportSubtype: 'outdoor' };
   }
-  if (normalised.includes('walking')) return { sportType: 'running', sportSubtype: 'walk' };
+  if (normalised.includes('walking')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (normalised.includes('cycling') || normalised.includes('handcycling')) {
     if (normalised.includes('indoor') || normalised.includes('spin')) {
       if (normalised.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
-      return { sportType: 'cycling', sportSubtype: 'indoor' };
+      return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
     }
     if (normalised.includes('mountain') || normalised.includes('mtb')) {
-      return { sportType: 'cycling', sportSubtype: 'trail' };
+      return { sportType: 'cycling', sportSubtype: 'mtb' };
     }
     if (normalised.includes('gravel')) {
       return { sportType: 'cycling', sportSubtype: 'gravel' };

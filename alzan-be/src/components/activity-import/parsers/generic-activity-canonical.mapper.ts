@@ -114,16 +114,16 @@ function mapSportNameToCanonical(rawSportName: string | null): CanonicalActivity
     if (sportName.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
     if (sportName.includes('gravel')) return { sportType: 'cycling', sportSubtype: 'gravel' };
     if (sportName.includes('mountain') || sportName.includes('mtb'))
-      return { sportType: 'cycling', sportSubtype: 'trail' };
+      return { sportType: 'cycling', sportSubtype: 'mtb' };
     if (sportName.includes('urban') || sportName.includes('commute') || sportName.includes('city'))
       return { sportType: 'cycling', sportSubtype: 'urban' };
     if (sportName.includes('indoor') || sportName.includes('trainer'))
-      return { sportType: 'cycling', sportSubtype: 'indoor' };
+      return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
-  if (sportName.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
+  if (sportName.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (sportName.includes('trail') && sportName.includes('run')) return { sportType: 'running', sportSubtype: 'trail' };
-  if (sportName.includes('run')) return { sportType: 'running', sportSubtype: 'road' };
+  if (sportName.includes('run')) return { sportType: 'running', sportSubtype: 'outdoor' };
   if (sportName.includes('gym') && !sportName.includes('strength')) return { sportType: 'gym', sportSubtype: 'indoor' };
   if (sportName.includes('strength') || sportName.includes('weightlifting') || sportName.includes('weight training')) {
     return { sportType: 'strength', sportSubtype: 'indoor' };

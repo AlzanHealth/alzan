@@ -182,7 +182,7 @@ function buildTestFit(params: {
 function assertSuuntoSportMapping(): void {
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 1 }), {
     sportType: 'running',
-    sportSubtype: 'road',
+    sportSubtype: 'outdoor',
   });
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 22 }), {
     sportType: 'running',
@@ -194,7 +194,7 @@ function assertSuuntoSportMapping(): void {
   });
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 10 }), {
     sportType: 'cycling',
-    sportSubtype: 'trail',
+    sportSubtype: 'mtb',
   });
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 99 }), {
     sportType: 'cycling',
@@ -231,6 +231,10 @@ function assertSuuntoSportMapping(): void {
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 104 }), {
     sportType: 'strength',
     sportSubtype: 'indoor',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 11 }), {
+    sportType: 'hiking',
+    sportSubtype: 'urban_walk',
   });
 }
 
@@ -364,7 +368,7 @@ function assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks(): void {
   const canonical = parseSuuntoActivityFileToCanonical(rawJson, 'suunto-running-export.json');
 
   assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'road');
+  assert.equal(canonical.sportSubtype, 'outdoor');
   assert.equal(canonical.summary.durationSeconds, 2638);
   assert.equal(canonical.summary.distanceM, 8023);
   assert.equal(canonical.summary.caloriesKcal, 884);

@@ -140,7 +140,7 @@ ended_at_local timestamp without time zone,
 provider USER-DEFINED NOT NULL DEFAULT 'manual'::provider_enum,
 provider_activity_id text,
 device_id uuid,
-sport_subtype USER-DEFINED,
+sport_subtype text,
 visibility USER-DEFINED DEFAULT 'private'::visibility_enum,
 total_sets integer,
 total_reps integer,
@@ -408,8 +408,10 @@ total_distance_m integer,
 total_duration_s integer,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 updated_at timestamp with time zone NOT NULL DEFAULT now(),
-workout_goal USER-DEFINED,
+workout_goal text,
 scheduled_day integer,
+environment_type text,
+surface text,
 CONSTRAINT endurance_workout_templates_pkey PRIMARY KEY (id),
 CONSTRAINT endurance_workout_templates_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
@@ -994,6 +996,19 @@ created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT social_follows_pkey PRIMARY KEY (id_follower, id_followed),
 CONSTRAINT social_follows_id_followed_fkey FOREIGN KEY (id_followed) REFERENCES public.users(id),
 CONSTRAINT social_follows_id_follower_fkey FOREIGN KEY (id_follower) REFERENCES public.users(id)
+);
+CREATE TABLE public.sport_catalog_options (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+sport_type USER-DEFINED NOT NULL,
+option_type text NOT NULL CHECK (option_type = ANY (ARRAY['goal'::text, 'modality'::text, 'terrain'::text])),
+option_key text NOT NULL CHECK (length(TRIM(BOTH FROM option_key)) > 0),
+translation_key text NOT NULL CHECK (length(TRIM(BOTH FROM translation_key)) > 0),
+group_translation_key text NOT NULL CHECK (length(TRIM(BOTH FROM group_translation_key)) > 0),
+sort_order integer NOT NULL DEFAULT 0,
+is_template_selectable boolean NOT NULL DEFAULT true,
+is_active boolean NOT NULL DEFAULT true,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT sport_catalog_options_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.step_intervals (
 id uuid NOT NULL DEFAULT gen_random_uuid(),

@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
+import { useSportCatalog } from '../../hooks/useSportCatalog';
 
 export const SportTemplatesListScreen = () => {
   const { t } = useTranslation();
@@ -29,6 +30,7 @@ export const SportTemplatesListScreen = () => {
 
   const { user } = useAuth();
   const { templates, isLoading, deleteTemplate } = useEnduranceTemplates();
+  const { getOptionLabel } = useSportCatalog();
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   const getSportLabel = React.useCallback(
@@ -136,6 +138,10 @@ export const SportTemplatesListScreen = () => {
           )}
 
           {templates?.map(template => {
+            const goalLabel = template.workout_goal
+              ? getOptionLabel(template.sport_type, template.workout_goal, 'goal')
+              : t('training.noGoal');
+
             return (
               <View key={template.id} style={styles.cardWrapper}>
                 <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
@@ -153,7 +159,7 @@ export const SportTemplatesListScreen = () => {
                     <View style={styles.cardInfo}>
                       <Text style={[styles.cardTitle, dynamicStyles.title]}>{template.base_name}</Text>
                       <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
-                        {getSportLabel(template.sport_type)} • {template.workout_goal || t('training.noGoal')}
+                        {getSportLabel(template.sport_type)} • {goalLabel}
                       </Text>
                     </View>
                   </View>

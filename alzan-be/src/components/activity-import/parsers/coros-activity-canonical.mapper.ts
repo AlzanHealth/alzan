@@ -116,7 +116,7 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
     readString(record.mode) ??
     readString(record.type);
   const text = normaliseSportText(rawSport);
-  if (text.includes('walk')) return { sportType: 'running', sportSubtype: 'walk' };
+  if (text.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (text.includes('padel'))
     return { sportType: 'padel', sportSubtype: text.includes('indoor') ? 'indoor' : 'outdoor' };
   if (text.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
@@ -128,7 +128,7 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
   if (text.includes('swim')) return { sportType: 'swimming', sportSubtype: null };
   if (text.includes('trail') && text.includes('run')) return { sportType: 'running', sportSubtype: 'trail' };
   if (text.includes('track') && text.includes('run')) return { sportType: 'running', sportSubtype: 'track' };
-  if (text.includes('indoor') && text.includes('run')) return { sportType: 'running', sportSubtype: 'indoor' };
+  if (text.includes('indoor') && text.includes('run')) return { sportType: 'running', sportSubtype: 'treadmill' };
   if (text.includes('run')) {
     if (
       text.includes('race') ||
@@ -140,11 +140,11 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
     ) {
       return { sportType: 'running', sportSubtype: 'race' };
     }
-    return { sportType: 'running', sportSubtype: 'road' };
+    return { sportType: 'running', sportSubtype: 'outdoor' };
   }
   if (text.includes('indoor') && (text.includes('bike') || text.includes('cycling'))) {
     if (text.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
-    return { sportType: 'cycling', sportSubtype: 'indoor' };
+    return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
   }
   if (text.includes('spin')) {
     return { sportType: 'cycling', sportSubtype: 'spinning' };
@@ -153,7 +153,7 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
     return { sportType: 'cycling', sportSubtype: 'gravel' };
   }
   if (text.includes('mtb') || text.includes('mountain')) {
-    return { sportType: 'cycling', sportSubtype: 'trail' };
+    return { sportType: 'cycling', sportSubtype: 'mtb' };
   }
   if (text.includes('urban') || text.includes('commute') || text.includes('city')) {
     return { sportType: 'cycling', sportSubtype: 'urban' };

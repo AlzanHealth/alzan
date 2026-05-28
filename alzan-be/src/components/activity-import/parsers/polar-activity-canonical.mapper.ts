@@ -160,7 +160,7 @@ function pushPositionSample(
 
 function mapPolarSport(rawSport: string | null, rawDetailed: string | null): CanonicalActivitySportMapping {
   const sport = `${rawDetailed ?? ''} ${rawSport ?? ''}`.toUpperCase();
-  if (sport.includes('WALKING')) return { sportType: 'running', sportSubtype: 'walk' };
+  if (sport.includes('WALKING')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (sport.includes('PADEL')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (sport.includes('TENNIS')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (sport.includes('BASKETBALL')) return { sportType: 'basketball', sportSubtype: 'indoor' };
@@ -179,7 +179,7 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
     return { sportType: 'running', sportSubtype: 'trail' };
   }
   if (sport.includes('TREADMILL') || sport.includes('INDOOR_RUNNING')) {
-    return { sportType: 'running', sportSubtype: 'indoor' };
+    return { sportType: 'running', sportSubtype: 'treadmill' };
   }
   if (sport.includes('TRACK_AND_FIELD') || sport.includes('TRACK_RUNNING')) {
     return { sportType: 'running', sportSubtype: 'track' };
@@ -196,10 +196,10 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
     ) {
       return { sportType: 'running', sportSubtype: 'race' };
     }
-    return { sportType: 'running', sportSubtype: 'road' };
+    return { sportType: 'running', sportSubtype: 'outdoor' };
   }
   if (sport.includes('INDOOR_CYCLING')) {
-    return { sportType: 'cycling', sportSubtype: 'indoor' };
+    return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
   }
   if (sport.includes('SPINNING')) {
     return { sportType: 'cycling', sportSubtype: 'spinning' };
@@ -208,7 +208,7 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
     return { sportType: 'cycling', sportSubtype: 'gravel' };
   }
   if (sport.includes('MOUNTAIN_BIKING')) {
-    return { sportType: 'cycling', sportSubtype: 'trail' };
+    return { sportType: 'cycling', sportSubtype: 'mtb' };
   }
   if (sport.includes('CITY_CYCLING') || sport.includes('URBAN_CYCLING')) {
     return { sportType: 'cycling', sportSubtype: 'urban' };

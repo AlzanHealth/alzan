@@ -100,10 +100,10 @@ function assertUltrahumanSportsWithoutGpsDoNotFail(): void {
 
 function assertUltrahumanCyclingModalitiesArePreserved(): void {
   const cases = [
-    { activity: 'indoor_cycling', expected: 'indoor' },
+    { activity: 'indoor_cycling', expected: 'indoor_trainer' },
     { activity: 'gravel_cycling', expected: 'gravel' },
     { activity: 'spinning_cycling', expected: 'spinning' },
-    { activity: 'mountain_biking', expected: 'trail' },
+    { activity: 'mountain_biking', expected: 'mtb' },
     { activity: 'urban_cycling', expected: 'urban' },
   ] as const;
 
@@ -123,7 +123,7 @@ function assertUltrahumanCyclingModalitiesArePreserved(): void {
   }
 }
 
-function assertUltrahumanWalkingMapsToRunningWalk(): void {
+function assertUltrahumanWalkingMapsToHikingUrbanWalk(): void {
   const rawJson = JSON.stringify({
     provider: 'ultrahuman',
     id: 'walk-1',
@@ -133,8 +133,8 @@ function assertUltrahumanWalkingMapsToRunningWalk(): void {
     steps: 1800,
   });
   const canonical = parseActivityFileToCanonical(rawJson, 'ultrahuman-walking.json');
-  assert.equal(canonical.sportType, 'running');
-  assert.equal(canonical.sportSubtype, 'walk');
+  assert.equal(canonical.sportType, 'hiking');
+  assert.equal(canonical.sportSubtype, 'urban_walk');
   assert.equal(canonical.vendorFields.ultrahumanActivity, 'walking');
 }
 
@@ -249,7 +249,7 @@ assertUltrahumanDailyMetricsFixtureUsesProviderMapper();
 assertUltrahumanMetricsEnvelopeParsesMovementAndRecovery();
 assertUltrahumanSportsWithoutGpsDoNotFail();
 assertUltrahumanCyclingModalitiesArePreserved();
-assertUltrahumanWalkingMapsToRunningWalk();
+assertUltrahumanWalkingMapsToHikingUrbanWalk();
 assertUltrahumanStrengthParsesInStrengthFlow();
 assertUltrahumanSleepMapsWithoutPersistence();
 assertUltrahumanRecoveryMapsWithoutPersistence();

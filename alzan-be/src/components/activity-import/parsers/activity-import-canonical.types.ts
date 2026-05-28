@@ -3,7 +3,7 @@ import { Database } from '../../../types/database.types';
 export type CanonicalActivityProvider = Database['public']['Enums']['wearable_provider_enum'] | 'other';
 export type CanonicalActivitySourceFileType = 'fit' | 'json';
 export type CanonicalSportType = Database['public']['Enums']['sport_type_enum'];
-export type CanonicalSportSubtype = Database['public']['Enums']['sport_subtype_enum'];
+export type CanonicalSportSubtype = string;
 
 export interface CanonicalActivitySportMapping {
   sportType: CanonicalSportType;

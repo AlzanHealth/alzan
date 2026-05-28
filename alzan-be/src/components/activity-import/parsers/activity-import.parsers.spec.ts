@@ -168,7 +168,7 @@ function assertSuuntoJsonKeepsNativeAutoLapDurations(): void {
 function assertGenericCyclingTerrainIsNotLost(): void {
   const cases = [
     { sportType: 'Gravel cycling', expected: 'gravel' },
-    { sportType: 'Mountain bike', expected: 'trail' },
+    { sportType: 'Mountain bike', expected: 'mtb' },
     { sportType: 'Indoor spin ride', expected: 'spinning' },
     { sportType: 'Urban bike commute', expected: 'urban' },
   ] as const;
@@ -187,9 +187,23 @@ function assertGenericCyclingTerrainIsNotLost(): void {
   }
 }
 
+function assertGenericWalkingUsesHikingCatalogModality(): void {
+  const canonical = parseActivityFileToCanonical(
+    JSON.stringify({
+      sport_type: 'Walking',
+      start_time: '2026-05-01T08:00:00Z',
+      duration_s: 1800,
+    }),
+    'generic-walking.json',
+  );
+  assert.equal(canonical.sportType, 'hiking');
+  assert.equal(canonical.sportSubtype, 'urban_walk');
+}
+
 assertSuuntoStrengthJsonParses();
 assertClearEnduranceStrengthJsonIsRejected();
 assertSuuntoDistanceActivityIsRejectedForStrength();
 assertGpxRouteParses();
 assertSuuntoJsonKeepsNativeAutoLapDurations();
 assertGenericCyclingTerrainIsNotLost();
+assertGenericWalkingUsesHikingCatalogModality();

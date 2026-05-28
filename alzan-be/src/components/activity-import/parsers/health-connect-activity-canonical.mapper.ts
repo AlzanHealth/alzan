@@ -225,18 +225,18 @@ function mapHealthConnectSport(workout: JsonRecord): CanonicalActivitySportMappi
   const normalised = normaliseType(raw);
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'indoor' };
   if (normalised.includes('runningtreadmill') || normalised.includes('treadmill'))
-    return { sportType: 'running', sportSubtype: 'indoor' };
-  if (normalised.includes('running')) return { sportType: 'running', sportSubtype: 'road' };
-  if (normalised.includes('walking')) return { sportType: 'running', sportSubtype: 'walk' };
+    return { sportType: 'running', sportSubtype: 'treadmill' };
+  if (normalised.includes('running')) return { sportType: 'running', sportSubtype: 'outdoor' };
+  if (normalised.includes('walking')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (normalised.includes('biking') || normalised.includes('cycling')) {
     if (normalised.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
     if (normalised.includes('gravel')) return { sportType: 'cycling', sportSubtype: 'gravel' };
     if (normalised.includes('mountain') || normalised.includes('mtb'))
-      return { sportType: 'cycling', sportSubtype: 'trail' };
+      return { sportType: 'cycling', sportSubtype: 'mtb' };
     if (normalised.includes('urban') || normalised.includes('commute') || normalised.includes('city'))
       return { sportType: 'cycling', sportSubtype: 'urban' };
     if (normalised.includes('stationary') || normalised.includes('indoor') || normalised.includes('trainer'))
-      return { sportType: 'cycling', sportSubtype: 'indoor' };
+      return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (normalised.includes('swimmingpool')) return { sportType: 'swimming', sportSubtype: 'pool' };

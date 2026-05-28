@@ -8,6 +8,7 @@ import {
   Modal,
   TextInput,
   Pressable,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -56,6 +57,7 @@ export const EnduranceStepEditorModal = ({
   const { preferences } = useUserPreferences();
   const { width } = useWindowDimensions();
   const isWideLayout = width >= 960;
+  const useCenteredModal = isWideLayout && Platform.OS !== 'web';
 
   const dynamicStyles = {
     container: {
@@ -302,301 +304,303 @@ export const EnduranceStepEditorModal = ({
     onSave(newStep);
   };
 
+  const modalContent = (
+    <SafeAreaView style={[styles.container, dynamicStyles.container, useCenteredModal && styles.containerWide]}>
+      <View style={[styles.header, dynamicStyles.header]}>
+        <TouchableOpacity onPress={onCancel} style={styles.headerAction} accessibilityRole="button">
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+        </TouchableOpacity>
+        <Text style={[styles.title, dynamicStyles.title]}>
+          {initialStep ? t('training.editStep') : t('training.newStep')}
+        </Text>
+        <TouchableOpacity
+          onPress={handleSave}
+          style={styles.headerAction}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.save')}
+        >
+          <Text style={styles.saveText}>{t('common.save')}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.editorScroll} contentContainerStyle={styles.scrollContent}>
+        <Text style={[styles.sectionLabel, dynamicStyles.sectionLabel]}>{t('training.phaseType')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+          {(['warmup', 'interval', 'recovery', 'cooldown'] as PhaseType[]).map(p => (
+            <TouchableOpacity
+              key={p}
+              style={[styles.chip, dynamicStyles.chip, phase === p && { backgroundColor: getPhaseColor(p) }]}
+              onPress={() => setPhase(p)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: phase === p }}
+            >
+              <Text style={[styles.chipText, phase === p && styles.chipTextActive]}>{t(getPhaseLabel(p))}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Duration Type */}
+        <Text style={[styles.sectionLabel, dynamicStyles.sectionLabel]}>{t('training.duration')}</Text>
+        <View style={[styles.segmentContainer, dynamicStyles.segmentContainer]}>
+          <TouchableOpacity
+            style={[styles.segment, durationType === 'distance' && styles.segmentActive]}
+            onPress={() => setDurationType('distance')}
+          >
+            <Ruler size={16} color={durationType === 'distance' ? '#FFF' : colors.textSecondary} />
+            <Text style={[styles.segmentText, durationType === 'distance' && styles.segmentTextActive]}>
+              {t('settings.distance')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segment, durationType === 'time' && styles.segmentActive]}
+            onPress={() => setDurationType('time')}
+          >
+            <Clock size={16} color={durationType === 'time' ? '#FFF' : colors.textSecondary} />
+            <Text style={[styles.segmentText, durationType === 'time' && styles.segmentTextActive]}>
+              {t('alzan.time')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segment, durationType === 'lap_button' && styles.segmentActive]}
+            onPress={() => setDurationType('lap_button')}
+          >
+            <Text style={[styles.segmentText, durationType === 'lap_button' && styles.segmentTextActive]}>
+              {t('nutrition.manual')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Value Input */}
+        {durationType === 'distance' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>
+              {t('settings.distance')}
+              {sportType === 'swimming' && isMetricDist ? t('training.unitMetres') : ''}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.m }}>
+              {sportType !== 'swimming' && (
+                <View style={{ flex: 1 }}>
+                  <View style={[styles.suffixInputContainer, dynamicStyles.suffixInputContainer]}>
+                    <TextInput
+                      style={[styles.input, dynamicStyles.input]}
+                      keyboardType="numeric"
+                      value={distMajor}
+                      onChangeText={setDistMajor}
+                    />
+                    <Text style={[styles.inputSuffix, dynamicStyles.inputSuffix]}>
+                      {isMetricDist ? t('onboarding.unitKm') : t('onboarding.unitMi')}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              {/* Only show secondary 'm' input if Metric and NOT generic single input mode (which we are moving towards, but preserving km+m for metric users for now) */}
+              {isMetricDist && (
+                <View style={{ flex: 1 }}>
+                  <View style={[styles.suffixInputContainer, dynamicStyles.suffixInputContainer]}>
+                    <TextInput
+                      style={[styles.input, dynamicStyles.input]}
+                      keyboardType="numeric"
+                      value={distMinor}
+                      onChangeText={setDistMinor}
+                    />
+                    <Text style={[styles.inputSuffix, dynamicStyles.inputSuffix]}>m</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+        {durationType === 'time' && (
+          <View style={[styles.inputContainer, { alignItems: 'center' }]}>
+            <Text style={styles.inputLabel}>{t('training.timeHmsFormat')}</Text>
+            <View style={styles.wheelContainer}>
+              {/* Hours */}
+              <SimpleWheelPicker
+                items={Array.from({ length: 24 }, (_, i) => i.toString())}
+                selectedValue={durationHour}
+                onValueChange={setDurationHour}
+              />
+              <Text style={[styles.wheelSeparator, dynamicStyles.wheelSeparator]}>:</Text>
+
+              {/* Minutes */}
+              <SimpleWheelPicker
+                items={Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'))}
+                selectedValue={durationMin}
+                onValueChange={setDurationMin}
+              />
+              <Text style={[styles.wheelSeparator, dynamicStyles.wheelSeparator]}>:</Text>
+
+              {/* Seconds */}
+              <SimpleWheelPicker
+                items={Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'))}
+                selectedValue={durationSec}
+                onValueChange={setDurationSec}
+              />
+            </View>
+            <Text style={styles.previewText}>
+              {parseInt(durationHour) > 0 ? `${durationHour}h ` : ''}
+              {durationMin}m {durationSec}s
+            </Text>
+          </View>
+        )}
+
+        {/* Target */}
+        <Text style={[styles.sectionLabel, dynamicStyles.sectionLabel]}>{t('nutrition.goal')}</Text>
+        <View style={[styles.segmentContainer, dynamicStyles.segmentContainer]}>
+          <TouchableOpacity
+            style={[styles.segment, targetType === 'none' && styles.segmentActive]}
+            onPress={() => setTargetType('none')}
+          >
+            <Text style={[styles.segmentText, targetType === 'none' && styles.segmentTextActive]}>
+              {t('training.none')}
+            </Text>
+          </TouchableOpacity>
+          {sportType !== 'cycling' && (
+            <TouchableOpacity
+              style={[styles.segment, targetType === 'pace' && styles.segmentActive]}
+              onPress={() => setTargetType('pace')}
+            >
+              <Activity size={16} color={targetType === 'pace' ? '#FFF' : colors.textSecondary} />
+              <Text style={[styles.segmentText, targetType === 'pace' && styles.segmentTextActive]}>
+                {t('training.pace')}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {sportType === 'cycling' && (
+            <TouchableOpacity
+              style={[styles.segment, targetType === 'speed' && styles.segmentActive]}
+              onPress={() => setTargetType('speed')}
+            >
+              <Activity size={16} color={targetType === 'speed' ? '#FFF' : colors.textSecondary} />
+              <Text style={[styles.segmentText, targetType === 'speed' && styles.segmentTextActive]}>
+                {t('training.speed')}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.segment, targetType === 'heart_rate' && styles.segmentActive]}
+            onPress={() => setTargetType('heart_rate')}
+          >
+            <Heart size={16} color={targetType === 'heart_rate' ? '#FFF' : colors.textSecondary} />
+            <Text style={[styles.segmentText, targetType === 'heart_rate' && styles.segmentTextActive]}>
+              {t('training.hrZone')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Target Specific Inputs */}
+        {targetType === 'pace' && (
+          <View style={styles.targetContent}>
+            <Text style={styles.helperText}>
+              {sportType === 'swimming'
+                ? `${t('training.selectTargetPace')} ${paceUnitLabel})`
+                : `${t('training.selectTargetPaceObjective')} ${paceUnitLabel})`}
+            </Text>
+            <View style={styles.wheelContainer}>
+              <SimpleWheelPicker
+                items={
+                  sportType === 'swimming'
+                    ? Array.from({ length: 15 }, (_, i) => (i + 1).toString()) // 1 - 15 min for swim
+                    : Array.from({ length: 15 }, (_, i) => (i + (isMetricDist ? 2 : 3)).toString()) // Shift range based on unit roughly?
+                }
+                selectedValue={paceMin}
+                onValueChange={setPaceMin}
+              />
+              <Text style={[styles.wheelSeparator, dynamicStyles.wheelSeparator]}>:</Text>
+              <SimpleWheelPicker
+                items={Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'))}
+                selectedValue={paceSec}
+                onValueChange={setPaceSec}
+              />
+              <Text style={styles.wheelLabel}>{paceUnitLabel}</Text>
+            </View>
+            <Text style={styles.previewText}>
+              {t('training.pace')}
+              {paceMin}'{paceSec}" {paceUnitLabel}
+            </Text>
+          </View>
+        )}
+
+        {targetType === 'speed' && (
+          <View style={styles.targetContent}>
+            <Text style={styles.helperText}>
+              {t('training.selectTargetSpeed')}
+              {speedUnitLabel})
+            </Text>
+            <View style={styles.wheelContainer}>
+              <SimpleWheelPicker
+                items={
+                  isMetricDist
+                    ? Array.from({ length: 60 }, (_, i) => (i + 10).toString()) // 10 - 70 km/h
+                    : Array.from({ length: 40 }, (_, i) => (i + 5).toString()) // 5 - 45 mph
+                }
+                selectedValue={speedVal}
+                onValueChange={setSpeedVal}
+              />
+              <Text style={styles.wheelLabel}>{speedUnitLabel}</Text>
+            </View>
+            <Text style={styles.previewText}>
+              {t('training.speed')}
+              {speedVal} {speedUnitLabel}
+            </Text>
+          </View>
+        )}
+
+        {targetType === 'heart_rate' && (
+          <View style={styles.targetContent}>
+            <Text style={styles.helperText}>{t('training.selectTrainingZone')}</Text>
+            <View style={styles.zonesContainer}>
+              {[1, 2, 3, 4, 5].map(z => (
+                <TouchableOpacity
+                  key={z}
+                  style={[
+                    styles.zoneButton,
+                    dynamicStyles.zoneButton,
+                    zone === z && [styles.zoneButtonActive, dynamicStyles.zoneButtonActive],
+                    { borderColor: getZoneColor(z) },
+                  ]}
+                  onPress={() => setZone(z)}
+                >
+                  <View style={[styles.zoneBadge, { backgroundColor: getZoneColor(z) }]}>
+                    <Text style={styles.zoneBadgeText}>Z{z}</Text>
+                  </View>
+                  <Text style={[styles.zoneTitle, dynamicStyles.zoneTitle]}>
+                    {z === 1
+                      ? t('training.recovery')
+                      : z === 2
+                        ? t('training.zoneAerobicEasy')
+                        : z === 3
+                          ? t('training.zoneAerobicModerate')
+                          : z === 4
+                            ? t('training.zoneThreshold')
+                            : t('training.zoneMaximum')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+
   return (
     <Modal
       visible={visible}
-      animationType={isWideLayout ? 'fade' : 'slide'}
-      transparent={isWideLayout}
-      presentationStyle={isWideLayout ? 'overFullScreen' : 'pageSheet'}
+      animationType={useCenteredModal ? 'fade' : 'slide'}
+      transparent={useCenteredModal}
+      presentationStyle={useCenteredModal ? 'overFullScreen' : 'pageSheet'}
       onRequestClose={onCancel}
     >
-      <Pressable
-        style={[styles.modalShell, isWideLayout && styles.modalOverlay]}
-        onPress={isWideLayout ? onCancel : undefined}
-      >
-        <Pressable
-          style={[styles.modalSurface, isWideLayout && styles.modalSurfaceWide]}
-          onPress={event => event.stopPropagation()}
-        >
-          <SafeAreaView style={[styles.container, dynamicStyles.container, isWideLayout && styles.containerWide]}>
-            <View style={[styles.header, dynamicStyles.header]}>
-              <TouchableOpacity onPress={onCancel} style={styles.headerAction} accessibilityRole="button">
-                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <Text style={[styles.title, dynamicStyles.title]}>
-                {initialStep ? t('training.editStep') : t('training.newStep')}
-              </Text>
-              <TouchableOpacity
-                onPress={handleSave}
-                style={styles.headerAction}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.save')}
-              >
-                <Text style={styles.saveText}>{t('common.save')}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.editorScroll} contentContainerStyle={styles.scrollContent}>
-              <Text style={[styles.sectionLabel, dynamicStyles.sectionLabel]}>{t('training.phaseType')}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
-                {(['warmup', 'interval', 'recovery', 'cooldown'] as PhaseType[]).map(p => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[styles.chip, dynamicStyles.chip, phase === p && { backgroundColor: getPhaseColor(p) }]}
-                    onPress={() => setPhase(p)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: phase === p }}
-                  >
-                    <Text style={[styles.chipText, phase === p && styles.chipTextActive]}>{t(getPhaseLabel(p))}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {/* Duration Type */}
-              <Text style={[styles.sectionLabel, dynamicStyles.sectionLabel]}>{t('training.duration')}</Text>
-              <View style={[styles.segmentContainer, dynamicStyles.segmentContainer]}>
-                <TouchableOpacity
-                  style={[styles.segment, durationType === 'distance' && styles.segmentActive]}
-                  onPress={() => setDurationType('distance')}
-                >
-                  <Ruler size={16} color={durationType === 'distance' ? '#FFF' : colors.textSecondary} />
-                  <Text style={[styles.segmentText, durationType === 'distance' && styles.segmentTextActive]}>
-                    {t('settings.distance')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.segment, durationType === 'time' && styles.segmentActive]}
-                  onPress={() => setDurationType('time')}
-                >
-                  <Clock size={16} color={durationType === 'time' ? '#FFF' : colors.textSecondary} />
-                  <Text style={[styles.segmentText, durationType === 'time' && styles.segmentTextActive]}>
-                    {t('alzan.time')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.segment, durationType === 'lap_button' && styles.segmentActive]}
-                  onPress={() => setDurationType('lap_button')}
-                >
-                  <Text style={[styles.segmentText, durationType === 'lap_button' && styles.segmentTextActive]}>
-                    {t('nutrition.manual')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Value Input */}
-              {durationType === 'distance' && (
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>
-                    {t('settings.distance')}
-                    {sportType === 'swimming' && isMetricDist ? t('training.unitMetres') : ''}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: spacing.m }}>
-                    {sportType !== 'swimming' && (
-                      <View style={{ flex: 1 }}>
-                        <View style={[styles.suffixInputContainer, dynamicStyles.suffixInputContainer]}>
-                          <TextInput
-                            style={[styles.input, dynamicStyles.input]}
-                            keyboardType="numeric"
-                            value={distMajor}
-                            onChangeText={setDistMajor}
-                          />
-                          <Text style={[styles.inputSuffix, dynamicStyles.inputSuffix]}>
-                            {isMetricDist ? t('onboarding.unitKm') : t('onboarding.unitMi')}
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-                    {/* Only show secondary 'm' input if Metric and NOT generic single input mode (which we are moving towards, but preserving km+m for metric users for now) */}
-                    {isMetricDist && (
-                      <View style={{ flex: 1 }}>
-                        <View style={[styles.suffixInputContainer, dynamicStyles.suffixInputContainer]}>
-                          <TextInput
-                            style={[styles.input, dynamicStyles.input]}
-                            keyboardType="numeric"
-                            value={distMinor}
-                            onChangeText={setDistMinor}
-                          />
-                          <Text style={[styles.inputSuffix, dynamicStyles.inputSuffix]}>m</Text>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              )}
-              {durationType === 'time' && (
-                <View style={[styles.inputContainer, { alignItems: 'center' }]}>
-                  <Text style={styles.inputLabel}>{t('training.timeHmsFormat')}</Text>
-                  <View style={styles.wheelContainer}>
-                    {/* Hours */}
-                    <SimpleWheelPicker
-                      items={Array.from({ length: 24 }, (_, i) => i.toString())}
-                      selectedValue={durationHour}
-                      onValueChange={setDurationHour}
-                    />
-                    <Text style={[styles.wheelSeparator, dynamicStyles.wheelSeparator]}>:</Text>
-
-                    {/* Minutes */}
-                    <SimpleWheelPicker
-                      items={Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'))}
-                      selectedValue={durationMin}
-                      onValueChange={setDurationMin}
-                    />
-                    <Text style={[styles.wheelSeparator, dynamicStyles.wheelSeparator]}>:</Text>
-
-                    {/* Seconds */}
-                    <SimpleWheelPicker
-                      items={Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'))}
-                      selectedValue={durationSec}
-                      onValueChange={setDurationSec}
-                    />
-                  </View>
-                  <Text style={styles.previewText}>
-                    {parseInt(durationHour) > 0 ? `${durationHour}h ` : ''}
-                    {durationMin}m {durationSec}s
-                  </Text>
-                </View>
-              )}
-
-              {/* Target */}
-              <Text style={[styles.sectionLabel, dynamicStyles.sectionLabel]}>{t('nutrition.goal')}</Text>
-              <View style={[styles.segmentContainer, dynamicStyles.segmentContainer]}>
-                <TouchableOpacity
-                  style={[styles.segment, targetType === 'none' && styles.segmentActive]}
-                  onPress={() => setTargetType('none')}
-                >
-                  <Text style={[styles.segmentText, targetType === 'none' && styles.segmentTextActive]}>
-                    {t('training.none')}
-                  </Text>
-                </TouchableOpacity>
-                {sportType !== 'cycling' && (
-                  <TouchableOpacity
-                    style={[styles.segment, targetType === 'pace' && styles.segmentActive]}
-                    onPress={() => setTargetType('pace')}
-                  >
-                    <Activity size={16} color={targetType === 'pace' ? '#FFF' : colors.textSecondary} />
-                    <Text style={[styles.segmentText, targetType === 'pace' && styles.segmentTextActive]}>
-                      {t('training.pace')}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {sportType === 'cycling' && (
-                  <TouchableOpacity
-                    style={[styles.segment, targetType === 'speed' && styles.segmentActive]}
-                    onPress={() => setTargetType('speed')}
-                  >
-                    <Activity size={16} color={targetType === 'speed' ? '#FFF' : colors.textSecondary} />
-                    <Text style={[styles.segmentText, targetType === 'speed' && styles.segmentTextActive]}>
-                      {t('training.speed')}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[styles.segment, targetType === 'heart_rate' && styles.segmentActive]}
-                  onPress={() => setTargetType('heart_rate')}
-                >
-                  <Heart size={16} color={targetType === 'heart_rate' ? '#FFF' : colors.textSecondary} />
-                  <Text style={[styles.segmentText, targetType === 'heart_rate' && styles.segmentTextActive]}>
-                    {t('training.hrZone')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Target Specific Inputs */}
-              {targetType === 'pace' && (
-                <View style={styles.targetContent}>
-                  <Text style={styles.helperText}>
-                    {sportType === 'swimming'
-                      ? `${t('training.selectTargetPace')} ${paceUnitLabel})`
-                      : `${t('training.selectTargetPaceObjective')} ${paceUnitLabel})`}
-                  </Text>
-                  <View style={styles.wheelContainer}>
-                    <SimpleWheelPicker
-                      items={
-                        sportType === 'swimming'
-                          ? Array.from({ length: 15 }, (_, i) => (i + 1).toString()) // 1 - 15 min for swim
-                          : Array.from({ length: 15 }, (_, i) => (i + (isMetricDist ? 2 : 3)).toString()) // Shift range based on unit roughly?
-                      }
-                      selectedValue={paceMin}
-                      onValueChange={setPaceMin}
-                    />
-                    <Text style={[styles.wheelSeparator, dynamicStyles.wheelSeparator]}>:</Text>
-                    <SimpleWheelPicker
-                      items={Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'))}
-                      selectedValue={paceSec}
-                      onValueChange={setPaceSec}
-                    />
-                    <Text style={styles.wheelLabel}>{paceUnitLabel}</Text>
-                  </View>
-                  <Text style={styles.previewText}>
-                    {t('training.pace')}
-                    {paceMin}'{paceSec}" {paceUnitLabel}
-                  </Text>
-                </View>
-              )}
-
-              {targetType === 'speed' && (
-                <View style={styles.targetContent}>
-                  <Text style={styles.helperText}>
-                    {t('training.selectTargetSpeed')}
-                    {speedUnitLabel})
-                  </Text>
-                  <View style={styles.wheelContainer}>
-                    <SimpleWheelPicker
-                      items={
-                        isMetricDist
-                          ? Array.from({ length: 60 }, (_, i) => (i + 10).toString()) // 10 - 70 km/h
-                          : Array.from({ length: 40 }, (_, i) => (i + 5).toString()) // 5 - 45 mph
-                      }
-                      selectedValue={speedVal}
-                      onValueChange={setSpeedVal}
-                    />
-                    <Text style={styles.wheelLabel}>{speedUnitLabel}</Text>
-                  </View>
-                  <Text style={styles.previewText}>
-                    {t('training.speed')}
-                    {speedVal} {speedUnitLabel}
-                  </Text>
-                </View>
-              )}
-
-              {targetType === 'heart_rate' && (
-                <View style={styles.targetContent}>
-                  <Text style={styles.helperText}>{t('training.selectTrainingZone')}</Text>
-                  <View style={styles.zonesContainer}>
-                    {[1, 2, 3, 4, 5].map(z => (
-                      <TouchableOpacity
-                        key={z}
-                        style={[
-                          styles.zoneButton,
-                          dynamicStyles.zoneButton,
-                          zone === z && [styles.zoneButtonActive, dynamicStyles.zoneButtonActive],
-                          { borderColor: getZoneColor(z) },
-                        ]}
-                        onPress={() => setZone(z)}
-                      >
-                        <View style={[styles.zoneBadge, { backgroundColor: getZoneColor(z) }]}>
-                          <Text style={styles.zoneBadgeText}>Z{z}</Text>
-                        </View>
-                        <Text style={[styles.zoneTitle, dynamicStyles.zoneTitle]}>
-                          {z === 1
-                            ? t('training.recovery')
-                            : z === 2
-                              ? t('training.zoneAerobicEasy')
-                              : z === 3
-                                ? t('training.zoneAerobicModerate')
-                                : z === 4
-                                  ? t('training.zoneThreshold')
-                                  : t('training.zoneMaximum')}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </ScrollView>
-          </SafeAreaView>
+      {useCenteredModal ? (
+        <Pressable style={[styles.modalShell, styles.modalOverlay]} onPress={onCancel}>
+          <Pressable style={[styles.modalSurface, styles.modalSurfaceWide]} onPress={event => event.stopPropagation()}>
+            {modalContent}
+          </Pressable>
         </Pressable>
-      </Pressable>
+      ) : (
+        modalContent
+      )}
     </Modal>
   );
 };
