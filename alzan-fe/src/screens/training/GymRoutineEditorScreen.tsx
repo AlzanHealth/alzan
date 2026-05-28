@@ -85,6 +85,7 @@ export const GymRoutineEditorScreen = () => {
   const deleteExerciseAnimations = useRef<Record<string, Animated.Value>>({});
   const exercisesRef = useRef<RoutineDataExercise[]>([]);
   const exerciseFillAnimations = useRef<Animated.Value[]>([]);
+  const warmupFillAnimations = useRef<Animated.Value[]>([]);
   const connectorFlowAnimations = useRef<Animated.Value[]>([]);
   const supersetTransitionAnimation = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -457,7 +458,23 @@ export const GymRoutineEditorScreen = () => {
 
   useEffect(() => {
     exerciseFillAnimations.current = exerciseFillAnimations.current.slice(0, exercises.length);
+    warmupFillAnimations.current = warmupFillAnimations.current.slice(0, exercises.length);
   }, [exercises.length]);
+
+  useEffect(() => {
+    exercises.forEach((ex, index) => {
+      if (!warmupFillAnimations.current[index]) {
+        warmupFillAnimations.current[index] = new Animated.Value(ex.is_warmup ? 1 : 0);
+      } else {
+        Animated.timing(warmupFillAnimations.current[index], {
+          toValue: ex.is_warmup ? 1 : 0,
+          duration: 700,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }).start();
+      }
+    });
+  }, [exercises]);
 
   useEffect(() => {
     const connectorCount = Math.max(0, exercises.length - 1);
@@ -694,6 +711,7 @@ export const GymRoutineEditorScreen = () => {
             contentContainerStyle={styles.content}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
             {currentView === 'main' ? (
               <>
@@ -955,24 +973,45 @@ export const GymRoutineEditorScreen = () => {
                               isWarmupExercise && [
                                 styles.exerciseCardWarmup,
                                 {
-                                  borderColor: '#FF9500B3',
+                                  borderColor: '#FF950066',
                                 },
                               ],
-                              isInSuperset && [
-                                styles.exerciseCardSuperset,
-                                {
-                                  borderColor: themeColors.primary + 'B3',
-                                },
-                              ],
+                              isInSuperset &&
+                                !isWarmupExercise && [
+                                  styles.exerciseCardSuperset,
+                                  {
+                                    borderColor: themeColors.primary + '66',
+                                  },
+                                ],
                             ]}
                           >
+                            {/* Superset animated background fill */}
                             <Animated.View
                               pointerEvents="none"
                               style={[
                                 styles.supersetFillOverlay,
                                 {
-                                  opacity: fillAnimation,
-                                  backgroundColor: themeColors.primary + '16',
+                                  width: fillAnimation.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['0%', '100%'],
+                                  }),
+                                  backgroundColor: themeColors.primary + '1A',
+                                },
+                              ]}
+                            />
+                            {/* Warmup animated background fill */}
+                            <Animated.View
+                              pointerEvents="none"
+                              style={[
+                                styles.supersetFillOverlay,
+                                {
+                                  width: (
+                                    warmupFillAnimations.current[index] || new Animated.Value(isWarmupExercise ? 1 : 0)
+                                  ).interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['0%', '100%'],
+                                  }),
+                                  backgroundColor: '#FF95001A',
                                 },
                               ]}
                             />
@@ -1026,6 +1065,7 @@ export const GymRoutineEditorScreen = () => {
                                       styles.warmupExerciseToggle,
                                       isWarmupExercise && styles.warmupExerciseToggleActive,
                                     ]}
+                                    activeOpacity={0.7}
                                   >
                                     <Text
                                       style={[
@@ -1542,11 +1582,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   exerciseCardWarmup: {
-    borderWidth: 2,
+    borderWidth: 1.5,
   },
   exerciseCardSuperset: {
-    borderWidth: 2,
-    borderLeftWidth: 3,
+    borderWidth: 1.5,
   },
   exerciseNameRow: {
     flexDirection: 'row',
@@ -1629,18 +1668,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   warmupExerciseToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(153,153,153,0.35)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     minWidth: 64,
-    alignItems: 'center',
     justifyContent: 'center',
   },
   warmupExerciseToggleActive: {
-    borderColor: 'rgba(255,149,0,0.55)',
-    backgroundColor: 'rgba(255,149,0,0.12)',
+    borderColor: 'rgba(255,149,0,0.6)',
+    backgroundColor: 'rgba(255,149,0,0.14)',
+    shadowColor: '#FF9500',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   warmupExerciseToggleText: {
     fontSize: 10,
