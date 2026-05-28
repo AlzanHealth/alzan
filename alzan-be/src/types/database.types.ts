@@ -4366,33 +4366,36 @@ export type Database = {
           created_at: string;
           description: string | null;
           id: string;
+          modality: string | null;
           source: string;
           suggested_day_of_week: number | null;
           updated_at: string;
           user_id: string;
-          workout_goal: Database['public']['Enums']['workout_goal_enum'] | null;
+          workout_goal: string | null;
         };
         Insert: {
           base_name: string;
           created_at?: string;
           description?: string | null;
           id?: string;
+          modality?: string | null;
           source?: string;
           suggested_day_of_week?: number | null;
           updated_at?: string;
           user_id: string;
-          workout_goal?: Database['public']['Enums']['workout_goal_enum'] | null;
+          workout_goal?: string | null;
         };
         Update: {
           base_name?: string;
           created_at?: string;
           description?: string | null;
           id?: string;
+          modality?: string | null;
           source?: string;
           suggested_day_of_week?: number | null;
           updated_at?: string;
           user_id?: string;
-          workout_goal?: Database['public']['Enums']['workout_goal_enum'] | null;
+          workout_goal?: string | null;
         };
         Relationships: [
           {

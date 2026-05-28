@@ -15,6 +15,8 @@ export type RoutineEditorData = {
   id?: string;
   base_name: string;
   description: string | null;
+  workout_goal?: string | null;
+  modality?: string | null;
   suggested_day_of_week?: number | null;
   exercises: RoutineDataExercise[];
   supersetLinks?: number[];
@@ -148,6 +150,8 @@ export const useGymRoutineEditor = (routineId?: string) => {
           user_id: user.id,
           base_name: data.base_name,
           description: data.description,
+          workout_goal: data.workout_goal,
+          modality: data.modality,
           suggested_day_of_week: data.suggested_day_of_week,
           updated_at: new Date().toISOString(),
         })

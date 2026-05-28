@@ -33,10 +33,12 @@ import { WorkoutTemplate } from '../../types/requests.types';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
+import { useSportCatalog } from '../../hooks/useSportCatalog';
 
 export const GymRoutinesListScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
+  const { getOptionLabel } = useSportCatalog();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'GymRoutinesList'>>();
   const { assignToDate } = route.params || {};
@@ -299,7 +301,9 @@ export const GymRoutinesListScreen = () => {
                       <View style={styles.cardInfo}>
                         <Text style={[styles.cardTitle, dynamicStyles.title]}>{routine.base_name}</Text>
                         <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
-                          {routine.description || t('training.noDescription')}
+                          {routine.workout_goal || routine.modality
+                            ? `${routine.workout_goal ? getOptionLabel('strength', routine.workout_goal, 'goal') : ''}${routine.workout_goal && routine.modality ? ' • ' : ''}${routine.modality ? getOptionLabel('strength', routine.modality, 'modality') : ''}`
+                            : routine.description || t('training.noDescription')}
                         </Text>
                         {routine.created_at && (
                           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>

@@ -17,6 +17,7 @@ import {
   Modal,
   LayoutAnimation,
   UIManager,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -27,7 +28,18 @@ import { spacing, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { RoutineDataExercise, useGymRoutineEditor } from '../../hooks/useGymRoutineEditor';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
-import { Plus, Trash2, ChevronUp, ChevronDown, Infinity as InfinityIcon, HelpCircle, Check } from 'lucide-react-native';
+import {
+  Plus,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  Infinity as InfinityIcon,
+  HelpCircle,
+  Check,
+  Dumbbell,
+  Zap,
+  ChevronRight,
+} from 'lucide-react-native';
 import { WeekDaySelector } from '../../components/training/WeekDaySelector';
 import { useExercisesPRs } from '../../hooks/useExercisesPRs';
 import { supabase } from '../../lib/supabaseClient';
@@ -38,6 +50,7 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
 import { ExerciseWithDetails } from '../../types/training';
+import { useSportCatalog } from '../../hooks/useSportCatalog';
 
 export const GymRoutineEditorScreen = () => {
   const { t } = useTranslation();
@@ -50,9 +63,15 @@ export const GymRoutineEditorScreen = () => {
   const { preferences, toDisplayWeight } = useUserPreferences();
 
   const { routineData, saveRoutine } = useGymRoutineEditor(routineId);
+  const { getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [workoutGoal, setWorkoutGoal] = useState<string | null>(null);
+  const [modality, setModality] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<'main' | 'builder'>('main');
+  const [goalModalVisible, setGoalModalVisible] = useState(false);
+  const [modalityModalVisible, setModalityModalVisible] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [originalSuggestedDay, setOriginalSuggestedDay] = useState<number | null>(null); // Track original day for edit mode
   const [isRecurring, setIsRecurring] = useState(false);
@@ -167,6 +186,8 @@ export const GymRoutineEditorScreen = () => {
       setIsRecurring(!!routineData.suggested_day_of_week);
       setExercises(routineData.exercises || []);
       setSupersetLinks(buildSupersetLinksFromExercises(routineData.exercises || []));
+      setWorkoutGoal(routineData.workout_goal || null);
+      setModality(routineData.modality || null);
     }
   }, [routineData]);
 
@@ -500,6 +521,8 @@ export const GymRoutineEditorScreen = () => {
         id: routineId,
         base_name: name,
         description,
+        workout_goal: workoutGoal || null,
+        modality: modality || null,
         suggested_day_of_week: isRecurring && selectedDays.length > 0 ? selectedDays[0] : null,
         exercises,
         supersetLinks: supersetIndexes,
@@ -622,15 +645,42 @@ export const GymRoutineEditorScreen = () => {
     >
       <SafeAreaView style={{ flex: 1 }}>
         <View style={[styles.header, { borderBottomColor: dynamicStyles.border.borderColor }]}>
-          <TouchableOpacity onPress={() => navigation.navigate('GymRoutinesList')}>
-            <Text style={[styles.cancelText, { color: themeColors.danger }]}>{t('common.cancel')}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (currentView === 'builder') {
+                setCurrentView('main');
+              } else {
+                navigation.navigate('GymRoutinesList');
+              }
+            }}
+          >
+            <Text style={[styles.cancelText, { color: themeColors.danger }]}>
+              {currentView === 'builder' ? t('common.back') : t('common.cancel')}
+            </Text>
           </TouchableOpacity>
           <Text style={[styles.title, dynamicStyles.title]}>
-            {routineId ? t('training.editRoutine') : t('training.newRoutine')}
+            {currentView === 'builder'
+              ? t('training.designWorkout')
+              : routineId
+                ? t('training.editRoutine')
+                : t('training.newRoutine')}
           </Text>
-          <TouchableOpacity onPress={handleSave} disabled={saveRoutine.isPending}>
+          <TouchableOpacity
+            onPress={() => {
+              if (currentView === 'builder') {
+                setCurrentView('main');
+              } else {
+                handleSave();
+              }
+            }}
+            disabled={saveRoutine.isPending}
+          >
             <Text style={[styles.saveText, { color: themeColors.primary }]}>
-              {saveRoutine.isPending ? t('training.saving') : t('common.save')}
+              {currentView === 'builder'
+                ? t('common.done')
+                : saveRoutine.isPending
+                  ? t('training.saving')
+                  : t('common.save')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -645,364 +695,490 @@ export const GymRoutineEditorScreen = () => {
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.formGroup}>
-              <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.name')}</Text>
-              <TextInput
-                style={[styles.input, dynamicStyles.input]}
-                placeholder={t('training.routinePlaceholder')}
-                placeholderTextColor={themeColors.textSecondary}
-                value={name}
-                onChangeText={setName}
-                inputAccessoryViewID={inputAccessoryViewID}
-              />
-            </View>
+            {currentView === 'main' ? (
+              <>
+                <GlassCard style={[styles.formBlock, dynamicStyles.glassCard]}>
+                  <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+                    {t('training.configureGeneralDetails').toUpperCase()}
+                  </Text>
 
-            <View style={styles.formGroup}>
-              <Text style={[styles.label, dynamicStyles.sublabel]}>{t('settings.description')}</Text>
-              <TextInput
-                style={[styles.input, dynamicStyles.input]}
-                placeholder={t('training.optional')}
-                placeholderTextColor={themeColors.textSecondary}
-                value={description}
-                onChangeText={setDescription}
-                inputAccessoryViewID={inputAccessoryViewID}
-              />
-            </View>
+                  {/* Template Name Row */}
+                  <View style={styles.formRow}>
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.templateName')}
+                    </Text>
+                    <TextInput
+                      style={[styles.rowInput, { color: themeColors.textPrimary }]}
+                      placeholder="Ex: Push A"
+                      placeholderTextColor={themeColors.textSecondary + '70'}
+                      value={name}
+                      onChangeText={setName}
+                      inputAccessoryViewID={inputAccessoryViewID}
+                    />
+                  </View>
 
-            <View style={styles.formGroup}>
-              <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.scheduleDay')}</Text>
-              <WeekDaySelector
-                selectedDays={selectedDays}
-                onDaysChange={setSelectedDays}
-                isRecurring={isRecurring}
-                onToggleRecurring={() => setIsRecurring(!isRecurring)}
-                singleSelect={true}
-              />
-            </View>
-
-            <View style={styles.exercisesHeader}>
-              <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>
-                {t('training.exercises')} ({exercises.length})
-              </Text>
-              <TouchableOpacity onPress={handleAddExercise} style={styles.addBtn}>
-                <Plus size={20} color={themeColors.primary} />
-                <Text style={[styles.addBtnText, { color: themeColors.primary }]}>{t('nutrition.add')}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {exercises.map((item, index) => {
-              const isInSuperset = isExerciseInSuperset(index);
-              const connectorActive = isConnectorActive(index);
-              const exerciseKey = getExerciseRenderKey(item, index);
-              const isWarmupExercise = !!item.is_warmup;
-              const exerciseCardKey = `${exerciseKey}-${isWarmupExercise ? 'warmup' : 'regular'}`;
-              const deleteAnimation = getDeleteExerciseAnimation(exerciseKey);
-              const isDeleting = deletingExerciseKeys.has(exerciseKey);
-              if (!exerciseFillAnimations.current[index]) {
-                exerciseFillAnimations.current[index] = new Animated.Value(isInSuperset ? 1 : 0);
-              }
-              const fillAnimation = exerciseFillAnimations.current[index];
-              if (!connectorFlowAnimations.current[index]) {
-                connectorFlowAnimations.current[index] = new Animated.Value(connectorActive ? 1 : 0);
-              }
-              const connectorFlow = connectorFlowAnimations.current[index];
-
-              return (
-                <React.Fragment key={exerciseCardKey}>
-                  <Animated.View
-                    pointerEvents={isDeleting ? 'none' : 'auto'}
-                    style={
-                      isDeleting
-                        ? {
-                            opacity: deleteAnimation.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [1, 0],
-                            }),
-                            transform: [
-                              {
-                                translateY: deleteAnimation.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [0, -10],
-                                }),
-                              },
-                              {
-                                scale: deleteAnimation.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [1, 0.98],
-                                }),
-                              },
-                            ],
-                          }
-                        : undefined
-                    }
-                  >
-                    <Animated.View
-                      style={[
-                        movedExerciseId === item.exercise_id &&
-                          movedExerciseDirection && {
-                            transform: [
-                              {
-                                translateY: moveHighlightAnim.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [0, movedExerciseDirection === 'up' ? -6 : 6],
-                                }),
-                              },
-                              {
-                                scale: moveHighlightAnim.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [1, 1.02],
-                                }),
-                              },
-                            ],
-                            opacity: moveHighlightAnim.interpolate({
-                              inputRange: [0, 0.5, 1],
-                              outputRange: [1, 0.9, 1],
-                            }),
-                          },
-                      ]}
-                    >
-                      <GlassCard
+                  {/* Main Goal Row */}
+                  <TouchableOpacity style={styles.formRow} onPress={() => setGoalModalVisible(true)}>
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.mainGoal')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
                         style={[
-                          styles.exerciseCard,
-                          dynamicStyles.glassCard,
-                          isWarmupExercise && [
-                            styles.exerciseCardWarmup,
-                            {
-                              borderColor: '#FF9500B3',
-                            },
-                          ],
-                          isInSuperset && [
-                            styles.exerciseCardSuperset,
-                            {
-                              borderColor: themeColors.primary + 'B3',
-                            },
-                          ],
+                          styles.rowValueText,
+                          { color: workoutGoal ? themeColors.textPrimary : themeColors.textSecondary },
                         ]}
                       >
-                        <Animated.View
-                          pointerEvents="none"
-                          style={[
-                            styles.supersetFillOverlay,
-                            {
-                              opacity: fillAnimation,
-                              backgroundColor: themeColors.primary + '16',
-                            },
-                          ]}
-                        />
-                        <View style={styles.exerciseCardContent}>
-                          <View style={styles.exerciseHeader}>
-                            <View style={styles.exerciseInfo}>
-                              <Text style={[styles.exerciseName, dynamicStyles.title]}>
-                                {getExerciseDisplayName(item.exercise)}
-                              </Text>
-                            </View>
-                            <View style={styles.actionButtonsRow}>
-                              <View style={styles.moveButtons}>
-                                {index > 0 && (
-                                  <TouchableOpacity
-                                    onPress={() => handleMoveExercise(index, 'up')}
-                                    style={styles.moveBtn}
-                                  >
-                                    <ChevronUp size={20} color={themeColors.textSecondary} />
-                                  </TouchableOpacity>
-                                )}
-                                {index < exercises.length - 1 && (
-                                  <TouchableOpacity
-                                    onPress={() => handleMoveExercise(index, 'down')}
-                                    style={styles.moveBtn}
-                                  >
-                                    <ChevronDown size={20} color={themeColors.textSecondary} />
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                              <TouchableOpacity
-                                onPress={() => toggleExerciseWarmup(index)}
-                                style={[
-                                  styles.warmupExerciseToggle,
-                                  isWarmupExercise && styles.warmupExerciseToggleActive,
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.warmupExerciseToggleText,
-                                    { color: isWarmupExercise ? '#FF9500' : themeColors.textSecondary },
-                                  ]}
-                                >
-                                  {t('training.warmup')}
-                                </Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity onPress={() => setHelpModalVisible(true)} style={styles.deleteBtn}>
-                                <HelpCircle size={18} color={themeColors.textSecondary} />
-                              </TouchableOpacity>
-                              <TouchableOpacity onPress={() => handleRemoveExercise(index)} style={styles.deleteBtn}>
-                                <Trash2 size={18} color={themeColors.danger} />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
+                        {workoutGoal ? getOptionLabel('strength', workoutGoal, 'goal') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={18} color={themeColors.textSecondary} />
+                    </View>
+                  </TouchableOpacity>
 
-                          <View style={styles.targetsRow}>
-                            <View style={styles.targetField}>
-                              <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
-                                {t('training.setsLabel')}
-                              </Text>
-                              <TextInput
-                                style={[styles.targetInput, dynamicStyles.input]}
-                                keyboardType="numeric"
-                                value={String(item.target_sets || '')}
-                                onChangeText={v => updateExerciseTarget(index, 'target_sets', v)}
-                                inputAccessoryViewID={inputAccessoryViewID}
-                              />
-                            </View>
-                            {isTimeBasedExercise(item.exercise) ? (
-                              // Time-based exercise: show single Tiempo field
-                              <View style={styles.targetField}>
-                                <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
-                                  {t('training.timeSeconds')}
-                                </Text>
-                                <TextInput
-                                  style={[styles.targetInput, dynamicStyles.input]}
-                                  keyboardType="numeric"
-                                  placeholder="30"
-                                  placeholderTextColor={themeColors.textSecondary + '50'}
-                                  value={String(item.target_reps_min || '')}
-                                  onChangeText={v => updateExerciseTarget(index, 'target_reps_min', v)}
-                                  inputAccessoryViewID={inputAccessoryViewID}
-                                />
-                              </View>
-                            ) : (
-                              // Reps-based exercise: single repetitions target
-                              <View style={styles.targetField}>
-                                <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
-                                  {t('training.repsColon')}
-                                </Text>
-                                <TextInput
-                                  style={[styles.targetInput, dynamicStyles.input]}
-                                  keyboardType="numeric"
-                                  value={String(item.target_reps_min || '')}
-                                  onChangeText={v => updateExerciseTarget(index, 'target_reps_min', v)}
-                                  inputAccessoryViewID={inputAccessoryViewID}
-                                />
-                              </View>
-                            )}
-                            {!isTimeBasedExercise(item.exercise) && (
-                              <View style={styles.targetField}>
-                                <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
-                                  {t('training.prColon')}
-                                  {preferences.weight_unit})
-                                </Text>
-                                <View
-                                  style={[
-                                    styles.targetInput,
-                                    dynamicStyles.input,
-                                    { justifyContent: 'center', alignItems: 'center' },
-                                  ]}
-                                >
-                                  <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>
-                                    {prs?.[item.exercise_id]
-                                      ? `${toDisplayWeight(prs[item.exercise_id].weight_kg)}`
-                                      : '-'}
+                  {/* Description Row (Text Area) */}
+                  <View style={{ marginTop: spacing.m }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                        {t('settings.description')}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: themeColors.textSecondary }}>
+                        {`${description.length}/150`}
+                      </Text>
+                    </View>
+                    <TextInput
+                      style={[styles.rowTextArea, { borderColor: themeColors.border, color: themeColors.textPrimary }]}
+                      placeholder="Ex: Focused on torso hypertrophy, active mobility warm-up..."
+                      placeholderTextColor={themeColors.textSecondary + '70'}
+                      multiline
+                      maxLength={150}
+                      value={description}
+                      onChangeText={setDescription}
+                      inputAccessoryViewID={inputAccessoryViewID}
+                    />
+                  </View>
+
+                  {/* Modality Row (BELOW DESCRIPTION) */}
+                  <TouchableOpacity
+                    style={[styles.formRow, { borderBottomWidth: 0, marginTop: spacing.s }]}
+                    onPress={() => setModalityModalVisible(true)}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.modalityLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: modality ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {modality ? getOptionLabel('strength', modality, 'modality') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={18} color={themeColors.textSecondary} />
+                    </View>
+                  </TouchableOpacity>
+                </GlassCard>
+
+                {/* Routine Summary Card */}
+                <GlassCard style={[styles.summaryCard, { borderColor: themeColors.border }]}>
+                  <View style={styles.summaryHeader}>
+                    <View style={[styles.summaryIconContainer, { backgroundColor: `${themeColors.primary}18` }]}>
+                      <Dumbbell size={27} color={themeColors.primary} />
+                    </View>
+                    <View style={styles.summaryTitleContainer}>
+                      <Text style={[styles.summaryOverline, { color: themeColors.textSecondary }]}>
+                        {t('training.sessionSummary').toUpperCase()}
+                      </Text>
+                      <Text style={[styles.summaryTitle, { color: themeColors.textPrimary }]}>
+                        {name || t('training.newRoutine')}
+                      </Text>
+                      {(workoutGoal || modality) && (
+                        <Text numberOfLines={2} style={[styles.summaryMetadata, { color: themeColors.textSecondary }]}>
+                          {[
+                            workoutGoal ? getOptionLabel('strength', workoutGoal, 'goal') : null,
+                            modality ? getOptionLabel('strength', modality, 'modality') : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.summaryMetricsRow}>
+                    <View style={[styles.summaryMetricCard, { backgroundColor: `${themeColors.primary}0D` }]}>
+                      <Dumbbell size={18} color={themeColors.primary} />
+                      <Text style={[styles.summaryMetricValue, { color: themeColors.textPrimary }]}>
+                        {exercises.length}
+                      </Text>
+                      <Text style={[styles.summaryMetricLabel, { color: themeColors.textSecondary }]}>
+                        {t('training.totalExercises')}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.summaryMetricCard, { backgroundColor: `${themeColors.primary}12` }]}>
+                      <InfinityIcon size={18} color={themeColors.primary} />
+                      <Text style={[styles.summaryMetricValue, { color: themeColors.textPrimary }]}>
+                        {exercises.reduce((acc, curr) => acc + (curr.target_sets || 0), 0)}
+                      </Text>
+                      <Text style={[styles.summaryMetricLabel, { color: themeColors.textSecondary }]}>
+                        {t('training.totalSets')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={exercises.length > 0 ? t('training.editWorkout') : t('training.designWorkout')}
+                    activeOpacity={0.86}
+                    style={[styles.designButton, { backgroundColor: themeColors.primary }]}
+                    onPress={() => setCurrentView('builder')}
+                  >
+                    <Zap size={17} color="#FFFFFF" />
+                    <Text style={styles.designButtonText}>
+                      {exercises.length > 0 ? t('training.editWorkout') : t('training.designWorkout')}
+                    </Text>
+                  </TouchableOpacity>
+                </GlassCard>
+
+                {/* Schedule Day Selector */}
+                <View style={styles.formGroup}>
+                  <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.scheduleDay')}</Text>
+                  <WeekDaySelector
+                    selectedDays={selectedDays}
+                    onDaysChange={setSelectedDays}
+                    isRecurring={isRecurring}
+                    onToggleRecurring={() => setIsRecurring(!isRecurring)}
+                    singleSelect={true}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.exercisesHeader}>
+                  <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>
+                    {t('training.exercises')} ({exercises.length})
+                  </Text>
+                  <TouchableOpacity onPress={handleAddExercise} style={styles.addBtn}>
+                    <Plus size={20} color={themeColors.primary} />
+                    <Text style={[styles.addBtnText, { color: themeColors.primary }]}>{t('nutrition.add')}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {exercises.map((item, index) => {
+                  const isInSuperset = isExerciseInSuperset(index);
+                  const connectorActive = isConnectorActive(index);
+                  const exerciseKey = getExerciseRenderKey(item, index);
+                  const isWarmupExercise = !!item.is_warmup;
+                  const exerciseCardKey = `${exerciseKey}-${isWarmupExercise ? 'warmup' : 'regular'}`;
+                  const deleteAnimation = getDeleteExerciseAnimation(exerciseKey);
+                  const isDeleting = deletingExerciseKeys.has(exerciseKey);
+                  if (!exerciseFillAnimations.current[index]) {
+                    exerciseFillAnimations.current[index] = new Animated.Value(isInSuperset ? 1 : 0);
+                  }
+                  const fillAnimation = exerciseFillAnimations.current[index];
+                  if (!connectorFlowAnimations.current[index]) {
+                    connectorFlowAnimations.current[index] = new Animated.Value(connectorActive ? 1 : 0);
+                  }
+                  const connectorFlow = connectorFlowAnimations.current[index];
+
+                  return (
+                    <React.Fragment key={exerciseCardKey}>
+                      <Animated.View
+                        pointerEvents={isDeleting ? 'none' : 'auto'}
+                        style={
+                          isDeleting
+                            ? {
+                                opacity: deleteAnimation.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [1, 0],
+                                }),
+                                transform: [
+                                  {
+                                    translateY: deleteAnimation.interpolate({
+                                      inputRange: [0, 1],
+                                      outputRange: [0, -10],
+                                    }),
+                                  },
+                                  {
+                                    scale: deleteAnimation.interpolate({
+                                      inputRange: [0, 1],
+                                      outputRange: [1, 0.98],
+                                    }),
+                                  },
+                                ],
+                              }
+                            : undefined
+                        }
+                      >
+                        <Animated.View
+                          style={[
+                            movedExerciseId === item.exercise_id &&
+                              movedExerciseDirection && {
+                                transform: [
+                                  {
+                                    translateY: moveHighlightAnim.interpolate({
+                                      inputRange: [0, 1],
+                                      outputRange: [0, movedExerciseDirection === 'up' ? -6 : 6],
+                                    }),
+                                  },
+                                  {
+                                    scale: moveHighlightAnim.interpolate({
+                                      inputRange: [0, 1],
+                                      outputRange: [1, 1.02],
+                                    }),
+                                  },
+                                ],
+                                opacity: moveHighlightAnim.interpolate({
+                                  inputRange: [0, 0.5, 1],
+                                  outputRange: [1, 0.9, 1],
+                                }),
+                              },
+                          ]}
+                        >
+                          <GlassCard
+                            style={[
+                              styles.exerciseCard,
+                              dynamicStyles.glassCard,
+                              isWarmupExercise && [
+                                styles.exerciseCardWarmup,
+                                {
+                                  borderColor: '#FF9500B3',
+                                },
+                              ],
+                              isInSuperset && [
+                                styles.exerciseCardSuperset,
+                                {
+                                  borderColor: themeColors.primary + 'B3',
+                                },
+                              ],
+                            ]}
+                          >
+                            <Animated.View
+                              pointerEvents="none"
+                              style={[
+                                styles.supersetFillOverlay,
+                                {
+                                  opacity: fillAnimation,
+                                  backgroundColor: themeColors.primary + '16',
+                                },
+                              ]}
+                            />
+                            <View style={styles.exerciseCardContent}>
+                              <View style={styles.exerciseHeader}>
+                                <View style={styles.exerciseInfo}>
+                                  <Text style={[styles.exerciseName, dynamicStyles.title]}>
+                                    {getExerciseDisplayName(item.exercise)}
                                   </Text>
                                 </View>
+                                <View style={styles.actionButtonsRow}>
+                                  <View style={styles.moveButtons}>
+                                    {index > 0 && (
+                                      <TouchableOpacity
+                                        onPress={() => handleMoveExercise(index, 'up')}
+                                        style={styles.moveBtn}
+                                      >
+                                        <ChevronUp size={20} color={themeColors.textSecondary} />
+                                      </TouchableOpacity>
+                                    )}
+                                    {index < exercises.length - 1 && (
+                                      <TouchableOpacity
+                                        onPress={() => handleMoveExercise(index, 'down')}
+                                        style={styles.moveBtn}
+                                      >
+                                        <ChevronDown size={20} color={themeColors.textSecondary} />
+                                      </TouchableOpacity>
+                                    )}
+                                  </View>
+                                  <TouchableOpacity
+                                    onPress={() => toggleExerciseWarmup(index)}
+                                    style={[
+                                      styles.warmupExerciseToggle,
+                                      isWarmupExercise && styles.warmupExerciseToggleActive,
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.warmupExerciseToggleText,
+                                        { color: isWarmupExercise ? '#FF9500' : themeColors.textSecondary },
+                                      ]}
+                                    >
+                                      {t('training.warmup')}
+                                    </Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity onPress={() => setHelpModalVisible(true)} style={styles.deleteBtn}>
+                                    <HelpCircle size={18} color={themeColors.textSecondary} />
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    onPress={() => handleRemoveExercise(index)}
+                                    style={styles.deleteBtn}
+                                  >
+                                    <Trash2 size={18} color={themeColors.danger} />
+                                  </TouchableOpacity>
+                                </View>
                               </View>
-                            )}
-                            <View style={styles.targetField}>
-                              <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
-                                {t('training.restSeconds')}
-                              </Text>
-                              <TextInput
-                                style={[styles.targetInput, dynamicStyles.input]}
-                                keyboardType="numeric"
-                                placeholder="60"
-                                placeholderTextColor={themeColors.textSecondary + '50'}
-                                value={String(item.rest_seconds || '')}
-                                onChangeText={v => updateExerciseTarget(index, 'rest_seconds', v)}
-                                inputAccessoryViewID={inputAccessoryViewID}
-                              />
+
+                              <View style={styles.targetsRow}>
+                                <View style={styles.targetField}>
+                                  <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
+                                    {t('training.setsLabel')}
+                                  </Text>
+                                  <TextInput
+                                    style={[styles.targetInput, dynamicStyles.input]}
+                                    keyboardType="numeric"
+                                    value={String(item.target_sets || '')}
+                                    onChangeText={v => updateExerciseTarget(index, 'target_sets', v)}
+                                    inputAccessoryViewID={inputAccessoryViewID}
+                                  />
+                                </View>
+                                {isTimeBasedExercise(item.exercise) ? (
+                                  <View style={styles.targetField}>
+                                    <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
+                                      {t('training.timeSeconds')}
+                                    </Text>
+                                    <TextInput
+                                      style={[styles.targetInput, dynamicStyles.input]}
+                                      keyboardType="numeric"
+                                      placeholder="30"
+                                      placeholderTextColor={themeColors.textSecondary + '50'}
+                                      value={String(item.target_reps_min || '')}
+                                      onChangeText={v => updateExerciseTarget(index, 'target_reps_min', v)}
+                                      inputAccessoryViewID={inputAccessoryViewID}
+                                    />
+                                  </View>
+                                ) : (
+                                  <View style={styles.targetField}>
+                                    <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
+                                      {t('training.repsColon')}
+                                    </Text>
+                                    <TextInput
+                                      style={[styles.targetInput, dynamicStyles.input]}
+                                      keyboardType="numeric"
+                                      value={String(item.target_reps_min || '')}
+                                      onChangeText={v => updateExerciseTarget(index, 'target_reps_min', v)}
+                                      inputAccessoryViewID={inputAccessoryViewID}
+                                    />
+                                  </View>
+                                )}
+                                {!isTimeBasedExercise(item.exercise) && (
+                                  <View style={styles.targetField}>
+                                    <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
+                                      {t('training.prColon')}
+                                      {preferences.weight_unit})
+                                    </Text>
+                                    <View
+                                      style={[
+                                        styles.targetInput,
+                                        dynamicStyles.input,
+                                        { justifyContent: 'center', alignItems: 'center' },
+                                      ]}
+                                    >
+                                      <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>
+                                        {prs?.[item.exercise_id]
+                                          ? `${toDisplayWeight(prs[item.exercise_id].weight_kg)}`
+                                          : '-'}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                )}
+                                <View style={styles.targetField}>
+                                  <Text style={[styles.targetLabel, dynamicStyles.sublabel]}>
+                                    {t('training.restSeconds')}
+                                  </Text>
+                                  <TextInput
+                                    style={[styles.targetInput, dynamicStyles.input]}
+                                    keyboardType="numeric"
+                                    placeholder="60"
+                                    placeholderTextColor={themeColors.textSecondary + '50'}
+                                    value={String(item.rest_seconds || '')}
+                                    onChangeText={v => updateExerciseTarget(index, 'rest_seconds', v)}
+                                    inputAccessoryViewID={inputAccessoryViewID}
+                                  />
+                                </View>
+                              </View>
                             </View>
+                          </GlassCard>
+                        </Animated.View>
+                      </Animated.View>
+
+                      {index < exercises.length - 1 && (
+                        <View style={styles.supersetConnectorContainer}>
+                          <View style={styles.supersetLineTrack}>
+                            <View
+                              style={[
+                                styles.supersetLine,
+                                connectorActive && styles.supersetLineActive,
+                                { backgroundColor: themeColors.border },
+                              ]}
+                            />
+                            <Animated.View
+                              style={[
+                                styles.supersetLine,
+                                connectorActive && styles.supersetLineActive,
+                                styles.supersetLineFill,
+                                styles.supersetLineFillLeft,
+                                {
+                                  width: connectorFlow.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['0%', '100%'],
+                                  }),
+                                  backgroundColor: themeColors.primary + 'D9',
+                                },
+                              ]}
+                            />
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleSupersetPress(index)}
+                            style={[
+                              styles.supersetConnectorButton,
+                              connectorActive && styles.supersetConnectorButtonActive,
+                              {
+                                borderColor: connectorActive ? themeColors.primary : themeColors.primary + '55',
+                                backgroundColor: connectorActive ? themeColors.primary + '22' : themeColors.background,
+                              },
+                            ]}
+                          >
+                            <InfinityIcon size={18} color={themeColors.primary} />
+                          </TouchableOpacity>
+                          <View style={styles.supersetLineTrack}>
+                            <View
+                              style={[
+                                styles.supersetLine,
+                                connectorActive && styles.supersetLineActive,
+                                { backgroundColor: themeColors.border },
+                              ]}
+                            />
+                            <Animated.View
+                              style={[
+                                styles.supersetLine,
+                                connectorActive && styles.supersetLineActive,
+                                styles.supersetLineFill,
+                                styles.supersetLineFillRight,
+                                {
+                                  width: connectorFlow.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['0%', '100%'],
+                                  }),
+                                  backgroundColor: themeColors.primary + 'D9',
+                                },
+                              ]}
+                            />
                           </View>
                         </View>
-                      </GlassCard>
-                    </Animated.View>
-                  </Animated.View>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
 
-                  {index < exercises.length - 1 && (
-                    <View style={styles.supersetConnectorContainer}>
-                      <View style={styles.supersetLineTrack}>
-                        <View
-                          style={[
-                            styles.supersetLine,
-                            connectorActive && styles.supersetLineActive,
-                            { backgroundColor: themeColors.border },
-                          ]}
-                        />
-                        <Animated.View
-                          style={[
-                            styles.supersetLine,
-                            connectorActive && styles.supersetLineActive,
-                            styles.supersetLineFill,
-                            styles.supersetLineFillLeft,
-                            {
-                              width: connectorFlow.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: ['0%', '100%'],
-                              }),
-                              backgroundColor: themeColors.primary + 'D9',
-                            },
-                          ]}
-                        />
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => handleSupersetPress(index)}
-                        style={[
-                          styles.supersetConnectorButton,
-                          connectorActive && styles.supersetConnectorButtonActive,
-                          {
-                            borderColor: connectorActive ? themeColors.primary : themeColors.primary + '55',
-                            backgroundColor: connectorActive ? themeColors.primary + '22' : themeColors.background,
-                          },
-                        ]}
-                      >
-                        <InfinityIcon size={18} color={themeColors.primary} />
-                      </TouchableOpacity>
-                      <View style={styles.supersetLineTrack}>
-                        <View
-                          style={[
-                            styles.supersetLine,
-                            connectorActive && styles.supersetLineActive,
-                            { backgroundColor: themeColors.border },
-                          ]}
-                        />
-                        <Animated.View
-                          style={[
-                            styles.supersetLine,
-                            connectorActive && styles.supersetLineActive,
-                            styles.supersetLineFill,
-                            styles.supersetLineFillRight,
-                            {
-                              width: connectorFlow.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: ['0%', '100%'],
-                              }),
-                              backgroundColor: themeColors.primary + 'D9',
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  )}
-                </React.Fragment>
-              );
-            })}
-
-            <TouchableOpacity
-              style={[styles.addLargeBtn, { borderColor: themeColors.border }]}
-              onPress={handleAddExercise}
-            >
-              <Plus size={24} color={themeColors.textSecondary} />
-              <Text style={[styles.addLargeBtnText, { color: themeColors.textSecondary }]}>
-                {t('training.addExercise')}
-              </Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.addLargeBtn, { borderColor: themeColors.border }]}
+                  onPress={handleAddExercise}
+                >
+                  <Plus size={24} color={themeColors.textSecondary} />
+                  <Text style={[styles.addLargeBtnText, { color: themeColors.textSecondary }]}>
+                    {t('training.addExercise')}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
 
@@ -1089,6 +1265,131 @@ export const GymRoutineEditorScreen = () => {
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
+        </Modal>
+
+        {/* Goal Selector Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={goalModalVisible}
+          onRequestClose={() => setGoalModalVisible(false)}
+        >
+          <Pressable style={styles.bottomModalOverlay} onPress={() => setGoalModalVisible(false)}>
+            <Pressable
+              style={[styles.bottomModalCard, { backgroundColor: themeColors.background }]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.bottomModalTitle, { color: themeColors.textPrimary }]}>
+                {t('training.mainGoal')}
+              </Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getOptions('strength', 'goal').map(goal => {
+                  const isSelected = workoutGoal === goal.option_key;
+
+                  return (
+                    <View key={goal.option_key}>
+                      <TouchableOpacity
+                        style={[
+                          styles.goalOptionRow,
+                          isSelected && {
+                            backgroundColor: themeColors.primary + '15',
+                            borderColor: themeColors.primary,
+                          },
+                        ]}
+                        onPress={() => {
+                          setWorkoutGoal(goal.option_key);
+                          setGoalModalVisible(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.goalOptionTitle,
+                            { color: themeColors.textPrimary },
+                            isSelected && { color: themeColors.primary },
+                          ]}
+                        >
+                          {getOptionLabel('strength', goal.option_key, 'goal')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setGoalModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Modality Selector Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalityModalVisible}
+          onRequestClose={() => setModalityModalVisible(false)}
+        >
+          <Pressable style={styles.bottomModalOverlay} onPress={() => setModalityModalVisible(false)}>
+            <Pressable
+              style={[styles.bottomModalCard, { backgroundColor: themeColors.background }]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.bottomModalTitle, { color: themeColors.textPrimary }]}>
+                {getGroupLabel('strength', 'modality')}
+              </Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getOptions('strength', 'modality').map(typeOption => {
+                  const isSelected = modality === typeOption.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={typeOption.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setModality(typeOption.option_key);
+                        setModalityModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel('strength', typeOption.option_key, 'modality')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setModalityModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
         </Modal>
       </SafeAreaView>
     </LinearGradient>
@@ -1374,5 +1675,228 @@ const styles = StyleSheet.create({
   checkBtnDone: {
     backgroundColor: '#34C759',
     borderColor: '#34C759',
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.l,
+    marginTop: spacing.s,
+  },
+  profileAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.m,
+  },
+  profileTextContainer: {
+    flex: 1,
+  },
+  profileTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  profileSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  formBlock: {
+    padding: spacing.m,
+    marginBottom: spacing.l,
+    borderRadius: borderRadius.l,
+  },
+  blockTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  formRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.m,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(150,150,150,0.1)',
+  },
+  rowLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  rowInput: {
+    flex: 1,
+    fontSize: 15,
+    textAlign: 'right',
+    padding: 0,
+    marginLeft: spacing.m,
+  },
+  rowRightValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rowValueText: {
+    fontSize: 15,
+  },
+  rowTextArea: {
+    height: 80,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    padding: spacing.s,
+    fontSize: 14,
+    textAlignVertical: 'top',
+    marginTop: 4,
+  },
+  bottomModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  bottomModalCard: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.l,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  bottomModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: spacing.m,
+  },
+  goalsScroll: {
+    marginBottom: spacing.l,
+  },
+  goalOptionRow: {
+    padding: spacing.m,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginBottom: spacing.s,
+  },
+  goalOptionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  goalOptionDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  surfaceOptionRow: {
+    paddingVertical: spacing.m,
+    paddingHorizontal: spacing.l,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    marginBottom: spacing.s,
+  },
+  surfaceOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(150,150,150,0.3)',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    gap: spacing.m,
+  },
+  modalActionBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  cancelActionBtn: {
+    backgroundColor: 'transparent',
+  },
+  cancelActionBtnText: {
+    fontWeight: '600',
+  },
+  summaryCard: {
+    padding: spacing.m,
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    marginBottom: spacing.l,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.m,
+  },
+  summaryIconContainer: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.m,
+  },
+  summaryTitleContainer: {
+    flex: 1,
+  },
+  summaryOverline: {
+    fontSize: 10,
+    letterSpacing: 0.9,
+    fontWeight: '700',
+  },
+  summaryTitle: {
+    fontSize: 20,
+    marginTop: 2,
+    fontWeight: '700',
+  },
+  summaryMetadata: {
+    fontSize: 12,
+    marginTop: 3,
+    lineHeight: 17,
+  },
+  summaryMetricsRow: {
+    flexDirection: 'row',
+    gap: spacing.s,
+  },
+  summaryMetricCard: {
+    flex: 1,
+    minHeight: 92,
+    borderRadius: borderRadius.m,
+    padding: spacing.s,
+    justifyContent: 'space-between',
+  },
+  summaryMetricValue: {
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    marginTop: spacing.s,
+  },
+  summaryMetricLabel: {
+    fontSize: 10,
+    letterSpacing: 0.8,
+    fontWeight: '600',
+  },
+  designButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+    borderRadius: borderRadius.full,
+    marginTop: spacing.m,
+  },
+  designButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
   },
 });
