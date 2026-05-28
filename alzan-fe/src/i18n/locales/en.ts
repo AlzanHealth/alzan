@@ -1569,6 +1569,7 @@ const en = {
     loadVeryHigh: 'Very High',
     loadLabel: 'Base load',
     bootsLabel: 'Boots used',
+    racketLabel: 'Racket used',
     rivalLabel: 'Team / Opponent',
     rivalPlaceholder: 'Select',
     notesLabel: 'Notes',

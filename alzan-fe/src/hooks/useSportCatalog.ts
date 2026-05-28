@@ -5,7 +5,15 @@ import { supabase } from '../lib/supabaseClient';
 import { Row, SportType } from '../types/requests.types';
 import { TranslationKey } from '../i18n/locales/en';
 
-export type SportCatalogOptionType = 'goal' | 'modality' | 'terrain' | 'pool_type' | 'stroke' | 'boots' | 'base_load';
+export type SportCatalogOptionType =
+  | 'goal'
+  | 'modality'
+  | 'terrain'
+  | 'pool_type'
+  | 'stroke'
+  | 'boots'
+  | 'base_load'
+  | 'racket';
 export type SportCatalogOption = Row<'sport_catalog_options'>;
 
 type OptionsBySport = Partial<Record<SportType, Partial<Record<SportCatalogOptionType, SportCatalogOption[]>>>>;
@@ -18,6 +26,7 @@ const OPTION_TYPES: SportCatalogOptionType[] = [
   'stroke',
   'boots',
   'base_load',
+  'racket',
 ];
 
 const isSportCatalogOptionType = (value: string): value is SportCatalogOptionType =>

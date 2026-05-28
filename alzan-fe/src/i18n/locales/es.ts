@@ -1645,6 +1645,7 @@ export default {
     loadVeryHigh: 'Muy Alta',
     loadLabel: 'Carga base',
     bootsLabel: 'Bota utilizada',
+    racketLabel: 'Raqueta utilizada',
     rivalLabel: 'Equipo / Rival',
     rivalPlaceholder: 'Seleccionar',
     notesLabel: 'Notas',

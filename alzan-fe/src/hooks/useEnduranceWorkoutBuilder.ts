@@ -34,6 +34,7 @@ export interface BuilderTemplateData {
   football_session_type?: string | null;
   base_load?: string | null;
   boots_used?: string | null;
+  racket_used?: string | null;
   rival?: string | null;
   notes?: string | null;
 }
@@ -84,6 +85,7 @@ export const useEnduranceWorkoutBuilder = () => {
               football_session_type: data.football_session_type,
               base_load: data.base_load,
               boots_used: data.boots_used,
+              racket_used: data.racket_used,
               rival: data.rival,
               notes: data.notes,
               updated_at: new Date().toISOString(),
@@ -120,6 +122,7 @@ export const useEnduranceWorkoutBuilder = () => {
               football_session_type: data.football_session_type,
               base_load: data.base_load,
               boots_used: data.boots_used,
+              racket_used: data.racket_used,
               rival: data.rival,
               notes: data.notes,
             })

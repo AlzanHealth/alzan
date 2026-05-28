@@ -463,6 +463,7 @@ export type Database = {
           provider: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id: string | null
           pte: number | null
+          racket_used: string | null
           raw_payload_id: string | null
           recovery_time_s: number | null
           rival: string | null
@@ -527,6 +528,7 @@ export type Database = {
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
           pte?: number | null
+          racket_used?: string | null
           raw_payload_id?: string | null
           recovery_time_s?: number | null
           rival?: string | null
@@ -591,6 +593,7 @@ export type Database = {
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
           pte?: number | null
+          racket_used?: string | null
           raw_payload_id?: string | null
           recovery_time_s?: number | null
           rival?: string | null
@@ -1447,6 +1450,7 @@ export type Database = {
           id: string
           notes: string | null
           pool_type: string | null
+          racket_used: string | null
           rival: string | null
           scheduled_day: number | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
@@ -1469,6 +1473,7 @@ export type Database = {
           id?: string
           notes?: string | null
           pool_type?: string | null
+          racket_used?: string | null
           rival?: string | null
           scheduled_day?: number | null
           sport_type: Database["public"]["Enums"]["sport_type_enum"]
@@ -1491,6 +1496,7 @@ export type Database = {
           id?: string
           notes?: string | null
           pool_type?: string | null
+          racket_used?: string | null
           rival?: string | null
           scheduled_day?: number | null
           sport_type?: Database["public"]["Enums"]["sport_type_enum"]
