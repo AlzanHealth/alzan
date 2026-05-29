@@ -259,6 +259,15 @@ function mapHealthConnectSport(workout: JsonRecord): CanonicalActivitySportMappi
   ) {
     return { sportType: 'strength', sportSubtype: 'indoor' };
   }
+  if (
+    normalised.includes('highintensityintervaltraining') ||
+    normalised.includes('exerciseclass') ||
+    normalised.includes('gymnastics') ||
+    normalised.includes('gym') ||
+    normalised.includes('workout')
+  ) {
+    return { sportType: 'gym', sportSubtype: null };
+  }
   return { sportType: 'other', sportSubtype: null };
 }
 

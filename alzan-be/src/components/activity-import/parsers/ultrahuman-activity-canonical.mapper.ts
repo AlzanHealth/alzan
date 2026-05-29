@@ -143,8 +143,23 @@ function mapUltrahumanSport(activity: string | null): CanonicalActivitySportMapp
   if (normalised === 'tennis') return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised === 'padel') return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised === 'hiking' || normalised === 'hike') return { sportType: 'hiking', sportSubtype: 'trail' };
-  if (normalised === 'strength_training' || normalised === 'strength' || normalised === 'gym') {
+  if (
+    normalised === 'strength_training' ||
+    normalised === 'strength' ||
+    normalised === 'weightlifting' ||
+    normalised.includes('weight')
+  ) {
     return { sportType: 'strength', sportSubtype: 'indoor' };
+  }
+  if (
+    normalised === 'gym' ||
+    normalised.includes('fitness') ||
+    normalised.includes('crossfit') ||
+    normalised.includes('hiit') ||
+    normalised.includes('workout') ||
+    normalised.includes('functional')
+  ) {
+    return { sportType: 'gym', sportSubtype: 'indoor' };
   }
   return { sportType: 'other', sportSubtype: null };
 }

@@ -174,6 +174,14 @@ function mapAppleHealthSport(
   ) {
     return { sportType: 'strength', sportSubtype: 'indoor' };
   }
+  if (
+    normalised.includes('crosstraining') ||
+    normalised.includes('highintensityintervaltraining') ||
+    normalised.includes('fitness') ||
+    normalised.includes('gym')
+  ) {
+    return { sportType: 'gym', sportSubtype: null };
+  }
   return { sportType: 'other', sportSubtype: null };
 }
 

@@ -167,8 +167,11 @@ function mapStravaSport(
   if (normalised === 'tennis') return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised === 'padel') return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised === 'hike') return { sportType: 'hiking', sportSubtype: 'trail' };
-  if (normalised === 'weighttraining' || normalised === 'workout') {
+  if (normalised === 'weighttraining') {
     return { sportType: 'strength', sportSubtype: 'indoor' };
+  }
+  if (normalised === 'workout' || normalised === 'hiit' || normalised === 'crossfit') {
+    return { sportType: 'gym', sportSubtype: null };
   }
   return { sportType: 'other', sportSubtype: null };
 }

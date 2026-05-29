@@ -199,6 +199,18 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
   if (normalised.includes('swim')) return { sportType: 'swimming', sportSubtype: null };
   if (normalised.includes('strength') || normalised.includes('weight'))
     return { sportType: 'strength', sportSubtype: 'indoor' };
+  if (
+    normalised.includes('gym') ||
+    normalised.includes('fitness') ||
+    normalised.includes('workout') ||
+    normalised.includes('circuit') ||
+    normalised.includes('crossfit') ||
+    normalised.includes('hiit') ||
+    normalised.includes('aerobic') ||
+    normalised.includes('bootcamp')
+  ) {
+    return { sportType: 'gym', sportSubtype: 'indoor' };
+  }
   return { sportType: 'other', sportSubtype: null };
 }
 

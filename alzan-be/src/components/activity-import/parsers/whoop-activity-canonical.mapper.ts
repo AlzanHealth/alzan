@@ -102,10 +102,20 @@ function mapWhoopSport(sportName: string | null): CanonicalActivitySportMapping 
     normalised === 'weightlifting' ||
     normalised === 'powerlifting' ||
     normalised === 'strength_trainer' ||
-    normalised === 'functional_fitness' ||
-    normalised === 'box_fitness'
+    normalised.includes('strength')
   ) {
     return { sportType: 'strength', sportSubtype: 'indoor' };
+  }
+  if (
+    normalised === 'functional_fitness' ||
+    normalised === 'box_fitness' ||
+    normalised === 'gym' ||
+    normalised === 'crossfit' ||
+    normalised === 'hiit' ||
+    normalised === 'workout' ||
+    normalised.includes('fitness')
+  ) {
+    return { sportType: 'gym', sportSubtype: 'indoor' };
   }
   return { sportType: 'other', sportSubtype: null };
 }

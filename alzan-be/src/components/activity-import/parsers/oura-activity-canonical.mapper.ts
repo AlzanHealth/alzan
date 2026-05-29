@@ -141,8 +141,22 @@ function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
   if (normalised === 'tennis') return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (normalised === 'padel') return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised === 'hiking') return { sportType: 'hiking', sportSubtype: 'trail' };
-  if (normalised === 'strength_training' || normalised === 'weightlifting') {
+  if (
+    normalised === 'strength_training' ||
+    normalised === 'weightlifting' ||
+    normalised.includes('strength') ||
+    normalised.includes('weight')
+  ) {
     return { sportType: 'strength', sportSubtype: 'indoor' };
+  }
+  if (
+    normalised === 'gym' ||
+    normalised.includes('fitness') ||
+    normalised.includes('crossfit') ||
+    normalised.includes('hiit') ||
+    normalised.includes('workout')
+  ) {
+    return { sportType: 'gym', sportSubtype: 'indoor' };
   }
   return { sportType: 'other', sportSubtype: null };
 }

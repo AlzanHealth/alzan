@@ -94,6 +94,8 @@ Confirm or decide and write these values first:
 ## Phase C - Backend import and providers
 
 1. Parsers/mappers
+- **MANDATORY**: Before adding or modifying a sport in ANY provider mapper, you MUST use web search (`search_web` tool or manual search) to find the official technical documentation for that provider (e.g. Garmin FIT SDK, Apple HealthKit `HKWorkoutActivityType`, Strava API ActivityType, etc.). Never guess the provider IDs or enums.
+- Document the source URL or specific SDK enum name found when adding the mapping.
 - Review every provider mapper for every added or modified sport. Update code where mapping behavior changes; record `reviewed, no change required` where it does not:
   - Garmin
   - Suunto

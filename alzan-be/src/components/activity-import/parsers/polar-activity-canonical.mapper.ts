@@ -220,7 +220,16 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (sport.includes('STRENGTH_TRAINING')) return { sportType: 'strength', sportSubtype: 'indoor' };
-  if (sport.includes('FITNESS') || sport.includes('ELLIPTICAL') || sport.includes('ROWING')) {
+  if (
+    sport.includes('FITNESS') ||
+    sport.includes('ELLIPTICAL') ||
+    sport.includes('ROWING') ||
+    sport.includes('CIRCUIT') ||
+    sport.includes('FUNCTIONAL') ||
+    sport.includes('HIIT') ||
+    sport.includes('BOOTCAMP') ||
+    sport.includes('GYM')
+  ) {
     return { sportType: 'gym', sportSubtype: 'indoor' };
   }
   return { sportType: 'other', sportSubtype: null };

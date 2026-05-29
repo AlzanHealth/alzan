@@ -529,7 +529,11 @@ export function mapGarminActivityToCanonicalSport(params: {
     return { sportType: 'football', sportSubtype: 'football_11' };
   }
   if (fitSport === 8) return { sportType: 'tennis', sportSubtype: 'outdoor' };
-  if (fitSport === 4 || fitSport === 37 || fitSubSport === 20) return { sportType: 'strength', sportSubtype: 'indoor' };
+  if (fitSubSport === 20) return { sportType: 'strength', sportSubtype: 'indoor' };
+  if (fitSport === 4) {
+    if (fitSubSport === 1) return { sportType: 'running', sportSubtype: 'treadmill' };
+    return { sportType: 'gym', sportSubtype: null };
+  }
   if (fitSport === 17) return { sportType: 'hiking', sportSubtype: 'trail' };
   if (fitSport === 11) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (fitSport === 64 && fitSubSport === 85) return { sportType: 'padel', sportSubtype: 'outdoor' };
@@ -579,8 +583,10 @@ export function mapGarminActivityToCanonicalSport(params: {
     if (isRace) return { sportType: 'running', sportSubtype: 'race' };
     return { sportType: 'running', sportSubtype: 'outdoor' };
   }
-  if (activityType.includes('strength') || activityType.includes('gym'))
+  if (activityType.includes('strength') || activityType.includes('weight'))
     return { sportType: 'strength', sportSubtype: 'indoor' };
+  if (activityType.includes('gym') || activityType.includes('fitness'))
+    return { sportType: 'gym', sportSubtype: null };
   return { sportType: 'other', sportSubtype: null };
 }
 
