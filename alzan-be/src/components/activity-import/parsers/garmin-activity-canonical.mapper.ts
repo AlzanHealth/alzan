@@ -585,8 +585,7 @@ export function mapGarminActivityToCanonicalSport(params: {
   }
   if (activityType.includes('strength') || activityType.includes('weight'))
     return { sportType: 'strength', sportSubtype: 'indoor' };
-  if (activityType.includes('gym') || activityType.includes('fitness'))
-    return { sportType: 'gym', sportSubtype: null };
+  if (activityType.includes('gym') || activityType.includes('fitness')) return { sportType: 'gym', sportSubtype: null };
   return { sportType: 'other', sportSubtype: null };
 }
 

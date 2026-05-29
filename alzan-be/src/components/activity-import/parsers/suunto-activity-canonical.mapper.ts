@@ -102,7 +102,7 @@ const SUUNTO_ACTIVITY_ID_MAP = new Map<number, CanonicalActivitySportMapping>([
   [11, { sportType: 'hiking', sportSubtype: 'trail' }],
   [21, { sportType: 'swimming', sportSubtype: 'pool' }],
   [22, { sportType: 'running', sportSubtype: 'trail' }],
-  [23, { sportType: 'gym', sportSubtype: 'indoor' }],
+  [23, { sportType: 'strength', sportSubtype: 'indoor' }],
   [33, { sportType: 'football', sportSubtype: 'football_11' }],
   [34, { sportType: 'tennis', sportSubtype: 'outdoor' }],
   [35, { sportType: 'basketball', sportSubtype: 'indoor' }],

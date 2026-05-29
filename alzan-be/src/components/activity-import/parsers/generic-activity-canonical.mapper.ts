@@ -128,7 +128,12 @@ function mapSportNameToCanonical(rawSportName: string | null): CanonicalActivity
   if (sportName.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (sportName.includes('trail') && sportName.includes('run')) return { sportType: 'running', sportSubtype: 'trail' };
   if (sportName.includes('run')) return { sportType: 'running', sportSubtype: 'outdoor' };
-  if (sportName.includes('strength') || sportName.includes('weightlifting') || sportName.includes('weight training') || sportName.includes('weight')) {
+  if (
+    sportName.includes('strength') ||
+    sportName.includes('weightlifting') ||
+    sportName.includes('weight training') ||
+    sportName.includes('weight')
+  ) {
     return { sportType: 'strength', sportSubtype: 'indoor' };
   }
   if (
