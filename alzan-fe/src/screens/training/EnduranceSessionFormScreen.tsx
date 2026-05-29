@@ -704,32 +704,23 @@ export const EnduranceSessionFormScreen = () => {
         : safeParseFloat(distance) * 1.60934
       : 0;
 
-    if (dist > 0 && totalDurationMin > 0 && !isEditingPace) {
-      if (sportType === 'running') {
-        // min/km
-        const minPerKm = totalDurationMin / dist;
-        const mins = Math.floor(minPerKm);
-        const secs = Math.round((minPerKm - mins) * 60);
-        setPace(`${mins}:${secs.toString().padStart(2, '0')}`);
-      } else if (sportType === 'cycling') {
-        // km/h
+    if (dist > 0 && totalDurationMin > 0 && !isEditingPace && currentConfig?.units?.speed) {
+      if (currentConfig.units.speed === 'km/h') {
         const kmh = (dist / totalDurationMin) * 60;
         setPace(`${kmh.toFixed(1)}`);
-      } else if (sportType === 'swimming') {
-        // min/100m
+      } else if (currentConfig.units.speed === 'min/100m') {
         const distMeters = dist * 1000;
         const minPer100m = (totalDurationMin / distMeters) * 100;
         const mins = Math.floor(minPer100m);
         const secs = Math.round((minPer100m - mins) * 60);
         setPace(`${mins}:${secs.toString().padStart(2, '0')}`);
-      } else {
-        // Default for all other sports (hiking, padel, etc): min/km
+      } else if (currentConfig.units.speed === 'min/km') {
         const minPerKm = totalDurationMin / dist;
         const mins = Math.floor(minPerKm);
         const secs = Math.round((minPerKm - mins) * 60);
         setPace(`${mins}:${secs.toString().padStart(2, '0')}`);
       }
-    } else if (!isEditingPace && (dist <= 0 || totalDurationMin <= 0)) {
+    } else if (!isEditingPace && (dist <= 0 || totalDurationMin <= 0 || !currentConfig?.units?.speed)) {
       setPace('');
     }
 
@@ -812,7 +803,7 @@ export const EnduranceSessionFormScreen = () => {
 
     let totalMin = 0;
 
-    if (sportType === 'running' || sportType === 'swimming') {
+    if (currentConfig?.units?.speed === 'min/km' || currentConfig?.units?.speed === 'min/100m') {
       // Parse mm:ss format
       const parts = pace.split(':');
       if (parts.length === 2) {
@@ -820,12 +811,10 @@ export const EnduranceSessionFormScreen = () => {
         const secs = parseInt(parts[1]) || 0;
         const paceVal = mins + secs / 60;
 
-        if (sportType === 'running') {
-          // paceVal is min/km
+        if (currentConfig.units.speed === 'min/km') {
           totalMin = paceVal * dist;
         } else {
-          // paceVal is min/100m
-          // Dist in 100m units
+          // min/100m
           const dist100m = (dist * 1000) / 100;
           totalMin = paceVal * dist100m;
         }
@@ -833,12 +822,11 @@ export const EnduranceSessionFormScreen = () => {
         // Try parsing as simple number (min)
         const val = safeParseFloat(pace);
         if (val > 0) {
-          if (sportType === 'running') totalMin = val * dist;
+          if (currentConfig.units.speed === 'min/km') totalMin = val * dist;
           else totalMin = val * ((dist * 1000) / 100);
         }
       }
-    } else {
-      // Cycling / Others: km/h
+    } else if (currentConfig?.units?.speed === 'km/h') {
       const speedKmh = safeParseFloat(pace);
       if (speedKmh > 0) {
         const hours = dist / speedKmh;
@@ -2182,7 +2170,7 @@ export const EnduranceSessionFormScreen = () => {
               </View>
 
               {/* Pace/Rhythm Row */}
-              {(currentConfig?.fields.distance || currentConfig?.fields.duration) && (
+              {!!currentConfig?.units?.speed && (
                 <View style={styles.row}>
                   <View style={[styles.formGroup, { flex: 1 }]}>
                     <Text style={styles.label}>{t('training.pace')}</Text>
