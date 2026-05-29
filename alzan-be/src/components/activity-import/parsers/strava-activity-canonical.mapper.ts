@@ -9,6 +9,7 @@ import {
   CanonicalSportSubtype,
   CanonicalSportType,
 } from './activity-import-canonical.types';
+import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -114,6 +115,9 @@ function mapStravaSport(
 ): CanonicalActivitySportMapping {
   const sportType = rawSportType?.trim() ?? '';
   const normalised = sportType.toLowerCase();
+  const martialArtsSport = mapMartialArtsTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
+  if (martialArtsSport) return martialArtsSport;
+
   if (normalised === 'walk') return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (normalised === 'trailrun') return { sportType: 'running', sportSubtype: 'trail' };
   if (normalised === 'virtualrun') return { sportType: 'running', sportSubtype: 'treadmill' };

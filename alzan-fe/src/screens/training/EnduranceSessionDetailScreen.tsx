@@ -59,6 +59,7 @@ import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strength
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { SPORT_COLORS } from '../../theme/sportColors';
 
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
@@ -130,6 +131,12 @@ export const EnduranceSessionDetailScreen = () => {
 
   const getSurfaceDisplayLabel = (surf?: string | null) =>
     getOptionLabel(template?.sport_type || session?.sport_type, surf, 'terrain');
+
+  const getBaseLoadDisplayLabel = (load?: string | null) =>
+    getOptionLabel(session?.sport_type || template?.sport_type, load, 'base_load');
+
+  const getContactLevelDisplayLabel = (level?: string | null) =>
+    getOptionLabel(session?.sport_type || template?.sport_type, level, 'contact_level');
 
   const formatSplitDistanceBucketLabel = useCallback((splitDistanceM: number) => {
     const distanceKm = splitDistanceM / 1000;
@@ -974,7 +981,14 @@ export const EnduranceSessionDetailScreen = () => {
                 locale: getDateFnsLocale(),
               })}
             </Text>
-            {(session.sport_subtype || session.surface || template?.surface || template?.environment_type) && (
+            {(session.sport_subtype ||
+              session.surface ||
+              session.base_load ||
+              session.contact_level ||
+              template?.surface ||
+              template?.environment_type ||
+              template?.base_load ||
+              template?.contact_level) && (
               <View style={styles.metadataTagsContainer}>
                 {(session.sport_subtype || template?.environment_type) && (
                   <View
@@ -997,6 +1011,30 @@ export const EnduranceSessionDetailScreen = () => {
                   >
                     <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
                       {getSurfaceDisplayLabel(session.surface || template?.surface)}
+                    </Text>
+                  </View>
+                )}
+                {(session.base_load || template?.base_load) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                      {getBaseLoadDisplayLabel(session.base_load || template?.base_load)}
+                    </Text>
+                  </View>
+                )}
+                {(session.contact_level || template?.contact_level) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(214,75,127,0.16)' : 'rgba(214,75,127,0.1)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: SPORT_COLORS.martial_arts }]}>
+                      {getContactLevelDisplayLabel(session.contact_level || template?.contact_level)}
                     </Text>
                   </View>
                 )}

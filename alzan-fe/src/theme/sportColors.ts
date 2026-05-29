@@ -8,6 +8,7 @@ export const SPORT_COLORS: Record<string, string> = {
   tennis: '#F2D648', // Amarillo clásico
   padel: '#8A5CC8', // Morado único
   hiking: '#A9825A', // Tierra/montaña
+  martial_arts: '#D64B7F', // Rosa combate
   walking: '#34C759', // Greenish (Default for walking if needed)
   other: '#8E8E93', // Gris neutro
 };

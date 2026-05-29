@@ -7,6 +7,7 @@ import {
   CanonicalActivitySportMapping,
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
+import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -144,6 +145,9 @@ function normaliseSpeedMps(value: unknown): number | null {
 
 function mapFitbitSport(activityTypeId: number | null, activityName: string | null): CanonicalActivitySportMapping {
   const normalised = activityName?.trim().toLowerCase() ?? '';
+  const martialArtsSport = mapMartialArtsTextToCanonical(activityName);
+  if (martialArtsSport) return martialArtsSport;
+
   if (activityTypeId != null && FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId]) {
     const mapped = FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId];
     const hasDetailedCyclingName =

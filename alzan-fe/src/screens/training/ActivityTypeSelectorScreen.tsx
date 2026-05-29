@@ -29,6 +29,12 @@ const ACTIVITIES: ActivityType[] = [
   { id: 'tennis', label: 'constants.tennis', sportType: 'tennis', color: SPORT_COLORS.tennis },
   { id: 'padel', label: 'constants.padel', sportType: 'padel', color: SPORT_COLORS.padel },
   { id: 'hiking', label: 'constants.hiking', sportType: 'hiking', color: SPORT_COLORS.hiking },
+  {
+    id: 'martial_arts',
+    label: 'constants.martialArts',
+    sportType: 'martial_arts',
+    color: SPORT_COLORS.martial_arts,
+  },
   { id: 'gym', label: 'constants.gym', sportType: 'gym', color: SPORT_COLORS.gym, isGym: true },
   { id: 'other', label: 'constants.other', sportType: 'other', color: SPORT_COLORS.other },
 ];

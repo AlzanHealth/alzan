@@ -76,7 +76,7 @@ interface SessionWithDate {
 
 type SummarySportType = Exclude<ActivitySession['sport_type'], 'strength'> | 'gym';
 
-type SportMiddleMetric = 'distance' | 'volume' | 'sets' | 'elevation';
+type SportMiddleMetric = 'distance' | 'volume' | 'sets' | 'elevation' | 'calories';
 
 interface SportSummaryCardData {
   sportType: SummarySportType;
@@ -130,6 +130,10 @@ const hasSessionRoute = (session: ActivitySession): boolean => {
 const getPreferredMiddleMetric = (sportType: SummarySportType): SportMiddleMetric => {
   if (sportType === 'gym') {
     return 'sets';
+  }
+
+  if (sportType === 'martial_arts') {
+    return 'calories';
   }
 
   if (
@@ -528,6 +532,9 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
         } else if (group.totalElevationGainMeters > 0) {
           middleMetricValue = Math.round(group.totalElevationGainMeters).toLocaleString();
           middleMetricLabel = t('training.elevationM');
+        } else if (preferredMiddleMetric === 'calories' && group.totalCalories > 0) {
+          middleMetricValue = Math.round(group.totalCalories).toLocaleString();
+          middleMetricLabel = t('training.caloriesKcal');
         }
         const color = SPORT_COLORS[group.sportType] ?? SPORT_COLORS.other;
 

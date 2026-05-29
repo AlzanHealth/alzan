@@ -33,6 +33,7 @@ export interface BuilderTemplateData {
   stroke?: string | null;
   football_session_type?: string | null;
   base_load?: string | null;
+  contact_level?: string | null;
   boots_used?: string | null;
   racket_used?: string | null;
   rival?: string | null;
@@ -84,6 +85,7 @@ export const useEnduranceWorkoutBuilder = () => {
               stroke: data.stroke,
               football_session_type: data.football_session_type,
               base_load: data.base_load,
+              contact_level: data.contact_level,
               boots_used: data.boots_used,
               racket_used: data.racket_used,
               rival: data.rival,
@@ -121,6 +123,7 @@ export const useEnduranceWorkoutBuilder = () => {
               stroke: data.stroke,
               football_session_type: data.football_session_type,
               base_load: data.base_load,
+              contact_level: data.contact_level,
               boots_used: data.boots_used,
               racket_used: data.racket_used,
               rival: data.rival,

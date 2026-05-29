@@ -5,6 +5,7 @@ import {
   CanonicalActivitySportMapping,
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
+import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -223,6 +224,9 @@ function mapHealthConnectSport(workout: JsonRecord): CanonicalActivitySportMappi
     .filter((value): value is string => value != null)
     .join(' ');
   const normalised = normaliseType(raw);
+  const martialArtsSport = mapMartialArtsTextToCanonical(raw);
+  if (martialArtsSport) return martialArtsSport;
+
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'indoor' };
   if (normalised.includes('runningtreadmill') || normalised.includes('treadmill'))
     return { sportType: 'running', sportSubtype: 'treadmill' };

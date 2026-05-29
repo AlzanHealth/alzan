@@ -14,6 +14,7 @@ const BasketballIcon = (props: SportIconProps) => <SportIcon {...props} sport="b
 const TennisIcon = (props: SportIconProps) => <SportIcon {...props} sport="tennis" />;
 const OtherIcon = (props: SportIconProps) => <SportIcon {...props} sport="other" />;
 const PadelIcon = (props: SportIconProps) => <SportIcon {...props} sport="padel" />;
+const MartialArtsIcon = (props: SportIconProps) => <SportIcon {...props} sport="martial_arts" />;
 
 export type SportConfig = {
   id: SportType;
@@ -68,6 +69,14 @@ export const SPORTS_CONFIG: Record<string, SportConfig> = {
     units: { distance: 'km', speed: 'min/km' },
     fields: { distance: true, duration: true, elevation: true, calories: true, rpe: true, heartRate: true },
     defaultTitle: 'constants.hikingTitle',
+  },
+  martial_arts: {
+    id: 'martial_arts',
+    label: 'constants.martialArts',
+    icon: MartialArtsIcon,
+    units: {},
+    fields: { distance: false, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.martialArtsTitle',
   },
   football: {
     id: 'football',
@@ -129,6 +138,7 @@ export const SPORT_GOALS: Record<SportType, string[]> = {
   tennis: [],
   padel: ['1 set', '2 sets', '3 sets'],
   hiking: [],
+  martial_arts: [],
   other: [],
   strength: [],
   gym: [],

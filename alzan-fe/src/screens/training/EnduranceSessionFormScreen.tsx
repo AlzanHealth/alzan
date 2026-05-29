@@ -232,11 +232,13 @@ export const EnduranceSessionFormScreen = () => {
   // Football states
   const [footballSessionType, setFootballSessionType] = useState<string>('match');
   const [baseLoad, setBaseLoad] = useState<string | null>(null);
+  const [contactLevel, setContactLevel] = useState<string | null>(null);
   const [rival, setRival] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [surface, setSurface] = useState<string | null>(null);
 
   const [baseLoadModalVisible, setBaseLoadModalVisible] = useState(false);
+  const [contactLevelModalVisible, setContactLevelModalVisible] = useState(false);
   const [surfaceModalVisible, setSurfaceModalVisible] = useState(false);
 
   // Initialize date from param if available, otherwise today (LOCAL TIME)
@@ -330,9 +332,14 @@ export const EnduranceSessionFormScreen = () => {
       if (activeTemplate.stroke) {
         setStroke(activeTemplate.stroke);
       }
+      if (['football', 'tennis', 'padel', 'hiking', 'martial_arts'].includes(activeTemplate.sport_type)) {
+        setBaseLoad(activeTemplate.base_load || null);
+      }
+      if (activeTemplate.sport_type === 'martial_arts') {
+        setContactLevel(activeTemplate.contact_level || null);
+      }
       if (activeTemplate.sport_type === 'football') {
         setFootballSessionType(activeTemplate.football_session_type || 'match');
-        setBaseLoad(activeTemplate.base_load || null);
         setRival(activeTemplate.rival || '');
         setNotes(activeTemplate.notes || '');
       }
@@ -944,11 +951,14 @@ export const EnduranceSessionFormScreen = () => {
 
       const payload: ActivitySessionInsert | ActivitySessionUpdate = {
         sport_type: (sportType === 'gym' ? 'strength' : sportType) as SportType,
-        sport_subtype: ['swimming', 'football', 'tennis', 'padel', 'hiking'].includes(sportType) ? sportSubtype : null,
+        sport_subtype: ['swimming', 'football', 'tennis', 'padel', 'hiking', 'martial_arts'].includes(sportType)
+          ? sportSubtype
+          : null,
         pool_type: sportType === 'swimming' ? poolType : null,
         stroke: sportType === 'swimming' ? stroke : null,
         football_session_type: sportType === 'football' ? footballSessionType : null,
-        base_load: ['football', 'tennis', 'padel', 'hiking'].includes(sportType) ? baseLoad : null,
+        base_load: ['football', 'tennis', 'padel', 'hiking', 'martial_arts'].includes(sportType) ? baseLoad : null,
+        contact_level: sportType === 'martial_arts' ? contactLevel : null,
         boots_used: ['football', 'hiking'].includes(sportType) ? 'coming_soon' : null,
         racket_used: ['tennis', 'padel'].includes(sportType) ? 'coming_soon' : null,
         rival: sportType === 'football' ? rival || null : null,
@@ -1936,6 +1946,97 @@ export const EnduranceSessionFormScreen = () => {
                 </View>
               )}
 
+              {/* Martial Arts Specific Configuration Block */}
+              {sportType === 'martial_arts' && (
+                <View
+                  style={[
+                    {
+                      marginBottom: spacing.m,
+                      paddingHorizontal: spacing.m,
+                      paddingVertical: spacing.s,
+                      borderRadius: borderRadius.m,
+                    },
+                    dynamicStyles.glassCard,
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSportSubtypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.modalityLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.modalityLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: sportSubtype ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {sportSubtype ? getOptionLabel(sportType, sportSubtype, 'modality') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setBaseLoadModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.loadLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.loadLabel')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: baseLoad ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {baseLoad ? getOptionLabel(sportType, baseLoad, 'base_load') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setContactLevelModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.contactLevelLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.contactLevelLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: contactLevel ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {contactLevel ? getOptionLabel(sportType, contactLevel, 'contact_level') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={[styles.formRow, { borderBottomWidth: 0, opacity: 0.5 }]}>
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.materialLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text style={[styles.rowValueText, { color: themeColors.textSecondary }]}>
+                        {t('training.comingSoon')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </View>
+                </View>
+              )}
+
               <View style={styles.row}>
                 {currentConfig?.fields.distance && (
                   <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
@@ -2753,6 +2854,66 @@ export const EnduranceSessionFormScreen = () => {
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
                   onPress={() => setBaseLoadModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Contact Level Selector Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={contactLevelModalVisible}
+          onRequestClose={() => setContactLevelModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setContactLevelModalVisible(false)}>
+            <Pressable
+              style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                {t('training.contactLevelLabel')}
+              </Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getOptions(sportType, 'contact_level').map(opt => {
+                  const isSelected = contactLevel === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setContactLevel(opt.option_key);
+                        setContactLevelModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'contact_level')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setContactLevelModalVisible(false)}
                 >
                   <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
                     {t('common.cancel')}

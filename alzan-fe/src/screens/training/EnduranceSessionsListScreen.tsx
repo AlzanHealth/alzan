@@ -988,6 +988,32 @@ export const EnduranceSessionsListScreen = () => {
                                   </Text>
                                 </View>
                               )}
+                              {session.base_load && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
+                                    {getOptionLabel(session.sport_type, session.base_load, 'base_load')}
+                                  </Text>
+                                </View>
+                              )}
+                              {session.contact_level && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    {
+                                      backgroundColor: isDark ? 'rgba(214,75,127,0.16)' : 'rgba(214,75,127,0.1)',
+                                    },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: SPORT_COLORS.martial_arts }]}>
+                                    {getOptionLabel(session.sport_type, session.contact_level, 'contact_level')}
+                                  </Text>
+                                </View>
+                              )}
                               {hasRoute && (
                                 <View
                                   style={[

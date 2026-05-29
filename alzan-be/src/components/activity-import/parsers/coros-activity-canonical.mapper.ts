@@ -7,6 +7,7 @@ import {
   CanonicalActivitySportMapping,
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
+import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -116,6 +117,9 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
     readString(record.mode) ??
     readString(record.type);
   const text = normaliseSportText(rawSport);
+  const martialArtsSport = mapMartialArtsTextToCanonical(rawSport);
+  if (martialArtsSport) return martialArtsSport;
+
   if (text.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (text.includes('padel'))
     return { sportType: 'padel', sportSubtype: text.includes('indoor') ? 'indoor' : 'outdoor' };

@@ -5,6 +5,7 @@ import {
   CanonicalActivitySportMapping,
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
+import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -118,6 +119,9 @@ function selectActivityRecord(parsed: JsonRecord): JsonRecord {
 
 function mapUltrahumanSport(activity: string | null): CanonicalActivitySportMapping {
   const normalised = activity?.trim().toLowerCase().replace(/\s+/g, '_') ?? '';
+  const martialArtsSport = mapMartialArtsTextToCanonical(activity);
+  if (martialArtsSport) return martialArtsSport;
+
   if (normalised === 'running' || normalised === 'run') return { sportType: 'running', sportSubtype: 'outdoor' };
   if (normalised === 'trail_running') return { sportType: 'running', sportSubtype: 'trail' };
   if (normalised === 'walking' || normalised === 'walk') return { sportType: 'hiking', sportSubtype: 'urban_walk' };

@@ -4,6 +4,7 @@ import {
   CanonicalActivitySportMapping,
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
+import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -73,6 +74,9 @@ function mapWhoopSport(sportName: string | null): CanonicalActivitySportMapping 
       ?.trim()
       .toLowerCase()
       .replace(/[\s-]+/g, '_') ?? '';
+  const martialArtsSport = mapMartialArtsTextToCanonical(sportName);
+  if (martialArtsSport) return martialArtsSport;
+
   if (normalised === 'running' || normalised === 'track_field')
     return { sportType: 'running', sportSubtype: 'outdoor' };
   if (normalised === 'walking' || normalised === 'walk') return { sportType: 'hiking', sportSubtype: 'urban_walk' };

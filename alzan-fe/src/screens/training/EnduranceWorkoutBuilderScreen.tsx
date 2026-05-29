@@ -105,7 +105,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [trainingGoal, setTrainingGoal] = useState<string | undefined>(undefined);
   const [sportType, setSportType] = useState<Nullable<SportType>>(route.params?.sportType || null);
   const showSummary =
-    sportType !== 'football' && sportType !== 'tennis' && sportType !== 'padel' && sportType !== 'hiking';
+    sportType !== 'football' &&
+    sportType !== 'tennis' &&
+    sportType !== 'padel' &&
+    sportType !== 'hiking' &&
+    sportType !== 'martial_arts';
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -118,6 +122,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   // Football-specific state
   const [footballSessionType, setFootballSessionType] = useState<string>('match');
   const [baseLoad, setBaseLoad] = useState<string | null>(null);
+  const [contactLevel, setContactLevel] = useState<string | null>(null);
   const [bootsUsed, setBootsUsed] = useState<string | null>(null);
   const [rival, setRival] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -132,6 +137,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [poolTypeModalVisible, setPoolTypeModalVisible] = useState(false);
   const [strokeModalVisible, setStrokeModalVisible] = useState(false);
   const [baseLoadModalVisible, setBaseLoadModalVisible] = useState(false);
+  const [contactLevelModalVisible, setContactLevelModalVisible] = useState(false);
 
   // Step Modals
   const [modalVisible, setModalVisible] = useState(false);
@@ -212,6 +218,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       // Football hydration
       setFootballSessionType(existingTemplate.football_session_type || 'match');
       setBaseLoad(existingTemplate.base_load || null);
+      setContactLevel(existingTemplate.contact_level || null);
       setBootsUsed(existingTemplate.boots_used || null);
       setRival(existingTemplate.rival || '');
       setNotes(existingTemplate.notes || '');
@@ -270,9 +277,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const goalOptions = sportType ? getOptions(sportType, 'goal') : [];
   const modalityOptions = sportType ? getOptions(sportType, 'modality') : [];
   const terrainOptions = sportType ? getOptions(sportType, 'terrain') : [];
-  const baseLoadOptions = ['football', 'tennis', 'padel', 'hiking'].includes(sportType || '')
+  const baseLoadOptions = ['football', 'tennis', 'padel', 'hiking', 'martial_arts'].includes(sportType || '')
     ? getOptions(sportType, 'base_load')
     : [];
+  const contactLevelOptions = sportType === 'martial_arts' ? getOptions(sportType, 'contact_level') : [];
   const hasModalityOptions = modalityOptions.length > 0;
   const hasTerrainOptions = terrainOptions.length > 0;
 
@@ -460,7 +468,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
           pool_type: poolType,
           stroke: stroke,
           football_session_type: sportType === 'football' ? footballSessionType : null,
-          base_load: ['football', 'tennis', 'padel', 'hiking'].includes(sportType || '') ? baseLoad : null,
+          base_load: ['football', 'tennis', 'padel', 'hiking', 'martial_arts'].includes(sportType || '')
+            ? baseLoad
+            : null,
+          contact_level: sportType === 'martial_arts' ? contactLevel : null,
           boots_used: sportType === 'football' || sportType === 'hiking' ? bootsUsed : null,
           racket_used: ['tennis', 'padel'].includes(sportType || '') ? racketUsed : null,
           rival: sportType === 'football' ? rival : null,
@@ -1050,6 +1061,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 { id: 'tennis', label: t('constants.tennis') },
                 { id: 'padel', label: t('constants.padel') },
                 { id: 'hiking', label: t('constants.hiking') },
+                { id: 'martial_arts', label: t('constants.martialArts') },
               ].map(sport => (
                 <TouchableOpacity
                   key={sport.id}
@@ -1237,11 +1249,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 )}
               </GlassCard>
 
-              {/* Block 2: Detalles de la plantilla (Football, Tennis, Padel and Hiking) */}
+              {/* Block 2: Detalles de la plantilla (simple sport details) */}
               {(sportType === 'football' ||
                 sportType === 'tennis' ||
                 sportType === 'padel' ||
-                sportType === 'hiking') && (
+                sportType === 'hiking' ||
+                sportType === 'martial_arts') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
                     {t('training.templateDetails').toUpperCase()}
@@ -1254,7 +1267,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       marginTop: spacing.s,
                     }}
                   >
-                    {/* Col 1: Superficie (Surface) */}
+                    {/* Col 1: Superficie or contact level */}
                     <TouchableOpacity
                       style={{
                         flex: 1,
@@ -1267,19 +1280,29 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         minHeight: 90,
                         backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
                       }}
-                      onPress={() => setSurfaceModalVisible(true)}
+                      onPress={() => {
+                        if (sportType === 'martial_arts') {
+                          setContactLevelModalVisible(true);
+                        } else {
+                          setSurfaceModalVisible(true);
+                        }
+                      }}
                       accessibilityRole="button"
-                      accessibilityLabel={t('training.surfaceLabel')}
+                      accessibilityLabel={
+                        sportType === 'martial_arts' ? t('training.contactLevelLabel') : t('training.surfaceLabel')
+                      }
                     >
                       <MaterialCommunityIcons
                         name={
-                          sportType === 'football'
-                            ? 'grass'
-                            : sportType === 'tennis'
-                              ? 'rhombus-split'
-                              : sportType === 'padel'
-                                ? 'tennis-ball'
-                                : 'image-filter-hdr'
+                          sportType === 'martial_arts'
+                            ? 'boxing-glove'
+                            : sportType === 'football'
+                              ? 'grass'
+                              : sportType === 'tennis'
+                                ? 'rhombus-split'
+                                : sportType === 'padel'
+                                  ? 'tennis-ball'
+                                  : 'image-filter-hdr'
                         }
                         size={24}
                         color={SPORT_COLORS[sportType] || themeColors.primary}
@@ -1295,18 +1318,31 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           color: themeColors.textSecondary,
                         }}
                       >
-                        {t('training.surfaceLabel')}
+                        {sportType === 'martial_arts' ? t('training.contactLevelLabel') : t('training.surfaceLabel')}
                       </Text>
                       <Text
                         style={{
                           fontSize: 13,
                           fontWeight: '700',
                           textAlign: 'center',
-                          color: surface ? themeColors.textPrimary : themeColors.textSecondary,
+                          color:
+                            sportType === 'martial_arts'
+                              ? contactLevel
+                                ? themeColors.textPrimary
+                                : themeColors.textSecondary
+                              : surface
+                                ? themeColors.textPrimary
+                                : themeColors.textSecondary,
                         }}
                         numberOfLines={1}
                       >
-                        {surface ? getSurfaceDisplayLabel(surface) : t('common.select')}
+                        {sportType === 'martial_arts'
+                          ? contactLevel
+                            ? getOptionLabel(sportType, contactLevel, 'contact_level')
+                            : t('common.select')
+                          : surface
+                            ? getSurfaceDisplayLabel(surface)
+                            : t('common.select')}
                       </Text>
                     </TouchableOpacity>
 
@@ -1381,7 +1417,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                               ? 'tennis-ball'
                               : sportType === 'hiking'
                                 ? 'shoe-sneaker'
-                                : 'shoe-cleat'
+                                : sportType === 'martial_arts'
+                                  ? 'boxing-glove'
+                                  : 'shoe-cleat'
                         }
                         size={24}
                         color={SPORT_COLORS[sportType] || themeColors.primary}
@@ -1403,7 +1441,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                             ? t('training.palaLabel')
                             : sportType === 'hiking'
                               ? t('training.shoesLabel')
-                              : t('training.bootsLabel')}
+                              : sportType === 'martial_arts'
+                                ? t('training.materialLabel')
+                                : t('training.bootsLabel')}
                       </Text>
                       <Text
                         style={{
@@ -1430,6 +1470,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== 'tennis' &&
                 sportType !== 'padel' &&
                 sportType !== 'hiking' &&
+                sportType !== 'martial_arts' &&
                 !isWideLayout && <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>}
 
               {/* Block 3: Configuración */}
@@ -1437,7 +1478,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== 'football' &&
                 sportType !== 'tennis' &&
                 sportType !== 'padel' &&
-                sportType !== 'hiking') ||
+                sportType !== 'hiking' &&
+                sportType !== 'martial_arts') ||
                 sportType === 'swimming') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
@@ -2031,6 +2073,73 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
                   onPress={() => setStrokeModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Contact Level Selector Modal */}
+        <Modal
+          animationType={isWideLayout ? 'fade' : 'slide'}
+          transparent={true}
+          visible={contactLevelModalVisible}
+          onRequestClose={() => setContactLevelModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setContactLevelModalVisible(false)}
+          >
+            <Pressable
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                {t('training.contactLevelLabel')}
+              </Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {contactLevelOptions.map(opt => {
+                  const isSelected = contactLevel === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setContactLevel(opt.option_key);
+                        setContactLevelModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'contact_level')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setContactLevelModalVisible(false)}
                 >
                   <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
                     {t('common.cancel')}
