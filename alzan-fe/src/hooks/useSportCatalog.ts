@@ -14,7 +14,8 @@ export type SportCatalogOptionType =
   | 'boots'
   | 'base_load'
   | 'racket'
-  | 'contact_level';
+  | 'contact_level'
+  | 'climbing_grade';
 export type SportCatalogOption = Row<'sport_catalog_options'>;
 
 type OptionsBySport = Partial<Record<SportType, Partial<Record<SportCatalogOptionType, SportCatalogOption[]>>>>;
@@ -29,6 +30,7 @@ const OPTION_TYPES: SportCatalogOptionType[] = [
   'base_load',
   'racket',
   'contact_level',
+  'climbing_grade',
 ];
 
 const isSportCatalogOptionType = (value: string): value is SportCatalogOptionType =>

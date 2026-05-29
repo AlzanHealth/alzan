@@ -9,6 +9,7 @@ import {
   CanonicalSportSubtype,
   CanonicalSportType,
 } from './activity-import-canonical.types';
+import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -197,6 +198,8 @@ export function mapSuuntoActivityToCanonicalSport(params: {
 }): CanonicalActivitySportMapping {
   const martialArtsSport = mapMartialArtsTextToCanonical(params.sportName);
   if (martialArtsSport) return martialArtsSport;
+  const climbingSport = mapClimbingTextToCanonical(params.sportName);
+  if (climbingSport) return climbingSport;
 
   if (params.activityId != null) {
     const mappedActivityId = SUUNTO_ACTIVITY_ID_MAP.get(Math.round(params.activityId));

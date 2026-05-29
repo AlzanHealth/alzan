@@ -16,6 +16,7 @@ const SPORT_ICONS: Record<string, IconName> = {
   padel: 'tennis-ball', // Fallback as requested
   hiking: 'hiking',
   martial_arts: 'karate',
+  climbing: 'terrain',
   walking: 'walk',
   gym: 'dumbbell',
   other: 'lightning-bolt', // Generic icon for "other" sports

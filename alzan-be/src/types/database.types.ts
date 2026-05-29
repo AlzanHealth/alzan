@@ -432,6 +432,7 @@ export type Database = {
           base_load: string | null;
           boots_used: string | null;
           calories_kcal: number | null;
+          climbing_grade: string | null;
           contact_level: string | null;
           created_at: string;
           description: string | null;
@@ -498,6 +499,7 @@ export type Database = {
           base_load?: string | null;
           boots_used?: string | null;
           calories_kcal?: number | null;
+          climbing_grade?: string | null;
           contact_level?: string | null;
           created_at?: string;
           description?: string | null;
@@ -564,6 +566,7 @@ export type Database = {
           base_load?: string | null;
           boots_used?: string | null;
           calories_kcal?: number | null;
+          climbing_grade?: string | null;
           contact_level?: string | null;
           created_at?: string;
           description?: string | null;
@@ -1416,6 +1419,7 @@ export type Database = {
           base_load: string | null;
           base_name: string;
           boots_used: string | null;
+          climbing_grade: string | null;
           contact_level: string | null;
           created_at: string;
           description: string | null;
@@ -1440,6 +1444,7 @@ export type Database = {
           base_load?: string | null;
           base_name: string;
           boots_used?: string | null;
+          climbing_grade?: string | null;
           contact_level?: string | null;
           created_at?: string;
           description?: string | null;
@@ -1464,6 +1469,7 @@ export type Database = {
           base_load?: string | null;
           base_name?: string;
           boots_used?: string | null;
+          climbing_grade?: string | null;
           contact_level?: string | null;
           created_at?: string;
           description?: string | null;
@@ -4558,7 +4564,8 @@ export type Database = {
         | 'tennis'
         | 'other'
         | 'gym'
-        | 'martial_arts';
+        | 'martial_arts'
+        | 'climbing';
       stream_type_enum: 'heart_rate' | 'cadence' | 'power' | 'altitude' | 'speed' | 'distance' | 'temperature';
       target_type_enum: 'none' | 'pace' | 'heart_rate' | 'power' | 'speed' | 'heart_rate_zone' | 'rpe';
       training_frequency_enum: 'none' | 'occasional' | 'frequent' | 'athlete';
@@ -4809,6 +4816,7 @@ export const Constants = {
         'other',
         'gym',
         'martial_arts',
+        'climbing',
       ],
       stream_type_enum: ['heart_rate', 'cadence', 'power', 'altitude', 'speed', 'distance', 'temperature'],
       target_type_enum: ['none', 'pace', 'heart_rate', 'power', 'speed', 'heart_rate_zone', 'rpe'],

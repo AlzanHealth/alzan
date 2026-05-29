@@ -214,6 +214,20 @@ function assertGenericMartialArtsUsesCatalogModality(): void {
   assert.equal(canonical.sportSubtype, 'jiu_jitsu_bjj');
 }
 
+function assertGenericClimbingUsesCatalogModality(): void {
+  const canonical = parseActivityFileToCanonical(
+    JSON.stringify({
+      sport_type: 'Bouldering',
+      start_time: '2026-05-01T08:00:00Z',
+      duration_s: 3600,
+      calories_kcal: 520,
+    }),
+    'generic-bouldering.json',
+  );
+  assert.equal(canonical.sportType, 'climbing');
+  assert.equal(canonical.sportSubtype, 'bouldering');
+}
+
 assertSuuntoStrengthJsonParses();
 assertClearEnduranceStrengthJsonIsRejected();
 assertSuuntoDistanceActivityIsRejectedForStrength();
@@ -222,3 +236,4 @@ assertSuuntoJsonKeepsNativeAutoLapDurations();
 assertGenericCyclingTerrainIsNotLost();
 assertGenericWalkingUsesHikingCatalogModality();
 assertGenericMartialArtsUsesCatalogModality();
+assertGenericClimbingUsesCatalogModality();

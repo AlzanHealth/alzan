@@ -80,7 +80,9 @@ Confirm or decide and write these values first:
   - goal/config tables and references using sport enums.
 
 4. Regenerate and sync types
-- Regenerate and verify:
+- **NEVER** edit `database.types.ts` manually.
+- Always run `pnpm run supabase:types` to generate and sync the types automatically.
+- Verify the generated changes in:
   - `supabase/database.types.ts`,
   - `supabase/requests.types.ts`,
   - FE/BE derived type files using `SportType`/`SportSubtype`.

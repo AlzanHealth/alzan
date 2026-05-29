@@ -604,6 +604,22 @@ export const EnduranceSessionDetailScreen = () => {
         value: t('training.comingSoon'),
       });
     }
+    if (session.sport_type === 'climbing') {
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'climbing-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+      if (session.climbing_grade) {
+        secondaryMetrics.push({
+          key: 'climbing-grade',
+          label: t('training.gradeLabel'),
+          value: getOptionLabel(session.sport_type, session.climbing_grade, 'climbing_grade'),
+        });
+      }
+    }
     if (session.sport_type === 'tennis') {
       if (session.base_load) {
         secondaryMetrics.push({

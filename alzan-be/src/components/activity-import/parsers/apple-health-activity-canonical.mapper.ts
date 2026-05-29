@@ -6,6 +6,7 @@ import {
   CanonicalActivitySportMapping,
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
+import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -100,6 +101,8 @@ function mapAppleHealthSport(
   const normalised = normaliseType(combined);
   const martialArtsSport = mapMartialArtsTextToCanonical(combined);
   if (martialArtsSport) return martialArtsSport;
+  const climbingSport = mapClimbingTextToCanonical(combined);
+  if (climbingSport) return climbingSport;
 
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised.includes('running') || normalised.includes('trackandfield')) {

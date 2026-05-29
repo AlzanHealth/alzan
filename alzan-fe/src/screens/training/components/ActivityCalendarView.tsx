@@ -132,7 +132,7 @@ const getPreferredMiddleMetric = (sportType: SummarySportType): SportMiddleMetri
     return 'sets';
   }
 
-  if (sportType === 'martial_arts') {
+  if (sportType === 'martial_arts' || sportType === 'climbing') {
     return 'calories';
   }
 

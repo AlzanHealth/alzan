@@ -67,6 +67,7 @@ const SPORT_CONFIG: Record<string, { label: TranslationKey; color: string }> = {
   tennis: { label: 'constants.tennis', color: '#F2D648' },
   padel: { label: 'constants.padel', color: '#8A5CC8' },
   martial_arts: { label: 'constants.martialArts', color: '#D64B7F' },
+  climbing: { label: 'constants.climbing', color: '#6B8E4E' },
   other: { label: 'constants.other', color: '#8E8E93' },
 };
 
@@ -152,6 +153,7 @@ const toSportType = (value: string): SportType => {
     case 'tennis':
     case 'padel':
     case 'martial_arts':
+    case 'climbing':
     case 'other':
       return value;
     default:

@@ -9,6 +9,7 @@ import {
   CanonicalSportSubtype,
   CanonicalSportType,
 } from './activity-import-canonical.types';
+import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -498,6 +499,8 @@ export function mapGarminActivityToCanonicalSport(params: {
   const combinedText = [params.activityType, params.name].filter(Boolean).join(' ').toLowerCase();
   const martialArtsSport = mapMartialArtsTextToCanonical(combinedText);
   if (martialArtsSport) return martialArtsSport;
+  const climbingSport = mapClimbingTextToCanonical(combinedText);
+  if (climbingSport) return climbingSport;
 
   const isRace =
     combinedText.includes('carrera') ||

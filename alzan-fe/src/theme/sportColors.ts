@@ -9,6 +9,7 @@ export const SPORT_COLORS: Record<string, string> = {
   padel: '#8A5CC8', // Morado único
   hiking: '#A9825A', // Tierra/montaña
   martial_arts: '#D64B7F', // Rosa combate
+  climbing: '#6B8E4E', // Verde roca
   walking: '#34C759', // Greenish (Default for walking if needed)
   other: '#8E8E93', // Gris neutro
 };
