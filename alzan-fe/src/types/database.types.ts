@@ -430,6 +430,7 @@ export type Database = {
           avg_speed_m_per_s: number | null;
           avg_temp_c: number | null;
           base_load: string | null;
+          board: string | null;
           boots_used: string | null;
           calories_kcal: number | null;
           climbing_grade: string | null;
@@ -488,6 +489,7 @@ export type Database = {
           user_id: string;
           visibility: Database['public']['Enums']['visibility_enum'] | null;
           vo2_max: number | null;
+          wetsuit: string | null;
           workout_template_id: string | null;
         };
         Insert: {
@@ -497,6 +499,7 @@ export type Database = {
           avg_speed_m_per_s?: number | null;
           avg_temp_c?: number | null;
           base_load?: string | null;
+          board?: string | null;
           boots_used?: string | null;
           calories_kcal?: number | null;
           climbing_grade?: string | null;
@@ -555,6 +558,7 @@ export type Database = {
           user_id: string;
           visibility?: Database['public']['Enums']['visibility_enum'] | null;
           vo2_max?: number | null;
+          wetsuit?: string | null;
           workout_template_id?: string | null;
         };
         Update: {
@@ -564,6 +568,7 @@ export type Database = {
           avg_speed_m_per_s?: number | null;
           avg_temp_c?: number | null;
           base_load?: string | null;
+          board?: string | null;
           boots_used?: string | null;
           calories_kcal?: number | null;
           climbing_grade?: string | null;
@@ -622,6 +627,7 @@ export type Database = {
           user_id?: string;
           visibility?: Database['public']['Enums']['visibility_enum'] | null;
           vo2_max?: number | null;
+          wetsuit?: string | null;
           workout_template_id?: string | null;
         };
         Relationships: [
@@ -1418,6 +1424,7 @@ export type Database = {
         Row: {
           base_load: string | null;
           base_name: string;
+          board: string | null;
           boots_used: string | null;
           climbing_grade: string | null;
           contact_level: string | null;
@@ -1438,11 +1445,13 @@ export type Database = {
           total_duration_s: number | null;
           updated_at: string;
           user_id: string;
+          wetsuit: string | null;
           workout_goal: string | null;
         };
         Insert: {
           base_load?: string | null;
           base_name: string;
+          board?: string | null;
           boots_used?: string | null;
           climbing_grade?: string | null;
           contact_level?: string | null;
@@ -1463,11 +1472,13 @@ export type Database = {
           total_duration_s?: number | null;
           updated_at?: string;
           user_id: string;
+          wetsuit?: string | null;
           workout_goal?: string | null;
         };
         Update: {
           base_load?: string | null;
           base_name?: string;
+          board?: string | null;
           boots_used?: string | null;
           climbing_grade?: string | null;
           contact_level?: string | null;
@@ -1488,6 +1499,7 @@ export type Database = {
           total_duration_s?: number | null;
           updated_at?: string;
           user_id?: string;
+          wetsuit?: string | null;
           workout_goal?: string | null;
         };
         Relationships: [
@@ -4551,7 +4563,12 @@ export type Database = {
         | 'walk'
         | 'gravel'
         | 'spinning'
-        | 'urban';
+        | 'urban'
+        | 'surf'
+        | 'longboard'
+        | 'shortboard'
+        | 'bodyboard'
+        | 'paddle_surf';
       sport_type_enum:
         | 'basketball'
         | 'padel'
@@ -4565,7 +4582,8 @@ export type Database = {
         | 'other'
         | 'gym'
         | 'martial_arts'
-        | 'climbing';
+        | 'climbing'
+        | 'surf';
       stream_type_enum: 'heart_rate' | 'cadence' | 'power' | 'altitude' | 'speed' | 'distance' | 'temperature';
       target_type_enum: 'none' | 'pace' | 'heart_rate' | 'power' | 'speed' | 'heart_rate_zone' | 'rpe';
       training_frequency_enum: 'none' | 'occasional' | 'frequent' | 'athlete';
@@ -4802,6 +4820,11 @@ export const Constants = {
         'gravel',
         'spinning',
         'urban',
+        'surf',
+        'longboard',
+        'shortboard',
+        'bodyboard',
+        'paddle_surf',
       ],
       sport_type_enum: [
         'basketball',
@@ -4817,6 +4840,7 @@ export const Constants = {
         'gym',
         'martial_arts',
         'climbing',
+        'surf',
       ],
       stream_type_enum: ['heart_rate', 'cadence', 'power', 'altitude', 'speed', 'distance', 'temperature'],
       target_type_enum: ['none', 'pace', 'heart_rate', 'power', 'speed', 'heart_rate_zone', 'rpe'],

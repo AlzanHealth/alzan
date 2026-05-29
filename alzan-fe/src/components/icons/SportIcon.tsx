@@ -19,6 +19,7 @@ const SPORT_ICONS: Record<string, IconName> = {
   climbing: 'terrain',
   walking: 'walk',
   gym: 'dumbbell',
+  surf: 'surfing',
   other: 'lightning-bolt', // Generic icon for "other" sports
 };
 

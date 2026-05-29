@@ -10,18 +10,21 @@ description: Use when adding a sport or modifying any sport-dependent behavior i
 Use this skill whenever work adds a sport or changes anything sport-dependent for an existing sport across Alzan FE + BE + Supabase.
 
 Trigger this skill for:
+
 - New `sport_type` or `sport_subtype` values.
 - Changed provider tokens, mappings, or fallbacks for an existing sport.
 - Changed templates, metric behavior, color/icon, labels, filters, analytics, exports, or display rules for an existing sport.
 - Fixes or refactors that can alter how any sport is created, imported, stored, or shown.
 
 Hard goal:
+
 - No partial additions.
 - No partial modifications.
 - No enum/type drift.
 - No "works in one screen but breaks in import/stats/export".
 
 Provider review rule:
+
 - Every new or modified sport requires an explicit review of every current provider integration and the generic fallback, even when only one mapper is expected to change.
 - A provider recorded as already correct, intentionally falling back, unsupported, or unaffected is still a reviewed provider.
 - Silence is not verification: document every provider result in the Provider x Sport matrix.
@@ -31,6 +34,7 @@ Provider review rule:
 ## Definition of Done
 
 A sport addition or modification is done only when all conditions are true:
+
 - Its canonical type/subtype and DB/type contracts are correct, updating enums only when required.
 - Its manual creation and display behavior is correct in the app, including color and icon when applicable.
 - It appears correctly in affected training flows (builder, form, detail, list, calendar, home).
@@ -43,6 +47,7 @@ A sport addition or modification is done only when all conditions are true:
 ## Phase A - Pre-decisions and impact (mandatory before code)
 
 Confirm or decide and write these values first:
+
 - `sport_type` canonical key (lowercase, stable, no aliases in DB).
 - Optional `sport_subtype` usage.
 - Main metric model:
@@ -65,29 +70,35 @@ Confirm or decide and write these values first:
 ## Phase B - DB and Supabase
 
 1. Enums and migrations
+
 - Update `sport_type_enum` and `sport_subtype_enum` only when required by the addition or modification.
 
 2. Sport Catalog Options
+
 - Insert or update the sport's goals, modalities, and terrains in the `sport_catalog_options` table via a database migration.
 - Ensure that the options represent the dynamic configuration of the sport, separating goals, modalities, and terrains using the correct `option_type` value (`goal`, `modality`, or `terrain`).
 - Avoid inserting generic `'custom'` options in option types unless explicitly requested, as they complicate standard option flows and validations.
 - Assign descriptive and structured translation keys (e.g. `training.sportOptionPower`) and specify appropriate `sort_order` values.
 
 3. Check dependent tables and contracts
+
 - Validate usage in:
   - `activity_sessions`,
   - `endurance_workout_templates`,
   - goal/config tables and references using sport enums.
 
 4. Regenerate and sync types
+
 - **NEVER** edit `database.types.ts` manually.
-- Always run `pnpm run supabase:types` to generate and sync the types automatically.
-- Verify the generated changes in:
-  - `supabase/database.types.ts`,
-  - `supabase/requests.types.ts`,
+- Always run `pnpm run supabase:types` to generate and sync `database.types.ts` automatically (primero haces supabase db reset y luego pnpm run supabase:types).
+- **IMPORTANT**: `requests.types.ts` must be updated **manually** if your changes require modifying type overrides (it is not regenerated automatically like `database.types.ts`).
+- Verify the changes in:
+  - `alzan-fe/src/types/database.types.ts` and `alzan-be/src/types/database.types.ts`,
+  - `alzan-fe/src/types/requests.types.ts` and `alzan-be/src/types/requests.types.ts`,
   - FE/BE derived type files using `SportType`/`SportSubtype`.
 
 5. Seed coverage
+
 - Add or update minimal seed rows/fixtures to verify:
   - manual session for the new or modified sport,
   - template rows if applicable,
@@ -96,6 +107,7 @@ Confirm or decide and write these values first:
 ## Phase C - Backend import and providers
 
 1. Parsers/mappers
+
 - **MANDATORY**: Before adding or modifying a sport in ANY provider mapper, you MUST use web search (`search_web` tool or manual search) to find the official technical documentation for that provider (e.g. Garmin FIT SDK, Apple HealthKit `HKWorkoutActivityType`, Strava API ActivityType, etc.). Never guess the provider IDs or enums.
 - Document the source URL or specific SDK enum name found when adding the mapping.
 - Review every provider mapper for every added or modified sport. Update code where mapping behavior changes; record `reviewed, no change required` where it does not:
@@ -117,6 +129,7 @@ Confirm or decide and write these values first:
 - Ensure canonical parser and route parser include the sport where applicable.
 
 2. Canonical activity validation
+
 - Confirm final canonical payload correctness:
   - `provider`,
   - `providerActivityId`,
@@ -129,6 +142,7 @@ Confirm or decide and write these values first:
 ## Phase D - Frontend sport experience
 
 1. Core sport identity (mandatory)
+
 - Add or confirm unique color in `SPORT_COLORS`.
 - Add or confirm icon mapping in `SportIcon` using native `MaterialCommunityIcons` from `@expo/vector-icons` (do not switch to custom SVGs unless explicitly requested, to preserve mobile visual familiarity).
 - Add or confirm config entry in `SPORTS_CONFIG`:
@@ -138,16 +152,18 @@ Confirm or decide and write these values first:
   - display formatting behavior.
 
 2. Sport Catalog Hook Usage
+
 - Verify that screens displaying sport goals, modalities, or terrains (e.g., endurance builder, session details, templates list, calendar summaries) fetch their options dynamically using the `useSportCatalog` hook (`getOptions`, `getOptionLabel`, `getGroupLabel`).
 - Avoid hardcoding arrays or structures of goals/modalities/terrains on any UI screen.
 - If a screen contains fields that depend on modality (e.g. pool length dependent on pool modality), keep the field visible but disable it (e.g. set `opacity: 0.5` and disable actions) rather than hiding it entirely to maintain consistent card/form layouts.
 - Ensure any legacy or compatibility options mapping is added/updated in the `LEGACY_TRANSLATION_KEYS` map within `alzan-fe/src/hooks/useSportCatalog.ts` if needed.
 
 3. Training screens and flows
+
 - Review all sport-dependent surfaces and update those affected by the behavior change:
   - activity type selector,
   - endurance builder,
-  - session form,
+  - session form ("Registrar Actividad" - MANDATORY: Ensure conditional UI blocks and `handleSave` payload logic only capture the sport's relevant data fields, and that generic fields like Pace are configured dynamically based on sport units),
   - session detail,
   - sessions list/history filters,
   - calendar views,
@@ -155,12 +171,14 @@ Confirm or decide and write these values first:
   - Alzan home highlights if applicable.
 
 4. Template decision
+
 - If structured endurance is needed:
   - include in template creation and step flows.
 - If simple sport:
   - ensure manual duration/distance flow is coherent.
 
 5. i18n
+
 - Add ES/EN keys for sport name and related labels/messages.
 - Include translations for all option keys inserted into the `sport_catalog_options` table.
 - Avoid hardcoded strings.
@@ -176,20 +194,24 @@ Confirm or decide and write these values first:
 ## Phase F - Testing checklist
 
 1. Manual session path
+
 - Create or update a manual session for the new or modified sport in app.
 - Verify history, detail, calendar, and home card rendering with correct color/icon.
 
 2. Provider import path (mandatory audit; executable fixture where applicable)
+
 - For every provider in the matrix, check whether the new or modified sport maps correctly, remains unchanged, deliberately falls back, or is unsupported.
 - Import/run payload fixtures for providers whose sport path exists or whose mapping changes.
 - Record review-only providers explicitly when no executable provider path applies.
 - Verify unsupported provider cases use an explicit fallback, not an accidental one.
 
 3. Template path
+
 - Verify template visibility/creation for the new sport when applicable.
 - Verify no regressions for `strength` and existing simple sports.
 
 4. Regression checks
+
 - Existing behavior for a modified sport remains correct outside the intended change.
 - Existing sports imports and UI still behave correctly.
 
@@ -204,6 +226,7 @@ Confirm or decide and write these values first:
 For every sport addition or modification, create/update a row for every provider below, even if code does not change in that provider. No provider may be omitted.
 
 Required integration audit:
+
 - [ ] Garmin
 - [ ] Suunto
 - [ ] Polar
@@ -218,6 +241,7 @@ Required integration audit:
 - [ ] Generic mapper fallback
 
 Matrix schema:
+
 - Provider: `garmin | suunto | polar | strava | fitbit | oura | ultrahuman | whoop | apple_health | health_connect | coros`
 - Sport key: `<sport_type>`
 - Status:
@@ -235,6 +259,7 @@ Matrix schema:
 Record the generic mapper fallback alongside the matrix, using the same status and notes fields.
 
 Conditional legacy check:
+
 - If historical Google Fit input/contracts are affected or Google Fit is reintroduced, add `google_fit` to the matrix and review it with the same standard.
 
 ## Common failure modes (must review before merge)
@@ -250,10 +275,12 @@ Conditional legacy check:
 - Provider omitted from the matrix because it was assumed unrelated.
 - Sport missing from history filters, calendar summaries, analytics, or PDF export.
 - Template flow broken because sport metric model was not decided early.
+- "Registrar Actividad" form captures data unrelated to the sport, or generic fields (like Pace) are shown/calculated inappropriately for sports that don't support them.
 
 ## Quality gate (mandatory)
 
 Run all commands:
+
 - `pnpm --prefix alzan-fe run typecheck`
 - `pnpm --prefix alzan-fe run format:check`
 - `pnpm --prefix alzan-fe run lint:check`
@@ -264,6 +291,7 @@ Run all commands:
 - `pnpm run lint:check`
 
 If any command fails:
+
 - Do not mark sport integration as complete.
 - Fix first, rerun full gate.
 

@@ -80,9 +80,12 @@ Confirm or decide and write these values first:
   - goal/config tables and references using sport enums.
 
 4. Regenerate and sync types
-- Regenerate and verify:
-  - `supabase/database.types.ts`,
-  - `supabase/requests.types.ts`,
+- **NEVER** edit `database.types.ts` manually.
+- Always run `pnpm run supabase:types` to generate and sync `database.types.ts` automatically (los otros se regeneran con reset y supabase:types).
+- **IMPORTANT**: `requests.types.ts` must be updated **manually** if your changes require modifying type overrides (it is not regenerated automatically like `database.types.ts`).
+- Verify the changes in:
+  - `alzan-fe/src/types/database.types.ts` and `alzan-be/src/types/database.types.ts`,
+  - `alzan-fe/src/types/requests.types.ts` and `alzan-be/src/types/requests.types.ts`,
   - FE/BE derived type files using `SportType`/`SportSubtype`.
 
 5. Seed coverage

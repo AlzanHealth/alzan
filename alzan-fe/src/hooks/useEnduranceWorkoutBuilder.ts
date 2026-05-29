@@ -36,6 +36,9 @@ export interface BuilderTemplateData {
   contact_level?: string | null;
   boots_used?: string | null;
   racket_used?: string | null;
+  climbing_grade?: string | null;
+  wetsuit?: string | null;
+  board?: string | null;
   rival?: string | null;
   notes?: string | null;
 }
@@ -88,6 +91,9 @@ export const useEnduranceWorkoutBuilder = () => {
               contact_level: data.contact_level,
               boots_used: data.boots_used,
               racket_used: data.racket_used,
+              climbing_grade: data.climbing_grade,
+              wetsuit: data.wetsuit,
+              board: data.board,
               rival: data.rival,
               notes: data.notes,
               updated_at: new Date().toISOString(),
@@ -126,6 +132,9 @@ export const useEnduranceWorkoutBuilder = () => {
               contact_level: data.contact_level,
               boots_used: data.boots_used,
               racket_used: data.racket_used,
+              climbing_grade: data.climbing_grade,
+              wetsuit: data.wetsuit,
+              board: data.board,
               rival: data.rival,
               notes: data.notes,
             })

@@ -163,6 +163,7 @@ function mapStravaSport(
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (normalised === 'swim') return { sportType: 'swimming', sportSubtype: null };
+  if (normalised === 'surfing') return { sportType: 'surf', sportSubtype: null };
   if (normalised === 'soccer' || normalised === 'football') {
     const combinedName = (name || '').toLowerCase();
     if (combinedName.includes('futsal') || combinedName.includes('sala') || combinedName.includes('indoor')) {

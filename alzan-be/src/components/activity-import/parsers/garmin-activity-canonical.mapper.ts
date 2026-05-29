@@ -528,6 +528,7 @@ export function mapGarminActivityToCanonicalSport(params: {
     if (fitSubSport === 18) return { sportType: 'swimming', sportSubtype: 'open_water' };
     return { sportType: 'swimming', sportSubtype: 'pool' };
   }
+  if (fitSport === 43 && fitSubSport === 55) return { sportType: 'surf', sportSubtype: null };
   if (fitSport === 6) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (fitSport === 7) {
     if (combinedText.includes('futsal') || combinedText.includes('sala') || combinedText.includes('indoor')) {
@@ -558,6 +559,7 @@ export function mapGarminActivityToCanonicalSport(params: {
   if (activityType.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (activityType.includes('open water')) return { sportType: 'swimming', sportSubtype: 'open_water' };
   if (activityType.includes('swim')) return { sportType: 'swimming', sportSubtype: 'pool' };
+  if (activityType.includes('surf')) return { sportType: 'surf', sportSubtype: null };
   if (activityType.includes('bike') || activityType.includes('cycling') || activityType.includes('ciclismo')) {
     if (activityType.includes('indoor') || activityType.includes('rodillo') || activityType.includes('trainer')) {
       if (activityType.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };

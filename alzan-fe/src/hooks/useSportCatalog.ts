@@ -15,6 +15,8 @@ export type SportCatalogOptionType =
   | 'base_load'
   | 'racket'
   | 'contact_level'
+  | 'wetsuit'
+  | 'board'
   | 'climbing_grade';
 export type SportCatalogOption = Row<'sport_catalog_options'>;
 
@@ -30,6 +32,8 @@ const OPTION_TYPES: SportCatalogOptionType[] = [
   'base_load',
   'racket',
   'contact_level',
+  'wetsuit',
+  'board',
   'climbing_grade',
 ];
 

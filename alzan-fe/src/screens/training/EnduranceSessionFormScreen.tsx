@@ -887,7 +887,11 @@ export const EnduranceSessionFormScreen = () => {
           return;
         }
         if (
-          (sportType === 'football' || sportType === 'tennis' || sportType === 'padel' || sportType === 'hiking') &&
+          (sportType === 'football' ||
+            sportType === 'tennis' ||
+            sportType === 'padel' ||
+            sportType === 'hiking' ||
+            sportType === 'surf') &&
           !sportSubtype
         ) {
           Alert.alert(t('training.missingDataTitle'), t('training.modalityRequired'));
@@ -945,15 +949,22 @@ export const EnduranceSessionFormScreen = () => {
 
       const payload: ActivitySessionInsert | ActivitySessionUpdate = {
         sport_type: (sportType === 'gym' ? 'strength' : sportType) as SportType,
-        sport_subtype: ['swimming', 'football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing'].includes(
-          sportType,
-        )
+        sport_subtype: [
+          'swimming',
+          'football',
+          'tennis',
+          'padel',
+          'hiking',
+          'martial_arts',
+          'climbing',
+          'surf',
+        ].includes(sportType)
           ? sportSubtype
           : null,
         pool_type: sportType === 'swimming' ? poolType : null,
         stroke: sportType === 'swimming' ? stroke : null,
         football_session_type: sportType === 'football' ? footballSessionType : null,
-        base_load: ['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing'].includes(sportType)
+        base_load: ['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing', 'surf'].includes(sportType)
           ? baseLoad
           : null,
         contact_level: sportType === 'martial_arts' ? contactLevel : null,
@@ -2126,6 +2137,63 @@ export const EnduranceSessionFormScreen = () => {
                       <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
                     </View>
                   </View>
+                </View>
+              )}
+
+              {/* Surf Specific Configuration Block */}
+              {sportType === 'surf' && (
+                <View
+                  style={[
+                    {
+                      marginBottom: spacing.m,
+                      paddingHorizontal: spacing.m,
+                      paddingVertical: spacing.s,
+                      borderRadius: borderRadius.m,
+                    },
+                    dynamicStyles.glassCard,
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSportSubtypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.modalityLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.modalityLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: sportSubtype ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {sportSubtype ? getOptionLabel(sportType, sportSubtype, 'modality') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.formRow, { borderBottomWidth: 0 }]}
+                    onPress={() => setBaseLoadModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.loadLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.loadLabel')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: baseLoad ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {baseLoad ? getOptionLabel(sportType, baseLoad, 'base_load') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
                 </View>
               )}
 

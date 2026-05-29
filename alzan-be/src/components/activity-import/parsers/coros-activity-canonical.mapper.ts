@@ -138,6 +138,7 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
   if (text.includes('pool') && text.includes('swim')) return { sportType: 'swimming', sportSubtype: 'pool' };
   if (text.includes('open_water')) return { sportType: 'swimming', sportSubtype: 'open_water' };
   if (text.includes('swim')) return { sportType: 'swimming', sportSubtype: null };
+  if (text.includes('surf')) return { sportType: 'surf', sportSubtype: null };
   if (text.includes('trail') && text.includes('run')) return { sportType: 'running', sportSubtype: 'trail' };
   if (text.includes('track') && text.includes('run')) return { sportType: 'running', sportSubtype: 'track' };
   if (text.includes('indoor') && text.includes('run')) return { sportType: 'running', sportSubtype: 'treadmill' };

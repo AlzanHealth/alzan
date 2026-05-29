@@ -36,6 +36,7 @@ const ACTIVITIES: ActivityType[] = [
     color: SPORT_COLORS.martial_arts,
   },
   { id: 'climbing', label: 'constants.climbing', sportType: 'climbing', color: SPORT_COLORS.climbing },
+  { id: 'surf', label: 'constants.surfTitle', sportType: 'surf', color: SPORT_COLORS.surf },
   { id: 'gym', label: 'constants.gym', sportType: 'gym', color: SPORT_COLORS.gym, isGym: true },
   { id: 'other', label: 'constants.other', sportType: 'other', color: SPORT_COLORS.other },
 ];

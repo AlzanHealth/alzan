@@ -165,6 +165,7 @@ function mapAppleHealthSport(
   }
   if (normalised.includes('swimming') || normalised.includes('waterfitness'))
     return { sportType: 'swimming', sportSubtype: null };
+  if (normalised.includes('surfing')) return { sportType: 'surf', sportSubtype: null };
   if (normalised.includes('soccer') || normalised.includes('football')) {
     if (normalised.includes('futsal') || normalised.includes('sala') || normalised.includes('indoor')) {
       return { sportType: 'football', sportSubtype: 'futsal' };
