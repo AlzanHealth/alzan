@@ -68,9 +68,10 @@ const SPORT_CONFIG: Record<string, { label: TranslationKey; color: string }> = {
   padel: { label: 'constants.padel', color: '#8A5CC8' },
   martial_arts: { label: 'constants.martialArts', color: '#D64B7F' },
   climbing: { label: 'constants.climbing', color: '#6B8E4E' },
-  volleyball: { label: 'constants.volleyball', color: '#00A6A6' },
+  volleyball: { label: 'constants.volleyball', color: '#E8B44B' },
   trail: { label: 'constants.trail', color: '#C46A2D' },
-  skiing: { label: 'constants.skiing', color: '#2B92D4' },
+  skiing: { label: 'constants.skiing', color: '#1B5E9E' },
+  surf: { label: 'constants.surfTitle', color: '#1891AC' },
   other: { label: 'constants.other', color: '#8E8E93' },
 };
 
@@ -160,6 +161,7 @@ const toSportType = (value: string): SportType => {
     case 'volleyball':
     case 'trail':
     case 'skiing':
+    case 'surf':
     case 'other':
       return value as SportType;
     default:

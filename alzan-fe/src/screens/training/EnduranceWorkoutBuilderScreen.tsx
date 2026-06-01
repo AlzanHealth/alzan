@@ -1140,6 +1140,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 { id: 'climbing', label: t('constants.climbing') },
                 { id: 'volleyball', label: t('constants.volleyball') },
                 { id: 'surf', label: t('constants.surfTitle') },
+                { id: 'skiing', label: t('constants.skiingTitle') },
               ].map(sport => (
                 <TouchableOpacity
                   key={sport.id}
