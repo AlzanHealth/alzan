@@ -20,6 +20,7 @@ const SurfIcon = (props: SportIconProps) => <SportIcon {...props} sport="surf" /
 const VolleyballIcon = (props: SportIconProps) => <SportIcon {...props} sport="volleyball" />;
 const TrailIcon = (props: SportIconProps) => <SportIcon {...props} sport="trail" />;
 const SkiingIcon = (props: SportIconProps) => <SportIcon {...props} sport="skiing" />;
+const SnowboardIcon = (props: SportIconProps) => <SportIcon {...props} sport="snowboard" />;
 
 export type SportConfig = {
   id: SportType;
@@ -171,6 +172,14 @@ export const SPORTS_CONFIG: Record<string, SportConfig> = {
     fields: { distance: true, duration: true, elevation: true, calories: true, rpe: true, heartRate: true },
     defaultTitle: 'constants.skiingTitle',
   },
+  snowboard: {
+    id: 'snowboard' as SportType,
+    label: 'constants.snowboard',
+    icon: SnowboardIcon,
+    units: { distance: 'km', speed: 'km/h' },
+    fields: { distance: true, duration: true, elevation: true, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.snowboardTitle',
+  },
 };
 
 export const SPORT_GOALS: Partial<Record<SportType | 'volleyball' | 'trail', string[]>> = {
@@ -192,6 +201,7 @@ export const SPORT_GOALS: Partial<Record<SportType | 'volleyball' | 'trail', str
   gym: [],
   surf: [],
   skiing: [],
+  snowboard: [],
 };
 
 export const formatDuration = (seconds: number) => {
@@ -205,8 +215,8 @@ export const formatDuration = (seconds: number) => {
 export const calculatePace = (distanceM: number, durationS: number, sport: string): string => {
   if (distanceM <= 0 || durationS <= 0) return '-';
 
-  if (sport === 'cycling') {
-    // km/h for cycling
+  if (sport === 'cycling' || sport === 'skiing' || sport === 'snowboard') {
+    // km/h for cycling, skiing, and snowboard
     const distanceKm = distanceM / 1000;
     const hours = durationS / 3600;
     return `${(distanceKm / hours).toFixed(1)} km/h`;

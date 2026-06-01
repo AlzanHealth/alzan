@@ -19,8 +19,16 @@ export type SportCatalogOptionType =
   | 'board'
   | 'climbing_grade'
   | 'ski_type'
-  | 'slope_type';
-export type SportCatalogOption = Row<'sport_catalog_options'>;
+  | 'slope_type'
+  | 'snowboard_type';
+type SportCatalogLocalizedLabels = {
+  label_es?: string | null;
+  label_en?: string | null;
+  group_label_es?: string | null;
+  group_label_en?: string | null;
+};
+
+export type SportCatalogOption = Row<'sport_catalog_options'> & SportCatalogLocalizedLabels;
 
 type OptionsBySport = Partial<Record<SportType, Partial<Record<SportCatalogOptionType, SportCatalogOption[]>>>>;
 
@@ -39,6 +47,7 @@ const OPTION_TYPES: SportCatalogOptionType[] = [
   'climbing_grade',
   'ski_type',
   'slope_type',
+  'snowboard_type',
 ];
 
 const isSportCatalogOptionType = (value: string): value is SportCatalogOptionType =>
@@ -82,7 +91,8 @@ const formatUnknownOption = (optionKey: string): string =>
 const asTranslationKey = (key: string): TranslationKey => key as TranslationKey;
 
 export const useSportCatalog = () => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
+  const languageCode = i18n.language?.startsWith('es') ? 'es' : 'en';
 
   const { data: options = [], isLoading } = useQuery({
     queryKey: ['sportCatalogOptions'],
@@ -90,7 +100,7 @@ export const useSportCatalog = () => {
       const { data, error } = await supabase
         .from('sport_catalog_options')
         .select(
-          'id,sport_type,option_type,option_key,translation_key,group_translation_key,sort_order,is_template_selectable,is_active,created_at',
+          'id,sport_type,option_type,option_key,translation_key,group_translation_key,label_es,label_en,group_label_es,group_label_en,sort_order,is_template_selectable,is_active,created_at',
         )
         .eq('is_active', true)
         .order('sport_type', { ascending: true })
@@ -98,7 +108,7 @@ export const useSportCatalog = () => {
         .order('sort_order', { ascending: true });
 
       if (error) throw error;
-      return data.filter(option => isSportCatalogOptionType(option.option_type)) as SportCatalogOption[];
+      return (data as unknown as SportCatalogOption[]).filter(option => isSportCatalogOptionType(option.option_type));
     },
   });
 
@@ -130,7 +140,15 @@ export const useSportCatalog = () => {
 
   const getGroupLabel = (sportType: string | null | undefined, optionType: SportCatalogOptionType): string => {
     const option = getOptions(sportType, optionType, false)[0];
-    return option ? t(asTranslationKey(option.group_translation_key)) : '';
+    if (!option) return '';
+
+    const localizedLabel = languageCode === 'es' ? option.group_label_es : option.group_label_en;
+    return localizedLabel || t(asTranslationKey(option.group_translation_key));
+  };
+
+  const getLocalizedOptionLabel = (option: SportCatalogOption): string => {
+    const localizedLabel = languageCode === 'es' ? option.label_es : option.label_en;
+    return localizedLabel || t(asTranslationKey(option.translation_key));
   };
 
   const getOptionLabel = (
@@ -145,7 +163,7 @@ export const useSportCatalog = () => {
       .flatMap(type => getOptions(sportType, type, false))
       .find(option => option.option_key === optionKey);
 
-    if (match) return t(asTranslationKey(match.translation_key));
+    if (match) return getLocalizedOptionLabel(match);
 
     const normalizedSportType = normalizeSportType(sportType);
     const legacyKey = `${normalizedSportType ?? sportType}:${optionKey}`;

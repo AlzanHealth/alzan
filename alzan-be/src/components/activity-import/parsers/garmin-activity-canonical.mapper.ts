@@ -12,6 +12,7 @@ import {
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
+import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -511,10 +512,12 @@ export function mapGarminActivityToCanonicalSport(params: {
   if (trailSport) return trailSport;
   const skiingSport = mapSkiingTextToCanonical(combinedText);
   if (skiingSport) return skiingSport;
+  const snowboardSport = mapSnowboardTextToCanonical(combinedText);
+  if (snowboardSport) return snowboardSport;
 
   if (fitSport === 13) return { sportType: 'skiing', sportSubtype: 'alpine' };
   if (fitSport === 3) return { sportType: 'skiing', sportSubtype: 'cross_country' };
-  if (fitSport === 14) return { sportType: 'skiing', sportSubtype: null };
+  if (fitSport === 14) return { sportType: 'snowboard', sportSubtype: null };
 
   const isRace =
     combinedText.includes('carrera') ||

@@ -146,7 +146,8 @@ const getPreferredMiddleMetric = (sportType: SummarySportType): SportMiddleMetri
     sportType === 'basketball' ||
     sportType === 'tennis' ||
     sportType === 'padel' ||
-    sportType === 'skiing'
+    sportType === 'skiing' ||
+    sportType === 'snowboard'
   ) {
     return 'distance';
   }

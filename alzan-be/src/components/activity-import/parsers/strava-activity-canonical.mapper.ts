@@ -12,6 +12,7 @@ import {
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
+import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -130,6 +131,8 @@ function mapStravaSport(
   if (trailSport) return trailSport;
   const skiingSport = mapSkiingTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
   if (skiingSport) return skiingSport;
+  const snowboardSport = mapSnowboardTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
+  if (snowboardSport) return snowboardSport;
 
   if (normalised === 'walk') return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (normalised === 'trailrun') return { sportType: 'trail', sportSubtype: 'trail_running' };

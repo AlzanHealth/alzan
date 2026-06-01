@@ -72,6 +72,7 @@ const SPORT_CONFIG: Record<string, { label: TranslationKey; color: string }> = {
   trail: { label: 'constants.trail', color: '#C46A2D' },
   skiing: { label: 'constants.skiing', color: '#1B5E9E' },
   surf: { label: 'constants.surfTitle', color: '#1891AC' },
+  snowboard: { label: 'constants.snowboard', color: '#7560E5' },
   other: { label: 'constants.other', color: '#8E8E93' },
 };
 
@@ -162,6 +163,7 @@ const toSportType = (value: string): SportType => {
     case 'trail':
     case 'skiing':
     case 'surf':
+    case 'snowboard':
     case 'other':
       return value as SportType;
     default:

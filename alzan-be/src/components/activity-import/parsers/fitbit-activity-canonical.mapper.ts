@@ -10,6 +10,7 @@ import {
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
+import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -160,6 +161,8 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
   if (trailSport) return trailSport;
   const skiingSport = mapSkiingTextToCanonical(activityName);
   if (skiingSport) return skiingSport;
+  const snowboardSport = mapSnowboardTextToCanonical(activityName);
+  if (snowboardSport) return snowboardSport;
 
   if (activityTypeId != null && FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId]) {
     const mapped = FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId];

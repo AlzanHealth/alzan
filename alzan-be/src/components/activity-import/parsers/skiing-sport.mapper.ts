@@ -15,6 +15,10 @@ export function mapSkiingTextToCanonical(raw: string | null | undefined): Canoni
   const text = normalizeSportText(raw);
   if (!text) return null;
 
+  if (text.includes('snowboard') || text.includes('splitboard')) {
+    return null;
+  }
+
   if (text.includes('alpine') || text.includes('downhill') || text.includes('alpino') || text.includes('pista')) {
     return { sportType: SKIING_SPORT_TYPE, sportSubtype: 'alpine' };
   }
@@ -33,7 +37,7 @@ export function mapSkiingTextToCanonical(raw: string | null | undefined): Canoni
   if (text.includes('freeride') || text.includes('fuera_pista') || text.includes('fuera_de_pista')) {
     return { sportType: SKIING_SPORT_TYPE, sportSubtype: 'freeride' };
   }
-  if (text.includes('skiing') || text.includes('esqui') || text.includes('ski') || text.includes('snowboard')) {
+  if (text.includes('skiing') || text.includes('esqui') || text.includes('ski')) {
     return { sportType: SKIING_SPORT_TYPE, sportSubtype: null };
   }
 

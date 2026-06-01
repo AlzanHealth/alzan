@@ -468,6 +468,7 @@ export type Database = {
           rpe: number | null;
           ski_type: string | null;
           slope_type: string | null;
+          snowboard_type: string | null;
           source: Database['public']['Enums']['activity_source_enum'];
           source_channel: string | null;
           source_package: string | null;
@@ -539,6 +540,7 @@ export type Database = {
           rpe?: number | null;
           ski_type?: string | null;
           slope_type?: string | null;
+          snowboard_type?: string | null;
           source?: Database['public']['Enums']['activity_source_enum'];
           source_channel?: string | null;
           source_package?: string | null;
@@ -610,6 +612,7 @@ export type Database = {
           rpe?: number | null;
           ski_type?: string | null;
           slope_type?: string | null;
+          snowboard_type?: string | null;
           source?: Database['public']['Enums']['activity_source_enum'];
           source_channel?: string | null;
           source_package?: string | null;
@@ -1447,6 +1450,7 @@ export type Database = {
           scheduled_day: number | null;
           ski_type: string | null;
           slope_type: string | null;
+          snowboard_type: string | null;
           sport_type: Database['public']['Enums']['sport_type_enum'];
           stroke: string | null;
           surface: string | null;
@@ -1477,6 +1481,7 @@ export type Database = {
           scheduled_day?: number | null;
           ski_type?: string | null;
           slope_type?: string | null;
+          snowboard_type?: string | null;
           sport_type: Database['public']['Enums']['sport_type_enum'];
           stroke?: string | null;
           surface?: string | null;
@@ -1507,6 +1512,7 @@ export type Database = {
           scheduled_day?: number | null;
           ski_type?: string | null;
           slope_type?: string | null;
+          snowboard_type?: string | null;
           sport_type?: Database['public']['Enums']['sport_type_enum'];
           stroke?: string | null;
           surface?: string | null;
@@ -3525,10 +3531,14 @@ export type Database = {
       sport_catalog_options: {
         Row: {
           created_at: string;
+          group_label_en: string | null;
+          group_label_es: string | null;
           group_translation_key: string;
           id: string;
           is_active: boolean;
           is_template_selectable: boolean;
+          label_en: string | null;
+          label_es: string | null;
           option_key: string;
           option_type: string;
           sort_order: number;
@@ -3537,10 +3547,14 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
+          group_label_en?: string | null;
+          group_label_es?: string | null;
           group_translation_key: string;
           id?: string;
           is_active?: boolean;
           is_template_selectable?: boolean;
+          label_en?: string | null;
+          label_es?: string | null;
           option_key: string;
           option_type: string;
           sort_order?: number;
@@ -3549,10 +3563,14 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          group_label_en?: string | null;
+          group_label_es?: string | null;
           group_translation_key?: string;
           id?: string;
           is_active?: boolean;
           is_template_selectable?: boolean;
+          label_en?: string | null;
+          label_es?: string | null;
           option_key?: string;
           option_type?: string;
           sort_order?: number;
@@ -4601,7 +4619,8 @@ export type Database = {
         | 'surf'
         | 'volleyball'
         | 'trail'
-        | 'skiing';
+        | 'skiing'
+        | 'snowboard';
       stream_type_enum: 'heart_rate' | 'cadence' | 'power' | 'altitude' | 'speed' | 'distance' | 'temperature';
       target_type_enum: 'none' | 'pace' | 'heart_rate' | 'power' | 'speed' | 'heart_rate_zone' | 'rpe';
       training_frequency_enum: 'none' | 'occasional' | 'frequent' | 'athlete';
@@ -4862,6 +4881,7 @@ export const Constants = {
         'volleyball',
         'trail',
         'skiing',
+        'snowboard',
       ],
       stream_type_enum: ['heart_rate', 'cadence', 'power', 'altitude', 'speed', 'distance', 'temperature'],
       target_type_enum: ['none', 'pace', 'heart_rate', 'power', 'speed', 'heart_rate_zone', 'rpe'],

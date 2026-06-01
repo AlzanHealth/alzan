@@ -264,7 +264,29 @@ function assertGenericSkiingUsesCatalogModality(): void {
     { name: 'Nordic Skiing', subtype: 'cross_country' },
     { name: 'Backcountry randonee', subtype: 'backcountry' },
     { name: 'Skiing Freeride in snow', subtype: 'freeride' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify({
+        sport_type: testCase.name,
+        start_time: '2026-06-01T08:00:00Z',
+        duration_s: 3600,
+      }),
+      `generic-${testCase.subtype}.json`,
+    );
+    assert.equal(canonical.sportType, 'skiing');
+    assert.equal(canonical.sportSubtype, testCase.subtype);
+  }
+}
+
+function assertGenericSnowboardUsesCatalogModality(): void {
+  const cases = [
     { name: 'Snowboarding', subtype: null },
+    { name: 'Splitboard', subtype: 'splitboard' },
+    { name: 'Snowboard Freeride', subtype: 'freeride' },
+    { name: 'Freestyle Snowboard', subtype: 'park_freestyle' },
+    { name: 'Alpine Snowboard', subtype: 'slope' },
   ] as const;
 
   for (const testCase of cases) {
@@ -276,7 +298,7 @@ function assertGenericSkiingUsesCatalogModality(): void {
       }),
       `generic-${testCase.subtype ?? 'snowboard'}.json`,
     );
-    assert.equal(canonical.sportType, 'skiing');
+    assert.equal(canonical.sportType, 'snowboard');
     assert.equal(canonical.sportSubtype, testCase.subtype);
   }
 }
@@ -293,3 +315,4 @@ assertGenericClimbingUsesCatalogModality();
 assertGenericVolleyballUsesCatalogModality();
 assertGenericTrailUsesCatalogModality();
 assertGenericSkiingUsesCatalogModality();
+assertGenericSnowboardUsesCatalogModality();

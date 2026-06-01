@@ -9,6 +9,7 @@ import {
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
+import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -113,6 +114,8 @@ function mapAppleHealthSport(
   if (trailSport) return trailSport;
   const skiingSport = mapSkiingTextToCanonical(combined);
   if (skiingSport) return skiingSport;
+  const snowboardSport = mapSnowboardTextToCanonical(combined);
+  if (snowboardSport) return snowboardSport;
 
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised.includes('running') || normalised.includes('trackandfield')) {

@@ -734,6 +734,36 @@ export const EnduranceSessionDetailScreen = () => {
         });
       }
     }
+    if (session.sport_type === 'snowboard') {
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'snowboard-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (session.snowboard_type) {
+        secondaryMetrics.push({
+          key: 'snowboard-snowboard-type',
+          label: t('training.snowboardLabel'),
+          value: getOptionLabel(session.sport_type, session.snowboard_type, 'snowboard_type'),
+        });
+      }
+      if (session.slope_type) {
+        secondaryMetrics.push({
+          key: 'snowboard-slope-type',
+          label: t('training.slopeLabel'),
+          value: getOptionLabel(session.sport_type, session.slope_type, 'slope_type'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'snowboard-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
   }
 
   const handleImportedMetricInfoPress = useCallback(

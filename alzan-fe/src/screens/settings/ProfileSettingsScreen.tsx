@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   TextStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 
 import { supabase } from '../../lib/supabaseClient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,12 +40,37 @@ import { Locale, getValidLocale, getLocaleOptions } from '../../i18n';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { convertLengthToUi, parseLengthToCm } from '../../utils/unitConversionUtils';
+import { SettingsStackParamList } from '../../navigation/SettingsNavigator';
 
 // --- Helper Components ---
 
 const SectionHeader = ({ title, dynamicStyle }: { title: string; dynamicStyle?: TextStyle }) => (
   <Text style={[styles.sectionHeader, dynamicStyle]}>{title.toUpperCase()}</Text>
 );
+
+type ProfileFormSnapshot = {
+  displayName: string;
+  dob: string;
+  height: string;
+  sex: Sex;
+  weightUnit: WeightUnit;
+  distanceUnit: DistanceUnit;
+  languageCode: Locale;
+  dailyActivity: DailyActivity;
+  trainingFrequency: TrainingFrequency;
+};
+
+const snapshotsEqual = (a: ProfileFormSnapshot | null, b: ProfileFormSnapshot): boolean =>
+  !!a &&
+  a.displayName === b.displayName &&
+  a.dob === b.dob &&
+  a.height === b.height &&
+  a.sex === b.sex &&
+  a.weightUnit === b.weightUnit &&
+  a.distanceUnit === b.distanceUnit &&
+  a.languageCode === b.languageCode &&
+  a.dailyActivity === b.dailyActivity &&
+  a.trainingFrequency === b.trainingFrequency;
 
 const UnitOption = ({
   label,
@@ -218,6 +245,7 @@ const formatHeightForInput = (heightCm: number | null, distanceUnit: DistanceUni
 
 export default function ProfileSettingsScreen() {
   const { t } = useTranslation();
+  const navigation = useNavigation<StackNavigationProp<SettingsStackParamList, 'ProfileSettings'>>();
   const { user } = useAuth();
   const { styles: dynamicStyles, colors, isDark } = useSettingsStyles();
   const { profile, loading, updating, updateProfile } = useSettingsProfile();
@@ -253,7 +281,9 @@ export default function ProfileSettingsScreen() {
   // Activity Level state (Two-Step)
   const [dailyActivity, setDailyActivity] = useState<DailyActivity>('sedentary');
   const [trainingFrequency, setTrainingFrequency] = useState<TrainingFrequency>('occasional');
-  const [, setLoadingActivity] = useState(true);
+  const [loadingActivity, setLoadingActivity] = useState(true);
+  const [savedSnapshot, setSavedSnapshot] = useState<ProfileFormSnapshot | null>(null);
+  const initialSnapshotCapturedRef = useRef(false);
 
   const heightUnit = distanceUnit === 'km' ? 'cm' : 'in';
   const heightRange = useMemo(() => {
@@ -268,6 +298,23 @@ export default function ProfileSettingsScreen() {
     () => formatInputNumber(convertLengthToUi(175, distanceUnit, getHeightPrecision(distanceUnit)).value),
     [distanceUnit],
   );
+
+  const currentSnapshot = useMemo<ProfileFormSnapshot>(
+    () => ({
+      displayName,
+      dob,
+      height,
+      sex,
+      weightUnit,
+      distanceUnit,
+      languageCode,
+      dailyActivity,
+      trainingFrequency,
+    }),
+    [dailyActivity, displayName, distanceUnit, dob, height, languageCode, sex, trainingFrequency, weightUnit],
+  );
+
+  const hasUnsavedChanges = !snapshotsEqual(savedSnapshot, currentSnapshot);
 
   // Sync avatar when profile loads
 
@@ -358,13 +405,22 @@ export default function ProfileSettingsScreen() {
       }
     };
     fetchActivityLevels();
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    if (loading || loadingActivity || !profile || !globalPrefs || initialSnapshotCapturedRef.current) {
+      return;
+    }
+
+    setSavedSnapshot(currentSnapshot);
+    initialSnapshotCapturedRef.current = true;
+  }, [currentSnapshot, globalPrefs, loading, loadingActivity, profile]);
 
   const pickImage = () => {
     Alert.alert(t('settings.changePhotoSoonTitle'), t('settings.changePhotoSoonMessage'));
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     // Validation
     const parsedHeight = parseInputNumber(height);
     if (height && (parsedHeight === null || parsedHeight < heightRange.min || parsedHeight > heightRange.max)) {
@@ -507,7 +563,49 @@ export default function ProfileSettingsScreen() {
     } catch (err) {
       console.error('Error saving activity levels or recalculating macros:', err);
     }
-  };
+
+    setSavedSnapshot(currentSnapshot);
+  }, [
+    currentSnapshot,
+    dailyActivity,
+    displayName,
+    distanceUnit,
+    dob,
+    height,
+    heightRange.max,
+    heightRange.min,
+    heightUnit,
+    languageCode,
+    queryClient,
+    sex,
+    t,
+    trainingFrequency,
+    updateGlobalPrefs,
+    updateProfile,
+    user,
+    weightUnit,
+  ]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () =>
+        hasUnsavedChanges ? (
+          <TouchableOpacity
+            style={styles.headerSaveButton}
+            onPress={handleSave}
+            disabled={updating || updatingGlobal}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.save')}
+          >
+            {updating || updatingGlobal ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={[styles.headerSaveText, { color: colors.primary }]}>{t('common.save')}</Text>
+            )}
+          </TouchableOpacity>
+        ) : null,
+    });
+  }, [colors.primary, handleSave, hasUnsavedChanges, navigation, t, updating, updatingGlobal]);
 
   const handleDateChange = (text: string) => {
     // Allow only numbers and hyphens
@@ -843,7 +941,7 @@ export default function ProfileSettingsScreen() {
             onPress={handleSave}
             disabled={updating || updatingGlobal}
           >
-            {updating ? (
+            {updating || updatingGlobal ? (
               <ActivityIndicator color={colors.white} />
             ) : (
               <Text style={styles.buttonText}>{t('settings.saveChanges')}</Text>
@@ -1024,6 +1122,17 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  headerSaveButton: {
+    minWidth: 64,
+    minHeight: 44,
+    paddingHorizontal: spacing.m,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSaveText: {
+    ...typography.body,
+    fontWeight: '700',
   },
   buttonText: {
     color: colors.white,

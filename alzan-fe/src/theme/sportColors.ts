@@ -14,6 +14,7 @@ export const SPORT_COLORS: Record<string, string> = {
   trail: '#C46A2D', // Terracota montaña
   skiing: '#1B5E9E', // Azul noche invernal (oscuro, ≠ swimming)
   surf: '#1891AC', // Azul océano profundo (≠ swimming, gym, skiing)
+  snowboard: '#7560E5', // Iris/violeta vibrante
   walking: '#34C759', // Verde paseo
   other: '#8E8E93', // Gris neutro
 };
