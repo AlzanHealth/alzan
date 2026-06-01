@@ -12,6 +12,7 @@ export const SPORT_COLORS: Record<string, string> = {
   climbing: '#6B8E4E', // Verde roca
   volleyball: '#00A6A6', // Turquesa pista/playa
   trail: '#C46A2D', // Terracota montaña
+  skiing: '#2B92D4', // Azul invernal/nieve
   walking: '#34C759', // Greenish (Default for walking if needed)
   other: '#8E8E93', // Gris neutro
 };

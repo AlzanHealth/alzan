@@ -258,6 +258,29 @@ function assertGenericTrailUsesCatalogModality(): void {
   assert.equal(canonical.summary.elevationGainM, 900);
 }
 
+function assertGenericSkiingUsesCatalogModality(): void {
+  const cases = [
+    { name: 'Alpine Skiing', subtype: 'alpine' },
+    { name: 'Nordic Skiing', subtype: 'cross_country' },
+    { name: 'Backcountry randonee', subtype: 'backcountry' },
+    { name: 'Skiing Freeride in snow', subtype: 'freeride' },
+    { name: 'Snowboarding', subtype: null },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify({
+        sport_type: testCase.name,
+        start_time: '2026-06-01T08:00:00Z',
+        duration_s: 3600,
+      }),
+      `generic-${testCase.subtype ?? 'snowboard'}.json`,
+    );
+    assert.equal(canonical.sportType, 'skiing');
+    assert.equal(canonical.sportSubtype, testCase.subtype);
+  }
+}
+
 assertSuuntoStrengthJsonParses();
 assertClearEnduranceStrengthJsonIsRejected();
 assertSuuntoDistanceActivityIsRejectedForStrength();
@@ -269,3 +292,4 @@ assertGenericMartialArtsUsesCatalogModality();
 assertGenericClimbingUsesCatalogModality();
 assertGenericVolleyballUsesCatalogModality();
 assertGenericTrailUsesCatalogModality();
+assertGenericSkiingUsesCatalogModality();

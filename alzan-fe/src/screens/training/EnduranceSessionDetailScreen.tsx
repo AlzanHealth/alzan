@@ -704,6 +704,36 @@ export const EnduranceSessionDetailScreen = () => {
         value: t('training.comingSoon'),
       });
     }
+    if (session.sport_type === 'skiing') {
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'skiing-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (session.ski_type) {
+        secondaryMetrics.push({
+          key: 'skiing-ski-type',
+          label: t('training.skiLabel'),
+          value: getOptionLabel(session.sport_type, session.ski_type, 'ski_type'),
+        });
+      }
+      if (session.slope_type) {
+        secondaryMetrics.push({
+          key: 'skiing-slope-type',
+          label: t('training.slopeLabel'),
+          value: getOptionLabel(session.sport_type, session.slope_type, 'slope_type'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'skiing-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
   }
 
   const handleImportedMetricInfoPress = useCallback(

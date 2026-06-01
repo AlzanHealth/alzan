@@ -686,6 +686,10 @@ class AlzanAppleHealth: NSObject {
     case .paddleSports: return "paddleSports"
     case .yoga: return "yoga"
     case .mindAndBody: return "mindAndBody"
+    case .downhillSkiing: return "downhillSkiing"
+    case .crossCountrySkiing: return "crossCountrySkiing"
+    case .snowboarding: return "snowboarding"
+    case .volleyball: return "volleyball"
     default: return "other"
     }
   }

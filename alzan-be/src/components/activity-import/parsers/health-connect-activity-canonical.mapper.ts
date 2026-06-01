@@ -7,6 +7,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -236,6 +237,8 @@ function mapHealthConnectSport(workout: JsonRecord): CanonicalActivitySportMappi
   if (volleyballSport) return volleyballSport;
   const trailSport = mapTrailTextToCanonical(raw);
   if (trailSport) return trailSport;
+  const skiingSport = mapSkiingTextToCanonical(raw);
+  if (skiingSport) return skiingSport;
 
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'indoor' };
   if (normalised.includes('runningtreadmill') || normalised.includes('treadmill'))

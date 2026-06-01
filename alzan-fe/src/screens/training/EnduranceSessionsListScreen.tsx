@@ -245,6 +245,7 @@ export const EnduranceSessionsListScreen = () => {
       { id: 'basketball' as const, label: t('constants.basketball') },
       { id: 'tennis' as const, label: t('constants.tennis') },
       { id: 'padel' as const, label: t('constants.padel') },
+      { id: 'skiing' as const, label: t('constants.skiing') },
       { id: 'gym' as const, label: t('constants.strength') },
       { id: 'other' as const, label: t('constants.other') },
     ],

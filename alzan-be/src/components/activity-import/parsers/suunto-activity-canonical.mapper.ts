@@ -11,6 +11,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -207,6 +208,8 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   if (volleyballSport) return volleyballSport;
   const trailSport = mapTrailTextToCanonical(params.sportName);
   if (trailSport) return trailSport;
+  const skiingSport = mapSkiingTextToCanonical(params.sportName);
+  if (skiingSport) return skiingSport;
 
   if (params.activityId != null) {
     const mappedActivityId = SUUNTO_ACTIVITY_ID_MAP.get(Math.round(params.activityId));

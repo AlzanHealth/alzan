@@ -19,6 +19,7 @@ const SPORT_ICONS: Record<string, IconName> = {
   climbing: 'terrain',
   volleyball: 'volleyball',
   trail: 'run-fast',
+  skiing: 'ski',
   walking: 'walk',
   gym: 'dumbbell',
   surf: 'surfing',

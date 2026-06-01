@@ -43,6 +43,8 @@ export interface BuilderTemplateData {
   rival?: string | null;
   notes?: string | null;
   elev_gain_m?: number | null;
+  ski_type?: string | null;
+  slope_type?: string | null;
 }
 
 type EnduranceWorkoutTemplateInsertPatch = Database['public']['Tables']['endurance_workout_templates']['Insert'] & {
@@ -101,6 +103,8 @@ export const useEnduranceWorkoutBuilder = () => {
             climbing_grade: data.climbing_grade,
             wetsuit: data.wetsuit,
             board: data.board,
+            ski_type: data.ski_type,
+            slope_type: data.slope_type,
             rival: data.rival,
             notes: data.notes,
             elev_gain_m: data.elev_gain_m,
@@ -144,6 +148,8 @@ export const useEnduranceWorkoutBuilder = () => {
             climbing_grade: data.climbing_grade,
             wetsuit: data.wetsuit,
             board: data.board,
+            ski_type: data.ski_type,
+            slope_type: data.slope_type,
             rival: data.rival,
             notes: data.notes,
             elev_gain_m: data.elev_gain_m,

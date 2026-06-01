@@ -9,6 +9,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
@@ -129,6 +130,8 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
   if (volleyballSport) return volleyballSport;
   const trailSport = mapTrailTextToCanonical(rawSport);
   if (trailSport) return trailSport;
+  const skiingSport = mapSkiingTextToCanonical(rawSport);
+  if (skiingSport) return skiingSport;
 
   if (text.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (text.includes('padel'))

@@ -245,6 +245,13 @@ export const EnduranceSessionFormScreen = () => {
   const [surfaceModalVisible, setSurfaceModalVisible] = useState(false);
   const [climbingGradeModalVisible, setClimbingGradeModalVisible] = useState(false);
 
+  // Skiing states
+  const [skiType, setSkiType] = useState<string | null>(null);
+  const [slopeType, setSlopeType] = useState<string | null>(null);
+
+  const [skiTypeModalVisible, setSkiTypeModalVisible] = useState(false);
+  const [slopeTypeModalVisible, setSlopeTypeModalVisible] = useState(false);
+
   // Initialize date from param if available, otherwise today (LOCAL TIME)
   const [date, setDate] = useState(initialDateStr ? initialDateStr.split('T')[0] : format(new Date(), 'yyyy-MM-dd'));
   const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
@@ -361,6 +368,11 @@ export const EnduranceSessionFormScreen = () => {
         setFootballSessionType(activeTemplate.football_session_type || 'match');
         setRival(activeTemplate.rival || '');
         setNotes(activeTemplate.notes || '');
+      }
+      if (activeTemplate.sport_type === 'skiing') {
+        setSkiType(activeTemplate.ski_type || null);
+        setSlopeType(activeTemplate.slope_type || null);
+        setBaseLoad(activeTemplate.base_load || null);
       }
 
       // RPE Pre-fill from steps
@@ -905,7 +917,8 @@ export const EnduranceSessionFormScreen = () => {
             sportType === 'padel' ||
             sportType === 'hiking' ||
             sportType === TRAIL_SPORT_TYPE ||
-            sportType === 'surf') &&
+            sportType === 'surf' ||
+            sportType === 'skiing') &&
           !sportSubtype
         ) {
           Alert.alert(t('training.missingDataTitle'), t('training.modalityRequired'));
@@ -974,6 +987,7 @@ export const EnduranceSessionFormScreen = () => {
           'volleyball',
           'trail',
           'surf',
+          'skiing',
         ].includes(sportType)
           ? sportSubtype
           : null,
@@ -990,6 +1004,7 @@ export const EnduranceSessionFormScreen = () => {
           'volleyball',
           'trail',
           'surf',
+          'skiing',
         ].includes(sportType)
           ? baseLoad
           : null,
@@ -1000,6 +1015,8 @@ export const EnduranceSessionFormScreen = () => {
         rival: sportType === 'football' ? rival || null : null,
         notes: sportType === 'football' ? notes || null : null,
         surface: ['football', 'tennis', 'padel', 'hiking', 'trail'].includes(sportType) ? surface : null,
+        ski_type: sportType === 'skiing' ? skiType : null,
+        slope_type: sportType === 'skiing' ? slopeType : null,
         name: name || (isGymMode ? t('constants.gymTitle') : t('alzan.activity')),
         start_time: startDateTime,
         end_time: endTime, // Critical to mark session as finished
@@ -2379,6 +2396,109 @@ export const EnduranceSessionFormScreen = () => {
                 </View>
               )}
 
+              {/* Skiing Specific Configuration Block */}
+              {sportType === 'skiing' && (
+                <View
+                  style={[
+                    {
+                      marginBottom: spacing.m,
+                      paddingHorizontal: spacing.m,
+                      paddingVertical: spacing.s,
+                      borderRadius: borderRadius.m,
+                    },
+                    dynamicStyles.glassCard,
+                  ]}
+                >
+                  {/* Modality */}
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSportSubtypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.modalityLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.modalityLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: sportSubtype ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {sportSubtype ? getOptionLabel(sportType, sportSubtype, 'modality') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Ski Type */}
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSkiTypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.skiLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.skiLabel')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: skiType ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {skiType ? getOptionLabel(sportType, skiType, 'ski_type') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Slope Type */}
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSlopeTypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.slopeLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.slopeLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: slopeType ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {slopeType ? getOptionLabel(sportType, slopeType, 'slope_type') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Base Load */}
+                  <TouchableOpacity
+                    style={[styles.formRow, { borderBottomWidth: 0 }]}
+                    onPress={() => setBaseLoadModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.loadLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.loadLabel')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: baseLoad ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {baseLoad ? getOptionLabel(sportType, baseLoad, 'base_load') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <View style={styles.row}>
                 {currentConfig?.fields.distance && (
                   <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
@@ -3490,6 +3610,122 @@ export const EnduranceSessionFormScreen = () => {
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
                   onPress={() => setClimbingGradeModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Ski Type Selector Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={skiTypeModalVisible}
+          onRequestClose={() => setSkiTypeModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setSkiTypeModalVisible(false)}>
+            <Pressable
+              style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.skiLabel')}</Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getOptions(sportType, 'ski_type').map(opt => {
+                  const isSelected = skiType === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setSkiType(opt.option_key);
+                        setSkiTypeModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'ski_type')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setSkiTypeModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Slope Type Selector Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={slopeTypeModalVisible}
+          onRequestClose={() => setSlopeTypeModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setSlopeTypeModalVisible(false)}>
+            <Pressable
+              style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.slopeLabel')}</Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {getOptions(sportType, 'slope_type').map(opt => {
+                  const isSelected = slopeType === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setSlopeType(opt.option_key);
+                        setSlopeTypeModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'slope_type')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setSlopeTypeModalVisible(false)}
                 >
                   <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
                     {t('common.cancel')}
