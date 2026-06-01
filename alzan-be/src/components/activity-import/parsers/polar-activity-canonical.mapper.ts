@@ -12,6 +12,7 @@ import {
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -170,6 +171,8 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
   if (volleyballSport) return volleyballSport;
+  const trailSport = mapTrailTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
+  if (trailSport) return trailSport;
 
   if (sport.includes('WALKING')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (sport.includes('PADEL')) return { sportType: 'padel', sportSubtype: 'outdoor' };
@@ -190,7 +193,7 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
   }
   if (sport.includes('SWIMMING')) return { sportType: 'swimming', sportSubtype: null };
   if (sport.includes('TRAIL_RUNNING') || sport.includes('RUNNING_TRAIL')) {
-    return { sportType: 'running', sportSubtype: 'trail' };
+    return { sportType: 'trail', sportSubtype: 'trail_running' };
   }
   if (sport.includes('TREADMILL') || sport.includes('INDOOR_RUNNING')) {
     return { sportType: 'running', sportSubtype: 'treadmill' };

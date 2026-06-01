@@ -1430,6 +1430,7 @@ export type Database = {
           contact_level: string | null;
           created_at: string;
           description: string | null;
+          elev_gain_m: number | null;
           environment_type: string | null;
           football_session_type: string | null;
           id: string;
@@ -1457,6 +1458,7 @@ export type Database = {
           contact_level?: string | null;
           created_at?: string;
           description?: string | null;
+          elev_gain_m?: number | null;
           environment_type?: string | null;
           football_session_type?: string | null;
           id?: string;
@@ -1484,6 +1486,7 @@ export type Database = {
           contact_level?: string | null;
           created_at?: string;
           description?: string | null;
+          elev_gain_m?: number | null;
           environment_type?: string | null;
           football_session_type?: string | null;
           id?: string;
@@ -4584,7 +4587,8 @@ export type Database = {
         | 'martial_arts'
         | 'climbing'
         | 'surf'
-        | 'volleyball';
+        | 'volleyball'
+        | 'trail';
       stream_type_enum: 'heart_rate' | 'cadence' | 'power' | 'altitude' | 'speed' | 'distance' | 'temperature';
       target_type_enum: 'none' | 'pace' | 'heart_rate' | 'power' | 'speed' | 'heart_rate_zone' | 'rpe';
       training_frequency_enum: 'none' | 'occasional' | 'frequent' | 'athlete';
@@ -4843,6 +4847,7 @@ export const Constants = {
         'climbing',
         'surf',
         'volleyball',
+        'trail',
       ],
       stream_type_enum: ['heart_rate', 'cadence', 'power', 'altitude', 'speed', 'distance', 'temperature'],
       target_type_enum: ['none', 'pace', 'heart_rate', 'power', 'speed', 'heart_rate_zone', 'rpe'],

@@ -8,6 +8,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -108,6 +109,8 @@ function mapSportNameToCanonical(rawSportName: string | null): CanonicalActivity
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(rawSportName);
   if (volleyballSport) return volleyballSport;
+  const trailSport = mapTrailTextToCanonical(rawSportName);
+  if (trailSport) return trailSport;
 
   if (sportName.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (sportName.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
@@ -136,7 +139,6 @@ function mapSportNameToCanonical(rawSportName: string | null): CanonicalActivity
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (sportName.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
-  if (sportName.includes('trail') && sportName.includes('run')) return { sportType: 'running', sportSubtype: 'trail' };
   if (sportName.includes('run')) return { sportType: 'running', sportSubtype: 'outdoor' };
   if (
     sportName.includes('strength') ||

@@ -9,6 +9,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
 
@@ -126,6 +127,8 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(rawSport);
   if (volleyballSport) return volleyballSport;
+  const trailSport = mapTrailTextToCanonical(rawSport);
+  if (trailSport) return trailSport;
 
   if (text.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (text.includes('padel'))
@@ -143,7 +146,7 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
   if (text.includes('open_water')) return { sportType: 'swimming', sportSubtype: 'open_water' };
   if (text.includes('swim')) return { sportType: 'swimming', sportSubtype: null };
   if (text.includes('surf')) return { sportType: 'surf', sportSubtype: null };
-  if (text.includes('trail') && text.includes('run')) return { sportType: 'running', sportSubtype: 'trail' };
+  if (text.includes('trail') && text.includes('run')) return { sportType: 'trail', sportSubtype: 'trail_running' };
   if (text.includes('track') && text.includes('run')) return { sportType: 'running', sportSubtype: 'track' };
   if (text.includes('indoor') && text.includes('run')) return { sportType: 'running', sportSubtype: 'treadmill' };
   if (text.includes('run')) {

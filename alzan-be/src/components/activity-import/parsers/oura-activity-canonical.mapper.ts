@@ -7,6 +7,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -101,10 +102,10 @@ function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(activity);
   if (volleyballSport) return volleyballSport;
+  const trailSport = mapTrailTextToCanonical(activity);
+  if (trailSport) return trailSport;
 
   if (normalised.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
-  if (normalised === 'trail_running' || normalised.includes('trail'))
-    return { sportType: 'running', sportSubtype: 'trail' };
   if (normalised.includes('track')) return { sportType: 'running', sportSubtype: 'track' };
   if (
     normalised.includes('treadmill') ||

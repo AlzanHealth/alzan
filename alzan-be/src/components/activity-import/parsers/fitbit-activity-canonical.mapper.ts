@@ -9,6 +9,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -154,6 +155,8 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(activityName);
   if (volleyballSport) return volleyballSport;
+  const trailSport = mapTrailTextToCanonical(activityName);
+  if (trailSport) return trailSport;
 
   if (activityTypeId != null && FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId]) {
     const mapped = FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId];
@@ -181,7 +184,7 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
   if (normalised.includes('treadmill') || normalised.includes('indoor run'))
     return { sportType: 'running', sportSubtype: 'treadmill' };
   if (normalised.includes('trail run') || normalised.includes('mountain run'))
-    return { sportType: 'running', sportSubtype: 'trail' };
+    return { sportType: 'trail', sportSubtype: 'trail_running' };
   if (normalised.includes('track run')) return { sportType: 'running', sportSubtype: 'track' };
   if (normalised.includes('run')) {
     if (

@@ -162,8 +162,8 @@ export function estimateCalories(input: CaloriesInput): CaloriesOutput {
     calculatedKcal = usedMet * usedWeight * duracion_h;
   }
 
-  // === HIKING ===
-  else if (deporte === 'hiking') {
+  // === HIKING / TRAIL ===
+  else if (deporte === 'hiking' || deporte === 'trail') {
     if (hasDist && desnivel_m != null) {
       const pendiente_m_km = desnivel_m / (distancia_km || 1); // avoid div 0
       if (pendiente_m_km < 30)

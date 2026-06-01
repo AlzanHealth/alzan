@@ -11,6 +11,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -124,9 +125,11 @@ function mapStravaSport(
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
   if (volleyballSport) return volleyballSport;
+  const trailSport = mapTrailTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
+  if (trailSport) return trailSport;
 
   if (normalised === 'walk') return { sportType: 'hiking', sportSubtype: 'urban_walk' };
-  if (normalised === 'trailrun') return { sportType: 'running', sportSubtype: 'trail' };
+  if (normalised === 'trailrun') return { sportType: 'trail', sportSubtype: 'trail_running' };
   if (normalised === 'virtualrun') return { sportType: 'running', sportSubtype: 'treadmill' };
   if (normalised === 'run') {
     if (workoutType === 3) return { sportType: 'running', sportSubtype: 'race' };

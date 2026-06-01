@@ -74,7 +74,7 @@ interface SessionWithDate {
   startDate: Date;
 }
 
-type SummarySportType = Exclude<ActivitySession['sport_type'], 'strength'> | 'gym' | 'volleyball';
+type SummarySportType = Exclude<ActivitySession['sport_type'], 'strength'> | 'gym' | 'volleyball' | 'trail';
 
 type SportMiddleMetric = 'distance' | 'volume' | 'sets' | 'elevation' | 'calories';
 
@@ -141,6 +141,7 @@ const getPreferredMiddleMetric = (sportType: SummarySportType): SportMiddleMetri
     sportType === 'cycling' ||
     sportType === 'swimming' ||
     sportType === 'hiking' ||
+    sportType === 'trail' ||
     sportType === 'football' ||
     sportType === 'basketball' ||
     sportType === 'tennis' ||

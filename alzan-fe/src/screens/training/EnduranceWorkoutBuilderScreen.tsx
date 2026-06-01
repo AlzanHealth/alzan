@@ -70,6 +70,7 @@ interface Step {
 }
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as SportType;
+const TRAIL_SPORT_TYPE = 'trail' as SportType;
 
 export const EnduranceWorkoutBuilderScreen = () => {
   const { t } = useTranslation();
@@ -114,11 +115,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
     sportType !== 'martial_arts' &&
     sportType !== 'climbing' &&
     sportType !== VOLLEYBALL_SPORT_TYPE &&
+    sportType !== TRAIL_SPORT_TYPE &&
     sportType !== 'surf';
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [manualDuration, setManualDuration] = useState<string>('');
+  const [elevationGain, setElevationGain] = useState<string>('');
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
   const [surface, setSurface] = useState<string | null>(null);
   const [poolType, setPoolType] = useState<string | null>(null);
@@ -227,6 +230,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       setSportType((existingTemplate.sport_type as SportType) || 'running');
       setEnvironmentType(existingTemplate.environment_type || null);
       setSurface(existingTemplate.surface || null);
+      setElevationGain(existingTemplate.elev_gain_m?.toString() || '');
       setPoolType(existingTemplate.pool_type || null);
       setStroke(existingTemplate.stroke || null);
 
@@ -310,6 +314,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     'martial_arts',
     'climbing',
     'volleyball',
+    'trail',
     'surf',
   ].includes(sportType || '')
     ? getOptions(sportType, 'base_load')
@@ -510,10 +515,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
             'martial_arts',
             'climbing',
             'volleyball',
+            'trail',
             'surf',
           ].includes(sportType || '')
             ? baseLoad
             : null,
+          elev_gain_m:
+            sportType === TRAIL_SPORT_TYPE && elevationGain.trim()
+              ? Math.max(0, Number.parseFloat(elevationGain.replace(',', '.')) || 0)
+              : null,
           contact_level: sportType === 'martial_arts' ? contactLevel : null,
           boots_used: sportType === 'football' || sportType === 'hiking' ? bootsUsed : null,
           racket_used: ['tennis', 'padel'].includes(sportType || '') ? racketUsed : null,
@@ -1107,6 +1117,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 { id: 'tennis', label: t('constants.tennis') },
                 { id: 'padel', label: t('constants.padel') },
                 { id: 'hiking', label: t('constants.hiking') },
+                { id: 'trail', label: t('constants.trail') },
                 { id: 'martial_arts', label: t('constants.martialArts') },
                 { id: 'climbing', label: t('constants.climbing') },
                 { id: 'volleyball', label: t('constants.volleyball') },
@@ -1306,6 +1317,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType === 'martial_arts' ||
                 sportType === 'climbing' ||
                 sportType === VOLLEYBALL_SPORT_TYPE ||
+                sportType === TRAIL_SPORT_TYPE ||
                 sportType === 'surf') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
@@ -1320,7 +1332,54 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     }}
                   >
                     {/* Col 1: Superficie, contact level, or grade */}
-                    {sportType === 'surf' ? (
+                    {sportType === TRAIL_SPORT_TYPE ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: themeColors.border,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: 90,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name="elevation-rise"
+                          size={24}
+                          color={SPORT_COLORS[sportType] || themeColors.primary}
+                          style={{ marginBottom: 6 }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            marginBottom: 6,
+                            textAlign: 'center',
+                            color: themeColors.textSecondary,
+                          }}
+                        >
+                          {t('training.elevationGoalLabel')}
+                        </Text>
+                        <TextInput
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            color: elevationGain ? themeColors.textPrimary : themeColors.textSecondary,
+                            minWidth: 64,
+                          }}
+                          keyboardType="numeric"
+                          placeholder="0 m"
+                          placeholderTextColor={themeColors.textSecondary}
+                          value={elevationGain}
+                          onChangeText={setElevationGain}
+                        />
+                      </View>
+                    ) : sportType === 'surf' ? (
                       <TouchableOpacity
                         style={{
                           flex: 1,
@@ -1545,7 +1604,54 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     </TouchableOpacity>
 
                     {/* Col 3: Racket/Boots/Board - Coming Soon (if not configured) */}
-                    {sportType === VOLLEYBALL_SPORT_TYPE ? null : sportType === 'surf' ? (
+                    {sportType === TRAIL_SPORT_TYPE && hasTerrainOptions ? (
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: themeColors.border,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: 90,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                        }}
+                        onPress={() => setSurfaceModalVisible(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={getGroupLabel(sportType, 'terrain')}
+                      >
+                        <MaterialCommunityIcons
+                          name="image-filter-hdr"
+                          size={24}
+                          color={SPORT_COLORS[sportType] || themeColors.primary}
+                          style={{ marginBottom: 6 }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            marginBottom: 6,
+                            textAlign: 'center',
+                            color: themeColors.textSecondary,
+                          }}
+                        >
+                          {getGroupLabel(sportType, 'terrain')}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            color: surface ? themeColors.textPrimary : themeColors.textSecondary,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {surface ? getSurfaceDisplayLabel(surface) : t('common.select')}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : sportType === VOLLEYBALL_SPORT_TYPE ? null : sportType === 'surf' ? (
                       <TouchableOpacity
                         style={{
                           flex: 1,
@@ -1676,6 +1782,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== 'martial_arts' &&
                 sportType !== 'climbing' &&
                 sportType !== VOLLEYBALL_SPORT_TYPE &&
+                sportType !== TRAIL_SPORT_TYPE &&
                 sportType !== 'surf' &&
                 !isWideLayout && <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>}
 
@@ -1688,6 +1795,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== 'martial_arts' &&
                 sportType !== 'climbing' &&
                 sportType !== VOLLEYBALL_SPORT_TYPE &&
+                sportType !== TRAIL_SPORT_TYPE &&
                 sportType !== 'surf') ||
                 sportType === 'swimming') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>

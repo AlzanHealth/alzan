@@ -62,6 +62,7 @@ import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { SPORT_COLORS } from '../../theme/sportColors';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
+const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
 
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
@@ -633,6 +634,29 @@ export const EnduranceSessionDetailScreen = () => {
       if (session.base_load) {
         secondaryMetrics.push({
           key: 'volleyball-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
+    if (session.sport_type === TRAIL_SPORT_TYPE) {
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'trail-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (session.surface) {
+        secondaryMetrics.push({
+          key: 'trail-surface',
+          label: t('training.surfaceLabel'),
+          value: getOptionLabel(session.sport_type, session.surface, 'terrain'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'trail-base-load',
           label: t('training.loadLabel'),
           value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
         });

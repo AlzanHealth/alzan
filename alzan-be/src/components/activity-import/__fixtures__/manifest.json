@@ -255,6 +255,28 @@
     }
   },
   {
+    "id": "strava-trail-json",
+    "provider": "strava",
+    "sportType": "trail",
+    "sportSubtype": "trail_running",
+    "format": "json",
+    "file": "providers/strava/trail.json",
+    "sourceKind": "synthetic_official_shape",
+    "sourceUrl": "https://developers.strava.com/docs/reference/",
+    "expectedSummary": {
+      "durationSeconds": 7200,
+      "caloriesKcal": 1240,
+      "distanceM": 18000,
+      "avgHeartRate": 151,
+      "maxHeartRate": 184,
+      "elevationGainM": 900
+    },
+    "expectedStreams": {},
+    "expectedProviderFields": {
+      "sourceProvider": "strava"
+    }
+  },
+  {
     "id": "strava-cycling-json",
     "provider": "strava",
     "sportType": "cycling",

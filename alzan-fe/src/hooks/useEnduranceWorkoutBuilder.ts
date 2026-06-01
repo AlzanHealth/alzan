@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { propagateTrainingPlans } from '../modules/training/services/trainingCopyService';
 import { DurationType, PhaseType, SportType, TargetType } from '../types/requests.types';
+import { Database } from '../types/database.types';
 
 export interface BuilderStep {
   id: string; // temp or real id
@@ -41,7 +42,16 @@ export interface BuilderTemplateData {
   board?: string | null;
   rival?: string | null;
   notes?: string | null;
+  elev_gain_m?: number | null;
 }
+
+type EnduranceWorkoutTemplateInsertPatch = Database['public']['Tables']['endurance_workout_templates']['Insert'] & {
+  elev_gain_m?: number | null;
+};
+
+type EnduranceWorkoutTemplateUpdatePatch = Database['public']['Tables']['endurance_workout_templates']['Update'] & {
+  elev_gain_m?: number | null;
+};
 
 export const useEnduranceWorkoutBuilder = () => {
   const { user } = useAuth();
@@ -71,33 +81,35 @@ export const useEnduranceWorkoutBuilder = () => {
         let finalTemplateId: string;
 
         if (isEditMode) {
+          const updatePayload: EnduranceWorkoutTemplateUpdatePatch = {
+            base_name: data.base_name,
+            description: data.description,
+            sport_type: data.sport_type,
+            total_duration_s: data.total_duration_s,
+            total_distance_m: data.total_distance_m,
+            workout_goal: data.workout_goal,
+            scheduled_day: data.scheduled_day,
+            environment_type: data.environment_type,
+            surface: data.surface,
+            pool_type: data.pool_type,
+            stroke: data.stroke,
+            football_session_type: data.football_session_type,
+            base_load: data.base_load,
+            contact_level: data.contact_level,
+            boots_used: data.boots_used,
+            racket_used: data.racket_used,
+            climbing_grade: data.climbing_grade,
+            wetsuit: data.wetsuit,
+            board: data.board,
+            rival: data.rival,
+            notes: data.notes,
+            elev_gain_m: data.elev_gain_m,
+            updated_at: new Date().toISOString(),
+          };
           // UPDATE existing template
           const { error: updateError } = await supabase
             .from('endurance_workout_templates')
-            .update({
-              base_name: data.base_name,
-              description: data.description,
-              sport_type: data.sport_type,
-              total_duration_s: data.total_duration_s,
-              total_distance_m: data.total_distance_m,
-              workout_goal: data.workout_goal,
-              scheduled_day: data.scheduled_day,
-              environment_type: data.environment_type,
-              surface: data.surface,
-              pool_type: data.pool_type,
-              stroke: data.stroke,
-              football_session_type: data.football_session_type,
-              base_load: data.base_load,
-              contact_level: data.contact_level,
-              boots_used: data.boots_used,
-              racket_used: data.racket_used,
-              climbing_grade: data.climbing_grade,
-              wetsuit: data.wetsuit,
-              board: data.board,
-              rival: data.rival,
-              notes: data.notes,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updatePayload)
             .eq('id', templateId);
 
           if (updateError) {
@@ -111,33 +123,35 @@ export const useEnduranceWorkoutBuilder = () => {
           finalTemplateId = templateId;
           console.log('[useEnduranceWorkoutBuilder.save] Template actualizado - id:', templateId);
         } else {
+          const insertPayload: EnduranceWorkoutTemplateInsertPatch = {
+            user_id: user.id,
+            base_name: data.base_name,
+            description: data.description,
+            sport_type: data.sport_type,
+            total_duration_s: data.total_duration_s,
+            total_distance_m: data.total_distance_m,
+            workout_goal: data.workout_goal,
+            scheduled_day: data.scheduled_day,
+            environment_type: data.environment_type,
+            surface: data.surface,
+            pool_type: data.pool_type,
+            stroke: data.stroke,
+            football_session_type: data.football_session_type,
+            base_load: data.base_load,
+            contact_level: data.contact_level,
+            boots_used: data.boots_used,
+            racket_used: data.racket_used,
+            climbing_grade: data.climbing_grade,
+            wetsuit: data.wetsuit,
+            board: data.board,
+            rival: data.rival,
+            notes: data.notes,
+            elev_gain_m: data.elev_gain_m,
+          };
           // INSERT new template
           const { data: template, error: tError } = await supabase
             .from('endurance_workout_templates')
-            .insert({
-              user_id: user.id,
-              base_name: data.base_name,
-              description: data.description,
-              sport_type: data.sport_type,
-              total_duration_s: data.total_duration_s,
-              total_distance_m: data.total_distance_m,
-              workout_goal: data.workout_goal,
-              scheduled_day: data.scheduled_day,
-              environment_type: data.environment_type,
-              surface: data.surface,
-              pool_type: data.pool_type,
-              stroke: data.stroke,
-              football_session_type: data.football_session_type,
-              base_load: data.base_load,
-              contact_level: data.contact_level,
-              boots_used: data.boots_used,
-              racket_used: data.racket_used,
-              climbing_grade: data.climbing_grade,
-              wetsuit: data.wetsuit,
-              board: data.board,
-              rival: data.rival,
-              notes: data.notes,
-            })
+            .insert(insertPayload)
             .select()
             .single();
 

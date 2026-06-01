@@ -11,6 +11,7 @@ export const SPORT_COLORS: Record<string, string> = {
   martial_arts: '#D64B7F', // Rosa combate
   climbing: '#6B8E4E', // Verde roca
   volleyball: '#00A6A6', // Turquesa pista/playa
+  trail: '#C46A2D', // Terracota montaña
   walking: '#34C759', // Greenish (Default for walking if needed)
   other: '#8E8E93', // Gris neutro
 };

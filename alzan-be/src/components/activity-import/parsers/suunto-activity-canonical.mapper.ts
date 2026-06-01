@@ -11,6 +11,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -104,7 +105,7 @@ const SUUNTO_ACTIVITY_ID_MAP = new Map<number, CanonicalActivitySportMapping>([
   [10, { sportType: 'cycling', sportSubtype: 'mtb' }], // Mountain Biking
   [11, { sportType: 'hiking', sportSubtype: 'trail' }],
   [21, { sportType: 'swimming', sportSubtype: 'pool' }],
-  [22, { sportType: 'running', sportSubtype: 'trail' }],
+  [22, { sportType: 'trail', sportSubtype: 'trail_running' }],
   [23, { sportType: 'strength', sportSubtype: 'indoor' }],
   [33, { sportType: 'football', sportSubtype: 'football_11' }],
   [34, { sportType: 'tennis', sportSubtype: 'outdoor' }],
@@ -204,6 +205,8 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(params.sportName);
   if (volleyballSport) return volleyballSport;
+  const trailSport = mapTrailTextToCanonical(params.sportName);
+  if (trailSport) return trailSport;
 
   if (params.activityId != null) {
     const mappedActivityId = SUUNTO_ACTIVITY_ID_MAP.get(Math.round(params.activityId));
@@ -231,7 +234,7 @@ export function mapSuuntoActivityToCanonicalSport(params: {
         params.sportName.toLowerCase().includes('maraton') ||
         params.sportName.toLowerCase().includes('competition') ||
         params.sportName.toLowerCase().includes('competición'));
-    if (fitSubSport === 3) return { sportType: 'running', sportSubtype: 'trail' };
+    if (fitSubSport === 3) return { sportType: 'trail', sportSubtype: 'trail_running' };
     if (fitSubSport === 4) return { sportType: 'running', sportSubtype: 'track' };
     if (fitSubSport === 1) return { sportType: 'running', sportSubtype: 'treadmill' };
     if (isRace) return { sportType: 'running', sportSubtype: 'race' };
@@ -306,7 +309,7 @@ export function mapSuuntoActivityToCanonicalSport(params: {
       return { sportType: 'running', sportSubtype: 'treadmill' };
     }
     if (sportName.includes('trail') || sportName.includes('mountain') || sportName.includes('montaña')) {
-      return { sportType: 'running', sportSubtype: 'trail' };
+      return { sportType: 'trail', sportSubtype: 'trail_running' };
     }
     if (sportName.includes('track') || sportName.includes('pista') || sportName.includes('atletismo')) {
       return { sportType: 'running', sportSubtype: 'track' };

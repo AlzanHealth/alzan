@@ -103,8 +103,8 @@ function assertPolarV4TrainingSessionParses(): void {
   });
   const parsed = parseRouteFileWithSummary(rawJson, 'polar-v4-running.json', { estimatedMaxHeartRate: 190 });
   assert.ok(parsed.polyline.length > 0);
-  assert.equal(parsed.summary.sportType, 'running');
-  assert.equal(parsed.summary.sportSubtype, 'trail');
+  assert.equal(parsed.summary.sportType, 'trail');
+  assert.equal(parsed.summary.sportSubtype, 'trail_running');
   assert.equal(parsed.summary.recoveryTimeSeconds, 7200);
   assert.equal(parsed.summary.elevationGainM, 90);
   assert.equal(parsed.details.customSplits.length, 1);

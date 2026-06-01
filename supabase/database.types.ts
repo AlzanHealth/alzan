@@ -1460,6 +1460,7 @@ export type Database = {
           contact_level: string | null
           created_at: string
           description: string | null
+          elev_gain_m: number | null
           environment_type: string | null
           football_session_type: string | null
           id: string
@@ -1487,6 +1488,7 @@ export type Database = {
           contact_level?: string | null
           created_at?: string
           description?: string | null
+          elev_gain_m?: number | null
           environment_type?: string | null
           football_session_type?: string | null
           id?: string
@@ -1514,6 +1516,7 @@ export type Database = {
           contact_level?: string | null
           created_at?: string
           description?: string | null
+          elev_gain_m?: number | null
           environment_type?: string | null
           football_session_type?: string | null
           id?: string
@@ -4668,6 +4671,7 @@ export type Database = {
         | "climbing"
         | "surf"
         | "volleyball"
+        | "trail"
       stream_type_enum:
         | "heart_rate"
         | "cadence"
@@ -5003,6 +5007,7 @@ export const Constants = {
         "climbing",
         "surf",
         "volleyball",
+        "trail",
       ],
       stream_type_enum: [
         "heart_rate",

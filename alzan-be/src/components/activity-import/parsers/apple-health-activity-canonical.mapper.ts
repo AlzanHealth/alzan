@@ -8,6 +8,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
@@ -107,6 +108,8 @@ function mapAppleHealthSport(
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(combined);
   if (volleyballSport) return volleyballSport;
+  const trailSport = mapTrailTextToCanonical(combined);
+  if (trailSport) return trailSport;
 
   if (normalised.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (normalised.includes('running') || normalised.includes('trackandfield')) {
@@ -142,7 +145,7 @@ function mapAppleHealthSport(
       nameLower.includes('montaña') ||
       nameLower.includes('mountain')
     ) {
-      return { sportType: 'running', sportSubtype: 'trail' };
+      return { sportType: 'trail', sportSubtype: 'trail_running' };
     }
     if (nameLower.includes('track') || nameLower.includes('pista') || nameLower.includes('atletismo')) {
       return { sportType: 'running', sportSubtype: 'track' };
