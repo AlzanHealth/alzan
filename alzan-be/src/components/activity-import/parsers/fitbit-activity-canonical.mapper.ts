@@ -9,6 +9,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -148,8 +149,11 @@ function mapFitbitSport(activityTypeId: number | null, activityName: string | nu
   const normalised = activityName?.trim().toLowerCase() ?? '';
   const martialArtsSport = mapMartialArtsTextToCanonical(activityName);
   if (martialArtsSport) return martialArtsSport;
+
   const climbingSport = mapClimbingTextToCanonical(activityName);
   if (climbingSport) return climbingSport;
+  const volleyballSport = mapVolleyballTextToCanonical(activityName);
+  if (volleyballSport) return volleyballSport;
 
   if (activityTypeId != null && FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId]) {
     const mapped = FITBIT_ACTIVITY_TYPE_BY_ID[activityTypeId];

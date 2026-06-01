@@ -4583,7 +4583,8 @@ export type Database = {
         | 'gym'
         | 'martial_arts'
         | 'climbing'
-        | 'surf';
+        | 'surf'
+        | 'volleyball';
       stream_type_enum: 'heart_rate' | 'cadence' | 'power' | 'altitude' | 'speed' | 'distance' | 'temperature';
       target_type_enum: 'none' | 'pace' | 'heart_rate' | 'power' | 'speed' | 'heart_rate_zone' | 'rpe';
       training_frequency_enum: 'none' | 'occasional' | 'frequent' | 'athlete';
@@ -4841,6 +4842,7 @@ export const Constants = {
         'martial_arts',
         'climbing',
         'surf',
+        'volleyball',
       ],
       stream_type_enum: ['heart_rate', 'cadence', 'power', 'altitude', 'speed', 'distance', 'temperature'],
       target_type_enum: ['none', 'pace', 'heart_rate', 'power', 'speed', 'heart_rate_zone', 'rpe'],

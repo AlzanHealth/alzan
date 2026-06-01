@@ -74,7 +74,7 @@ interface SessionWithDate {
   startDate: Date;
 }
 
-type SummarySportType = Exclude<ActivitySession['sport_type'], 'strength'> | 'gym';
+type SummarySportType = Exclude<ActivitySession['sport_type'], 'strength'> | 'gym' | 'volleyball';
 
 type SportMiddleMetric = 'distance' | 'volume' | 'sets' | 'elevation' | 'calories';
 
@@ -132,7 +132,7 @@ const getPreferredMiddleMetric = (sportType: SummarySportType): SportMiddleMetri
     return 'sets';
   }
 
-  if (sportType === 'martial_arts' || sportType === 'climbing') {
+  if (sportType === 'martial_arts' || sportType === 'climbing' || sportType === 'volleyball') {
     return 'calories';
   }
 

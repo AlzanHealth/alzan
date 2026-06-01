@@ -42,7 +42,7 @@ interface DateFilter {
 }
 
 type ActivityView = 'calendar' | 'history';
-type HistorySportFilter = 'all' | 'gym' | ActivitySession['sport_type'];
+type HistorySportFilter = 'all' | 'gym' | ActivitySession['sport_type'] | 'volleyball';
 const HISTORY_PAGE_SIZE = 10;
 
 interface HistorySummaryTotals {
@@ -343,7 +343,7 @@ export const EnduranceSessionsListScreen = () => {
   };
 
   const handleOpenSportHistoryFromCalendar = (payload: {
-    sportType: 'gym' | ActivitySession['sport_type'];
+    sportType: 'gym' | ActivitySession['sport_type'] | 'volleyball';
     sportLabel: string;
     rangeStart: string;
     rangeEnd: string;

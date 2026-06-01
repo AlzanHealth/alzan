@@ -12,6 +12,7 @@ import {
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -164,8 +165,11 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
   const sport = `${rawDetailed ?? ''} ${rawSport ?? ''}`.toUpperCase();
   const martialArtsSport = mapMartialArtsTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
   if (martialArtsSport) return martialArtsSport;
+
   const climbingSport = mapClimbingTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
   if (climbingSport) return climbingSport;
+  const volleyballSport = mapVolleyballTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
+  if (volleyballSport) return volleyballSport;
 
   if (sport.includes('WALKING')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (sport.includes('PADEL')) return { sportType: 'padel', sportSubtype: 'outdoor' };

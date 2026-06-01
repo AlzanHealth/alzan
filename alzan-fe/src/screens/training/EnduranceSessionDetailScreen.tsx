@@ -61,6 +61,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { SPORT_COLORS } from '../../theme/sportColors';
 
+const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
+
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
@@ -617,6 +619,22 @@ export const EnduranceSessionDetailScreen = () => {
           key: 'climbing-grade',
           label: t('training.gradeLabel'),
           value: getOptionLabel(session.sport_type, session.climbing_grade, 'climbing_grade'),
+        });
+      }
+    }
+    if (session.sport_type === VOLLEYBALL_SPORT_TYPE) {
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'volleyball-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'volleyball-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
         });
       }
     }

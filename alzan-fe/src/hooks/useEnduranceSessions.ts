@@ -6,7 +6,7 @@ import { ActivitySessionInsert, ActivitySessionUpdate, ActivitySession } from '.
 interface UseEnduranceSessionsOptions {
   startDate?: string; // ISO 8601 format YYYY-MM-DD
   endDate?: string; // ISO 8601 format YYYY-MM-DD
-  sportType?: ActivitySession['sport_type'] | 'gym' | 'all';
+  sportType?: ActivitySession['sport_type'] | 'gym' | 'volleyball' | 'all';
   limit?: number;
   enabled?: boolean;
 }
@@ -35,7 +35,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
         if (options.sportType === 'gym') {
           query = query.in('sport_type', ['strength', 'gym']);
         } else {
-          query = query.eq('sport_type', options.sportType);
+          query = query.eq('sport_type', options.sportType as ActivitySession['sport_type']);
         }
       }
 
@@ -77,7 +77,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
       if (options.sportType === 'gym') {
         query = query.in('sport_type', ['strength', 'gym']);
       } else {
-        query = query.eq('sport_type', options.sportType);
+        query = query.eq('sport_type', options.sportType as ActivitySession['sport_type']);
       }
     }
 

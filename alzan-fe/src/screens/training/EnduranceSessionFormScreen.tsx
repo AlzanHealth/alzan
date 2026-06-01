@@ -334,7 +334,11 @@ export const EnduranceSessionFormScreen = () => {
       if (activeTemplate.stroke) {
         setStroke(activeTemplate.stroke);
       }
-      if (['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing'].includes(activeTemplate.sport_type)) {
+      if (
+        ['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing', 'volleyball'].includes(
+          activeTemplate.sport_type,
+        )
+      ) {
         setBaseLoad(activeTemplate.base_load || null);
       }
       if (activeTemplate.sport_type === 'martial_arts') {
@@ -957,6 +961,7 @@ export const EnduranceSessionFormScreen = () => {
           'hiking',
           'martial_arts',
           'climbing',
+          'volleyball',
           'surf',
         ].includes(sportType)
           ? sportSubtype
@@ -964,7 +969,9 @@ export const EnduranceSessionFormScreen = () => {
         pool_type: sportType === 'swimming' ? poolType : null,
         stroke: sportType === 'swimming' ? stroke : null,
         football_session_type: sportType === 'football' ? footballSessionType : null,
-        base_load: ['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing', 'surf'].includes(sportType)
+        base_load: ['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing', 'volleyball', 'surf'].includes(
+          sportType,
+        )
           ? baseLoad
           : null,
         contact_level: sportType === 'martial_arts' ? contactLevel : null,
@@ -2137,6 +2144,63 @@ export const EnduranceSessionFormScreen = () => {
                       <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
                     </View>
                   </View>
+                </View>
+              )}
+
+              {/* Volleyball Specific Configuration Block */}
+              {sportType === 'volleyball' && (
+                <View
+                  style={[
+                    {
+                      marginBottom: spacing.m,
+                      paddingHorizontal: spacing.m,
+                      paddingVertical: spacing.s,
+                      borderRadius: borderRadius.m,
+                    },
+                    dynamicStyles.glassCard,
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSportSubtypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.modalityLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.modalityLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: sportSubtype ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {sportSubtype ? getOptionLabel(sportType, sportSubtype, 'modality') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.formRow, { borderBottomWidth: 0 }]}
+                    onPress={() => setBaseLoadModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.loadLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.loadLabel')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: baseLoad ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {baseLoad ? getOptionLabel(sportType, baseLoad, 'base_load') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
                 </View>
               )}
 

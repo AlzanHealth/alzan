@@ -69,6 +69,8 @@ interface Step {
   children?: Step[]; // For UI state
 }
 
+const VOLLEYBALL_SPORT_TYPE = 'volleyball' as SportType;
+
 export const EnduranceWorkoutBuilderScreen = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -111,6 +113,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     sportType !== 'hiking' &&
     sportType !== 'martial_arts' &&
     sportType !== 'climbing' &&
+    sportType !== VOLLEYBALL_SPORT_TYPE &&
     sportType !== 'surf';
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
@@ -299,9 +302,16 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const goalOptions = sportType ? getOptions(sportType, 'goal') : [];
   const modalityOptions = sportType ? getOptions(sportType, 'modality') : [];
   const terrainOptions = sportType ? getOptions(sportType, 'terrain') : [];
-  const baseLoadOptions = ['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing', 'surf'].includes(
-    sportType || '',
-  )
+  const baseLoadOptions = [
+    'football',
+    'tennis',
+    'padel',
+    'hiking',
+    'martial_arts',
+    'climbing',
+    'volleyball',
+    'surf',
+  ].includes(sportType || '')
     ? getOptions(sportType, 'base_load')
     : [];
   const contactLevelOptions = sportType === 'martial_arts' ? getOptions(sportType, 'contact_level') : [];
@@ -492,9 +502,16 @@ export const EnduranceWorkoutBuilderScreen = () => {
           pool_type: poolType,
           stroke: stroke,
           football_session_type: sportType === 'football' ? footballSessionType : null,
-          base_load: ['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing', 'surf'].includes(
-            sportType || '',
-          )
+          base_load: [
+            'football',
+            'tennis',
+            'padel',
+            'hiking',
+            'martial_arts',
+            'climbing',
+            'volleyball',
+            'surf',
+          ].includes(sportType || '')
             ? baseLoad
             : null,
           contact_level: sportType === 'martial_arts' ? contactLevel : null,
@@ -1092,6 +1109,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 { id: 'hiking', label: t('constants.hiking') },
                 { id: 'martial_arts', label: t('constants.martialArts') },
                 { id: 'climbing', label: t('constants.climbing') },
+                { id: 'volleyball', label: t('constants.volleyball') },
                 { id: 'surf', label: t('constants.surfTitle') },
               ].map(sport => (
                 <TouchableOpacity
@@ -1287,6 +1305,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType === 'hiking' ||
                 sportType === 'martial_arts' ||
                 sportType === 'climbing' ||
+                sportType === VOLLEYBALL_SPORT_TYPE ||
                 sportType === 'surf') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
@@ -1397,7 +1416,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                             : t('common.select')}
                         </Text>
                       </TouchableOpacity>
-                    ) : (
+                    ) : sportType === VOLLEYBALL_SPORT_TYPE ? null : (
                       <TouchableOpacity
                         style={{
                           flex: 1,
@@ -1526,7 +1545,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     </TouchableOpacity>
 
                     {/* Col 3: Racket/Boots/Board - Coming Soon (if not configured) */}
-                    {sportType === 'surf' ? (
+                    {sportType === VOLLEYBALL_SPORT_TYPE ? null : sportType === 'surf' ? (
                       <TouchableOpacity
                         style={{
                           flex: 1,
@@ -1656,6 +1675,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== 'hiking' &&
                 sportType !== 'martial_arts' &&
                 sportType !== 'climbing' &&
+                sportType !== VOLLEYBALL_SPORT_TYPE &&
                 sportType !== 'surf' &&
                 !isWideLayout && <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>}
 
@@ -1667,6 +1687,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== 'hiking' &&
                 sportType !== 'martial_arts' &&
                 sportType !== 'climbing' &&
+                sportType !== VOLLEYBALL_SPORT_TYPE &&
                 sportType !== 'surf') ||
                 sportType === 'swimming') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>

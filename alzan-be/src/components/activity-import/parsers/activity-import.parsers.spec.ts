@@ -228,6 +228,20 @@ function assertGenericClimbingUsesCatalogModality(): void {
   assert.equal(canonical.sportSubtype, 'bouldering');
 }
 
+function assertGenericVolleyballUsesCatalogModality(): void {
+  const canonical = parseActivityFileToCanonical(
+    JSON.stringify({
+      sport_type: 'Beach Volleyball',
+      start_time: '2026-05-01T18:00:00Z',
+      duration_s: 3600,
+      calories_kcal: 480,
+    }),
+    'generic-beach-volleyball.json',
+  );
+  assert.equal(canonical.sportType, 'volleyball');
+  assert.equal(canonical.sportSubtype, 'beach_volleyball');
+}
+
 assertSuuntoStrengthJsonParses();
 assertClearEnduranceStrengthJsonIsRejected();
 assertSuuntoDistanceActivityIsRejectedForStrength();
@@ -237,3 +251,4 @@ assertGenericCyclingTerrainIsNotLost();
 assertGenericWalkingUsesHikingCatalogModality();
 assertGenericMartialArtsUsesCatalogModality();
 assertGenericClimbingUsesCatalogModality();
+assertGenericVolleyballUsesCatalogModality();

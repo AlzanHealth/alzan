@@ -4667,6 +4667,7 @@ export type Database = {
         | "martial_arts"
         | "climbing"
         | "surf"
+        | "volleyball"
       stream_type_enum:
         | "heart_rate"
         | "cadence"
@@ -5001,6 +5002,7 @@ export const Constants = {
         "martial_arts",
         "climbing",
         "surf",
+        "volleyball",
       ],
       stream_type_enum: [
         "heart_rate",

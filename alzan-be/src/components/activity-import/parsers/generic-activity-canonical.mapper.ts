@@ -8,6 +8,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
+import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -105,6 +106,8 @@ function mapSportNameToCanonical(rawSportName: string | null): CanonicalActivity
   if (martialArtsSport) return martialArtsSport;
   const climbingSport = mapClimbingTextToCanonical(rawSportName);
   if (climbingSport) return climbingSport;
+  const volleyballSport = mapVolleyballTextToCanonical(rawSportName);
+  if (volleyballSport) return volleyballSport;
 
   if (sportName.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (sportName.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
