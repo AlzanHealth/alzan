@@ -41,6 +41,7 @@ const ACTIVITIES: ActivityType[] = [
   { id: 'surf', label: 'constants.surfTitle', sportType: 'surf', color: SPORT_COLORS.surf },
   { id: 'skiing', label: 'constants.skiingTitle', sportType: 'skiing', color: SPORT_COLORS.skiing },
   { id: 'snowboard', label: 'constants.snowboardTitle', sportType: 'snowboard', color: SPORT_COLORS.snowboard },
+  { id: 'golf', label: 'constants.golfTitle', sportType: 'golf', color: SPORT_COLORS.golf },
   { id: 'gym', label: 'constants.gym', sportType: 'gym', color: SPORT_COLORS.gym, isGym: true },
   { id: 'other', label: 'constants.other', sportType: 'other', color: SPORT_COLORS.other },
 ];

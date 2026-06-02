@@ -7,6 +7,7 @@ import {
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
+import { mapGolfTextToCanonical } from './golf-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
@@ -110,6 +111,8 @@ function mapAppleHealthSport(
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(combined);
   if (volleyballSport) return volleyballSport;
+  const golfSport = mapGolfTextToCanonical(combined);
+  if (golfSport) return golfSport;
   const trailSport = mapTrailTextToCanonical(combined);
   if (trailSport) return trailSport;
   const skiingSport = mapSkiingTextToCanonical(combined);

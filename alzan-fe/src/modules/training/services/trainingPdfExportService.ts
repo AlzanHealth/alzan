@@ -73,8 +73,18 @@ const SPORT_CONFIG: Record<string, { label: TranslationKey; color: string }> = {
   skiing: { label: 'constants.skiing', color: '#1B5E9E' },
   surf: { label: 'constants.surfTitle', color: '#1891AC' },
   snowboard: { label: 'constants.snowboard', color: '#7560E5' },
+  golf: { label: 'constants.golf', color: '#2F7D46' },
   other: { label: 'constants.other', color: '#8E8E93' },
 };
+
+interface CatalogOptionRecord {
+  sport_type: string;
+  option_type: string;
+  option_key: string;
+  translation_key: string;
+  label_es: string | null;
+  label_en: string | null;
+}
 
 const PHASE_COLORS: Record<string, string> = {
   warmup: '#34C759',
@@ -110,6 +120,12 @@ const escapeHtml = (value: string): string =>
 const normalizeText = (value: string | null | undefined): string | null => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+};
+
+const readStringField = (record: unknown, key: string): string | null => {
+  if (!record || typeof record !== 'object') return null;
+  const value = (record as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 };
 
 const getStringField = (record: Record<string, unknown>, key: string): string | null => {
@@ -164,6 +180,7 @@ const toSportType = (value: string): SportType => {
     case 'skiing':
     case 'surf':
     case 'snowboard':
+    case 'golf':
     case 'other':
       return value as SportType;
     default:
@@ -274,6 +291,32 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
 
     if (sessionsError) throw new Error(getErrorMessage(sessionsError));
     if (!sessions?.length) throw new Error(t('training.pdfNoWorkoutsInRange'));
+
+    const sportTypes = Array.from(new Set(sessions.map(session => session.sport_type).filter(Boolean)));
+    const { data: catalogOptions } =
+      sportTypes.length > 0
+        ? await supabase
+            .from('sport_catalog_options')
+            .select('sport_type,option_type,option_key,translation_key,label_es,label_en')
+            .in('sport_type', sportTypes)
+            .eq('is_active', true)
+        : { data: [] };
+    const catalogLabelByKey = new Map<string, string>();
+    (catalogOptions as CatalogOptionRecord[] | null | undefined)?.forEach(option => {
+      const localizedLabel = isEnglish() ? option.label_en : option.label_es;
+      catalogLabelByKey.set(
+        `${option.sport_type}:${option.option_type}:${option.option_key}`,
+        localizedLabel || t(option.translation_key as TranslationKey),
+      );
+    });
+    const getCatalogOptionLabel = (
+      sportType: string | null | undefined,
+      optionType: string,
+      optionKey: string | null | undefined,
+    ): string | null => {
+      if (!sportType || !optionKey) return null;
+      return catalogLabelByKey.get(`${sportType}:${optionType}:${optionKey}`) ?? null;
+    };
 
     const sessionIds = sessions.map(session => session.id);
     const heartRateZonesBySessionId: Record<string, ActivityHeartRateZone[]> = {};
@@ -594,6 +637,26 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       }
       if (session.max_temp_c != null) {
         stats.push(`${t('training.pdfMaxTemperature')}: ${Math.round(session.max_temp_c)}°C`);
+      }
+      const subtypeLabel = getCatalogOptionLabel(session.sport_type, 'modality', session.sport_subtype);
+      if (subtypeLabel) {
+        stats.push(`${t('training.modalityLabel')}: ${subtypeLabel}`);
+      }
+      const baseLoadLabel = getCatalogOptionLabel(
+        session.sport_type,
+        'base_load',
+        readStringField(session, 'base_load'),
+      );
+      if (baseLoadLabel) {
+        stats.push(`${t('training.loadLabel')}: ${baseLoadLabel}`);
+      }
+      const golfClubFocusLabel = getCatalogOptionLabel(
+        session.sport_type,
+        'golf_club_focus',
+        readStringField(session, 'golf_club_focus'),
+      );
+      if (golfClubFocusLabel) {
+        stats.push(`${t('training.golfClubFocusLabel')}: ${golfClubFocusLabel}`);
       }
       if (session.total_sets != null && session.total_sets > 0) {
         stats.push(`${t('training.pdfTotalSets')}: ${Math.round(session.total_sets)}`);

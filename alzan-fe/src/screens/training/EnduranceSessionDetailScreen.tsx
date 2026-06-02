@@ -764,6 +764,31 @@ export const EnduranceSessionDetailScreen = () => {
         });
       }
     }
+    if (String(session.sport_type) === 'golf') {
+      const golfClubFocus =
+        'golf_club_focus' in session && typeof session.golf_club_focus === 'string' ? session.golf_club_focus : null;
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'golf-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (golfClubFocus) {
+        secondaryMetrics.push({
+          key: 'golf-club-focus',
+          label: t('training.golfClubFocusLabel'),
+          value: getOptionLabel(session.sport_type, golfClubFocus, 'golf_club_focus'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'golf-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
   }
 
   const handleImportedMetricInfoPress = useCallback(

@@ -20,7 +20,8 @@ export type SportCatalogOptionType =
   | 'climbing_grade'
   | 'ski_type'
   | 'slope_type'
-  | 'snowboard_type';
+  | 'snowboard_type'
+  | 'golf_club_focus';
 type SportCatalogLocalizedLabels = {
   label_es?: string | null;
   label_en?: string | null;
@@ -48,6 +49,7 @@ const OPTION_TYPES: SportCatalogOptionType[] = [
   'ski_type',
   'slope_type',
   'snowboard_type',
+  'golf_club_focus',
 ];
 
 const isSportCatalogOptionType = (value: string): value is SportCatalogOptionType =>

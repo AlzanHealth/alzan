@@ -303,6 +303,28 @@ function assertGenericSnowboardUsesCatalogModality(): void {
   }
 }
 
+function assertGenericGolfUsesCatalogModality(): void {
+  const cases = [
+    { name: 'Golf', subtype: null },
+    { name: '18 holes round of golf', subtype: 'round_18_holes' },
+    { name: 'Driving range practice', subtype: 'driving_range' },
+    { name: 'Pitch & putt', subtype: 'pitch_and_putt' },
+  ] as const;
+
+  for (const testCase of cases) {
+    const canonical = parseActivityFileToCanonical(
+      JSON.stringify({
+        sport_type: testCase.name,
+        start_time: '2026-06-01T08:00:00Z',
+        duration_s: 3600,
+      }),
+      `generic-golf-${testCase.subtype ?? 'round'}.json`,
+    );
+    assert.equal(canonical.sportType, 'golf');
+    assert.equal(canonical.sportSubtype, testCase.subtype);
+  }
+}
+
 assertSuuntoStrengthJsonParses();
 assertClearEnduranceStrengthJsonIsRejected();
 assertSuuntoDistanceActivityIsRejectedForStrength();
@@ -316,3 +338,4 @@ assertGenericVolleyballUsesCatalogModality();
 assertGenericTrailUsesCatalogModality();
 assertGenericSkiingUsesCatalogModality();
 assertGenericSnowboardUsesCatalogModality();
+assertGenericGolfUsesCatalogModality();

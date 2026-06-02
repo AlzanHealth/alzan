@@ -46,14 +46,17 @@ export interface BuilderTemplateData {
   ski_type?: string | null;
   slope_type?: string | null;
   snowboard_type?: string | null;
+  golf_club_focus?: string | null;
 }
 
 type EnduranceWorkoutTemplateInsertPatch = Database['public']['Tables']['endurance_workout_templates']['Insert'] & {
   elev_gain_m?: number | null;
+  golf_club_focus?: string | null;
 };
 
 type EnduranceWorkoutTemplateUpdatePatch = Database['public']['Tables']['endurance_workout_templates']['Update'] & {
   elev_gain_m?: number | null;
+  golf_club_focus?: string | null;
 };
 
 export const useEnduranceWorkoutBuilder = () => {
@@ -107,6 +110,7 @@ export const useEnduranceWorkoutBuilder = () => {
             ski_type: data.ski_type,
             slope_type: data.slope_type,
             snowboard_type: data.snowboard_type,
+            golf_club_focus: data.golf_club_focus,
             rival: data.rival,
             notes: data.notes,
             elev_gain_m: data.elev_gain_m,
@@ -153,6 +157,7 @@ export const useEnduranceWorkoutBuilder = () => {
             ski_type: data.ski_type,
             slope_type: data.slope_type,
             snowboard_type: data.snowboard_type,
+            golf_club_focus: data.golf_club_focus,
             rival: data.rival,
             notes: data.notes,
             elev_gain_m: data.elev_gain_m,

@@ -71,6 +71,7 @@ interface Step {
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as SportType;
 const TRAIL_SPORT_TYPE = 'trail' as SportType;
+const GOLF_SPORT_TYPE = 'golf' as SportType;
 
 export const EnduranceWorkoutBuilderScreen = () => {
   const { t } = useTranslation();
@@ -118,7 +119,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
     sportType !== TRAIL_SPORT_TYPE &&
     sportType !== 'surf' &&
     sportType !== 'skiing' &&
-    sportType !== 'snowboard';
+    sportType !== 'snowboard' &&
+    sportType !== GOLF_SPORT_TYPE;
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -169,6 +171,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
   // Snowboard state
   const [snowboardType, setSnowboardType] = useState<string | null>(null);
   const [snowboardTypeModalVisible, setSnowboardTypeModalVisible] = useState(false);
+
+  // Golf state
+  const [golfClubFocus, setGolfClubFocus] = useState<string | null>(null);
+  const [golfClubFocusModalVisible, setGolfClubFocusModalVisible] = useState(false);
 
   // Step Modals
   const [modalVisible, setModalVisible] = useState(false);
@@ -260,6 +266,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
       setSnowboardType(existingTemplate.snowboard_type || null);
       setSlopeType(existingTemplate.slope_type || null);
 
+      // Golf hydration
+      setGolfClubFocus(
+        'golf_club_focus' in existingTemplate && typeof existingTemplate.golf_club_focus === 'string'
+          ? existingTemplate.golf_club_focus
+          : null,
+      );
+
       // Football hydration
       setFootballSessionType(existingTemplate.football_session_type || 'match');
       setBaseLoad(existingTemplate.base_load || null);
@@ -329,6 +342,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const terrainOptions = sportType ? getOptions(sportType, 'terrain') : [];
   const skiTypeOptions = sportType ? getOptions(sportType, 'ski_type') : [];
   const snowboardTypeOptions = sportType ? getOptions(sportType, 'snowboard_type') : [];
+  const golfClubFocusOptions = sportType ? getOptions(sportType, 'golf_club_focus') : [];
   const slopeTypeOptions = sportType ? getOptions(sportType, 'slope_type') : [];
   const baseLoadOptions = [
     'football',
@@ -342,6 +356,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     'surf',
     'skiing',
     'snowboard',
+    'golf',
   ].includes(sportType || '')
     ? getOptions(sportType, 'base_load')
     : [];
@@ -545,6 +560,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             'surf',
             'skiing',
             'snowboard',
+            'golf',
           ].includes(sportType || '')
             ? baseLoad
             : null,
@@ -560,6 +576,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
           board: sportType === 'surf' ? board : null,
           ski_type: sportType === 'skiing' ? skiType : null,
           snowboard_type: sportType === 'snowboard' ? snowboardType : null,
+          golf_club_focus: sportType === GOLF_SPORT_TYPE ? golfClubFocus : null,
           slope_type: ['skiing', 'snowboard'].includes(sportType || '') ? slopeType : null,
           rival: sportType === 'football' ? rival : null,
           notes: sportType === 'football' ? notes : null,
@@ -1155,6 +1172,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 { id: 'surf', label: t('constants.surfTitle') },
                 { id: 'skiing', label: t('constants.skiingTitle') },
                 { id: 'snowboard', label: t('constants.snowboardTitle') },
+                { id: 'golf', label: t('constants.golfTitle') },
               ].map(sport => (
                 <TouchableOpacity
                   key={sport.id}
@@ -1353,7 +1371,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType === TRAIL_SPORT_TYPE ||
                 sportType === 'surf' ||
                 sportType === 'skiing' ||
-                sportType === 'snowboard') && (
+                sportType === 'snowboard' ||
+                sportType === GOLF_SPORT_TYPE) && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
                     {t('training.templateDetails').toUpperCase()}
@@ -1554,6 +1573,55 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         >
                           {snowboardType
                             ? getOptionLabel(sportType, snowboardType, 'snowboard_type')
+                            : t('common.select')}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : sportType === GOLF_SPORT_TYPE ? (
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: themeColors.border,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: 90,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                        }}
+                        onPress={() => setGolfClubFocusModalVisible(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('training.golfClubFocusLabel')}
+                      >
+                        <MaterialCommunityIcons
+                          name="golf-tee"
+                          size={24}
+                          color={SPORT_COLORS[sportType] || themeColors.primary}
+                          style={{ marginBottom: 6 }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            marginBottom: 6,
+                            textAlign: 'center',
+                            color: themeColors.textSecondary,
+                          }}
+                        >
+                          {t('training.golfClubFocusLabel')}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            color: golfClubFocus ? themeColors.textPrimary : themeColors.textSecondary,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {golfClubFocus
+                            ? getOptionLabel(sportType, golfClubFocus, 'golf_club_focus')
                             : t('common.select')}
                         </Text>
                       </TouchableOpacity>
@@ -1829,7 +1897,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           {slopeType ? getOptionLabel(sportType, slopeType, 'slope_type') : t('common.select')}
                         </Text>
                       </TouchableOpacity>
-                    ) : sportType === VOLLEYBALL_SPORT_TYPE ? null : sportType === 'surf' ? (
+                    ) : sportType === VOLLEYBALL_SPORT_TYPE || sportType === GOLF_SPORT_TYPE ? null : sportType ===
+                      'surf' ? (
                       <TouchableOpacity
                         style={{
                           flex: 1,
@@ -1964,6 +2033,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== 'surf' &&
                 sportType !== 'skiing' &&
                 sportType !== 'snowboard' &&
+                sportType !== GOLF_SPORT_TYPE &&
                 !isWideLayout && <View style={styles.compactSummary}>{renderTemplateSummary(sportType)}</View>}
 
               {/* Block 3: Configuración */}
@@ -1978,7 +2048,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType !== TRAIL_SPORT_TYPE &&
                 sportType !== 'surf' &&
                 sportType !== 'skiing' &&
-                sportType !== 'snowboard') ||
+                sportType !== 'snowboard' &&
+                sportType !== GOLF_SPORT_TYPE) ||
                 sportType === 'swimming') && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
@@ -3031,6 +3102,73 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
                   onPress={() => setSnowboardTypeModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* Golf Club Focus Selector Modal */}
+        <Modal
+          animationType={isWideLayout ? 'fade' : 'slide'}
+          transparent={true}
+          visible={golfClubFocusModalVisible}
+          onRequestClose={() => setGolfClubFocusModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setGolfClubFocusModalVisible(false)}
+          >
+            <Pressable
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                {t('training.golfClubFocusLabel')}
+              </Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {golfClubFocusOptions.map(opt => {
+                  const isSelected = golfClubFocus === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setGolfClubFocus(opt.option_key);
+                        setGolfClubFocusModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'golf_club_focus')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setGolfClubFocusModalVisible(false)}
                 >
                   <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
                     {t('common.cancel')}

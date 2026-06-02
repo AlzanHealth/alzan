@@ -5,6 +5,7 @@ import {
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
+import { mapGolfTextToCanonical } from './golf-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
@@ -86,6 +87,8 @@ function mapWhoopSport(sportName: string | null): CanonicalActivitySportMapping 
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(sportName);
   if (volleyballSport) return volleyballSport;
+  const golfSport = mapGolfTextToCanonical(sportName);
+  if (golfSport) return golfSport;
   const trailSport = mapTrailTextToCanonical(sportName);
   if (trailSport) return trailSport;
   const skiingSport = mapSkiingTextToCanonical(sportName);

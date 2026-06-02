@@ -453,6 +453,7 @@ export type Database = {
           endurance_template_id: string | null
           epoc: number | null
           football_session_type: string | null
+          golf_club_focus: string | null
           id: string
           imported_at: string | null
           max_cadence: number | null
@@ -525,6 +526,7 @@ export type Database = {
           endurance_template_id?: string | null
           epoc?: number | null
           football_session_type?: string | null
+          golf_club_focus?: string | null
           id?: string
           imported_at?: string | null
           max_cadence?: number | null
@@ -597,6 +599,7 @@ export type Database = {
           endurance_template_id?: string | null
           epoc?: number | null
           football_session_type?: string | null
+          golf_club_focus?: string | null
           id?: string
           imported_at?: string | null
           max_cadence?: number | null
@@ -1472,6 +1475,7 @@ export type Database = {
           elev_gain_m: number | null
           environment_type: string | null
           football_session_type: string | null
+          golf_club_focus: string | null
           id: string
           notes: string | null
           pool_type: string | null
@@ -1503,6 +1507,7 @@ export type Database = {
           elev_gain_m?: number | null
           environment_type?: string | null
           football_session_type?: string | null
+          golf_club_focus?: string | null
           id?: string
           notes?: string | null
           pool_type?: string | null
@@ -1534,6 +1539,7 @@ export type Database = {
           elev_gain_m?: number | null
           environment_type?: string | null
           football_session_type?: string | null
+          golf_club_focus?: string | null
           id?: string
           notes?: string | null
           pool_type?: string | null
@@ -4704,6 +4710,7 @@ export type Database = {
         | "trail"
         | "skiing"
         | "snowboard"
+        | "golf"
       stream_type_enum:
         | "heart_rate"
         | "cadence"
@@ -5042,6 +5049,7 @@ export const Constants = {
         "trail",
         "skiing",
         "snowboard",
+        "golf",
       ],
       stream_type_enum: [
         "heart_rate",
