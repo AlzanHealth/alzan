@@ -18,6 +18,10 @@ export interface BuilderStep {
   parent_step_id?: string | null;
   is_group: boolean;
   children?: BuilderStep[];
+  hyrox_step_type?: string | null;
+  hyrox_station_key?: string | null;
+  load_kg?: number | null;
+  reps?: number | null;
 }
 
 export interface BuilderTemplateData {
@@ -47,17 +51,12 @@ export interface BuilderTemplateData {
   slope_type?: string | null;
   snowboard_type?: string | null;
   golf_club_focus?: string | null;
+  hyrox_station_focus?: string | null;
 }
 
-type EnduranceWorkoutTemplateInsertPatch = Database['public']['Tables']['endurance_workout_templates']['Insert'] & {
-  elev_gain_m?: number | null;
-  golf_club_focus?: string | null;
-};
+type EnduranceWorkoutTemplateInsertPatch = Database['public']['Tables']['endurance_workout_templates']['Insert'];
 
-type EnduranceWorkoutTemplateUpdatePatch = Database['public']['Tables']['endurance_workout_templates']['Update'] & {
-  elev_gain_m?: number | null;
-  golf_club_focus?: string | null;
-};
+type EnduranceWorkoutTemplateUpdatePatch = Database['public']['Tables']['endurance_workout_templates']['Update'];
 
 export const useEnduranceWorkoutBuilder = () => {
   const { user } = useAuth();
@@ -111,6 +110,7 @@ export const useEnduranceWorkoutBuilder = () => {
             slope_type: data.slope_type,
             snowboard_type: data.snowboard_type,
             golf_club_focus: data.golf_club_focus,
+            hyrox_station_focus: data.hyrox_station_focus,
             rival: data.rival,
             notes: data.notes,
             elev_gain_m: data.elev_gain_m,
@@ -158,6 +158,7 @@ export const useEnduranceWorkoutBuilder = () => {
             slope_type: data.slope_type,
             snowboard_type: data.snowboard_type,
             golf_club_focus: data.golf_club_focus,
+            hyrox_station_focus: data.hyrox_station_focus,
             rival: data.rival,
             notes: data.notes,
             elev_gain_m: data.elev_gain_m,
@@ -197,6 +198,10 @@ export const useEnduranceWorkoutBuilder = () => {
                 repetitions: step.repetitions,
                 is_group: step.is_group,
                 parent_step_id: parentId,
+                hyrox_step_type: step.hyrox_step_type ?? null,
+                hyrox_station_key: step.hyrox_station_key ?? null,
+                load_kg: step.load_kg ?? null,
+                reps: step.reps ?? null,
               })
               .select()
               .single();

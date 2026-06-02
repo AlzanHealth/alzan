@@ -11,6 +11,7 @@ import {
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapGolfTextToCanonical } from './golf-sport.mapper';
+import { mapHyroxTextToCanonical } from './hyrox-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
@@ -128,8 +129,11 @@ function mapStravaSport(
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
   if (volleyballSport) return volleyballSport;
+
   const golfSport = mapGolfTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
   if (golfSport) return golfSport;
+  const hyroxSport = mapHyroxTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
+  if (hyroxSport) return hyroxSport;
   const trailSport = mapTrailTextToCanonical([rawSportType, name].filter(Boolean).join(' '));
   if (trailSport) return trailSport;
   const skiingSport = mapSkiingTextToCanonical([rawSportType, name].filter(Boolean).join(' '));

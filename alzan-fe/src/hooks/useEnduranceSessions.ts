@@ -6,7 +6,7 @@ import { ActivitySessionInsert, ActivitySessionUpdate, ActivitySession } from '.
 interface UseEnduranceSessionsOptions {
   startDate?: string; // ISO 8601 format YYYY-MM-DD
   endDate?: string; // ISO 8601 format YYYY-MM-DD
-  sportType?: ActivitySession['sport_type'] | 'gym' | 'volleyball' | 'trail' | 'golf' | 'all';
+  sportType?: ActivitySession['sport_type'] | 'gym' | 'volleyball' | 'trail' | 'golf' | 'hyrox' | 'all';
   limit?: number;
   enabled?: boolean;
 }

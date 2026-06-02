@@ -31,6 +31,7 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 import { EnduranceStepEditorModal } from './components/EnduranceStepEditorModal';
+import { HyroxStepEditorModal } from './components/HyroxStepEditorModal';
 import { EnduranceTemplateSummaryPanel } from './components/EnduranceTemplateSummaryPanel';
 import { WeekDaySelector } from '../../components/training/WeekDaySelector';
 import { RepetitionsSelectorModal } from './components/RepetitionsSelectorModal';
@@ -67,11 +68,27 @@ interface Step {
   parent_step_id?: string | null;
   is_group: boolean;
   children?: Step[]; // For UI state
+  hyrox_step_type?: string | null;
+  hyrox_station_key?: string | null;
+  load_kg?: number | null;
+  reps?: number | null;
 }
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as SportType;
 const TRAIL_SPORT_TYPE = 'trail' as SportType;
 const GOLF_SPORT_TYPE = 'golf' as SportType;
+const HYROX_SPORT_TYPE = 'hyrox' as SportType;
+
+const HYROX_FULL_FORMAT_STATIONS = [
+  { key: 'skierg', distanceM: 1000 },
+  { key: 'sled_push', distanceM: 50 },
+  { key: 'sled_pull', distanceM: 50 },
+  { key: 'burpee_broad_jump', distanceM: 80 },
+  { key: 'rowing', distanceM: 1000 },
+  { key: 'farmers_carry', distanceM: 200 },
+  { key: 'sandbag_lunges', distanceM: 100 },
+  { key: 'wall_balls', reps: 100 },
+] satisfies Array<{ key: string; distanceM?: number; reps?: number }>;
 
 export const EnduranceWorkoutBuilderScreen = () => {
   const { t } = useTranslation();
@@ -176,6 +193,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [golfClubFocus, setGolfClubFocus] = useState<string | null>(null);
   const [golfClubFocusModalVisible, setGolfClubFocusModalVisible] = useState(false);
 
+  // HYROX state
+  const [hyroxStationFocus, setHyroxStationFocus] = useState<string | null>(null);
+  const [hyroxStationFocusModalVisible, setHyroxStationFocusModalVisible] = useState(false);
+
   // Step Modals
   const [modalVisible, setModalVisible] = useState(false);
   const [editingStep, setEditingStep] = useState<Step | null>(null);
@@ -272,6 +293,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
           ? existingTemplate.golf_club_focus
           : null,
       );
+      setHyroxStationFocus(
+        'hyrox_station_focus' in existingTemplate && typeof existingTemplate.hyrox_station_focus === 'string'
+          ? existingTemplate.hyrox_station_focus
+          : null,
+      );
 
       // Football hydration
       setFootballSessionType(existingTemplate.football_session_type || 'match');
@@ -310,6 +336,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
             target_max: s.target_max,
             repetitions: s.repetitions || 1,
             is_group: s.is_group || false,
+            hyrox_step_type: s.hyrox_step_type,
+            hyrox_station_key: s.hyrox_station_key,
+            load_kg: s.load_kg,
+            reps: s.reps,
             children: dbSteps
               .filter(c => c.parent_step_id === s.id)
               .sort((a, b) => a.order_index - b.order_index)
@@ -325,6 +355,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 repetitions: c.repetitions || 1,
                 is_group: false,
                 parent_step_id: s.id,
+                hyrox_step_type: c.hyrox_step_type,
+                hyrox_station_key: c.hyrox_station_key,
+                load_kg: c.load_kg,
+                reps: c.reps,
               })),
           })) as Step[];
         setSteps(uiSteps);
@@ -343,6 +377,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const skiTypeOptions = sportType ? getOptions(sportType, 'ski_type') : [];
   const snowboardTypeOptions = sportType ? getOptions(sportType, 'snowboard_type') : [];
   const golfClubFocusOptions = sportType ? getOptions(sportType, 'golf_club_focus') : [];
+  const hyroxStationFocusOptions = sportType ? getOptions(sportType, 'hyrox_station_focus') : [];
   const slopeTypeOptions = sportType ? getOptions(sportType, 'slope_type') : [];
   const baseLoadOptions = [
     'football',
@@ -357,6 +392,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     'skiing',
     'snowboard',
     'golf',
+    'hyrox',
   ].includes(sportType || '')
     ? getOptions(sportType, 'base_load')
     : [];
@@ -379,7 +415,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return goalOptions.map(option => ({
       key: option.option_key,
       title: getOptionLabel(sportType, option.option_key, 'goal'),
-      desc: '',
     }));
   };
 
@@ -463,6 +498,18 @@ export const EnduranceWorkoutBuilderScreen = () => {
     let workStr = '--';
     let cooldownStr = '--';
 
+    if (sportType === HYROX_SPORT_TYPE) {
+      const runCount = steps.filter(step => step.hyrox_step_type === 'run').length;
+      const stationCount = steps.filter(step => step.hyrox_step_type === 'station').length;
+      const restCount = steps.filter(step => step.hyrox_step_type === 'rest').length;
+
+      return {
+        warmupStr: runCount ? `${runCount}x ${t('training.hyroxRunBlock')}` : '--',
+        workStr: stationCount ? `${stationCount}x ${t('training.hyroxStationBlock')}` : '--',
+        cooldownStr: restCount ? `${restCount}x ${t('training.hyroxRestBlock')}` : '--',
+      };
+    }
+
     const warmupStep = steps.find(s => s.phase_type === 'warmup');
     if (warmupStep) {
       warmupStr =
@@ -538,9 +585,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
           description,
           sport_type: sportType || 'running',
           workout_goal: finalGoal,
-          total_duration_s: ['running', 'cycling', 'swimming'].includes(sportType || '')
-            ? Math.round(totalDuration)
-            : (parseInt(manualDuration) || 0) * 60,
+          total_duration_s:
+            sportType === HYROX_SPORT_TYPE
+              ? Math.round(totalDuration || (parseInt(manualDuration) || 0) * 60)
+              : ['running', 'cycling', 'swimming'].includes(sportType || '')
+                ? Math.round(totalDuration)
+                : (parseInt(manualDuration) || 0) * 60,
           total_distance_m: Math.round(totalDistance),
           scheduled_day: templateScheduledDay,
           environment_type: environmentType,
@@ -561,6 +611,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             'skiing',
             'snowboard',
             'golf',
+            'hyrox',
           ].includes(sportType || '')
             ? baseLoad
             : null,
@@ -577,6 +628,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
           ski_type: sportType === 'skiing' ? skiType : null,
           snowboard_type: sportType === 'snowboard' ? snowboardType : null,
           golf_club_focus: sportType === GOLF_SPORT_TYPE ? golfClubFocus : null,
+          hyrox_station_focus: sportType === HYROX_SPORT_TYPE ? hyroxStationFocus : null,
           slope_type: ['skiing', 'snowboard'].includes(sportType || '') ? slopeType : null,
           rival: sportType === 'football' ? rival : null,
           notes: sportType === 'football' ? notes : null,
@@ -628,7 +680,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (!name.trim()) {
       missingFields.push('name');
     }
-    if ((sportType === 'running' || sportType === 'cycling' || sportType === 'swimming') && !environmentType) {
+    if (
+      (sportType === 'running' ||
+        sportType === 'cycling' ||
+        sportType === 'swimming' ||
+        sportType === HYROX_SPORT_TYPE) &&
+      !environmentType
+    ) {
       missingFields.push('type');
     }
     if (!trainingGoal) {
@@ -802,6 +860,40 @@ export const EnduranceWorkoutBuilderScreen = () => {
     setSteps(prev => [...prev, newGroup]);
   };
 
+  const handleAddHyroxFullFormat = () => {
+    const fullFormatSteps = HYROX_FULL_FORMAT_STATIONS.flatMap((station, index): Step[] => [
+      {
+        id: `hyrox-run-${Date.now()}-${index}`,
+        phase_type: 'interval',
+        duration_type: 'distance',
+        distance_m: 1000,
+        target_type: 'none',
+        repetitions: 1,
+        is_group: false,
+        hyrox_step_type: 'run',
+        hyrox_station_key: null,
+        load_kg: null,
+        reps: null,
+      },
+      {
+        id: `hyrox-station-${Date.now()}-${index}`,
+        phase_type: 'interval',
+        duration_type: station.distanceM ? 'distance' : 'time',
+        distance_m: station.distanceM,
+        duration_s: station.distanceM ? undefined : 0,
+        target_type: 'none',
+        repetitions: 1,
+        is_group: false,
+        hyrox_step_type: 'station',
+        hyrox_station_key: station.key,
+        load_kg: null,
+        reps: station.reps ?? null,
+      },
+    ]);
+
+    setSteps(fullFormatSteps);
+  };
+
   const handleDeleteStep = (stepId: string, isChild: boolean = false, parentId?: string) => {
     Alert.alert(t('training.deleteStepTitle'), t('training.deleteStepMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
@@ -878,6 +970,37 @@ export const EnduranceWorkoutBuilderScreen = () => {
     }
   };
 
+  const getHyroxStepTitle = (step: Step) => {
+    if (step.hyrox_step_type === 'run') return t('training.hyroxRunBlock');
+    if (step.hyrox_step_type === 'station') {
+      return step.hyrox_station_key
+        ? getOptionLabel(HYROX_SPORT_TYPE, step.hyrox_station_key, 'hyrox_station_focus')
+        : t('training.hyroxStationBlock');
+    }
+    if (step.hyrox_step_type === 'rest') return t('training.hyroxRestBlock');
+    return t(getPhaseLabel(step.phase_type));
+  };
+
+  const renderHyroxExtraDetails = (step: Step) => {
+    if (sportType !== HYROX_SPORT_TYPE || step.hyrox_step_type !== 'station') return null;
+
+    const parts = [
+      step.reps ? `${step.reps} ${t('training.hyroxReps').toLowerCase()}` : null,
+      step.load_kg ? `${step.load_kg} ${t('training.unitKgShort')}` : null,
+    ].filter(Boolean);
+
+    if (parts.length === 0) return null;
+
+    return (
+      <View style={styles.detailRow}>
+        <Zap size={16} color={themeColors.textSecondary} />
+        <Text style={[styles.detailText, { color: isDark ? themeColors.textPrimary : themeColors.textSecondary }]}>
+          {parts.join(' · ')}
+        </Text>
+      </View>
+    );
+  };
+
   const renderStepItem = (item: Step, index: number) => {
     return (
       <GlassCard key={item.id} style={[styles.stepCard, dynamicStyles.card]}>
@@ -893,7 +1016,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
               ]}
             />
             <Text style={[styles.stepTitle, dynamicStyles.label]}>
-              {item.is_group ? t('training.repCaps') : t(getPhaseLabel(item.phase_type))}
+              {item.is_group
+                ? t('training.repCaps')
+                : sportType === HYROX_SPORT_TYPE
+                  ? getHyroxStepTitle(item)
+                  : t(getPhaseLabel(item.phase_type))}
             </Text>
           </View>
           <View style={styles.stepActions}>
@@ -948,7 +1075,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           ]}
                         />
                         <Text style={[styles.stepTitle, dynamicStyles.label]}>
-                          {t(getPhaseLabel(child.phase_type))}
+                          {sportType === HYROX_SPORT_TYPE
+                            ? getHyroxStepTitle(child)
+                            : t(getPhaseLabel(child.phase_type))}
                         </Text>
                       </View>
                       <View style={styles.stepActions}>
@@ -993,6 +1122,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         </Text>
                       </View>
                     </View>
+                    {renderHyroxExtraDetails(child)}
                   </GlassCard>
                 </View>
               ))}
@@ -1028,6 +1158,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 <Text style={styles.detailText}>{formatTarget(item)}</Text>
               </View>
             )}
+            {renderHyroxExtraDetails(item)}
           </View>
         )}
       </GlassCard>
@@ -1040,11 +1171,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const summaryBlocks = getSummaryBlocks();
-  const structuredSport = sportType ? ['running', 'cycling', 'swimming'].includes(sportType) : false;
+  const structuredSport = sportType ? ['running', 'cycling', 'swimming', 'hyrox'].includes(sportType) : false;
 
   const renderTemplateSummary = (selectedSport: SportType, showEditorAction = true, compact = false) => {
     const formattedDistance = convertDistanceToUi(totalDistance, 2);
     const scheduledDayNames = scheduledDays.map(day => getWeekdayName(day)).join(', ');
+    const structuredDurationLabel =
+      sportType === HYROX_SPORT_TYPE && totalDuration <= 0
+        ? `${parseInt(manualDuration, 10) || 0} min`
+        : formatTime(Math.round(totalDuration));
 
     return (
       <EnduranceTemplateSummaryPanel
@@ -1057,9 +1192,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         }
         surfaceLabel={getOptions(selectedSport, 'terrain').length > 0 ? getSurfaceDisplayLabel(surface) : undefined}
         scheduleLabel={scheduledDayNames ? t('training.plannedForDays', { days: scheduledDayNames }) : undefined}
-        durationLabel={
-          structuredSport ? formatTime(Math.round(totalDuration)) : `${parseInt(manualDuration, 10) || 0} min`
-        }
+        durationLabel={structuredSport ? structuredDurationLabel : `${parseInt(manualDuration, 10) || 0} min`}
         distanceLabel={structuredSport ? `${formattedDistance.value} ${formattedDistance.unit}` : undefined}
         phaseSummary={
           structuredSport
@@ -1092,7 +1225,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 setCurrentView('main');
               } else if (!sportType) {
                 navigation.goBack();
-              } else if (!['running', 'cycling', 'swimming'].includes(sportType)) {
+              } else if (!['running', 'cycling', 'swimming', 'hyrox'].includes(sportType)) {
                 setSportType(null);
               } else if (sportType && !isEditMode) {
                 setSportType(null);
@@ -1173,6 +1306,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 { id: 'skiing', label: t('constants.skiingTitle') },
                 { id: 'snowboard', label: t('constants.snowboardTitle') },
                 { id: 'golf', label: t('constants.golfTitle') },
+                { id: 'hyrox', label: t('constants.hyroxTitle') },
               ].map(sport => (
                 <TouchableOpacity
                   key={sport.id}
@@ -1372,7 +1506,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 sportType === 'surf' ||
                 sportType === 'skiing' ||
                 sportType === 'snowboard' ||
-                sportType === GOLF_SPORT_TYPE) && (
+                sportType === GOLF_SPORT_TYPE ||
+                sportType === HYROX_SPORT_TYPE) && (
                 <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                   <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
                     {t('training.templateDetails').toUpperCase()}
@@ -1622,6 +1757,55 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         >
                           {golfClubFocus
                             ? getOptionLabel(sportType, golfClubFocus, 'golf_club_focus')
+                            : t('common.select')}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : sportType === HYROX_SPORT_TYPE ? (
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: themeColors.border,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: 90,
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                        }}
+                        onPress={() => setHyroxStationFocusModalVisible(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('training.hyroxStationFocusLabel')}
+                      >
+                        <MaterialCommunityIcons
+                          name="dumbbell"
+                          size={24}
+                          color={SPORT_COLORS[sportType] || themeColors.primary}
+                          style={{ marginBottom: 6 }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            marginBottom: 6,
+                            textAlign: 'center',
+                            color: themeColors.textSecondary,
+                          }}
+                        >
+                          {t('training.hyroxStationFocusLabel')}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            color: hyroxStationFocus ? themeColors.textPrimary : themeColors.textSecondary,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {hyroxStationFocus
+                            ? getOptionLabel(sportType, hyroxStationFocus, 'hyrox_station_focus')
                             : t('common.select')}
                         </Text>
                       </TouchableOpacity>
@@ -1897,8 +2081,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           {slopeType ? getOptionLabel(sportType, slopeType, 'slope_type') : t('common.select')}
                         </Text>
                       </TouchableOpacity>
-                    ) : sportType === VOLLEYBALL_SPORT_TYPE || sportType === GOLF_SPORT_TYPE ? null : sportType ===
-                      'surf' ? (
+                    ) : sportType === VOLLEYBALL_SPORT_TYPE ||
+                      sportType === GOLF_SPORT_TYPE ||
+                      sportType === HYROX_SPORT_TYPE ? null : sportType === 'surf' ? (
                       <TouchableOpacity
                         style={{
                           flex: 1,
@@ -2233,9 +2418,22 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       ? t('training.swimming')
                       : sportType === 'cycling'
                         ? t('training.cycling')
-                        : t('constants.running')}
+                        : sportType === HYROX_SPORT_TYPE
+                          ? t('constants.hyrox')
+                          : t('constants.running')}
                     .
                   </Text>
+                  {sportType === HYROX_SPORT_TYPE && (
+                    <TouchableOpacity
+                      style={[styles.fullFormatButton, { backgroundColor: themeColors.primary }]}
+                      onPress={handleAddHyroxFullFormat}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('training.hyroxAddFullFormat')}
+                    >
+                      <Zap size={18} color="#FFF" />
+                      <Text style={styles.fullFormatButtonText}>{t('training.hyroxAddFullFormat')}</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ) : (
                 <>{steps.map((item, index) => renderStepItem(item, index))}</>
@@ -2257,14 +2455,25 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   <Text style={styles.addStepButtonText}>{t('training.addStep')}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.addRepButton, dynamicStyles.secondaryButton]}
-                  onPress={handleAddGroup}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('training.repetitions')}
-                >
-                  <Repeat size={20} color={themeColors.primary} />
-                </TouchableOpacity>
+                {sportType === HYROX_SPORT_TYPE ? (
+                  <TouchableOpacity
+                    style={[styles.addRepButton, dynamicStyles.secondaryButton]}
+                    onPress={handleAddHyroxFullFormat}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.hyroxFullFormat')}
+                  >
+                    <Zap size={20} color={themeColors.primary} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.addRepButton, dynamicStyles.secondaryButton]}
+                    onPress={handleAddGroup}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.repetitions')}
+                  >
+                    <Repeat size={20} color={themeColors.primary} />
+                  </TouchableOpacity>
+                )}
               </View>
             </ScrollView>
 
@@ -2363,9 +2572,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         >
                           {goal.title}
                         </Text>
-                        {goal.desc ? (
-                          <Text style={[styles.goalOptionDesc, { color: themeColors.textSecondary }]}>{goal.desc}</Text>
-                        ) : null}
                       </TouchableOpacity>
                     </View>
                   );
@@ -3179,6 +3385,73 @@ export const EnduranceWorkoutBuilderScreen = () => {
           </Pressable>
         </Modal>
 
+        {/* HYROX Station Focus Selector Modal */}
+        <Modal
+          animationType={isWideLayout ? 'fade' : 'slide'}
+          transparent={true}
+          visible={hyroxStationFocusModalVisible}
+          onRequestClose={() => setHyroxStationFocusModalVisible(false)}
+        >
+          <Pressable
+            style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+            onPress={() => setHyroxStationFocusModalVisible(false)}
+          >
+            <Pressable
+              style={[
+                styles.modalCard,
+                isWideLayout && styles.modalCardWide,
+                { backgroundColor: isDark ? '#1C1C1E' : '#FFF' },
+              ]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                {t('training.hyroxStationFocusLabel')}
+              </Text>
+
+              <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
+                {hyroxStationFocusOptions.map(opt => {
+                  const isSelected = hyroxStationFocus === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setHyroxStationFocus(opt.option_key);
+                        setHyroxStationFocusModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'hyrox_station_focus')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setHyroxStationFocusModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
         {/* Slope Type Selector Modal */}
         <Modal
           animationType={isWideLayout ? 'fade' : 'slide'}
@@ -3245,16 +3518,30 @@ export const EnduranceWorkoutBuilderScreen = () => {
         </Modal>
 
         {/* Builder Step Modals */}
-        <EnduranceStepEditorModal
-          visible={modalVisible}
-          initialStep={editingStep}
-          onSave={handleSaveStep}
-          onCancel={() => {
-            setModalVisible(false);
-            setActiveGroupId(null);
-          }}
-          sportType={sportType || 'running'}
-        />
+        {sportType === HYROX_SPORT_TYPE ? (
+          <HyroxStepEditorModal
+            visible={modalVisible}
+            initialStep={editingStep as BuilderStep | null}
+            stationOptions={hyroxStationFocusOptions}
+            getStationLabel={key => getOptionLabel(HYROX_SPORT_TYPE, key, 'hyrox_station_focus')}
+            onSave={handleSaveStep}
+            onCancel={() => {
+              setModalVisible(false);
+              setActiveGroupId(null);
+            }}
+          />
+        ) : (
+          <EnduranceStepEditorModal
+            visible={modalVisible}
+            initialStep={editingStep}
+            onSave={handleSaveStep}
+            onCancel={() => {
+              setModalVisible(false);
+              setActiveGroupId(null);
+            }}
+            sportType={sportType || 'running'}
+          />
+        )}
 
         <RepetitionsSelectorModal
           visible={repsModalVisible}
@@ -3419,6 +3706,17 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
   emptyTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.s },
   emptyText: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
+  fullFormatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.m,
+    paddingHorizontal: spacing.l,
+    marginTop: spacing.l,
+  },
+  fullFormatButtonText: { ...typography.button, color: '#FFFFFF' },
   addStepButton: {
     flex: 1,
     flexDirection: 'row',

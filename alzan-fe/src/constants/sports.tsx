@@ -22,6 +22,7 @@ const TrailIcon = (props: SportIconProps) => <SportIcon {...props} sport="trail"
 const SkiingIcon = (props: SportIconProps) => <SportIcon {...props} sport="skiing" />;
 const SnowboardIcon = (props: SportIconProps) => <SportIcon {...props} sport="snowboard" />;
 const GolfIcon = (props: SportIconProps) => <SportIcon {...props} sport="golf" />;
+const HyroxIcon = (props: SportIconProps) => <SportIcon {...props} sport="hyrox" />;
 
 export type SportConfig = {
   id: SportType;
@@ -189,9 +190,17 @@ export const SPORTS_CONFIG: Record<string, SportConfig> = {
     fields: { distance: false, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
     defaultTitle: 'constants.golfTitle',
   },
+  hyrox: {
+    id: 'hyrox' as SportType,
+    label: 'constants.hyrox',
+    icon: HyroxIcon,
+    units: { distance: 'km', speed: 'min/km' },
+    fields: { distance: true, duration: true, elevation: false, calories: true, rpe: true, heartRate: true },
+    defaultTitle: 'constants.hyroxTitle',
+  },
 };
 
-export const SPORT_GOALS: Partial<Record<SportType | 'volleyball' | 'trail' | 'golf', string[]>> = {
+export const SPORT_GOALS: Partial<Record<SportType | 'volleyball' | 'trail' | 'golf' | 'hyrox', string[]>> = {
   running: ['5 km', '10 km', '15 km', '21 km', '42 km'],
   cycling: ['50 km', '80 km', '100 km', '180 km', '250 km'],
   swimming: ['400 m', '800 m', '1500 m', '1900 m', '3800 m'],
@@ -212,6 +221,7 @@ export const SPORT_GOALS: Partial<Record<SportType | 'volleyball' | 'trail' | 'g
   skiing: [],
   snowboard: [],
   golf: [],
+  hyrox: [],
 };
 
 export const formatDuration = (seconds: number) => {

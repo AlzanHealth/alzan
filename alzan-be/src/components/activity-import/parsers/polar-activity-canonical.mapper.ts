@@ -12,6 +12,7 @@ import {
 import { parseGarminActivityFileToCanonical } from './garmin-activity-canonical.mapper';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
 import { mapGolfTextToCanonical } from './golf-sport.mapper';
+import { mapHyroxTextToCanonical } from './hyrox-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
@@ -174,8 +175,11 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
   if (climbingSport) return climbingSport;
   const volleyballSport = mapVolleyballTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
   if (volleyballSport) return volleyballSport;
+
   const golfSport = mapGolfTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
   if (golfSport) return golfSport;
+  const hyroxSport = mapHyroxTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
+  if (hyroxSport) return hyroxSport;
   const trailSport = mapTrailTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
   if (trailSport) return trailSport;
   const skiingSport = mapSkiingTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);

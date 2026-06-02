@@ -42,7 +42,7 @@ interface DateFilter {
 }
 
 type ActivityView = 'calendar' | 'history';
-type HistorySportFilter = 'all' | 'gym' | ActivitySession['sport_type'] | 'volleyball' | 'trail' | 'golf';
+type HistorySportFilter = 'all' | 'gym' | ActivitySession['sport_type'] | 'volleyball' | 'trail' | 'golf' | 'hyrox';
 const HISTORY_PAGE_SIZE = 10;
 
 interface HistorySummaryTotals {
@@ -248,6 +248,7 @@ export const EnduranceSessionsListScreen = () => {
       { id: 'skiing' as const, label: t('constants.skiing') },
       { id: 'snowboard' as const, label: t('constants.snowboard') },
       { id: 'golf' as const, label: t('constants.golf') },
+      { id: 'hyrox' as const, label: t('constants.hyrox') },
       { id: 'gym' as const, label: t('constants.strength') },
       { id: 'other' as const, label: t('constants.other') },
     ],
@@ -1027,6 +1028,22 @@ export const EnduranceSessionsListScreen = () => {
                                 >
                                   <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
                                     {getOptionLabel(session.sport_type, session.golf_club_focus, 'golf_club_focus')}
+                                  </Text>
+                                </View>
+                              )}
+                              {'hyrox_station_focus' in session && typeof session.hyrox_station_focus === 'string' && (
+                                <View
+                                  style={[
+                                    styles.subtypeBadge,
+                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' },
+                                  ]}
+                                >
+                                  <Text style={[styles.subtypeBadgeText, { color: themeColors.textSecondary }]}>
+                                    {getOptionLabel(
+                                      session.sport_type,
+                                      session.hyrox_station_focus,
+                                      'hyrox_station_focus',
+                                    )}
                                   </Text>
                                 </View>
                               )}

@@ -74,7 +74,13 @@ interface SessionWithDate {
   startDate: Date;
 }
 
-type SummarySportType = Exclude<ActivitySession['sport_type'], 'strength'> | 'gym' | 'volleyball' | 'trail' | 'golf';
+type SummarySportType =
+  | Exclude<ActivitySession['sport_type'], 'strength'>
+  | 'gym'
+  | 'volleyball'
+  | 'trail'
+  | 'golf'
+  | 'hyrox';
 
 type SportMiddleMetric = 'distance' | 'volume' | 'sets' | 'elevation' | 'calories';
 
@@ -147,7 +153,8 @@ const getPreferredMiddleMetric = (sportType: SummarySportType): SportMiddleMetri
     sportType === 'tennis' ||
     sportType === 'padel' ||
     sportType === 'skiing' ||
-    sportType === 'snowboard'
+    sportType === 'snowboard' ||
+    sportType === 'hyrox'
   ) {
     return 'distance';
   }

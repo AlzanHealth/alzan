@@ -57,6 +57,7 @@ export type PopulatedEnduranceWorkoutTemplate = EnduranceWorkoutTemplate & { ste
 
 const TRAIL_SPORT_TYPE = 'trail' as SportType;
 const GOLF_SPORT_TYPE = 'golf' as SportType;
+const HYROX_SPORT_TYPE = 'hyrox' as SportType;
 
 interface SplitTab {
   key: string;
@@ -261,6 +262,10 @@ export const EnduranceSessionFormScreen = () => {
   const [golfClubFocus, setGolfClubFocus] = useState<string | null>(null);
   const [golfClubFocusModalVisible, setGolfClubFocusModalVisible] = useState(false);
 
+  // HYROX states
+  const [hyroxStationFocus, setHyroxStationFocus] = useState<string | null>(null);
+  const [hyroxStationFocusModalVisible, setHyroxStationFocusModalVisible] = useState(false);
+
   // Initialize date from param if available, otherwise today (LOCAL TIME)
   const [date, setDate] = useState(initialDateStr ? initialDateStr.split('T')[0] : format(new Date(), 'yyyy-MM-dd'));
   const [time, setTime] = useState(new Date().toTimeString().slice(0, 5));
@@ -358,9 +363,18 @@ export const EnduranceSessionFormScreen = () => {
         setStroke(activeTemplate.stroke);
       }
       if (
-        ['football', 'tennis', 'padel', 'hiking', 'martial_arts', 'climbing', 'volleyball', 'trail', 'golf'].includes(
-          activeTemplate.sport_type,
-        )
+        [
+          'football',
+          'tennis',
+          'padel',
+          'hiking',
+          'martial_arts',
+          'climbing',
+          'volleyball',
+          'trail',
+          'golf',
+          'hyrox',
+        ].includes(activeTemplate.sport_type)
       ) {
         setBaseLoad(activeTemplate.base_load || null);
       }
@@ -392,6 +406,14 @@ export const EnduranceSessionFormScreen = () => {
         setGolfClubFocus(
           'golf_club_focus' in activeTemplate && typeof activeTemplate.golf_club_focus === 'string'
             ? activeTemplate.golf_club_focus
+            : null,
+        );
+        setBaseLoad(activeTemplate.base_load || null);
+      }
+      if (activeTemplate.sport_type === HYROX_SPORT_TYPE) {
+        setHyroxStationFocus(
+          'hyrox_station_focus' in activeTemplate && typeof activeTemplate.hyrox_station_focus === 'string'
+            ? activeTemplate.hyrox_station_focus
             : null,
         );
         setBaseLoad(activeTemplate.base_load || null);
@@ -941,7 +963,8 @@ export const EnduranceSessionFormScreen = () => {
             sportType === TRAIL_SPORT_TYPE ||
             sportType === 'surf' ||
             sportType === 'skiing' ||
-            sportType === GOLF_SPORT_TYPE) &&
+            sportType === GOLF_SPORT_TYPE ||
+            sportType === HYROX_SPORT_TYPE) &&
           !sportSubtype
         ) {
           Alert.alert(t('training.missingDataTitle'), t('training.modalityRequired'));
@@ -997,7 +1020,10 @@ export const EnduranceSessionFormScreen = () => {
         }
       }
 
-      const payload: (ActivitySessionInsert | ActivitySessionUpdate) & { golf_club_focus?: string | null } = {
+      const payload: (ActivitySessionInsert | ActivitySessionUpdate) & {
+        golf_club_focus?: string | null;
+        hyrox_station_focus?: string | null;
+      } = {
         sport_type: (sportType === 'gym' ? 'strength' : sportType) as SportType,
         sport_subtype: [
           'swimming',
@@ -1013,6 +1039,7 @@ export const EnduranceSessionFormScreen = () => {
           'skiing',
           'snowboard',
           'golf',
+          'hyrox',
         ].includes(sportType)
           ? sportSubtype
           : null,
@@ -1032,6 +1059,7 @@ export const EnduranceSessionFormScreen = () => {
           'skiing',
           'snowboard',
           'golf',
+          'hyrox',
         ].includes(sportType)
           ? baseLoad
           : null,
@@ -1045,6 +1073,7 @@ export const EnduranceSessionFormScreen = () => {
         ski_type: sportType === 'skiing' ? skiType : null,
         snowboard_type: sportType === 'snowboard' ? snowboardType : null,
         golf_club_focus: sportType === GOLF_SPORT_TYPE ? golfClubFocus : null,
+        hyrox_station_focus: sportType === HYROX_SPORT_TYPE ? hyroxStationFocus : null,
         slope_type: ['skiing', 'snowboard'].includes(sportType) ? slopeType : null,
         name: name || (isGymMode ? t('constants.gymTitle') : t('alzan.activity')),
         start_time: startDateTime,
@@ -2716,6 +2745,87 @@ export const EnduranceSessionFormScreen = () => {
                 </View>
               )}
 
+              {/* HYROX Specific Configuration Block */}
+              {sportType === HYROX_SPORT_TYPE && (
+                <View
+                  style={[
+                    {
+                      marginBottom: spacing.m,
+                      paddingHorizontal: spacing.m,
+                      paddingVertical: spacing.s,
+                      borderRadius: borderRadius.m,
+                    },
+                    dynamicStyles.glassCard,
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setSportSubtypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.modalityLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.modalityLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: sportSubtype ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {sportSubtype ? getOptionLabel(sportType, sportSubtype, 'modality') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.formRow}
+                    onPress={() => setHyroxStationFocusModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.hyroxStationFocusLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.hyroxStationFocusLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: hyroxStationFocus ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {hyroxStationFocus
+                          ? getOptionLabel(sportType, hyroxStationFocus, 'hyrox_station_focus')
+                          : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.formRow, { borderBottomWidth: 0 }]}
+                    onPress={() => setBaseLoadModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.loadLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>{t('training.loadLabel')}</Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: baseLoad ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {baseLoad ? getOptionLabel(sportType, baseLoad, 'base_load') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <View style={styles.row}>
                 {currentConfig?.fields.distance && (
                   <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
@@ -4005,6 +4115,66 @@ export const EnduranceSessionFormScreen = () => {
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
                   onPress={() => setGolfClubFocusModalVisible(false)}
+                >
+                  <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
+                    {t('common.cancel')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* HYROX Station Focus Selector Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={hyroxStationFocusModalVisible}
+          onRequestClose={() => setHyroxStationFocusModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setHyroxStationFocusModalVisible(false)}>
+            <Pressable
+              style={[styles.modalCard, { backgroundColor: isDark ? '#1C1C1E' : '#FFF' }]}
+              onPress={e => e.stopPropagation()}
+            >
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                {t('training.hyroxStationFocusLabel')}
+              </Text>
+
+              <ScrollView style={{ maxHeight: 300 }}>
+                {getOptions(sportType, 'hyrox_station_focus').map(opt => {
+                  const isSelected = hyroxStationFocus === opt.option_key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.option_key}
+                      style={[
+                        styles.surfaceOptionRow,
+                        isSelected && { backgroundColor: themeColors.primary + '15', borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        setHyroxStationFocus(opt.option_key);
+                        setHyroxStationFocusModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.surfaceOptionText,
+                          { color: themeColors.textPrimary },
+                          isSelected && { color: themeColors.primary },
+                        ]}
+                      >
+                        {getOptionLabel(sportType, opt.option_key, 'hyrox_station_focus')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border, flex: 1 }]}
+                  onPress={() => setHyroxStationFocusModalVisible(false)}
                 >
                   <Text style={[styles.cancelActionBtnText, { color: themeColors.textPrimary }]}>
                     {t('common.cancel')}

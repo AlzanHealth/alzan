@@ -454,6 +454,7 @@ export type Database = {
           epoc: number | null
           football_session_type: string | null
           golf_club_focus: string | null
+          hyrox_station_focus: string | null
           id: string
           imported_at: string | null
           max_cadence: number | null
@@ -527,6 +528,7 @@ export type Database = {
           epoc?: number | null
           football_session_type?: string | null
           golf_club_focus?: string | null
+          hyrox_station_focus?: string | null
           id?: string
           imported_at?: string | null
           max_cadence?: number | null
@@ -600,6 +602,7 @@ export type Database = {
           epoc?: number | null
           football_session_type?: string | null
           golf_club_focus?: string | null
+          hyrox_station_focus?: string | null
           id?: string
           imported_at?: string | null
           max_cadence?: number | null
@@ -1399,12 +1402,16 @@ export type Database = {
           distance_m: number | null
           duration_s: number | null
           duration_type: Database["public"]["Enums"]["duration_type_enum"]
+          hyrox_station_key: string | null
+          hyrox_step_type: string | null
           id: string
           is_group: boolean | null
+          load_kg: number | null
           order_index: number
           parent_step_id: string | null
           phase_type: Database["public"]["Enums"]["phase_type_enum"]
           repetitions: number | null
+          reps: number | null
           target_max: number | null
           target_min: number | null
           target_type: Database["public"]["Enums"]["target_type_enum"]
@@ -1416,12 +1423,16 @@ export type Database = {
           distance_m?: number | null
           duration_s?: number | null
           duration_type: Database["public"]["Enums"]["duration_type_enum"]
+          hyrox_station_key?: string | null
+          hyrox_step_type?: string | null
           id?: string
           is_group?: boolean | null
+          load_kg?: number | null
           order_index: number
           parent_step_id?: string | null
           phase_type: Database["public"]["Enums"]["phase_type_enum"]
           repetitions?: number | null
+          reps?: number | null
           target_max?: number | null
           target_min?: number | null
           target_type?: Database["public"]["Enums"]["target_type_enum"]
@@ -1433,12 +1444,16 @@ export type Database = {
           distance_m?: number | null
           duration_s?: number | null
           duration_type?: Database["public"]["Enums"]["duration_type_enum"]
+          hyrox_station_key?: string | null
+          hyrox_step_type?: string | null
           id?: string
           is_group?: boolean | null
+          load_kg?: number | null
           order_index?: number
           parent_step_id?: string | null
           phase_type?: Database["public"]["Enums"]["phase_type_enum"]
           repetitions?: number | null
+          reps?: number | null
           target_max?: number | null
           target_min?: number | null
           target_type?: Database["public"]["Enums"]["target_type_enum"]
@@ -1476,6 +1491,7 @@ export type Database = {
           environment_type: string | null
           football_session_type: string | null
           golf_club_focus: string | null
+          hyrox_station_focus: string | null
           id: string
           notes: string | null
           pool_type: string | null
@@ -1508,6 +1524,7 @@ export type Database = {
           environment_type?: string | null
           football_session_type?: string | null
           golf_club_focus?: string | null
+          hyrox_station_focus?: string | null
           id?: string
           notes?: string | null
           pool_type?: string | null
@@ -1540,6 +1557,7 @@ export type Database = {
           environment_type?: string | null
           football_session_type?: string | null
           golf_club_focus?: string | null
+          hyrox_station_focus?: string | null
           id?: string
           notes?: string | null
           pool_type?: string | null
@@ -4711,6 +4729,7 @@ export type Database = {
         | "skiing"
         | "snowboard"
         | "golf"
+        | "hyrox"
       stream_type_enum:
         | "heart_rate"
         | "cadence"
@@ -5050,6 +5069,7 @@ export const Constants = {
         "skiing",
         "snowboard",
         "golf",
+        "hyrox",
       ],
       stream_type_enum: [
         "heart_rate",

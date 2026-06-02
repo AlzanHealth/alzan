@@ -63,6 +63,7 @@ import { SPORT_COLORS } from '../../theme/sportColors';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
+const HYROX_SPORT_TYPE = 'hyrox' as ActivitySession['sport_type'];
 
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
@@ -789,6 +790,33 @@ export const EnduranceSessionDetailScreen = () => {
         });
       }
     }
+    if (session.sport_type === HYROX_SPORT_TYPE) {
+      const hyroxStationFocus =
+        'hyrox_station_focus' in session && typeof session.hyrox_station_focus === 'string'
+          ? session.hyrox_station_focus
+          : null;
+      if (session.sport_subtype) {
+        secondaryMetrics.push({
+          key: 'hyrox-modality',
+          label: t('training.modalityLabel'),
+          value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
+        });
+      }
+      if (hyroxStationFocus) {
+        secondaryMetrics.push({
+          key: 'hyrox-station-focus',
+          label: t('training.hyroxStationFocusLabel'),
+          value: getOptionLabel(session.sport_type, hyroxStationFocus, 'hyrox_station_focus'),
+        });
+      }
+      if (session.base_load) {
+        secondaryMetrics.push({
+          key: 'hyrox-base-load',
+          label: t('training.loadLabel'),
+          value: getOptionLabel(session.sport_type, session.base_load, 'base_load'),
+        });
+      }
+    }
   }
 
   const handleImportedMetricInfoPress = useCallback(
@@ -1128,10 +1156,12 @@ export const EnduranceSessionDetailScreen = () => {
               session.surface ||
               session.base_load ||
               session.contact_level ||
+              ('hyrox_station_focus' in session && session.hyrox_station_focus) ||
               template?.surface ||
               template?.environment_type ||
               template?.base_load ||
-              template?.contact_level) && (
+              template?.contact_level ||
+              ('hyrox_station_focus' in (template || {}) && template?.hyrox_station_focus)) && (
               <View style={styles.metadataTagsContainer}>
                 {(session.sport_subtype || template?.environment_type) && (
                   <View
@@ -1215,6 +1245,25 @@ export const EnduranceSessionDetailScreen = () => {
                       </Text>
                     </View>
                   )}
+                {(('hyrox_station_focus' in session && session.hyrox_station_focus) ||
+                  ('hyrox_station_focus' in (template || {}) && template?.hyrox_station_focus)) && (
+                  <View
+                    style={[
+                      styles.metadataTag,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                    ]}
+                  >
+                    <Text style={[styles.metadataTagText, { color: themeColors.textSecondary }]}>
+                      {getOptionLabel(
+                        session.sport_type,
+                        ('hyrox_station_focus' in session && session.hyrox_station_focus) ||
+                          ('hyrox_station_focus' in (template || {}) && template?.hyrox_station_focus) ||
+                          null,
+                        'hyrox_station_focus',
+                      )}
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </View>

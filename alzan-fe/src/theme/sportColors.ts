@@ -16,6 +16,7 @@ export const SPORT_COLORS: Record<string, string> = {
   surf: '#1891AC', // Azul océano profundo (≠ swimming, gym, skiing)
   snowboard: '#7560E5', // Iris/violeta vibrante
   golf: '#2F7D46', // Verde fairway
+  hyrox: '#F05A28', // Naranja competición híbrida
   walking: '#34C759', // Verde paseo
   other: '#8E8E93', // Gris neutro
 };

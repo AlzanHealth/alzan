@@ -21,7 +21,8 @@ export type SportCatalogOptionType =
   | 'ski_type'
   | 'slope_type'
   | 'snowboard_type'
-  | 'golf_club_focus';
+  | 'golf_club_focus'
+  | 'hyrox_station_focus';
 type SportCatalogLocalizedLabels = {
   label_es?: string | null;
   label_en?: string | null;
@@ -50,6 +51,7 @@ const OPTION_TYPES: SportCatalogOptionType[] = [
   'slope_type',
   'snowboard_type',
   'golf_club_focus',
+  'hyrox_station_focus',
 ];
 
 const isSportCatalogOptionType = (value: string): value is SportCatalogOptionType =>
@@ -149,6 +151,11 @@ export const useSportCatalog = () => {
   };
 
   const getLocalizedOptionLabel = (option: SportCatalogOption): string => {
+    if (languageCode === 'es' && option.sport_type === 'hyrox' && option.option_type === 'hyrox_station_focus') {
+      const translatedLabel = t(asTranslationKey(option.translation_key));
+      if (translatedLabel && translatedLabel !== option.translation_key) return translatedLabel;
+    }
+
     const localizedLabel = languageCode === 'es' ? option.label_es : option.label_en;
     return localizedLabel || t(asTranslationKey(option.translation_key));
   };

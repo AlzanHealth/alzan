@@ -74,6 +74,7 @@ const SPORT_CONFIG: Record<string, { label: TranslationKey; color: string }> = {
   surf: { label: 'constants.surfTitle', color: '#1891AC' },
   snowboard: { label: 'constants.snowboard', color: '#7560E5' },
   golf: { label: 'constants.golf', color: '#2F7D46' },
+  hyrox: { label: 'constants.hyrox', color: '#F05A28' },
   other: { label: 'constants.other', color: '#8E8E93' },
 };
 
@@ -181,6 +182,7 @@ const toSportType = (value: string): SportType => {
     case 'surf':
     case 'snowboard':
     case 'golf':
+    case 'hyrox':
     case 'other':
       return value as SportType;
     default:
@@ -657,6 +659,14 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       );
       if (golfClubFocusLabel) {
         stats.push(`${t('training.golfClubFocusLabel')}: ${golfClubFocusLabel}`);
+      }
+      const hyroxStationFocusLabel = getCatalogOptionLabel(
+        session.sport_type,
+        'hyrox_station_focus',
+        readStringField(session, 'hyrox_station_focus'),
+      );
+      if (hyroxStationFocusLabel) {
+        stats.push(`${t('training.hyroxStationFocusLabel')}: ${hyroxStationFocusLabel}`);
       }
       if (session.total_sets != null && session.total_sets > 0) {
         stats.push(`${t('training.pdfTotalSets')}: ${Math.round(session.total_sets)}`);

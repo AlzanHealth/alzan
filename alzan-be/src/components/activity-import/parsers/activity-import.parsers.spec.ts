@@ -325,6 +325,31 @@ function assertGenericGolfUsesCatalogModality(): void {
   }
 }
 
+function assertGenericHyroxUsesExplicitSignalOnly(): void {
+  const canonical = parseActivityFileToCanonical(
+    JSON.stringify({
+      sport_type: 'HYROX race',
+      start_time: '2026-06-01T08:00:00Z',
+      duration_s: 5400,
+      distance_m: 8000,
+      calories_kcal: 760,
+    }),
+    'generic-hyrox-race.json',
+  );
+  assert.equal(canonical.sportType, 'hyrox');
+  assert.equal(canonical.sportSubtype, null);
+
+  const ambiguous = parseActivityFileToCanonical(
+    JSON.stringify({
+      sport_type: 'Functional training',
+      start_time: '2026-06-01T08:00:00Z',
+      duration_s: 3600,
+    }),
+    'generic-functional-training.json',
+  );
+  assert.notEqual(ambiguous.sportType, 'hyrox');
+}
+
 assertSuuntoStrengthJsonParses();
 assertClearEnduranceStrengthJsonIsRejected();
 assertSuuntoDistanceActivityIsRejectedForStrength();
@@ -339,3 +364,4 @@ assertGenericTrailUsesCatalogModality();
 assertGenericSkiingUsesCatalogModality();
 assertGenericSnowboardUsesCatalogModality();
 assertGenericGolfUsesCatalogModality();
+assertGenericHyroxUsesExplicitSignalOnly();
