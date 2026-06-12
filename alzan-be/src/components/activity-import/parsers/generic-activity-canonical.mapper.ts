@@ -12,6 +12,7 @@ import { mapHyroxTextToCanonical } from './hyrox-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
+import { mapSurfTextToCanonical } from './surf-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -124,6 +125,8 @@ function mapSportNameToCanonical(rawSportName: string | null): CanonicalActivity
   if (skiingSport) return skiingSport;
   const snowboardSport = mapSnowboardTextToCanonical(rawSportName);
   if (snowboardSport) return snowboardSport;
+  const surfSport = mapSurfTextToCanonical(rawSportName);
+  if (surfSport) return surfSport;
 
   if (sportName.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (sportName.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };

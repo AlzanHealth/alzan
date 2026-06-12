@@ -18,11 +18,15 @@ export function mapSkiingTextToCanonical(raw: string | null | undefined): Canoni
   if (text.includes('snowboard') || text.includes('splitboard')) {
     return null;
   }
+  // Nordic walking is walking; kite variants are not skiing.
+  if (text.includes('nordic_walking') || text.includes('kite')) {
+    return null;
+  }
 
   if (text.includes('alpine') || text.includes('downhill') || text.includes('alpino') || text.includes('pista')) {
     return { sportType: SKIING_SPORT_TYPE, sportSubtype: 'alpine' };
   }
-  if (text.includes('cross_country') || text.includes('nordic') || text.includes('fondo')) {
+  if (text.includes('cross_country') || text.includes('nordic') || text.includes('fondo') || text.includes('xc_ski')) {
     return { sportType: SKIING_SPORT_TYPE, sportSubtype: 'cross_country' };
   }
   if (

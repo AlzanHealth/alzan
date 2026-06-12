@@ -741,6 +741,27 @@ FIT sport 64 + subSport 85 -> padel
 FIT sport 4 / 37 / subSport 20 -> strength
 ```
 
+Subtipos de ciclismo segun el estandar FIT `sub_sport` (igual en Garmin y Suunto):
+
+```text
+subSport 5  -> spinning
+subSport 6  -> indoor_trainer
+subSport 7  -> road (valor por defecto)
+subSport 8  -> mtb
+subSport 11 -> gravel (cyclocross)
+subSport 46 -> gravel
+```
+
+Para Suunto, ademas, el mapa `SUUNTO_ACTIVITY_ID_MAP` cubre los activity IDs oficiales del
+cloud (lista oficial: https://aspartnercontent.blob.core.windows.net/apizone/docs/Activities.pdf),
+incluyendo esqui (3/13/31/107/116-118), snowboard (30/110), golf (16), escalada (29),
+voleibol (38), futsal (67), boxeo/combate (62/77), surf (91), e-bike (105/106) y variantes gym.
+
+Importante: los exports JSON del reloj (DeviceLog) usan un enum legacy de `ActivityType` que
+NO coincide con la lista oficial del cloud (ej: 3 = running en DeviceLog vs esqui de fondo en
+la lista oficial). Por eso, cuando hay nombre textual de deporte (`Header.Activity`), el texto
+tiene prioridad sobre el ID numerico.
+
 Tambien intenta leer texto del JSON:
 
 ```text

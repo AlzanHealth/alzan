@@ -22,7 +22,7 @@ import { useEnduranceSessions } from '../../hooks/useEnduranceSessions';
 import { Activity, Calendar, Trash2, Dumbbell, Filter, X, Route } from 'lucide-react-native';
 import { RouteMap } from '../../components/common/RouteMap';
 import { format, subDays, subMonths, startOfDay } from 'date-fns';
-import { SPORTS_CONFIG, formatDuration } from '../../constants/sports';
+import { SPORTS_CONFIG, formatDuration, getSportDefaultTitleKey } from '../../constants/sports';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ActivitySession } from '../../types/requests.types';
@@ -956,7 +956,10 @@ export const EnduranceSessionsListScreen = () => {
                           </View>
                           <View style={styles.headerInfo}>
                             <Text style={[styles.sessionTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                              {session.name || (isGym ? t('training.strengthWorkout') : t(config.defaultTitle))}
+                              {session.name ||
+                                (isGym
+                                  ? t('training.strengthWorkout')
+                                  : t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype)))}
                             </Text>
                             <View style={styles.sessionSubRow}>
                               {isActive && (

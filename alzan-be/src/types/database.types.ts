@@ -439,6 +439,9 @@ export type Database = {
           description: string | null;
           device_id: string | null;
           distance_m: number | null;
+          duplicate_of_session_id: string | null;
+          duplicate_resolution: Database['public']['Enums']['import_duplicate_resolution_enum'] | null;
+          duplicate_score: number | null;
           duration_s: number | null;
           elev_gain_m: number | null;
           elev_loss_m: number | null;
@@ -457,7 +460,9 @@ export type Database = {
           max_temp_c: number | null;
           min_heart_rate: number | null;
           name: string | null;
+          needs_strength_review: boolean;
           notes: string | null;
+          pending_watch_metrics: Json | null;
           pool_type: string | null;
           provider: Database['public']['Enums']['provider_enum'];
           provider_activity_id: string | null;
@@ -483,7 +488,10 @@ export type Database = {
           started_at_local: string | null;
           status: Database['public']['Enums']['activity_status_enum'];
           stroke: string | null;
+          suggested_endurance_template_id: string | null;
           surface: string | null;
+          template_match_method: Database['public']['Enums']['import_match_method_enum'] | null;
+          template_match_score: number | null;
           timezone: string | null;
           total_reps: number | null;
           total_sets: number | null;
@@ -513,6 +521,9 @@ export type Database = {
           description?: string | null;
           device_id?: string | null;
           distance_m?: number | null;
+          duplicate_of_session_id?: string | null;
+          duplicate_resolution?: Database['public']['Enums']['import_duplicate_resolution_enum'] | null;
+          duplicate_score?: number | null;
           duration_s?: number | null;
           elev_gain_m?: number | null;
           elev_loss_m?: number | null;
@@ -531,7 +542,9 @@ export type Database = {
           max_temp_c?: number | null;
           min_heart_rate?: number | null;
           name?: string | null;
+          needs_strength_review?: boolean;
           notes?: string | null;
+          pending_watch_metrics?: Json | null;
           pool_type?: string | null;
           provider?: Database['public']['Enums']['provider_enum'];
           provider_activity_id?: string | null;
@@ -557,7 +570,10 @@ export type Database = {
           started_at_local?: string | null;
           status?: Database['public']['Enums']['activity_status_enum'];
           stroke?: string | null;
+          suggested_endurance_template_id?: string | null;
           surface?: string | null;
+          template_match_method?: Database['public']['Enums']['import_match_method_enum'] | null;
+          template_match_score?: number | null;
           timezone?: string | null;
           total_reps?: number | null;
           total_sets?: number | null;
@@ -587,6 +603,9 @@ export type Database = {
           description?: string | null;
           device_id?: string | null;
           distance_m?: number | null;
+          duplicate_of_session_id?: string | null;
+          duplicate_resolution?: Database['public']['Enums']['import_duplicate_resolution_enum'] | null;
+          duplicate_score?: number | null;
           duration_s?: number | null;
           elev_gain_m?: number | null;
           elev_loss_m?: number | null;
@@ -605,7 +624,9 @@ export type Database = {
           max_temp_c?: number | null;
           min_heart_rate?: number | null;
           name?: string | null;
+          needs_strength_review?: boolean;
           notes?: string | null;
+          pending_watch_metrics?: Json | null;
           pool_type?: string | null;
           provider?: Database['public']['Enums']['provider_enum'];
           provider_activity_id?: string | null;
@@ -631,7 +652,10 @@ export type Database = {
           started_at_local?: string | null;
           status?: Database['public']['Enums']['activity_status_enum'];
           stroke?: string | null;
+          suggested_endurance_template_id?: string | null;
           surface?: string | null;
+          template_match_method?: Database['public']['Enums']['import_match_method_enum'] | null;
+          template_match_score?: number | null;
           timezone?: string | null;
           total_reps?: number | null;
           total_sets?: number | null;
@@ -654,6 +678,13 @@ export type Database = {
             referencedColumns: ['id'];
           },
           {
+            foreignKeyName: 'activity_sessions_duplicate_of_session_id_fkey';
+            columns: ['duplicate_of_session_id'];
+            isOneToOne: false;
+            referencedRelation: 'activity_sessions';
+            referencedColumns: ['id'];
+          },
+          {
             foreignKeyName: 'activity_sessions_endurance_template_id_fkey';
             columns: ['endurance_template_id'];
             isOneToOne: false;
@@ -665,6 +696,13 @@ export type Database = {
             columns: ['raw_payload_id'];
             isOneToOne: false;
             referencedRelation: 'external_raw_payloads_v2';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'activity_sessions_suggested_endurance_template_id_fkey';
+            columns: ['suggested_endurance_template_id'];
+            isOneToOne: false;
+            referencedRelation: 'endurance_workout_templates';
             referencedColumns: ['id'];
           },
           {
@@ -4552,6 +4590,8 @@ export type Database = {
       duration_type_enum: 'time' | 'distance' | 'lap_button';
       exercise_load_type: 'assisted' | 'bodyweight' | 'external' | 'mixed';
       health_data_quality_enum: 'complete' | 'partial' | 'estimated' | 'manual' | 'unknown';
+      import_duplicate_resolution_enum: 'pending' | 'merged' | 'kept_both';
+      import_match_method_enum: 'structural' | 'totals';
       ingredients_category:
         | 'proteina_animal'
         | 'proteina_vegetal'
@@ -4821,6 +4861,8 @@ export const Constants = {
       duration_type_enum: ['time', 'distance', 'lap_button'],
       exercise_load_type: ['assisted', 'bodyweight', 'external', 'mixed'],
       health_data_quality_enum: ['complete', 'partial', 'estimated', 'manual', 'unknown'],
+      import_duplicate_resolution_enum: ['pending', 'merged', 'kept_both'],
+      import_match_method_enum: ['structural', 'totals'],
       ingredients_category: [
         'proteina_animal',
         'proteina_vegetal',

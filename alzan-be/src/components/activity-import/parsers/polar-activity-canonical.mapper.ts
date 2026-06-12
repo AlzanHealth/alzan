@@ -16,6 +16,7 @@ import { mapHyroxTextToCanonical } from './hyrox-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
+import { mapSurfTextToCanonical } from './surf-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -186,6 +187,8 @@ function mapPolarSport(rawSport: string | null, rawDetailed: string | null): Can
   if (skiingSport) return skiingSport;
   const snowboardSport = mapSnowboardTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
   if (snowboardSport) return snowboardSport;
+  const surfSport = mapSurfTextToCanonical(`${rawDetailed ?? ''} ${rawSport ?? ''}`);
+  if (surfSport) return surfSport;
 
   if (sport.includes('WALKING')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (sport.includes('PADEL')) return { sportType: 'padel', sportSubtype: 'outdoor' };
@@ -277,8 +280,10 @@ function readPolarSport(record: JsonRecord, exercise: JsonRecord): string | null
 
 function readPolarDetailedSport(record: JsonRecord, exercise: JsonRecord): string | null {
   return (
+    readString(exercise['detailed-sport-info']) ??
     readString(exercise.detailed_sport_info) ??
     readString(exercise.detailedSportInfo) ??
+    readString(record['detailed-sport-info']) ??
     readString(record.detailed_sport_info) ??
     readString(record.detailedSportInfo)
   );

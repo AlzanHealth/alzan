@@ -224,6 +224,34 @@ export const SPORT_GOALS: Partial<Record<SportType | 'volleyball' | 'trail' | 'g
   hyrox: [],
 };
 
+// Subtype-specific default titles, used when an imported/manual session has no name
+// and the generic sport title would be misleading (e.g. "Ruta en bici" for an indoor ride).
+const SPORT_SUBTYPE_TITLES: Partial<Record<string, Partial<Record<string, TranslationKey>>>> = {
+  cycling: {
+    indoor_trainer: 'constants.cyclingIndoorTitle',
+    spinning: 'constants.cyclingSpinningTitle',
+    mtb: 'constants.cyclingMtbTitle',
+    gravel: 'constants.cyclingGravelTitle',
+    urban: 'constants.cyclingUrbanTitle',
+  },
+  running: {
+    treadmill: 'constants.runningTreadmillTitle',
+    track: 'constants.runningTrackTitle',
+  },
+  swimming: {
+    open_water: 'constants.swimmingOpenWaterTitle',
+  },
+};
+
+export const getSportDefaultTitleKey = (
+  sportType: string | null | undefined,
+  sportSubtype?: string | null,
+): TranslationKey => {
+  const subtypeTitle = sportType && sportSubtype ? SPORT_SUBTYPE_TITLES[sportType]?.[sportSubtype] : undefined;
+  if (subtypeTitle) return subtypeTitle;
+  return SPORTS_CONFIG[sportType ?? '']?.defaultTitle ?? 'constants.otherTitle';
+};
+
 export const formatDuration = (seconds: number) => {
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);

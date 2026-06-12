@@ -147,7 +147,7 @@ function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
   if (text.includes('padel'))
     return { sportType: 'padel', sportSubtype: text.includes('indoor') ? 'indoor' : 'outdoor' };
   if (text.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
-  if (text.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'outdoor' };
+  if (text.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (text.includes('soccer') || text.includes('football')) {
     if (text.includes('futsal') || text.includes('sala') || text.includes('indoor')) {
       return { sportType: 'football', sportSubtype: 'futsal' };

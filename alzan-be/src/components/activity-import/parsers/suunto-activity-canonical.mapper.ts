@@ -102,28 +102,64 @@ const EMPTY_STREAMS: CanonicalActivityStreams = {
   temperature: [],
 };
 
+// Official Suunto activity IDs: https://aspartnercontent.blob.core.windows.net/apizone/docs/Activities.pdf
 const SUUNTO_ACTIVITY_ID_MAP = new Map<number, CanonicalActivitySportMapping>([
-  [0, { sportType: 'other', sportSubtype: 'outdoor' }],
+  [0, { sportType: 'hiking', sportSubtype: 'urban_walk' }], // Walking
   [1, { sportType: 'running', sportSubtype: 'outdoor' }],
   [2, { sportType: 'cycling', sportSubtype: 'road' }],
+  [3, { sportType: 'skiing', sportSubtype: 'cross_country' }],
   [10, { sportType: 'cycling', sportSubtype: 'mtb' }], // Mountain Biking
   [11, { sportType: 'hiking', sportSubtype: 'trail' }],
+  [13, { sportType: 'skiing', sportSubtype: 'alpine' }], // Downhill skiing
+  [16, { sportType: 'golf', sportSubtype: null }],
+  [17, { sportType: 'gym', sportSubtype: null }], // Indoor sports
+  [20, { sportType: 'gym', sportSubtype: null }], // Outdoor gym
   [21, { sportType: 'swimming', sportSubtype: 'pool' }],
   [22, { sportType: 'trail', sportSubtype: 'trail_running' }],
-  [23, { sportType: 'strength', sportSubtype: 'indoor' }],
+  [23, { sportType: 'strength', sportSubtype: 'indoor' }], // Gym
+  [24, { sportType: 'hiking', sportSubtype: 'urban_walk' }], // Nordic walking
+  [29, { sportType: 'climbing', sportSubtype: null }],
+  [30, { sportType: 'snowboard', sportSubtype: 'slope' }],
+  [31, { sportType: 'skiing', sportSubtype: 'backcountry' }], // Ski touring
+  [32, { sportType: 'gym', sportSubtype: null }], // Fitness class
   [33, { sportType: 'football', sportSubtype: 'football_11' }],
   [34, { sportType: 'tennis', sportSubtype: 'outdoor' }],
   [35, { sportType: 'basketball', sportSubtype: 'indoor' }],
+  [38, { sportType: 'volleyball', sportSubtype: 'indoor_volleyball' }],
+  [51, { sportType: 'gym', sportSubtype: null }], // Yoga/pilates
   [52, { sportType: 'cycling', sportSubtype: 'indoor_trainer' }],
   [53, { sportType: 'running', sportSubtype: 'treadmill' }],
-  [59, { sportType: 'running', sportSubtype: 'track' }],
-  [63, { sportType: 'strength', sportSubtype: 'indoor' }],
-  [70, { sportType: 'hiking', sportSubtype: 'trail' }],
+  [54, { sportType: 'gym', sportSubtype: null }], // Crossfit
+  [55, { sportType: 'gym', sportSubtype: null }], // Crosstrainer
+  [57, { sportType: 'gym', sportSubtype: null }], // Indoor rowing
+  [59, { sportType: 'running', sportSubtype: 'track' }], // Track and field
+  [62, { sportType: 'martial_arts', sportSubtype: null }], // Combat sport
+  [63, { sportType: 'strength', sportSubtype: 'indoor' }], // Kettlebell
+  [67, { sportType: 'football', sportSubtype: 'futsal' }],
+  [69, { sportType: 'gym', sportSubtype: null }], // Aerobics
+  [70, { sportType: 'hiking', sportSubtype: 'trail' }], // Trekking
+  [73, { sportType: 'gym', sportSubtype: null }], // Circuit training
   [75, { sportType: 'padel', sportSubtype: 'outdoor' }],
+  [77, { sportType: 'martial_arts', sportSubtype: 'boxing' }],
+  [81, { sportType: 'gym', sportSubtype: null }], // Gymnastics
+  [83, { sportType: 'hiking', sportSubtype: 'high_mountain' }], // Mountaineering
+  [84, { sportType: 'skiing', sportSubtype: 'alpine' }], // Telemark skiing
   [85, { sportType: 'swimming', sportSubtype: 'open_water' }],
+  [91, { sportType: 'surf', sportSubtype: 'surf' }],
   [99, { sportType: 'cycling', sportSubtype: 'gravel' }], // Gravel Biking
-  [103, { sportType: 'running', sportSubtype: 'track' }],
-  [104, { sportType: 'strength', sportSubtype: 'indoor' }],
+  [103, { sportType: 'running', sportSubtype: 'track' }], // Track running
+  [104, { sportType: 'strength', sportSubtype: 'indoor' }], // Calisthenics
+  [105, { sportType: 'cycling', sportSubtype: 'road' }], // E-biking
+  [106, { sportType: 'cycling', sportSubtype: 'mtb' }], // E-mtb
+  [107, { sportType: 'skiing', sportSubtype: 'backcountry' }], // Backcountry skiing
+  [110, { sportType: 'snowboard', sportSubtype: 'splitboard' }], // Splitboarding
+  [114, { sportType: 'cycling', sportSubtype: 'gravel' }], // Cyclocross
+  [115, { sportType: 'trail', sportSubtype: 'trail_running' }], // Vertical running
+  [116, { sportType: 'skiing', sportSubtype: 'backcountry' }], // Ski mountaineering
+  [117, { sportType: 'skiing', sportSubtype: 'cross_country' }], // Skate skiing
+  [118, { sportType: 'skiing', sportSubtype: 'cross_country' }], // Classic skiing
+  [120, { sportType: 'gym', sportSubtype: null }], // Pilates
+  [121, { sportType: 'gym', sportSubtype: null }], // Yoga
 ]);
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -221,18 +257,15 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   const snowboardSport = mapSnowboardTextToCanonical(params.sportName);
   if (snowboardSport) return snowboardSport;
 
+  // Watch DeviceLog exports use a legacy ActivityType enum that conflicts with the official
+  // cloud activity IDs (e.g. 3 = running in DeviceLog vs cross-country skiing in the cloud list),
+  // so the textual sport label takes precedence over the numeric id when both are present.
+  const nameMapping = mapSuuntoSportNameToCanonical(params.sportName);
+  if (nameMapping) return nameMapping;
+
   if (params.activityId != null) {
     const mappedActivityId = SUUNTO_ACTIVITY_ID_MAP.get(Math.round(params.activityId));
-    if (mappedActivityId) {
-      if (mappedActivityId.sportType === 'football') {
-        const sportName = params.sportName?.toLowerCase() ?? '';
-        if (sportName.includes('futsal') || sportName.includes('sala') || sportName.includes('indoor')) {
-          return { sportType: 'football', sportSubtype: 'futsal' };
-        }
-        return { sportType: 'football', sportSubtype: 'football_11' };
-      }
-      return mappedActivityId;
-    }
+    if (mappedActivityId) return mappedActivityId;
   }
 
   const fitSport = params.fitSport != null ? Math.round(params.fitSport) : null;
@@ -254,15 +287,37 @@ export function mapSuuntoActivityToCanonicalSport(params: {
     return { sportType: 'running', sportSubtype: 'outdoor' };
   }
   if (fitSport === 2) {
+    // FIT sub_sport: 5 = spin, 6 = indoor_cycling, 7 = road, 8 = mountain, 11 = cyclocross, 46 = gravel_cycling
     if (fitSubSport === 6) return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
-    if (fitSubSport === 7) return { sportType: 'cycling', sportSubtype: 'mtb' };
+    if (fitSubSport === 5) return { sportType: 'cycling', sportSubtype: 'spinning' };
+    if (fitSubSport === 8) return { sportType: 'cycling', sportSubtype: 'mtb' };
     if (fitSubSport === 46) return { sportType: 'cycling', sportSubtype: 'gravel' };
-    if (fitSubSport === 17) return { sportType: 'cycling', sportSubtype: 'spinning' };
+    if (fitSubSport === 11) return { sportType: 'cycling', sportSubtype: 'gravel' }; // Cyclocross
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
   if (fitSport === 5) {
     if (fitSubSport === 18) return { sportType: 'swimming', sportSubtype: 'open_water' };
     return { sportType: 'swimming', sportSubtype: 'pool' };
+  }
+  if (fitSport === 12) return { sportType: 'skiing', sportSubtype: 'cross_country' };
+  if (fitSport === 13) {
+    if (fitSubSport === 37) return { sportType: 'skiing', sportSubtype: 'backcountry' };
+    return { sportType: 'skiing', sportSubtype: 'alpine' };
+  }
+  if (fitSport === 14) {
+    if (fitSubSport === 37) return { sportType: 'snowboard', sportSubtype: 'splitboard' };
+    return { sportType: 'snowboard', sportSubtype: 'slope' };
+  }
+  if (fitSport === 16) return { sportType: 'hiking', sportSubtype: 'high_mountain' }; // Mountaineering
+  if (fitSport === 25) return { sportType: 'golf', sportSubtype: null };
+  if (fitSport === 31) return { sportType: 'climbing', sportSubtype: null };
+  if (fitSport === 38) return { sportType: 'surf', sportSubtype: 'surf' };
+  if (fitSport === 47) return { sportType: 'martial_arts', sportSubtype: 'boxing' };
+  if (fitSport === 4) {
+    // FITNESS_EQUIPMENT
+    if (fitSubSport === 20) return { sportType: 'strength', sportSubtype: 'indoor' };
+    if (fitSubSport === 1) return { sportType: 'running', sportSubtype: 'treadmill' };
+    return { sportType: 'gym', sportSubtype: null };
   }
   if (fitSport === 6) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (fitSport === 7) {
@@ -279,7 +334,12 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   if (fitSport === 11) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (fitSport === 64 && fitSubSport === 85) return { sportType: 'padel', sportSubtype: 'outdoor' };
 
-  const sportName = params.sportName?.toLowerCase() ?? '';
+  return { sportType: 'other', sportSubtype: null };
+}
+
+function mapSuuntoSportNameToCanonical(rawSportName: string | null | undefined): CanonicalActivitySportMapping | null {
+  const sportName = rawSportName?.toLowerCase() ?? '';
+  if (!sportName) return null;
   if (sportName.includes('padel')) return { sportType: 'padel', sportSubtype: 'outdoor' };
   if (sportName.includes('hiking') || sportName.includes('trekking'))
     return { sportType: 'hiking', sportSubtype: 'trail' };
@@ -291,7 +351,12 @@ export function mapSuuntoActivityToCanonicalSport(params: {
   }
   if (sportName.includes('basketball')) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (sportName.includes('tennis')) return { sportType: 'tennis', sportSubtype: 'outdoor' };
-  if (sportName.includes('swim')) return { sportType: 'swimming', sportSubtype: 'pool' };
+  if (sportName.includes('swim')) {
+    if (sportName.includes('open') || sportName.includes('aguas abiertas')) {
+      return { sportType: 'swimming', sportSubtype: 'open_water' };
+    }
+    return { sportType: 'swimming', sportSubtype: 'pool' };
+  }
   if (sportName.includes('cycl') || sportName.includes('bike') || sportName.includes('bici')) {
     if (sportName.includes('indoor') || sportName.includes('rodillo') || sportName.includes('trainer')) {
       if (sportName.includes('spin')) return { sportType: 'cycling', sportSubtype: 'spinning' };
@@ -351,7 +416,7 @@ export function mapSuuntoActivityToCanonicalSport(params: {
     return { sportType: 'gym', sportSubtype: null };
   }
 
-  return { sportType: 'other', sportSubtype: null };
+  return null;
 }
 
 function getFitBaseTypeSize(baseType: number): number | null {

@@ -200,9 +200,57 @@ function assertSuuntoSportMapping(): void {
     sportType: 'cycling',
     sportSubtype: 'gravel',
   });
-  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 2, fitSubSport: 17 }), {
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 2, fitSubSport: 5 }), {
     sportType: 'cycling',
     sportSubtype: 'spinning',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 2, fitSubSport: 6 }), {
+    sportType: 'cycling',
+    sportSubtype: 'indoor_trainer',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 2, fitSubSport: 7 }), {
+    sportType: 'cycling',
+    sportSubtype: 'road',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 2, fitSubSport: 8 }), {
+    sportType: 'cycling',
+    sportSubtype: 'mtb',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 52 }), {
+    sportType: 'cycling',
+    sportSubtype: 'indoor_trainer',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 13 }), {
+    sportType: 'skiing',
+    sportSubtype: 'alpine',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 30 }), {
+    sportType: 'snowboard',
+    sportSubtype: 'slope',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 16 }), {
+    sportType: 'golf',
+    sportSubtype: null,
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 91 }), {
+    sportType: 'surf',
+    sportSubtype: 'surf',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 67 }), {
+    sportType: 'football',
+    sportSubtype: 'futsal',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 77 }), {
+    sportType: 'martial_arts',
+    sportSubtype: 'boxing',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 13 }), {
+    sportType: 'skiing',
+    sportSubtype: 'alpine',
+  });
+  assert.deepEqual(mapSuuntoActivityToCanonicalSport({ fitSport: 14, fitSubSport: 37 }), {
+    sportType: 'snowboard',
+    sportSubtype: 'splitboard',
   });
   assert.deepEqual(mapSuuntoActivityToCanonicalSport({ activityId: 21 }), {
     sportType: 'swimming',

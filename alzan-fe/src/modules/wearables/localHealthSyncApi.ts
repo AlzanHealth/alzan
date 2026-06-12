@@ -107,6 +107,11 @@ export const wearablesLocalHealthApi = {
     requestJson<CloudProviderSyncResult>('/wearables/cloud/polar/sync', {
       method: 'POST',
     }),
+
+  syncSuuntoActivities: () =>
+    requestJson<CloudProviderSyncResult>('/wearables/cloud/suunto/sync', {
+      method: 'POST',
+    }),
 };
 
 export { WearablesApiError };

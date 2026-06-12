@@ -296,9 +296,11 @@ function assertGarminHealthParsesWithoutPersistence(): void {
 }
 
 function assertGarminCyclingModalitiesAreCanonical(): void {
-  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 7 }).sportSubtype, 'mtb');
+  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 7 }).sportSubtype, 'road');
+  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 8 }).sportSubtype, 'mtb');
   assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 46 }).sportSubtype, 'gravel');
-  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 17 }).sportSubtype, 'spinning');
+  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 5 }).sportSubtype, 'spinning');
+  assert.equal(mapGarminActivityToCanonicalSport({ fitSport: 2, fitSubSport: 6 }).sportSubtype, 'indoor_trainer');
   assert.equal(mapGarminActivityToCanonicalSport({ activityType: 'Urban cycling commute' }).sportSubtype, 'urban');
   assert.deepEqual(mapGarminActivityToCanonicalSport({ activityType: 'Walking' }), {
     sportType: 'hiking',

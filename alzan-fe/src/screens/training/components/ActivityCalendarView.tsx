@@ -36,7 +36,7 @@ import { ThemeColors } from '../../../context/ThemeContext';
 import { useEnduranceSessions } from '../../../hooks/useEnduranceSessions';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
-import { SPORTS_CONFIG } from '../../../constants/sports';
+import { SPORTS_CONFIG, getSportDefaultTitleKey } from '../../../constants/sports';
 import { borderRadius, colors, spacing, typography } from '../../../theme';
 import { SPORT_COLORS } from '../../../theme/sportColors';
 import { ActivitySession } from '../../../types/requests.types';
@@ -736,8 +736,11 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
     const colorKey = normalizeSportTypeForColor(session.sport_type);
     const color = SPORT_COLORS[colorKey] ?? SPORT_COLORS.other;
     const isStrength = session.sport_type === 'strength';
-    const sessionConfig = SPORTS_CONFIG[session.sport_type] || SPORTS_CONFIG.other;
-    const sessionTitle = session.name || (isStrength ? t('training.strengthWorkout') : t(sessionConfig.defaultTitle));
+    const sessionTitle =
+      session.name ||
+      (isStrength
+        ? t('training.strengthWorkout')
+        : t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype)));
     const durationSeconds = getSessionDurationSeconds(session);
     const distanceObj = convertDistanceToUi(session.distance_m, 1);
     const distanceLabel =

@@ -13,6 +13,11 @@ export function mapClimbingTextToCanonical(raw: string | null | undefined): Cano
   const text = normalizeSportText(raw);
   if (!text) return null;
 
+  // Stair/floor climbing machines are cardio, not rock climbing.
+  if (text.includes('stair_climbing') || text.includes('floor_climbing') || text.includes('stair')) {
+    return null;
+  }
+
   if (text.includes('bouldering') || text.includes('boulder')) {
     return { sportType: 'climbing', sportSubtype: 'bouldering' };
   }

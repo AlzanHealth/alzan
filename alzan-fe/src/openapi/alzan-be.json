@@ -282,6 +282,255 @@
         },
         "tags": ["Providers"]
       }
+    },
+    "/activity-imports/strength/apply": {
+      "post": {
+        "operationId": "applyStrengthImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "session_id"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "session_id": { "type": "string", "format": "uuid" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportedStrengthActivitySummaryDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportedStrengthActivitySummaryDto" } }
+            }
+          }
+        },
+        "tags": ["Activity imports"]
+      }
+    },
+    "/activity-imports/route/parse": {
+      "post": {
+        "operationId": "parseRouteImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "estimated_max_heart_rate": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ParsedRouteImportDto" } } }
+          },
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ParsedRouteImportDto" } } }
+          }
+        },
+        "tags": ["Activity imports"]
+      }
+    },
+    "/activity-imports/route/apply": {
+      "post": {
+        "operationId": "applyRouteImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "session_id", "persist_details"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "session_id": { "type": "string", "format": "uuid" },
+                  "persist_details": { "type": "string", "enum": ["true", "false"] },
+                  "estimated_max_heart_rate": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApplyRouteActivityImportResponseDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ApplyRouteActivityImportResponseDto" } }
+            }
+          }
+        },
+        "tags": ["Activity imports"]
+      }
+    },
+    "/wearables/health-connect/origins": {
+      "get": {
+        "operationId": "listHealthConnectOrigins",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderOriginOutputDto" } }
+              }
+            }
+          }
+        },
+        "tags": ["Wearables"]
+      },
+      "post": {
+        "operationId": "upsertHealthConnectOrigins",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpsertProviderOriginsDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderOriginOutputDto" } }
+              }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderOriginOutputDto" } }
+              }
+            }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/wearables/health-connect/origins/select": {
+      "post": {
+        "operationId": "selectHealthConnectOrigin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/SelectHealthConnectOriginDto" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderOriginOutputDto" } } }
+          },
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderOriginOutputDto" } } }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/wearables/local-sync": {
+      "post": {
+        "operationId": "syncLocalHealth",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LocalHealthSyncDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LocalHealthSyncOutputDto" } } }
+          },
+          "201": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LocalHealthSyncOutputDto" } } }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/wearables/health-connect/selection": {
+      "get": {
+        "operationId": "getHealthConnectSelection",
+        "parameters": [{ "name": "source_channel", "required": true, "in": "query", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderOriginOutputDto" } } }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/wearables/cloud/polar/sync": {
+      "post": {
+        "operationId": "syncPolar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CloudProviderSyncOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CloudProviderSyncOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/wearables/cloud/suunto/sync": {
+      "post": {
+        "operationId": "syncSuunto",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CloudProviderSyncOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CloudProviderSyncOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Wearables"]
+      }
     }
   },
   "info": {
@@ -375,6 +624,180 @@
           "message": { "type": "string", "description": "Error message" }
         },
         "required": ["success", "message"]
+      },
+      "ImportedStrengthActivitySummaryDto": {
+        "type": "object",
+        "properties": {
+          "provider": { "type": "object" },
+          "sourceFileType": { "type": "object" },
+          "startedAt": { "type": "string", "nullable": true },
+          "endedAt": { "type": "string", "nullable": true },
+          "durationSeconds": { "type": "number", "nullable": true },
+          "caloriesKcal": { "type": "number", "nullable": true },
+          "avgHeartRate": { "type": "number", "nullable": true },
+          "maxHeartRate": { "type": "number", "nullable": true },
+          "minHeartRate": { "type": "number", "nullable": true },
+          "totalSteps": { "type": "number", "nullable": true },
+          "recoveryTimeSeconds": { "type": "number", "nullable": true },
+          "epoc": { "type": "number", "nullable": true },
+          "pte": { "type": "number", "nullable": true },
+          "tss": { "type": "number", "nullable": true },
+          "trainingLoadPeak": { "type": "number", "nullable": true },
+          "device": { "type": "object", "nullable": true },
+          "heartRateZones": { "type": "array", "items": { "type": "object" } },
+          "heartRateStream": { "type": "array", "items": { "type": "object" } }
+        },
+        "required": ["provider", "sourceFileType", "heartRateZones", "heartRateStream"]
+      },
+      "ParsedRouteImportDto": {
+        "type": "object",
+        "properties": {
+          "polyline": { "type": "string" },
+          "summary": { "type": "object" },
+          "details": { "type": "object" }
+        },
+        "required": ["polyline", "summary", "details"]
+      },
+      "ApplyRouteActivityImportResponseDto": {
+        "type": "object",
+        "properties": { "format": { "type": "object" }, "parsed": { "type": "object" } },
+        "required": ["format", "parsed"]
+      },
+      "ProviderOriginOutputDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "source_channel": { "type": "string" },
+          "provider": { "type": "object" },
+          "source_package": { "type": "string", "nullable": true },
+          "source_provider_key": { "type": "string", "nullable": true },
+          "display_name": { "type": "string", "nullable": true },
+          "platform": { "type": "string", "nullable": true },
+          "last_seen_at": { "type": "string" }
+        },
+        "required": [
+          "id",
+          "source_channel",
+          "provider",
+          "source_package",
+          "source_provider_key",
+          "display_name",
+          "platform",
+          "last_seen_at"
+        ]
+      },
+      "ProviderOriginDto": {
+        "type": "object",
+        "properties": {
+          "source_channel": {
+            "type": "string",
+            "enum": ["cloud", "apple_health", "health_connect", "file_import", "manual"]
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "strava",
+              "garmin",
+              "polar",
+              "suunto",
+              "whoop",
+              "oura",
+              "fitbit",
+              "ultrahuman",
+              "apple_health",
+              "health_connect",
+              "manual",
+              "coros"
+            ]
+          },
+          "source_package": { "type": "string" },
+          "source_provider_key": { "type": "string" },
+          "display_name": { "type": "string" },
+          "platform": { "type": "string" },
+          "raw_payload": { "type": "object" }
+        },
+        "required": ["source_channel", "provider"]
+      },
+      "UpsertProviderOriginsDto": {
+        "type": "object",
+        "properties": { "origins": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderOriginDto" } } },
+        "required": ["origins"]
+      },
+      "SelectHealthConnectOriginDto": {
+        "type": "object",
+        "properties": { "origin_id": { "type": "string", "format": "uuid" } },
+        "required": ["origin_id"]
+      },
+      "LocalHealthSyncRecordDto": {
+        "type": "object",
+        "properties": {
+          "object_type": {
+            "type": "string",
+            "enum": ["activity", "daily_activity", "sleep", "recovery", "health_sample", "vo2_max", "weight"]
+          },
+          "source_record_id": { "type": "string" },
+          "source_updated_at": { "type": "string" },
+          "source_package": { "type": "string" },
+          "metric_type": { "type": "string" },
+          "value": { "type": "number" },
+          "unit": { "type": "string" },
+          "recorded_at": { "type": "string" },
+          "payload": { "type": "object" }
+        },
+        "required": ["object_type", "payload"]
+      },
+      "LocalHealthSyncStateDto": {
+        "type": "object",
+        "properties": {
+          "sync_domain": {
+            "type": "string",
+            "enum": ["activities", "daily_activity", "sleep", "recovery", "health_metrics", "body"]
+          },
+          "cursor_token": { "type": "string" },
+          "anchor_token": { "type": "string" },
+          "last_record_at": { "type": "string" }
+        },
+        "required": ["sync_domain"]
+      },
+      "LocalHealthSyncDto": {
+        "type": "object",
+        "properties": {
+          "source_channel": { "type": "string", "enum": ["apple_health", "health_connect"] },
+          "source_package": { "type": "string" },
+          "trace_id": { "type": "string" },
+          "origins": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderOriginDto" } },
+          "records": { "type": "array", "items": { "$ref": "#/components/schemas/LocalHealthSyncRecordDto" } },
+          "sync_states": { "type": "array", "items": { "$ref": "#/components/schemas/LocalHealthSyncStateDto" } }
+        },
+        "required": ["source_channel", "records"]
+      },
+      "LocalHealthSyncOutputDto": {
+        "type": "object",
+        "properties": {
+          "activities_imported": { "type": "number" },
+          "daily_activities_imported": { "type": "number" },
+          "sleeps_imported": { "type": "number" },
+          "recoveries_imported": { "type": "number" },
+          "health_samples_imported": { "type": "number" },
+          "origins_upserted": { "type": "number" }
+        },
+        "required": [
+          "activities_imported",
+          "daily_activities_imported",
+          "sleeps_imported",
+          "recoveries_imported",
+          "health_samples_imported",
+          "origins_upserted"
+        ]
+      },
+      "CloudProviderSyncOutputDto": {
+        "type": "object",
+        "properties": {
+          "provider": { "type": "string" },
+          "activities_imported": { "type": "number" },
+          "last_success_at": { "type": "string" }
+        },
+        "required": ["provider", "activities_imported", "last_success_at"]
       }
     }
   },

@@ -523,9 +523,20 @@ export function mapGarminActivityToCanonicalSport(params: {
   if (snowboardSport) return snowboardSport;
 
   if (fitSport === 13) return { sportType: 'skiing', sportSubtype: 'alpine' };
-  if (fitSport === 3) return { sportType: 'skiing', sportSubtype: 'cross_country' };
+  if (fitSport === 12) return { sportType: 'skiing', sportSubtype: 'cross_country' };
   if (fitSport === 14) return { sportType: 'snowboard', sportSubtype: null };
   if (fitSport === 25) return { sportType: 'golf' as CanonicalSportType, sportSubtype: null };
+  if (fitSport === 16) return { sportType: 'hiking', sportSubtype: 'high_mountain' };
+  if (fitSport === 31) {
+    if (fitSubSport === 68) return { sportType: 'climbing', sportSubtype: 'indoor_climbing' };
+    if (fitSubSport === 69) return { sportType: 'climbing', sportSubtype: 'bouldering' };
+    return { sportType: 'climbing', sportSubtype: 'sport_climbing' };
+  }
+  if (fitSport === 47) return { sportType: 'martial_arts', sportSubtype: 'boxing' };
+  if (fitSport === 80) return { sportType: 'martial_arts', sportSubtype: 'mma' };
+  if (fitSport === 75) return { sportType: 'volleyball', sportSubtype: null };
+  if (fitSport === 37) return { sportType: 'surf', sportSubtype: 'paddle_surf' };
+  if (fitSport === 38) return { sportType: 'surf', sportSubtype: 'surf' };
 
   const isRace =
     combinedText.includes('carrera') ||
@@ -543,17 +554,24 @@ export function mapGarminActivityToCanonicalSport(params: {
     return { sportType: 'running', sportSubtype: 'outdoor' };
   }
   if (fitSport === 2) {
+    // FIT sub_sport: 5 = spin, 6 = indoor_cycling, 7 = road, 8 = mountain, 11 = cyclocross, 46 = gravel_cycling
     if (fitSubSport === 6) return { sportType: 'cycling', sportSubtype: 'indoor_trainer' };
-    if (fitSubSport === 7) return { sportType: 'cycling', sportSubtype: 'mtb' }; // Mountain Biking
+    if (fitSubSport === 5) return { sportType: 'cycling', sportSubtype: 'spinning' };
+    if (fitSubSport === 8) return { sportType: 'cycling', sportSubtype: 'mtb' };
     if (fitSubSport === 46) return { sportType: 'cycling', sportSubtype: 'gravel' };
-    if (fitSubSport === 17) return { sportType: 'cycling', sportSubtype: 'spinning' };
+    if (fitSubSport === 11) return { sportType: 'cycling', sportSubtype: 'gravel' }; // Cyclocross
     return { sportType: 'cycling', sportSubtype: 'road' };
   }
+  if (fitSport === 21) {
+    // FIT 21 = e_biking (sub_sport 47 = e_bike_mountain)
+    if (fitSubSport === 47) return { sportType: 'cycling', sportSubtype: 'mtb' };
+    return { sportType: 'cycling', sportSubtype: 'road' };
+  }
+  if (fitSport === 62) return { sportType: 'gym', sportSubtype: 'indoor' };
   if (fitSport === 5) {
     if (fitSubSport === 18) return { sportType: 'swimming', sportSubtype: 'open_water' };
     return { sportType: 'swimming', sportSubtype: 'pool' };
   }
-  if (fitSport === 43 && fitSubSport === 55) return { sportType: 'surf', sportSubtype: null };
   if (fitSport === 6) return { sportType: 'basketball', sportSubtype: 'indoor' };
   if (fitSport === 7) {
     if (combinedText.includes('futsal') || combinedText.includes('sala') || combinedText.includes('indoor')) {
@@ -563,6 +581,7 @@ export function mapGarminActivityToCanonicalSport(params: {
   }
   if (fitSport === 8) return { sportType: 'tennis', sportSubtype: 'outdoor' };
   if (fitSubSport === 20) return { sportType: 'strength', sportSubtype: 'indoor' };
+  if (fitSport === 10) return { sportType: 'gym', sportSubtype: null };
   if (fitSport === 4) {
     if (fitSubSport === 1) return { sportType: 'running', sportSubtype: 'treadmill' };
     return { sportType: 'gym', sportSubtype: null };

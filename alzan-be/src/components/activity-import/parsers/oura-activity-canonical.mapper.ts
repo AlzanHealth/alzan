@@ -11,6 +11,7 @@ import { mapHyroxTextToCanonical } from './hyrox-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
 import { mapSkiingTextToCanonical } from './skiing-sport.mapper';
 import { mapSnowboardTextToCanonical } from './snowboard-sport.mapper';
+import { mapSurfTextToCanonical } from './surf-sport.mapper';
 import { mapTrailTextToCanonical } from './trail-sport.mapper';
 import { mapVolleyballTextToCanonical } from './volleyball-sport.mapper';
 
@@ -117,6 +118,8 @@ function mapOuraSport(activity: string | null): CanonicalActivitySportMapping {
   if (skiingSport) return skiingSport;
   const snowboardSport = mapSnowboardTextToCanonical(activity);
   if (snowboardSport) return snowboardSport;
+  const surfSport = mapSurfTextToCanonical(activity);
+  if (surfSport) return surfSport;
 
   if (normalised.includes('walk')) return { sportType: 'hiking', sportSubtype: 'urban_walk' };
   if (normalised.includes('track')) return { sportType: 'running', sportSubtype: 'track' };

@@ -21,7 +21,7 @@ import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../type
 import { GlassCard } from '../../components/GlassCard';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
-import { SPORTS_CONFIG, formatDuration } from '../../constants/sports';
+import { SPORTS_CONFIG, formatDuration, getSportDefaultTitleKey } from '../../constants/sports';
 import { format } from 'date-fns';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useSessionDetail, useUpdateWorkoutSet } from '../../hooks/useSessionDetail';
@@ -1146,7 +1146,9 @@ export const EnduranceSessionDetailScreen = () => {
             <View style={[styles.iconContainer, dynamicStyles.iconContainer]}>
               <Icon size={32} color={themeColors.primary} sport={session.sport_type} />
             </View>
-            <Text style={[styles.activityName, dynamicStyles.title]}>{session.name || t(config.defaultTitle)}</Text>
+            <Text style={[styles.activityName, dynamicStyles.title]}>
+              {session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
+            </Text>
             <Text style={[styles.date, dynamicStyles.subtitle]}>
               {format(new Date(session.start_time), 'EEEE d MMMM, yyyy \u00B7 HH:mm', {
                 locale: getDateFnsLocale(),
