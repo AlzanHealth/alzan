@@ -60,22 +60,22 @@ export class ImportReviewController {
     return { session_id: await this.importReviewService.keepBothDuplicates(ctx.user.id, sessionId) };
   }
 
-  @Post(':id/watch-metrics/apply')
+  @Post(':id/watch-metrics/revert')
   @ApiOkResponse({ type: ImportReviewSessionOutputDto })
-  public async applyWatchMetrics(
+  public async revertWatchMetrics(
     @UserContext() ctx: UserCtx,
     @Param('id', ParseUUIDPipe) sessionId: string,
   ): Promise<ImportReviewSessionOutputDto> {
-    return { session_id: await this.importReviewService.applyPendingWatchMetrics(ctx.user.id, sessionId) };
+    return { session_id: await this.importReviewService.revertWatchMetrics(ctx.user.id, sessionId) };
   }
 
-  @Post(':id/watch-metrics/dismiss')
+  @Post(':id/watch-metrics/keep')
   @ApiOkResponse({ type: ImportReviewSessionOutputDto })
-  public async dismissWatchMetrics(
+  public async keepWatchMetrics(
     @UserContext() ctx: UserCtx,
     @Param('id', ParseUUIDPipe) sessionId: string,
   ): Promise<ImportReviewSessionOutputDto> {
-    return { session_id: await this.importReviewService.dismissPendingWatchMetrics(ctx.user.id, sessionId) };
+    return { session_id: await this.importReviewService.keepWatchMetrics(ctx.user.id, sessionId) };
   }
 
   @Post(':id/strength-assignment')

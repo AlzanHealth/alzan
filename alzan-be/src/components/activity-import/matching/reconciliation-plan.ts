@@ -46,10 +46,12 @@ export type WatchMetricColumn =
   | 'recovery_time_s';
 
 export interface StrengthMetricSplit {
-  /** Watch values that can be applied silently (no existing differing value). */
+  /** Watch values with no pre-existing app value (filled in silently). */
   applicable: Partial<Record<WatchMetricColumn, number>>;
-  /** Watch values that conflict with existing values and need user consent. */
+  /** Watch values that override a differing app value (watch wins by default). */
   conflicting: Partial<Record<WatchMetricColumn, number>>;
+  /** Previous app values that the watch overrode, kept so the user can revert. */
+  previous: Partial<Record<WatchMetricColumn, number>>;
 }
 
 export type StrengthReconciliationPlan =
@@ -92,8 +94,10 @@ function conflicts(existing: number | null, incoming: number): boolean {
 }
 
 /**
- * Splits the watch metrics into silently-applicable values and conflicting
- * values that require explicit user consent.
+ * Splits the watch metrics relative to the session's current values. The watch
+ * is the more accurate source, so every watch value is applied (filling empty
+ * fields and overriding differing ones); the overridden app values are kept in
+ * `previous` so the user can revert from the activity summary if they prefer.
  */
 export function splitStrengthMetrics(existing: StrengthSessionLite, watch: WatchStrengthMetrics): StrengthMetricSplit {
   const pairs: Array<{ column: WatchMetricColumn; existing: number | null; incoming: number | null }> = [
@@ -104,11 +108,12 @@ export function splitStrengthMetrics(existing: StrengthSessionLite, watch: Watch
     { column: 'min_heart_rate', existing: existing.minHeartRate, incoming: watch.minHeartRate },
     { column: 'recovery_time_s', existing: existing.recoveryTimeS, incoming: watch.recoveryTimeS },
   ];
-  const split: StrengthMetricSplit = { applicable: {}, conflicting: {} };
+  const split: StrengthMetricSplit = { applicable: {}, conflicting: {}, previous: {} };
   for (const pair of pairs) {
     if (pair.incoming == null) continue;
     if (conflicts(pair.existing, pair.incoming)) {
       split.conflicting[pair.column] = pair.incoming;
+      if (pair.existing != null) split.previous[pair.column] = pair.existing;
     } else {
       split.applicable[pair.column] = pair.incoming;
     }

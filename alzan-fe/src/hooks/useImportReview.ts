@@ -81,18 +81,20 @@ export const useImportReview = (sessionId?: string) => {
     onSuccess: invalidate,
   });
 
-  const applyWatchMetrics = useMutation({
+  // Watch values are applied by default; this reverts to the user's previous values.
+  const revertWatchMetrics = useMutation({
     mutationFn: () => {
       if (!sessionId) throw new Error('SESSION_REQUIRED');
-      return run(ActivityImportReview.applyWatchMetrics({ path: { id: sessionId } }));
+      return run(ActivityImportReview.revertWatchMetrics({ path: { id: sessionId } }));
     },
     onSuccess: invalidate,
   });
 
-  const dismissWatchMetrics = useMutation({
+  // Keeps the watch values (default) and clears the revert notice.
+  const keepWatchMetrics = useMutation({
     mutationFn: () => {
       if (!sessionId) throw new Error('SESSION_REQUIRED');
-      return run(ActivityImportReview.dismissWatchMetrics({ path: { id: sessionId } }));
+      return run(ActivityImportReview.keepWatchMetrics({ path: { id: sessionId } }));
     },
     onSuccess: invalidate,
   });
@@ -115,8 +117,8 @@ export const useImportReview = (sessionId?: string) => {
     dismissSuggestion,
     mergeDuplicate,
     keepBothDuplicates,
-    applyWatchMetrics,
-    dismissWatchMetrics,
+    revertWatchMetrics,
+    keepWatchMetrics,
     assignStrengthSession,
   };
 };

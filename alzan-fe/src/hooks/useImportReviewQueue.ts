@@ -6,7 +6,7 @@ import { ActivitySession } from '../types/requests.types';
 const STRONG_DUPLICATE_THRESHOLD = 80;
 const NEW_IMPORT_WINDOW_HOURS = 72;
 
-export type ImportReviewReason = 'duplicate' | 'watch_conflict' | 'strength_assignment' | 'new_import';
+export type ImportReviewReason = 'duplicate' | 'strength_assignment' | 'new_import';
 
 export interface ImportReviewItem {
   session: ActivitySession;
@@ -15,9 +15,12 @@ export interface ImportReviewItem {
   hard: boolean;
 }
 
-/** Hard, blocking review states that surface regardless of age until resolved. */
+/**
+ * Hard, blocking review states that surface regardless of age until resolved.
+ * Watch-metric differences are NOT here: the watch wins by default, so they are
+ * a soft, reversible notice shown only inside the activity detail.
+ */
 function hardReason(session: ActivitySession): ImportReviewReason | null {
-  if (session.pending_watch_metrics != null) return 'watch_conflict';
   if (
     session.duplicate_resolution === 'pending' &&
     session.duplicate_of_session_id != null &&
@@ -31,11 +34,12 @@ function hardReason(session: ActivitySession): ImportReviewReason | null {
 
 /**
  * Prioritized review queue surfaced when the user enters Training:
- * - Hard conflicts (watch-metric conflict, strong duplicate, multiple-strength)
- *   surface for every affected activity, any age, until resolved.
+ * - Hard conflicts (strong duplicate, multiple-strength) surface for every
+ *   affected activity, any age, until resolved.
  * - The single most recent imported activity not yet reviewed (< 72h) surfaces
  *   as a soft "new activity" summary (Strava-like), until opened or dismissed.
- * Soft, old signals (weak duplicate, 60-79% suggestion) never surface here.
+ * Soft signals (weak duplicate, 60-79% suggestion, watch-metric revert) never
+ * surface here; they live inside the activity detail.
  */
 export const useImportReviewQueue = () => {
   const { user } = useAuth();
@@ -53,10 +57,7 @@ export const useImportReviewQueue = () => {
         .select('*')
         .eq('user_id', user.id)
         .neq('status', 'cancelled')
-        .or(
-          'pending_watch_metrics.not.is.null,needs_strength_review.eq.true,' +
-            'and(duplicate_resolution.eq.pending,duplicate_of_session_id.not.is.null)',
-        )
+        .or('needs_strength_review.eq.true,and(duplicate_resolution.eq.pending,duplicate_of_session_id.not.is.null)')
         .order('start_time', { ascending: false });
       if (hardError) throw hardError;
 

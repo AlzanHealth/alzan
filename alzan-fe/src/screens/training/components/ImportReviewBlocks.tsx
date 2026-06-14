@@ -337,7 +337,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
         </GlassCard>
       )}
 
-      {/* 4. Watch metric conflict */}
+      {/* 4. Watch metrics applied (watch wins by default; optional revert) */}
       {hasPendingWatchMetrics && (
         <GlassCard style={styles.blockCard}>
           <View style={styles.blockHeader}>
@@ -348,15 +348,15 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
           </View>
           <View style={styles.buttonRow}>
             <PrimaryButton
-              title={t('training.importUseWatchData')}
-              onPress={() => review.applyWatchMetrics.mutate(undefined, { onError: showError })}
-              loading={review.applyWatchMetrics.isPending}
+              title={t('training.importKeepWatchData')}
+              onPress={() => review.keepWatchMetrics.mutate(undefined, { onError: showError })}
+              loading={review.keepWatchMetrics.isPending}
               style={styles.rowButton}
             />
             <PrimaryButton
-              title={t('training.importKeepCurrent')}
-              onPress={() => review.dismissWatchMetrics.mutate(undefined, { onError: showError })}
-              loading={review.dismissWatchMetrics.isPending}
+              title={t('training.importKeepMine')}
+              onPress={() => review.revertWatchMetrics.mutate(undefined, { onError: showError })}
+              loading={review.revertWatchMetrics.isPending}
               variant="outline"
               style={styles.rowButton}
             />

@@ -151,23 +151,26 @@ export class ImportReviewService {
     return sessionId;
   }
 
-  /** Applies the pending watch metrics after explicit user consent. */
-  public async applyPendingWatchMetrics(userId: string, sessionId: string): Promise<string> {
+  /**
+   * Reverts the metrics the watch overrode back to the user's previous app
+   * values ("keep mine"). The watch values were applied by default, so this
+   * restores `previous` and clears the pending notice.
+   */
+  public async revertWatchMetrics(userId: string, sessionId: string): Promise<string> {
     const session = await this.getOwnedSession(userId, sessionId);
-    const pending = this.readPendingWatchMetrics(session);
-    if (!pending) return sessionId;
+    const previous = this.readPreviousWatchMetrics(session);
+    if (!previous) return sessionId;
     const payload: ActivitySessionUpdate = { pending_watch_metrics: null };
     for (const column of PENDING_METRIC_COLUMNS) {
-      const value = pending.metrics[column];
+      const value = previous[column];
       if (typeof value === 'number') payload[column] = value;
     }
-    if (typeof pending.end_time === 'string') payload.end_time = pending.end_time;
     await this.updateSession(sessionId, payload);
     return sessionId;
   }
 
-  /** Discards the pending watch metrics ("keep current values"). */
-  public async dismissPendingWatchMetrics(userId: string, sessionId: string): Promise<string> {
+  /** Keeps the watch values (the default) and clears the revert notice. */
+  public async keepWatchMetrics(userId: string, sessionId: string): Promise<string> {
     await this.getOwnedSession(userId, sessionId);
     await this.updateSession(sessionId, { pending_watch_metrics: null });
     return sessionId;
@@ -187,12 +190,16 @@ export class ImportReviewService {
     }
     if (targetSessionId === sessionId) throw new BadRequestException('IMPORT_REVIEW_ASSIGN_TARGET_INVALID');
     const target = await this.getOwnedSession(userId, targetSessionId);
-    if (target.sport_type !== 'strength') throw new BadRequestException('IMPORT_REVIEW_ASSIGN_TARGET_INVALID');
+    if (target.sport_type !== 'strength' && target.sport_type !== 'gym') {
+      throw new BadRequestException('IMPORT_REVIEW_ASSIGN_TARGET_INVALID');
+    }
 
+    // Watch wins by default; overridden app values kept for an optional revert.
     const split = splitStrengthMetrics(this.toStrengthLite(target), this.toWatchMetrics(generic));
     const payload: ActivitySessionUpdate = {
       ...split.applicable,
-      pending_watch_metrics: this.importReconciliationService.buildPendingWatchMetrics(split, generic.end_time),
+      ...split.conflicting,
+      pending_watch_metrics: this.importReconciliationService.buildPendingWatchMetrics(split),
       epoc: generic.epoc ?? target.epoc,
       pte: generic.pte ?? target.pte,
       tss_hr: generic.tss_hr ?? target.tss_hr,
@@ -531,15 +538,13 @@ export class ImportReviewService {
     await this.run(query, 'PLAN_COMPLETE');
   }
 
-  private readPendingWatchMetrics(
-    session: ActivitySessionRow,
-  ): { metrics: Record<string, unknown>; end_time: unknown } | null {
+  /** Reads the previous app metric values stored for an optional revert. */
+  private readPreviousWatchMetrics(session: ActivitySessionRow): Record<string, unknown> | null {
     const raw = session.pending_watch_metrics;
     if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
-    const record = raw as Record<string, unknown>;
-    const metrics = record.metrics;
-    if (metrics == null || typeof metrics !== 'object' || Array.isArray(metrics)) return null;
-    return { metrics: metrics as Record<string, unknown>, end_time: record.end_time };
+    const previous = (raw as Record<string, unknown>).previous;
+    if (previous == null || typeof previous !== 'object' || Array.isArray(previous)) return null;
+    return previous as Record<string, unknown>;
   }
 
   private toStrengthLite(session: ActivitySessionRow): StrengthSessionLite {

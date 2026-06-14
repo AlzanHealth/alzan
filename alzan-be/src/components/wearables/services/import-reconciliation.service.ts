@@ -175,16 +175,21 @@ export class ImportReconciliationService {
     });
   }
 
-  /** Splits watch metrics vs an existing session into applicable/conflicting. */
+  /** Splits watch metrics vs an existing session into applicable/conflicting/previous. */
   public splitMetricsAgainstSession(session: ActivitySessionRow, activity: CanonicalActivity): StrengthMetricSplit {
     return splitStrengthMetrics(this.toStrengthLite(session), this.toWatchMetrics(activity));
   }
 
-  public buildPendingWatchMetrics(split: StrengthMetricSplit, endTime: string | null): Json | null {
-    if (Object.keys(split.conflicting).length === 0) return null;
+  /**
+   * The watch already overrode the conflicting columns (it is the more
+   * accurate source). This records the previous app values so the user can
+   * revert from the activity summary if they prefer their own numbers; returns
+   * null when nothing was overridden.
+   */
+  public buildPendingWatchMetrics(split: StrengthMetricSplit): Json | null {
+    if (Object.keys(split.previous).length === 0) return null;
     return {
-      metrics: split.conflicting,
-      end_time: endTime,
+      previous: split.previous,
       received_at: new Date().toISOString(),
     } as unknown as Json;
   }
@@ -205,9 +210,12 @@ export class ImportReconciliationService {
           },
         };
       case 'associate': {
+        // Watch wins by default: apply both the filled-in and the overriding
+        // values; keep the overridden app values in pending for an optional revert.
         const payload: ActivitySessionUpdate = {
           ...plan.metrics.applicable,
-          pending_watch_metrics: this.buildPendingWatchMetrics(plan.metrics, watch.endTime),
+          ...plan.metrics.conflicting,
+          pending_watch_metrics: this.buildPendingWatchMetrics(plan.metrics),
           epoc: watch.epoc,
           pte: watch.pte,
           tss_hr: watch.tssHr,

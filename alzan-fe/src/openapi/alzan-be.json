@@ -626,9 +626,9 @@
         "tags": ["Activity import review"]
       }
     },
-    "/activity-sessions/{id}/watch-metrics/apply": {
+    "/activity-sessions/{id}/watch-metrics/revert": {
       "post": {
-        "operationId": "applyWatchMetrics",
+        "operationId": "revertWatchMetrics",
         "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
         "responses": {
           "200": {
@@ -647,9 +647,9 @@
         "tags": ["Activity import review"]
       }
     },
-    "/activity-sessions/{id}/watch-metrics/dismiss": {
+    "/activity-sessions/{id}/watch-metrics/keep": {
       "post": {
-        "operationId": "dismissWatchMetrics",
+        "operationId": "keepWatchMetrics",
         "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
         "responses": {
           "200": {

@@ -55,6 +55,9 @@ function assertCase2FinishedSessionAssociatesWithConflictSplit(): void {
   assert.equal(plan.metrics.applicable.max_heart_rate, 165);
   assert.equal(plan.metrics.conflicting.duration_s, 3600);
   assert.equal(plan.metrics.conflicting.avg_heart_rate, 120);
+  // Overridden app values are kept for an optional revert.
+  assert.equal(plan.metrics.previous.duration_s, 3000);
+  assert.equal(plan.metrics.previous.avg_heart_rate, 110);
 }
 
 function assertCase2NoConflictAppliesEverything(): void {

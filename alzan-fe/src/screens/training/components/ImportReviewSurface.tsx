@@ -14,7 +14,7 @@ import { BlurView } from 'expo-blur';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { AlertTriangle, Bell, ChevronRight, Watch, X } from 'lucide-react-native';
+import { AlertTriangle, Bell, ChevronRight, X } from 'lucide-react-native';
 import { GlassCard } from '../../../components/GlassCard';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { borderRadius, spacing, typography } from '../../../theme';
@@ -35,7 +35,6 @@ interface ImportReviewSurfaceProps {
 const REASON_TITLE_KEY: Record<ImportReviewReason, TranslationKey> = {
   new_import: 'training.importReviewNewActivityTitle',
   duplicate: 'training.importReviewDuplicateTitle',
-  watch_conflict: 'training.importReviewWatchConflictTitle',
   strength_assignment: 'training.importReviewStrengthAssignTitle',
 };
 
@@ -106,9 +105,7 @@ export const ImportReviewSurface: React.FC<ImportReviewSurfaceProps> = ({ onOpen
         <TouchableOpacity activeOpacity={0.85} onPress={() => handleBannerPress(topItem)}>
           <GlassCard style={[styles.banner, topItem.hard && { borderColor: themeColors.warning, borderWidth: 1 }]}>
             <View style={styles.bannerIcon}>
-              {topItem.reason === 'watch_conflict' ? (
-                <Watch size={22} color={themeColors.warning} />
-              ) : topItem.hard ? (
+              {topItem.hard ? (
                 <AlertTriangle size={22} color={themeColors.warning} />
               ) : (
                 <Bell size={22} color={themeColors.primary} />

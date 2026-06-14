@@ -31,6 +31,16 @@ type StreamType = Database['public']['Enums']['stream_type_enum'];
 const WEARABLE_IMPORT_SOURCE = 'wearable_import';
 const INSERT_CHUNK_SIZE = 1000;
 
+/**
+ * Gym workouts can arrive from watches as either 'strength' or 'gym', and
+ * Alzan's interactive sessions are stored as 'strength'. Both must follow the
+ * strength reconciliation path so external metrics attach to the user's
+ * interactive session instead of creating a duplicate.
+ */
+function isStrengthSport(sportType: string | null | undefined): boolean {
+  return sportType === 'strength' || sportType === 'gym';
+}
+
 @Injectable()
 export class CanonicalActivityWriterService {
   constructor(
@@ -54,13 +64,13 @@ export class CanonicalActivityWriterService {
       // never overwrite its metrics again (the user may have chosen to keep
       // their own values): refresh provenance only.
       const existingMeta = await this.getSessionMeta(existingSessionId);
-      if (existingMeta?.sport_type === 'strength' && existingMeta.source !== 'imported') {
+      if (isStrengthSport(existingMeta?.sport_type) && existingMeta?.source !== 'imported') {
         strengthAssociation = true;
         sessionId = await this.updateSession(existingSessionId, this.buildProvenancePayload(input, deviceId));
       } else {
         sessionId = await this.updateSession(existingSessionId, sessionPayload);
       }
-    } else if (input.activity.sportType === 'strength') {
+    } else if (isStrengthSport(input.activity.sportType)) {
       // The watch never creates sets: a same-day Alzan strength session may
       // absorb the external metrics instead of spawning a new session.
       const directive = await this.importReconciliationService.resolveStrengthDirective(input.userId, input.activity);

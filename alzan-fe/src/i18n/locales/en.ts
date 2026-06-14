@@ -2066,9 +2066,10 @@ const en = {
     importNoExercisesPrompt: 'This activity has no logged exercises. Do you want to complete the exercises now?',
     importCompleteExercises: 'Complete exercises',
     importNotNow: 'Not now',
-    importWatchDataPrompt: 'We have watch data for this workout. Do you want to use it for time, kcal and heart rate?',
-    importUseWatchData: 'Use watch data',
-    importKeepCurrent: 'Keep current values',
+    importWatchDataPrompt:
+      'We applied your watch data for time, kcal and heart rate because it is more accurate. Prefer to keep your own values?',
+    importKeepWatchData: 'Keep watch data',
+    importKeepMine: 'Keep mine',
     importMultipleStrengthPrompt:
       'You have several strength workouts today. Does this one from the watch belong to any of them?',
     importAssignToSession: 'Associate with {{name}}',
@@ -2087,7 +2088,6 @@ const en = {
     importReviewNewActivityTitle: 'New activity from your watch',
     importReviewNewActivityBody: 'Review the summary, rename it or link it to a template.',
     importReviewDuplicateTitle: 'Possible duplicate to resolve',
-    importReviewWatchConflictTitle: 'Watch data to confirm',
     importReviewStrengthAssignTitle: 'Strength workout to assign',
     importReviewPendingCount: '{{count}} more to review',
     importReviewOpen: 'Review',
