@@ -8,6 +8,7 @@
 .env.*
 !.env.example
 !.example.env
+!.env.cloud.example
 .env*.local
 
 # ─── Dependencies ────────────────────────────────────────────────────────────

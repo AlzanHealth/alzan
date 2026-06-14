@@ -8,12 +8,18 @@
 
 const fs = require("fs");
 const path = require("path");
-const { config } = require("dotenv");
+const { config, parse } = require("dotenv");
 const { expand } = require("dotenv-expand");
 
 const ROOT = path.resolve(__dirname, "..");
 
 const rootEnvPath = path.join(ROOT, ".env");
+const cloudEnvPath = path.join(ROOT, ".env.cloud");
+
+// `--cloud` layers .env.cloud (cloud Supabase credentials) on top of the root
+// .env. Only the keys present in .env.cloud are overridden; everything else
+// (ports, backend URLs, OAuth, ...) keeps the local values from .env.
+const useCloud = process.argv.includes("--cloud");
 
 if (!fs.existsSync(rootEnvPath)) {
   console.error(
@@ -22,7 +28,23 @@ if (!fs.existsSync(rootEnvPath)) {
   process.exit(1);
 }
 
-const { parsed: root } = expand(config({ path: rootEnvPath }));
+let merged = parse(fs.readFileSync(rootEnvPath));
+
+if (useCloud) {
+  if (!fs.existsSync(cloudEnvPath)) {
+    console.error(
+      `❌  .env.cloud not found. Copy .env.cloud.example to .env.cloud and ` +
+        `fill in the cloud Supabase credentials.`,
+    );
+    process.exit(1);
+  }
+  merged = { ...merged, ...parse(fs.readFileSync(cloudEnvPath)) };
+  console.log(`☁️   Cloud mode: overlaying .env.cloud on top of .env`);
+}
+
+// Expand ${VAR} interpolations using only the merged file values (deterministic,
+// independent of the shell environment).
+const { parsed: root } = expand({ parsed: merged, processEnv: {} });
 
 // ─── Mapping definitions ──────────────────────────────────────────────────────
 // Format: { TARGET_KEY: "SOURCE_KEY_FROM_ROOT_ENV" }
