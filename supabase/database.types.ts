@@ -4600,6 +4600,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      absorb_and_delete_session: {
+        Args: { p_source: string; p_target: string }
+        Returns: undefined
+      }
       check_username: { Args: { username_input: string }; Returns: boolean }
       delete_user_account: { Args: never; Returns: undefined }
       duplicate_recipe: { Args: { p_recipe_id: string }; Returns: string }

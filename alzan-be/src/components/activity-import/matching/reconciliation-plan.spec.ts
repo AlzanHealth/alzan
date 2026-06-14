@@ -192,6 +192,40 @@ function assertSameLocalDayPrefersLocalTimestamps(): void {
   );
 }
 
+function assertAllWatchMetricsOverrideWhenConflicting(): void {
+  // Every metric present on both sides and differing -> all overridden, all
+  // previous values kept for revert; nothing silently applied.
+  const split = splitStrengthMetrics(
+    strengthSession({
+      durationS: 3000,
+      caloriesKcal: 300,
+      avgHeartRate: 100,
+      maxHeartRate: 150,
+      minHeartRate: 60,
+      recoveryTimeS: 1000,
+    }),
+    watchMetrics({ recoveryTimeS: 1800 }),
+  );
+  assert.deepEqual(split.applicable, {});
+  assert.equal(split.conflicting.duration_s, 3600);
+  assert.equal(split.conflicting.recovery_time_s, 1800);
+  assert.equal(split.previous.duration_s, 3000);
+  assert.equal(split.previous.recovery_time_s, 1000);
+  assert.equal(split.previous.min_heart_rate, 60);
+}
+
+function assertAllWatchMetricsFillWhenSessionEmpty(): void {
+  // Empty session -> every watch value fills in silently, nothing to revert.
+  const split = splitStrengthMetrics(strengthSession(), watchMetrics({ recoveryTimeS: 1800 }));
+  assert.equal(split.applicable.duration_s, 3600);
+  assert.equal(split.applicable.calories_kcal, 400);
+  assert.equal(split.applicable.recovery_time_s, 1800);
+  assert.deepEqual(split.conflicting, {});
+  assert.deepEqual(split.previous, {});
+}
+
+assertAllWatchMetricsOverrideWhenConflicting();
+assertAllWatchMetricsFillWhenSessionEmpty();
 assertCase1NoSessionCreatesGeneric();
 assertCase2FinishedSessionAssociatesWithConflictSplit();
 assertCase2NoConflictAppliesEverything();

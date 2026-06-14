@@ -12,8 +12,6 @@ import { RawPayloadService } from './raw-payload.service';
 type ActivitySessionRow = Row<'activity_sessions'>;
 type ActivitySessionUpdate = Update<'activity_sessions'>;
 
-const WEARABLE_IMPORT_SOURCE = 'wearable_import';
-
 const PENDING_METRIC_COLUMNS = [
   'duration_s',
   'calories_kcal',
@@ -46,7 +44,17 @@ export class ImportReviewService {
     const localDate = this.sessionLocalDate(session);
 
     if (input.enduranceTemplateId) {
-      await this.assertOwnedRow(userId, 'endurance_workout_templates', input.enduranceTemplateId);
+      const templateSport = await this.getOwnedTemplateSport(
+        userId,
+        'endurance_workout_templates',
+        input.enduranceTemplateId,
+      );
+      // An endurance template must match the session's sport (no associating a
+      // cycling template to a run). The FE picker already filters by sport;
+      // this is defense-in-depth at the API boundary.
+      if (templateSport !== session.sport_type) {
+        throw new BadRequestException('IMPORT_REVIEW_TEMPLATE_SPORT_MISMATCH');
+      }
       await this.revertPlansCompletedBySession(sessionId);
       await this.updateSession(sessionId, {
         endurance_template_id: input.enduranceTemplateId,
@@ -61,6 +69,10 @@ export class ImportReviewService {
     }
     if (input.workoutTemplateId) {
       await this.assertOwnedRow(userId, 'workout_templates', input.workoutTemplateId);
+      // Gym routines only attach to strength/gym sessions.
+      if (session.sport_type !== 'strength' && session.sport_type !== 'gym') {
+        throw new BadRequestException('IMPORT_REVIEW_TEMPLATE_SPORT_MISMATCH');
+      }
       await this.revertPlansCompletedBySession(sessionId);
       await this.updateSession(sessionId, { workout_template_id: input.workoutTemplateId });
       await this.completePlannedPlan(userId, localDate, sessionId, { gym_template_id: input.workoutTemplateId });
@@ -127,9 +139,6 @@ export class ImportReviewService {
       duplicate_resolution: 'merged',
       needs_strength_review: false,
     });
-    await this.moveImportArtifacts(source.id, survivor.id);
-    await this.moveWorkoutStructure(source.id, survivor.id);
-    await this.relinkSessionReferences(source.id, survivor.id);
     if (source.raw_payload_id) {
       await this.rawPayloadService.linkPayload({
         rawPayloadId: source.raw_payload_id,
@@ -137,7 +146,9 @@ export class ImportReviewService {
         relatedId: survivor.id,
       });
     }
-    await this.deleteSession(source.id);
+    // Atomic: moves every artifact + back-reference and deletes the source in
+    // a single transaction (no half-moved state on a mid-operation failure).
+    await this.absorbAndDelete(source.id, survivor.id);
     return survivor.id;
   }
 
@@ -212,9 +223,6 @@ export class ImportReviewService {
     // them onto the target (partial unique indexes would reject duplicates).
     await this.clearProvenance(generic.id);
     await this.updateSession(target.id, { ...payload, ...this.buildProvenanceCopy(generic) });
-    await this.moveImportArtifacts(generic.id, target.id);
-    await this.moveWorkoutStructure(generic.id, target.id);
-    await this.relinkSessionReferences(generic.id, target.id);
     if (generic.raw_payload_id) {
       await this.rawPayloadService.linkPayload({
         rawPayloadId: generic.raw_payload_id,
@@ -222,7 +230,8 @@ export class ImportReviewService {
         relatedId: target.id,
       });
     }
-    await this.deleteSession(generic.id);
+    // Atomic move + delete (see mergeDuplicate).
+    await this.absorbAndDelete(generic.id, target.id);
     return target.id;
   }
 
@@ -299,216 +308,16 @@ export class ImportReviewService {
   }
 
   /**
-   * Moves the imported artifacts (zones, streams, provider fields, laps and
-   * route points) onto the surviving session, replacing the survivor's
-   * previous wearable-import artifacts. Nothing belonging to the removed
-   * session is dropped — children would otherwise be cascade-deleted with it.
+   * Atomically moves every child artifact and back-reference from one session
+   * onto another and deletes the source, in a single Postgres transaction
+   * (absorb_and_delete_session). Guarantees no half-moved state on failure.
    */
-  private async moveImportArtifacts(fromSessionId: string, toSessionId: string): Promise<void> {
-    const client = this.supabaseAdminService.client;
-
-    // Each artifact type is only replaced on the survivor when the removed
-    // session actually has rows to move; otherwise the survivor's own
-    // artifacts are kept untouched.
-    const { count: zonesToMove } = await client
-      .from('activity_heart_rate_zones')
-      .select('id', { count: 'exact', head: true })
-      .eq('session_id', fromSessionId);
-    if ((zonesToMove ?? 0) > 0) {
-      await this.run(client.from('activity_heart_rate_zones').delete().eq('session_id', toSessionId), 'ZONES_CLEAR');
-      await this.run(
-        client.from('activity_heart_rate_zones').update({ session_id: toSessionId }).eq('session_id', fromSessionId),
-        'ZONES_MOVE',
-      );
-    }
-
-    const { count: streamsToMove } = await client
-      .from('activity_streams')
-      .select('id', { count: 'exact', head: true })
-      .eq('session_id', fromSessionId)
-      .eq('source', WEARABLE_IMPORT_SOURCE);
-    if ((streamsToMove ?? 0) > 0) {
-      await this.run(
-        client.from('activity_streams').delete().eq('session_id', toSessionId).eq('source', WEARABLE_IMPORT_SOURCE),
-        'STREAMS_CLEAR',
-      );
-      await this.run(
-        client
-          .from('activity_streams')
-          .update({ session_id: toSessionId })
-          .eq('session_id', fromSessionId)
-          .eq('source', WEARABLE_IMPORT_SOURCE),
-        'STREAMS_MOVE',
-      );
-      await this.run(
-        client
-          .from('activity_stream_samples')
-          .delete()
-          .eq('session_id', toSessionId)
-          .eq('source', WEARABLE_IMPORT_SOURCE),
-        'STREAM_SAMPLES_CLEAR',
-      );
-      await this.run(
-        client
-          .from('activity_stream_samples')
-          .update({ session_id: toSessionId })
-          .eq('session_id', fromSessionId)
-          .eq('source', WEARABLE_IMPORT_SOURCE),
-        'STREAM_SAMPLES_MOVE',
-      );
-    }
-
-    const { count: providerFieldsToMove } = await client
-      .from('activity_provider_fields')
-      .select('session_id', { count: 'exact', head: true })
-      .eq('session_id', fromSessionId);
-    if ((providerFieldsToMove ?? 0) > 0) {
-      await this.run(
-        client.from('activity_provider_fields').delete().eq('session_id', toSessionId),
-        'PROVIDER_FIELDS_CLEAR',
-      );
-      await this.run(
-        client.from('activity_provider_fields').update({ session_id: toSessionId }).eq('session_id', fromSessionId),
-        'PROVIDER_FIELDS_MOVE',
-      );
-    }
-
-    const { count: lapsToMove } = await client
-      .from('activity_laps')
-      .select('id', { count: 'exact', head: true })
-      .eq('session_id', fromSessionId);
-    if ((lapsToMove ?? 0) > 0) {
-      await this.run(
-        client.from('activity_laps').delete().eq('session_id', toSessionId).eq('split_group', 'custom'),
-        'LAPS_CLEAR',
-      );
-      await this.run(
-        client.from('activity_laps').update({ session_id: toSessionId }).eq('session_id', fromSessionId),
-        'LAPS_MOVE',
-      );
-    }
-    const { count: routePointsToMove } = await client
-      .from('activity_route_points')
-      .select('id', { count: 'exact', head: true })
-      .eq('session_id', fromSessionId);
-    if ((routePointsToMove ?? 0) > 0) {
-      await this.run(client.from('activity_route_points').delete().eq('session_id', toSessionId), 'ROUTE_CLEAR');
-      await this.run(
-        client.from('activity_route_points').update({ session_id: toSessionId }).eq('session_id', fromSessionId),
-        'ROUTE_MOVE',
-      );
-    }
-  }
-
-  /**
-   * Moves workout sets (and superset links) from the removed session to the
-   * survivor so user-logged strength structure is never lost, renumbering
-   * each exercise's sets to continue after the survivor's existing ones.
-   */
-  private async moveWorkoutStructure(fromSessionId: string, toSessionId: string): Promise<void> {
-    const client = this.supabaseAdminService.client;
-    const { data: sourceSets, error: sourceError } = await client
-      .from('workout_sets')
-      .select('id, exercise_id, set_number')
-      .eq('session_id', fromSessionId)
-      .order('set_number', { ascending: true });
-    if (sourceError) throw new InternalServerErrorException('IMPORT_REVIEW_SETS_READ_FAILED');
-    if (!sourceSets || sourceSets.length === 0) return;
-
-    const { data: survivorSets, error: survivorError } = await client
-      .from('workout_sets')
-      .select('exercise_id, set_number')
-      .eq('session_id', toSessionId);
-    if (survivorError) throw new InternalServerErrorException('IMPORT_REVIEW_SETS_READ_FAILED');
-
-    const nextNumberByExercise = new Map<string, number>();
-    for (const set of survivorSets ?? []) {
-      const current = nextNumberByExercise.get(set.exercise_id) ?? 0;
-      nextNumberByExercise.set(set.exercise_id, Math.max(current, set.set_number ?? 0));
-    }
-    for (const set of sourceSets) {
-      const nextNumber = (nextNumberByExercise.get(set.exercise_id) ?? 0) + 1;
-      nextNumberByExercise.set(set.exercise_id, nextNumber);
-      await this.run(
-        client.from('workout_sets').update({ session_id: toSessionId, set_number: nextNumber }).eq('id', set.id),
-        'SETS_MOVE',
-      );
-    }
-
-    // Superset links only move when the survivor has none of its own,
-    // otherwise grouping metadata could clash.
-    const { count: survivorLinks } = await client
-      .from('activity_session_superset_links')
-      .select('id', { count: 'exact', head: true })
-      .eq('session_id', toSessionId);
-    if ((survivorLinks ?? 0) === 0) {
-      await this.run(
-        client
-          .from('activity_session_superset_links')
-          .update({ session_id: toSessionId })
-          .eq('session_id', fromSessionId),
-        'SUPERSET_LINKS_MOVE',
-      );
-    }
-
-    // Recompute the survivor's strength totals from the final set list.
-    const { data: finalSets, error: finalError } = await client
-      .from('workout_sets')
-      .select('reps, weight_kg')
-      .eq('session_id', toSessionId);
-    if (finalError) throw new InternalServerErrorException('IMPORT_REVIEW_SETS_READ_FAILED');
-    const totals = (finalSets ?? []).reduce(
-      (acc, set) => ({
-        sets: acc.sets + 1,
-        reps: acc.reps + (set.reps ?? 0),
-        volume: acc.volume + (set.reps ?? 0) * (set.weight_kg ?? 0),
-      }),
-      { sets: 0, reps: 0, volume: 0 },
-    );
-    await this.updateSession(toSessionId, {
-      total_sets: totals.sets,
-      total_reps: totals.reps,
-      total_volume_kg: Math.round(totals.volume * 100) / 100,
+  private async absorbAndDelete(fromSessionId: string, toSessionId: string): Promise<void> {
+    const { error } = await this.supabaseAdminService.client.rpc('absorb_and_delete_session', {
+      p_source: fromSessionId,
+      p_target: toSessionId,
     });
-  }
-
-  /**
-   * Repoints every remaining reference from the removed session to the
-   * survivor (plans, files, health samples, feedback, tags) so nothing is
-   * lost or left dangling when the duplicate is deleted.
-   */
-  private async relinkSessionReferences(fromSessionId: string, toSessionId: string): Promise<void> {
-    const client = this.supabaseAdminService.client;
-    await this.run(
-      client
-        .from('workout_plans')
-        .update({ activity_session_id: toSessionId })
-        .eq('activity_session_id', fromSessionId),
-      'PLANS_RELINK',
-    );
-    await this.run(
-      client.from('activity_files').update({ session_id: toSessionId }).eq('session_id', fromSessionId),
-      'FILES_RELINK',
-    );
-    await this.run(
-      client
-        .from('health_metric_samples')
-        .update({ activity_session_id: toSessionId })
-        .eq('activity_session_id', fromSessionId),
-      'HEALTH_SAMPLES_RELINK',
-    );
-    await this.run(
-      client.from('vo2_max_logs').update({ activity_session_id: toSessionId }).eq('activity_session_id', fromSessionId),
-      'VO2_LOGS_RELINK',
-    );
-    await this.run(
-      client.from('session_feedback').update({ session_id: toSessionId }).eq('session_id', fromSessionId),
-      'FEEDBACK_RELINK',
-    );
-    await this.run(
-      client.from('activity_session_tags').update({ session_id: toSessionId }).eq('session_id', fromSessionId),
-      'TAGS_RELINK',
-    );
+    if (error) throw new InternalServerErrorException('IMPORT_REVIEW_ABSORB_FAILED');
   }
 
   private async revertPlansCompletedBySession(sessionId: string): Promise<void> {
@@ -608,17 +417,29 @@ export class ImportReviewService {
     if (!data) throw new NotFoundException('IMPORT_REVIEW_TEMPLATE_NOT_FOUND');
   }
 
+  /** Returns the owned template's sport_type, or throws if not found. */
+  private async getOwnedTemplateSport(
+    userId: string,
+    table: 'endurance_workout_templates',
+    id: string,
+  ): Promise<string> {
+    const { data, error } = await this.supabaseAdminService.client
+      .from(table)
+      .select('sport_type')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException('IMPORT_REVIEW_TEMPLATE_READ_FAILED');
+    if (!data) throw new NotFoundException('IMPORT_REVIEW_TEMPLATE_NOT_FOUND');
+    return data.sport_type;
+  }
+
   private async updateSession(sessionId: string, payload: ActivitySessionUpdate): Promise<void> {
     const { error } = await this.supabaseAdminService.client
       .from('activity_sessions')
       .update(payload)
       .eq('id', sessionId);
     if (error) throw new InternalServerErrorException('IMPORT_REVIEW_SESSION_UPDATE_FAILED');
-  }
-
-  private async deleteSession(sessionId: string): Promise<void> {
-    const { error } = await this.supabaseAdminService.client.from('activity_sessions').delete().eq('id', sessionId);
-    if (error) throw new InternalServerErrorException('IMPORT_REVIEW_SESSION_DELETE_FAILED');
   }
 
   private async run(query: PromiseLike<{ error: { message: string } | null }>, step: string): Promise<void> {

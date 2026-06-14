@@ -78,9 +78,25 @@ function assertStrengthMissingMetricsRenormalize(): void {
   );
 }
 
+function assertScoringIsScaleInvariantAcrossSports(): void {
+  // The score is purely percentage-based, so a large-magnitude cycling ride
+  // and a small swim behave the same as running for equivalent relative diffs.
+  const longRide = scoreEnduranceDuplicate(
+    { distanceM: 90000, durationS: 12000, startTime: '2026-06-12T07:00:00Z', endTime: '2026-06-12T10:20:00Z' },
+    { distanceM: 90300, durationS: 12030, startTime: '2026-06-12T07:01:00Z', endTime: '2026-06-12T10:21:00Z' },
+  );
+  assert.ok(longRide >= DUPLICATE_THRESHOLD, `large-magnitude ride duplicate, got ${longRide}`);
+  const shortSwim = scoreEnduranceDuplicate(
+    { distanceM: 1500, durationS: 1800, startTime: '2026-06-12T07:00:00Z', endTime: null },
+    { distanceM: 1505, durationS: 1805, startTime: '2026-06-12T07:02:00Z', endTime: null },
+  );
+  assert.ok(shortSwim >= DUPLICATE_THRESHOLD, `short swim duplicate, got ${shortSwim}`);
+}
+
 assertIdenticalEnduranceSessionsAreDuplicates();
 assertSimilarOverlappingSessionsAreDuplicates();
 assertDifferentDistanceSameTimeIsNotDuplicate();
 assertMissingMetricsRenormalize();
 assertStrengthDuplicateByDurationKcalHr();
 assertStrengthMissingMetricsRenormalize();
+assertScoringIsScaleInvariantAcrossSports();

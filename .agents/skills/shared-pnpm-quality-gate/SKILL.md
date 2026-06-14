@@ -13,12 +13,28 @@ Run this after any FE or BE code change unless the user explicitly asks for a di
 
 - `pnpm format`
 - `pnpm run lint:check`
+- `pnpm run verify:import-review` — imported-activity safety check (see below)
 
 Why this is the default:
 
 - The root scripts already cover both packages.
 - They are the fastest reliable baseline for day-to-day work.
 - They avoid running slow or side-effectful FE CI steps on every small change.
+
+### Import-review safety check (`verify:import-review`)
+
+Runs the imported-activity reconciliation end-to-end against the local Supabase
+instance, asserting that every user decision branch keeps the data coherent:
+merge, keep both, revert watch metrics, keep watch metrics, assign to a session,
+keep as new, and do-nothing — never losing an activity, creating a duplicate, or
+leaving a dangling foreign key.
+
+- **Self-guarding**: it auto-skips when no local Supabase is configured and refuses
+  to run against a non-local (production) database, so it is always safe to invoke.
+- **Non-destructive**: it seeds a disposable temporary user + sessions and deletes
+  them in a `finally` block.
+- Needs the local Supabase running (`supabase start`). If it prints `[skip]`, report
+  that it was skipped rather than treating it as a pass or a failure.
 
 ## Level 2: GitHub CI parity
 
@@ -36,6 +52,7 @@ Use package-level commands that mirror CI as closely as local execution safely a
 - `pnpm --prefix alzan-be run format:check`
 - `pnpm --prefix alzan-be run lint:check`
 - `pnpm --prefix alzan-be run verify:activity-import`
+- `pnpm --prefix alzan-be run verify:import-review` (auto-skips without a local Supabase)
 
 ### FE parity steps
 
