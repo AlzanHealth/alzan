@@ -10,6 +10,7 @@ import { FinishWorkoutScreen } from '../screens/training/FinishWorkoutScreen';
 import { EnduranceSessionFormScreen } from '../screens/training/EnduranceSessionFormScreen';
 import { ExternalActivityLinkingScreen } from '../screens/training/ExternalActivityLinkingScreen';
 import { EnduranceSessionDetailScreen } from '../screens/training/EnduranceSessionDetailScreen';
+import { CompleteExercisesScreen } from '../screens/training/CompleteExercisesScreen';
 import { EnduranceWorkoutBuilderScreen } from '../screens/training/EnduranceWorkoutBuilderScreen';
 import { WeeklyPlanScreen } from '../screens/training/WeeklyPlanScreen';
 import { ExerciseDetailScreen } from '../screens/training/ExerciseDetailScreen';
@@ -45,6 +46,7 @@ export const TrainingStack = () => {
       <Stack.Screen name="EnduranceSessionsList" component={EnduranceSessionsListScreen} />
       <Stack.Screen name="EnduranceSessionForm" component={EnduranceSessionFormScreen} />
       <Stack.Screen name="EnduranceSessionDetail" component={EnduranceSessionDetailScreen} />
+      <Stack.Screen name="CompleteExercises" component={CompleteExercisesScreen} />
       <Stack.Screen name="EnduranceWorkoutBuilder" component={EnduranceWorkoutBuilderScreen} />
       <Stack.Screen name="SportTemplatesList" component={SportTemplatesListScreen} />
       <Stack.Screen name="WeeklyPlan" component={WeeklyPlanScreen} />

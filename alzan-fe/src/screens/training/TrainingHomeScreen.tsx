@@ -22,6 +22,7 @@ import { SportIcon } from '../../components/icons/SportIcon';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { SPORTS_CONFIG } from '../../constants/sports';
 import { ActiveSessionBanner } from './components/ActiveSessionBanner';
+import { ImportReviewSurface } from './components/ImportReviewSurface';
 
 import { format, addDays, isSameDay, subDays, startOfDay } from 'date-fns';
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
@@ -729,6 +730,8 @@ export const TrainingHomeScreen = () => {
         />
 
         <ScrollView contentContainerStyle={styles.content}>
+          <ImportReviewSurface onOpenSession={session => navigation.navigate('EnduranceSessionDetail', { session })} />
+
           {renderDailyPlan()}
 
           {activeSession && <ActiveSessionBanner session={activeSession} />}

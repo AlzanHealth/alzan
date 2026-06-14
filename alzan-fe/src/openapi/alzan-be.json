@@ -531,6 +531,167 @@
         },
         "tags": ["Wearables"]
       }
+    },
+    "/activity-sessions/{id}/template-association": {
+      "post": {
+        "operationId": "associateTemplate",
+        "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/TemplateAssociationInputDto" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Activity import review"]
+      }
+    },
+    "/activity-sessions/{id}/template-suggestion/dismiss": {
+      "post": {
+        "operationId": "dismissSuggestion",
+        "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Activity import review"]
+      }
+    },
+    "/activity-sessions/{id}/duplicate/merge": {
+      "post": {
+        "operationId": "mergeDuplicate",
+        "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DuplicateMergeInputDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Activity import review"]
+      }
+    },
+    "/activity-sessions/{id}/duplicate/keep-both": {
+      "post": {
+        "operationId": "keepBothDuplicates",
+        "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Activity import review"]
+      }
+    },
+    "/activity-sessions/{id}/watch-metrics/apply": {
+      "post": {
+        "operationId": "applyWatchMetrics",
+        "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Activity import review"]
+      }
+    },
+    "/activity-sessions/{id}/watch-metrics/dismiss": {
+      "post": {
+        "operationId": "dismissWatchMetrics",
+        "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Activity import review"]
+      }
+    },
+    "/activity-sessions/{id}/strength-assignment": {
+      "post": {
+        "operationId": "assignStrengthSession",
+        "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StrengthAssignmentInputDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Activity import review"]
+      }
     }
   },
   "info": {
@@ -798,6 +959,32 @@
           "last_success_at": { "type": "string" }
         },
         "required": ["provider", "activities_imported", "last_success_at"]
+      },
+      "TemplateAssociationInputDto": {
+        "type": "object",
+        "properties": {
+          "endurance_template_id": { "type": "string", "nullable": true, "format": "uuid" },
+          "workout_template_id": { "type": "string", "nullable": true, "format": "uuid" }
+        }
+      },
+      "ImportReviewSessionOutputDto": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Surviving/updated session id after the action."
+          }
+        },
+        "required": ["session_id"]
+      },
+      "DuplicateMergeInputDto": {
+        "type": "object",
+        "properties": { "target_session_id": { "type": "string", "format": "uuid" } }
+      },
+      "StrengthAssignmentInputDto": {
+        "type": "object",
+        "properties": { "target_session_id": { "type": "string", "format": "uuid" } }
       }
     }
   },

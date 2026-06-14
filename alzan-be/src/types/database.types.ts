@@ -453,6 +453,7 @@ export type Database = {
           golf_club_focus: string | null;
           hyrox_station_focus: string | null;
           id: string;
+          import_review_seen_at: string | null;
           imported_at: string | null;
           max_cadence: number | null;
           max_heart_rate: number | null;
@@ -535,6 +536,7 @@ export type Database = {
           golf_club_focus?: string | null;
           hyrox_station_focus?: string | null;
           id?: string;
+          import_review_seen_at?: string | null;
           imported_at?: string | null;
           max_cadence?: number | null;
           max_heart_rate?: number | null;
@@ -617,6 +619,7 @@ export type Database = {
           golf_club_focus?: string | null;
           hyrox_station_focus?: string | null;
           id?: string;
+          import_review_seen_at?: string | null;
           imported_at?: string | null;
           max_cadence?: number | null;
           max_heart_rate?: number | null;

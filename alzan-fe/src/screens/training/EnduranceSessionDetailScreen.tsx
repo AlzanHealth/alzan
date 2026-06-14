@@ -56,7 +56,8 @@ import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImporte
 import { Tooltip } from '../../components/common/Tooltip';
 import { RouteMap } from '../../components/common/RouteMap';
 import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strengthActivityImportService';
-import { useQuery } from '@tanstack/react-query';
+import { ImportReviewBlocks } from './components/ImportReviewBlocks';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { SPORT_COLORS } from '../../theme/sportColors';
@@ -70,8 +71,9 @@ export const EnduranceSessionDetailScreen = () => {
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'EnduranceSessionDetail'>>();
-  const { session: initialSession } = route.params || {};
+  const { session: initialSession, sessionId: sessionIdParam } = route.params || {};
   const [session, setSession] = useState<ActivitySession | undefined>(initialSession);
+  const queryClient = useQueryClient();
   const { preferences, toDisplayWeight } = useUserPreferences();
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
   const { getOptionLabel } = useSportCatalog();
@@ -88,6 +90,11 @@ export const EnduranceSessionDetailScreen = () => {
   const [editReps, setEditReps] = useState('');
   const [editWeight, setEditWeight] = useState('');
 
+  // Rename modal state (always-available Strava-like editing)
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+
   const [routePolyline, setRoutePolyline] = useState<string | null>(session?.route_polyline ?? null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
 
@@ -100,6 +107,45 @@ export const EnduranceSessionDetailScreen = () => {
   const uploadPolyline = useUploadPolyline({
     onPolylineUploaded: polyline => setRoutePolyline(polyline),
   });
+
+  // Fresh session row — keeps import-review state (duplicates, suggestions,
+  // pending watch metrics) in sync after review actions.
+  const activeSessionId = session?.id ?? sessionIdParam;
+  const { data: freshSession } = useQuery({
+    queryKey: ['activitySession', activeSessionId],
+    queryFn: async (): Promise<ActivitySession | null> => {
+      if (!activeSessionId) return null;
+      const { data, error } = await supabase
+        .from('activity_sessions')
+        .select('*')
+        .eq('id', activeSessionId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeSessionId,
+  });
+  useEffect(() => {
+    if (freshSession) {
+      setSession(freshSession);
+      setRoutePolyline(current => freshSession.route_polyline ?? current);
+    }
+  }, [freshSession]);
+
+  // Opening an imported activity acknowledges its "new activity" review
+  // summary so the home banner/sheet stops surfacing it (hard conflicts keep
+  // showing until resolved via their own columns).
+  useEffect(() => {
+    if (!freshSession?.id || freshSession.imported_at == null || freshSession.import_review_seen_at != null) return;
+    void supabase
+      .from('activity_sessions')
+      .update({ import_review_seen_at: new Date().toISOString() })
+      .eq('id', freshSession.id)
+      .is('import_review_seen_at', null)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+      });
+  }, [freshSession?.id, freshSession?.imported_at, freshSession?.import_review_seen_at, queryClient]);
 
   // Fetch workout sets for gym sessions
   const { data: sessionDetail } = useSessionDetail(session?.sport_type === 'strength' ? session?.id : undefined);
@@ -314,6 +360,31 @@ export const EnduranceSessionDetailScreen = () => {
       durationSeconds != null && durationSeconds > 0 ? formatDuration(durationSeconds) : '-',
     [],
   );
+
+  const openRenameModal = useCallback(() => {
+    if (!session) return;
+    setRenameValue(session.name ?? '');
+    setRenameVisible(true);
+  }, [session]);
+
+  const handleRenameSave = useCallback(async () => {
+    if (!session) return;
+    const trimmed = renameValue.trim();
+    setRenameSaving(true);
+    const { error } = await supabase
+      .from('activity_sessions')
+      .update({ name: trimmed || null })
+      .eq('id', session.id);
+    setRenameSaving(false);
+    if (error) {
+      Alert.alert(t('common.error'), t('training.importReviewActionError'));
+      return;
+    }
+    setSession(current => (current ? { ...current, name: trimmed || null } : current));
+    setRenameVisible(false);
+    queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+    queryClient.invalidateQueries({ queryKey: ['activitySession', session.id] });
+  }, [session, renameValue, queryClient, t]);
 
   const handlePickStrengthActivityFile = useCallback(() => {
     if (!session) return;
@@ -1146,9 +1217,16 @@ export const EnduranceSessionDetailScreen = () => {
             <View style={[styles.iconContainer, dynamicStyles.iconContainer]}>
               <Icon size={32} color={themeColors.primary} sport={session.sport_type} />
             </View>
-            <Text style={[styles.activityName, dynamicStyles.title]}>
-              {session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
-            </Text>
+            <TouchableOpacity
+              onPress={openRenameModal}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}
+              accessibilityLabel={t('training.importRenameActivity')}
+            >
+              <Text style={[styles.activityName, dynamicStyles.title]}>
+                {session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
+              </Text>
+              <Pencil size={16} color={themeColors.textSecondary} />
+            </TouchableOpacity>
             <Text style={[styles.date, dynamicStyles.subtitle]}>
               {format(new Date(session.start_time), 'EEEE d MMMM, yyyy \u00B7 HH:mm', {
                 locale: getDateFnsLocale(),
@@ -1429,6 +1507,16 @@ export const EnduranceSessionDetailScreen = () => {
               </GlassCard>
             </View>
           )}
+
+          {/* Import review: duplicates, watch conflicts, suggestions and template association */}
+          <ImportReviewBlocks
+            session={session}
+            hasSets={exerciseGroups.length > 0}
+            onCompleteExercises={() => navigation.navigate('CompleteExercises', { sessionId: session.id })}
+            onSessionReplaced={newSessionId =>
+              navigation.replace('EnduranceSessionDetail', { sessionId: newSessionId })
+            }
+          />
 
           {!isGymSession && (session.notes || template?.notes) && (
             <View style={styles.sectionContainer}>
@@ -1798,6 +1886,60 @@ export const EnduranceSessionDetailScreen = () => {
           {renderProgrammedWorkoutSection()}
         </ScrollView>
       </SafeAreaView>
+
+      {/* Rename Activity Modal */}
+      <Modal visible={renameVisible} transparent animationType="fade" onRequestClose={() => setRenameVisible(false)}>
+        <View style={styles.modalContainer}>
+          <BlurView intensity={40} style={StyleSheet.absoluteFill} tint={isDark ? 'dark' : 'light'} />
+          <TouchableWithoutFeedback onPress={() => setRenameVisible(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalKeyboard}>
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+                  shadowColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.15)',
+                },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => setRenameVisible(false)}
+                style={[
+                  styles.modalCloseButton,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                ]}
+              >
+                <X size={20} color={themeColors.textSecondary} />
+              </TouchableOpacity>
+              <Text style={[styles.modalLabel, { color: themeColors.textSecondary }]}>
+                {t('training.importRenameActivity').toUpperCase()}
+              </Text>
+              <TextInput
+                style={[styles.renameInput, { color: themeColors.textPrimary, borderColor: themeColors.border }]}
+                value={renameValue}
+                onChangeText={setRenameValue}
+                placeholder={t('training.importRenamePlaceholder')}
+                placeholderTextColor={themeColors.textSecondary}
+                autoFocus
+                selectTextOnFocus
+              />
+              <TouchableOpacity
+                style={[
+                  styles.modalSaveButton,
+                  { backgroundColor: themeColors.primary, shadowColor: themeColors.primary },
+                  renameSaving && styles.modalSaveDisabled,
+                ]}
+                onPress={handleRenameSave}
+                disabled={renameSaving}
+              >
+                <Text style={styles.modalSaveText}>{renameSaving ? '...' : t('common.save')}</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       {/* Edit Set Modal — exact WeightLogModal pattern */}
       <Modal visible={!!editingSet} transparent animationType="fade" onRequestClose={() => setEditingSet(null)}>
@@ -2249,6 +2391,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 0,
     includeFontPadding: false,
+  },
+  renameInput: {
+    fontSize: 18,
+    fontWeight: '600',
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    marginBottom: spacing.m,
   },
   modalInputUnit: {
     fontSize: 14,

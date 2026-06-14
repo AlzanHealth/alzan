@@ -51,6 +51,24 @@ const verificationCases: VerificationCase[] = [
     specFile: 'src/components/activity-import/activity-import.service.spec.ts',
   },
   {
+    kind: 'service',
+    provider: 'matching',
+    check: 'endurance template match scoring (structural and totals)',
+    specFile: 'src/components/activity-import/matching/endurance-template-match.spec.ts',
+  },
+  {
+    kind: 'service',
+    provider: 'matching',
+    check: 'duplicate similarity scoring for endurance and strength sessions',
+    specFile: 'src/components/activity-import/matching/duplicate-score.spec.ts',
+  },
+  {
+    kind: 'service',
+    provider: 'matching',
+    check: 'import reconciliation decision plans (strength cases and endurance duplicates)',
+    specFile: 'src/components/activity-import/matching/reconciliation-plan.spec.ts',
+  },
+  {
     kind: 'activity',
     provider: 'apple_health',
     check: 'Apple Health/Fitness activity and strength canonical mapping',

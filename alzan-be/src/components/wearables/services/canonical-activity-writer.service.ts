@@ -14,6 +14,7 @@ import {
   WearableProvider,
 } from '../domain/wearable.types';
 import { DedupeService } from './dedupe.service';
+import { ImportReconciliationService } from './import-reconciliation.service';
 import { RawPayloadService } from './raw-payload.service';
 
 type ActivitySessionInsert = Insert<'activity_sessions'>;
@@ -36,17 +37,50 @@ export class CanonicalActivityWriterService {
     private readonly supabaseAdminService: SupabaseAdminService,
     private readonly rawPayloadService: RawPayloadService,
     private readonly dedupeService: DedupeService,
+    private readonly importReconciliationService: ImportReconciliationService,
   ) {}
 
   public async upsertActivity(input: UpsertActivityInput): Promise<string> {
     const deviceId = await this.ensureDevice(input.userId, input.activity, input.provenance);
     const existingSessionId = await this.findExistingSessionId(input.userId, input.activity, input.provenance);
     const sessionPayload = this.buildSessionPayload(input, deviceId);
-    const sessionId = existingSessionId
-      ? await this.updateSession(existingSessionId, sessionPayload)
-      : await this.insertSession(sessionPayload as ActivitySessionInsert);
 
-    await this.replaceLaps(sessionId, input.userId, input.activity);
+    let sessionId: string;
+    let isNewImport = false;
+    let strengthAssociation = false;
+    if (existingSessionId) {
+      // Re-sync of an activity already linked to a session. If that session
+      // is an Alzan strength session that absorbed the external activity,
+      // never overwrite its metrics again (the user may have chosen to keep
+      // their own values): refresh provenance only.
+      const existingMeta = await this.getSessionMeta(existingSessionId);
+      if (existingMeta?.sport_type === 'strength' && existingMeta.source !== 'imported') {
+        strengthAssociation = true;
+        sessionId = await this.updateSession(existingSessionId, this.buildProvenancePayload(input, deviceId));
+      } else {
+        sessionId = await this.updateSession(existingSessionId, sessionPayload);
+      }
+    } else if (input.activity.sportType === 'strength') {
+      // The watch never creates sets: a same-day Alzan strength session may
+      // absorb the external metrics instead of spawning a new session.
+      const directive = await this.importReconciliationService.resolveStrengthDirective(input.userId, input.activity);
+      if (directive.kind === 'associate') {
+        strengthAssociation = true;
+        sessionId = await this.updateSession(directive.targetSessionId, {
+          ...directive.payload,
+          ...this.buildProvenancePayload(input, deviceId),
+        });
+      } else {
+        sessionId = await this.insertSession({ ...sessionPayload, ...directive.extraFields } as ActivitySessionInsert);
+      }
+    } else {
+      sessionId = await this.insertSession(sessionPayload as ActivitySessionInsert);
+      isNewImport = true;
+    }
+
+    if (!strengthAssociation) {
+      await this.replaceLaps(sessionId, input.userId, input.activity);
+    }
     await this.replaceHeartRateZones(sessionId, input.activity);
     await this.replaceStreams(sessionId, input.userId, input.activity, input.provenance);
     await this.replaceRoutePoints(sessionId, input.userId, input.activity, input.provenance);
@@ -57,7 +91,39 @@ export class CanonicalActivityWriterService {
       relatedId: sessionId,
     });
 
+    if (isNewImport) {
+      // Duplicate detection + template matching for the freshly imported
+      // session. Runs after laps/zones are persisted; never blocks the import.
+      await this.importReconciliationService.reconcileEnduranceAfterInsert(input.userId, sessionId);
+    }
+
     return sessionId;
+  }
+
+  private async getSessionMeta(sessionId: string): Promise<{ sport_type: string; source: string | null } | null> {
+    const { data, error } = await this.supabaseAdminService.client
+      .from('activity_sessions')
+      .select('sport_type, source')
+      .eq('id', sessionId)
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LOOKUP_FAILED');
+    return data;
+  }
+
+  /** Provenance-only payload used when associating an external strength activity to an existing session. */
+  private buildProvenancePayload(input: UpsertActivityInput, deviceId: string | null): ActivitySessionUpdate {
+    return {
+      provider: this.toActivityDatabaseProvider(input.provenance.provider),
+      provider_activity_id: input.activity.providerActivityId,
+      device_id: deviceId,
+      imported_at: new Date().toISOString(),
+      source_channel: input.provenance.sourceChannel,
+      source_package: input.provenance.sourcePackage,
+      source_provider_key: input.provenance.sourceProviderKey,
+      source_record_id: input.provenance.sourceRecordId,
+      source_updated_at: input.provenance.sourceUpdatedAt,
+      raw_payload_id: input.provenance.rawPayloadId,
+    };
   }
 
   private async ensureDevice(

@@ -249,6 +249,8 @@ export const getSportDefaultTitleKey = (
 ): TranslationKey => {
   const subtypeTitle = sportType && sportSubtype ? SPORT_SUBTYPE_TITLES[sportType]?.[sportSubtype] : undefined;
   if (subtypeTitle) return subtypeTitle;
+  // Gym sessions (including watch imports) use sport_type 'strength', which has no SPORTS_CONFIG entry.
+  if (sportType === 'strength') return 'constants.gymTitle';
   return SPORTS_CONFIG[sportType ?? '']?.defaultTitle ?? 'constants.otherTitle';
 };
 

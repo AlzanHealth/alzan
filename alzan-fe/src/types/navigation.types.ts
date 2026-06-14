@@ -125,6 +125,7 @@ export type TrainingStackParamList = {
       }
     | undefined;
   EnduranceSessionDetail: { sessionId?: string; session?: ActivitySession };
+  CompleteExercises: { sessionId: string };
   EnduranceWorkoutBuilder: { templateId?: string; sportType?: SportType } | undefined;
   SportTemplatesList: { assignToDate?: string } | undefined;
   WeeklyPlan: { date?: string } | undefined;
