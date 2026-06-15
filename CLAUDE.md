@@ -21,12 +21,14 @@ All commands run from the repo root with pnpm. Per-package variants use `pnpm --
 - Quality gate (required after any code change): `pnpm format` then `pnpm run lint:check`. Only a non-zero exit code from lint is a failure; warnings are OK.
 - `pnpm typecheck` — `tsc --noEmit` for both packages.
 - `pnpm --prefix alzan-fe build` triggers `expo prebuild`; avoid unless strictly necessary.
+- Cloud dev environment: the `:cloud` script variants (`pnpm start:web:cloud`, `pnpm ios:cloud`, `pnpm android:cloud`) run against cloud Supabase. They are gated by `scripts/guard-cloud.js` and sync env via `env:sync:cloud`; use only when explicitly targeting the cloud environment.
 
 ### Tests
 
 There is no jest/vitest. Backend `*.spec.ts` files are plain ts-node scripts using `node:assert`.
 
 - Full activity-import suite: `pnpm verify:activity-import` (fixture-manifest runner; see `docs/activity-import-verification.md`).
+- Import-review suite: `pnpm verify:import-review`.
 - Single spec: `cd alzan-be && node -r ts-node/register -r tsconfig-paths/register src/components/activity-import/parsers/<name>.spec.ts`
 
 ### Generated code (never hand-edit)
