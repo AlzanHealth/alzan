@@ -6,6 +6,7 @@ import { Locale } from '../i18n';
 import {
   buildLooseIlikePattern,
   buildTokenIlikeClauses,
+  foldAccentsToWildcard,
   getCurrentAppLocale,
   getLocalizedExerciseDescription,
   getLocalizedExerciseName,
@@ -97,30 +98,34 @@ const withTimeout = async <T>(promiseLike: PromiseLike<T>, timeoutMs: number): P
   }
 };
 
-const buildExerciseSearchClauses = (query: string): string[] => {
+// Search exercise names only. Descriptions are long and cause false matches
+// (e.g. "flex" hitting any description that says "flexiona…"). Muscle/equipment
+// have their own dedicated filters.
+//
+// "Strong" clauses represent the whole query (prefix + in-order loose match).
+// They match few rows, so fetching them first guarantees the typed term surfaces
+// instead of being crowded out of the limited, id-ordered candidate window.
+const buildExerciseStrongClauses = (query: string): string[] => {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedQuery) return [];
 
-  const looseLikePattern = buildLooseIlikePattern(query).replace(/['"()]/g, '');
-  const startsWithPattern = `${looseLikePattern}%`;
-
-  const tokenClauses = buildTokenIlikeClauses(query, [
-    'base_name_es',
-    'base_name_en',
-    'description_es',
-    'description_en',
-  ]);
-
+  // Fold accents to `_`: exercises have no normalized name column, so this keeps
+  // "frances" matching "Press francés". matchesLoosely re-checks precision.
+  const looseLikePattern = foldAccentsToWildcard(buildLooseIlikePattern(query).replace(/['"()]/g, ''));
   return Array.from(
     new Set([
-      `base_name_es.ilike.${startsWithPattern}`,
-      `base_name_en.ilike.${startsWithPattern}`,
+      `base_name_es.ilike.${looseLikePattern}%`,
+      `base_name_en.ilike.${looseLikePattern}%`,
       `base_name_es.ilike.%${looseLikePattern}%`,
       `base_name_en.ilike.%${looseLikePattern}%`,
-      ...tokenClauses,
     ]),
   );
 };
+
+// "Broad" clauses match each token independently (order-independent recall),
+// also accent-folded so single accented words (e.g. "triceps") are found.
+const buildExerciseBroadClauses = (query: string): string[] =>
+  buildTokenIlikeClauses(query, ['base_name_es', 'base_name_en'], foldAccentsToWildcard);
 
 interface UseExercisesOptions {
   searchQuery?: string;
@@ -215,26 +220,40 @@ export const useExercises = (options?: UseExercisesOptions) => {
       if (shouldSearch) {
         const requestedLimit = typeof limit === 'number' && limit > 0 ? limit : SEARCH_CANDIDATE_FLOOR;
         const candidateLimit = Math.max(requestedLimit * SEARCH_CANDIDATE_MULTIPLIER, SEARCH_CANDIDATE_FLOOR);
-        const searchClauses = buildExerciseSearchClauses(trimmedSearchQuery);
 
-        let query = createBaseQuery().order('id', { ascending: true }).limit(candidateLimit);
+        // Two-phase fetch: strong (whole-query) matches first so the typed term
+        // always surfaces, then broad token matches to fill the remaining slots.
+        const runExerciseSearch = async (
+          orClauses: string[],
+          excludeIds: string[] = [],
+        ): Promise<ExerciseLookupRow[]> => {
+          if (orClauses.length === 0) return [];
 
-        if (searchClauses.length > 0) {
-          query = query.or(searchClauses.join(','));
-        }
+          let query = createBaseQuery().order('id', { ascending: true }).limit(candidateLimit).or(orClauses.join(','));
 
-        try {
-          const { data, error } = await withTimeout(query.returns<ExerciseLookupRow[]>(), SEARCH_QUERY_TIMEOUT_MS);
-
-          if (error) {
-            console.error('Error fetching exercises:', error);
-            return {
-              exercises: [],
-              hasMore: false,
-            };
+          if (excludeIds.length > 0) {
+            query = query.not('id', 'in', `(${excludeIds.join(',')})`);
           }
 
-          rows = data || [];
+          const { data, error } = await withTimeout(query.returns<ExerciseLookupRow[]>(), SEARCH_QUERY_TIMEOUT_MS);
+          if (error) {
+            console.error('Error fetching exercises:', error);
+            return [];
+          }
+          return data || [];
+        };
+
+        try {
+          const strongRows = await runExerciseSearch(buildExerciseStrongClauses(trimmedSearchQuery));
+          rows = strongRows;
+
+          if (strongRows.length < requestedLimit) {
+            const broadRows = await runExerciseSearch(
+              buildExerciseBroadClauses(trimmedSearchQuery),
+              strongRows.map(row => row.id),
+            );
+            rows = [...strongRows, ...broadRows];
+          }
         } catch (searchError) {
           console.error('Exercise search timed out or failed:', searchError);
           return {

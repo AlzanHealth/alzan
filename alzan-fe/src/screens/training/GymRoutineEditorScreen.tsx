@@ -239,6 +239,7 @@ export const GymRoutineEditorScreen = () => {
       onSelect: (_exerciseId: string) => {}, // Required but not used (using event emitter instead)
       fromScreen: 'GymRoutineEditor',
       routineId,
+      selectionMode: 'multi',
     });
   };
 

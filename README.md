@@ -53,16 +53,20 @@ Flujo normal del día a día. Levanta una Supabase local en Docker y la app apun
    | ------------------- | ------------------------------------------------------------------------------- |
    | `pnpm start`        | BE (NestJS watch) + FE (Expo dev server). Desde Expo abres iOS / Android / Web. |
    | `pnpm start:web`    | BE + FE en **web** (Expo web en `FE_PORT`, por defecto `8082`).                 |
-   | `pnpm start:be`     | Solo el backend.                                                                |
+   | `pnpm start:be`     | Solo el backend (sincroniza env a **local** antes de arrancar).                 |
    | `pnpm start:fe`     | Solo el frontend (Expo dev server).                                             |
    | `pnpm start:fe:web` | Solo el frontend en web.                                                        |
 
-   **Simulador nativo iOS/Android** (build nativo, equivale al flujo manual):
+   **Simulador nativo iOS/Android** (build nativo con `expo run`):
 
    ```bash
-   pnpm start:be                          # backend en una terminal
-   pnpm --prefix alzan-fe exec expo run:ios     # o expo run:android, en otra terminal
+   pnpm supabase start   # 1) Supabase local (si no la tienes ya levantada)
+   pnpm start:be         # 2) backend en una terminal
+   pnpm ios              # 3) en otra terminal — sincroniza env local y lanza expo run:ios
+   # (o `pnpm android` para Android)
    ```
+
+   > `pnpm ios` / `pnpm android` hacen `env:sync` (local) y luego `npx expo run:ios/android` desde `alzan-fe/`. No arrancan Supabase ni el BE: esos los lanzas tú (pasos 1 y 2).
 
 4. **Parar Supabase local** al terminar:
    ```bash
@@ -109,19 +113,21 @@ Descarga el schema OpenAPI del backend y regenera el cliente tipado + hooks de T
 
 Levanta el BE + FE (web o simulador) apuntando a la **Supabase de producción/nube** en vez de la local. Útil para probar contra datos y esquema reales.
 
-> 🔒 **Solo funciona en la rama `main`.** Los comandos cloud se **niegan a arrancar** desde una PR / rama de feature, porque las migraciones del PR todavía **no están aplicadas** en la nube y el esquema estaría desincronizado. Úsalos con el PR ya mergeado/cerrado.
+> 🔒 **Bloqueado si tu rama tiene migraciones sin desplegar.** El guard compara las migraciones de `supabase/migrations/` en tu rama con las de `origin/main` (de donde se despliega cloud). Si tu rama **no añade ninguna migración**, arranca sin problema — da igual el nombre de la rama. Si añade alguna que aún no está en cloud (incluso sin commitear), se **niega a arrancar** para no apuntar a un esquema desincronizado.
 
 ### Antes de arrancar: aplicar migraciones a la nube
 
 Las migraciones de `supabase/migrations/` llegan a la nube con `supabase db push`, **no** las lanzas tú a mano: lo hace el workflow [`Deploy Database Migrations`](.github/workflows/deploy-migrations.yml). Ese workflow es **manual** (`workflow_dispatch`), no se dispara solo al mergear.
 
-**Orden obligatorio:**
+**Si tu rama añade migraciones** (el guard te bloqueará hasta que estén en cloud):
 
 1. Mergea el PR a `main`.
 2. En GitHub: **Actions → Deploy Database Migrations → Run workflow** (ejecuta `supabase db push` contra la DB remota).
-3. Ya puedes usar los comandos `*:cloud` de abajo.
+3. Tras desplegarlas, esas migraciones ya estarán en `origin/main` → el guard dejará pasar.
 
-> ⚠️ La guarda solo comprueba que estás en `main`; **no** sabe si el workflow de migraciones ya corrió. Si arrancas cloud sin haber disparado el workflow, apuntarás a un esquema desactualizado. `db push` aplica solo migraciones (no corre seeds).
+Si tu rama **no** añade migraciones, salta este paso: el guard ya te deja arrancar.
+
+> ⚠️ El guard comprueba que tu rama no tenga migraciones por delante de `origin/main`; **no** sabe si el workflow ya corrió de verdad. Tras mergear, haz `git fetch` para que `origin/main` refleje lo desplegado. `db push` aplica solo migraciones (no corre seeds).
 
 ### Configuración (una sola vez)
 
@@ -137,8 +143,8 @@ Las migraciones de `supabase/migrations/` llegan a la nube con `supabase db push
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `pnpm start:web:cloud` | BE + FE en **web** contra cloud. Comando principal.                                                                 |
 | `pnpm start:be:cloud`  | Solo el backend contra cloud.                                                                                       |
-| `npx expo run:ios`     | Simulador **iOS** contra cloud (`expo run:ios`).                                                                    |
-| `pnpm android:cloud`   | Simulador **Android** contra cloud (`expo run:android`).                                                            |
+| `pnpm ios:cloud`       | Simulador **iOS** contra cloud (sincroniza env cloud y lanza `npx expo run:ios`).                                  |
+| `pnpm android:cloud`   | Simulador **Android** contra cloud (`npx expo run:android`).                                                        |
 | `pnpm env:sync:cloud`  | Regenera los `.env` por paquete con los valores de `.env.cloud` (lo hacen los comandos anteriores automáticamente). |
 
 Cómo funciona: `.env.cloud` se **superpone** al `.env` raíz, sobrescribiendo **solo** las claves de Supabase; los puertos, el `BACKEND_URL` y el OAuth siguen en local (el backend corre en tu máquina, solo cambia la base de datos a la nube).

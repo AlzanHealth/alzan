@@ -92,26 +92,123 @@ const withTimeout = async <T>(promiseLike: PromiseLike<T>, timeoutMs: number): P
   }
 };
 
-const buildIngredientSearchClauses = (query: string): string[] => {
-  const normQuery = normalizeInput(query);
+// "Strong" clauses represent the WHOLE query: prefix, in-order substring and
+// in-order loose match. They match few rows, so fetching them first guarantees
+// that what the user typed always surfaces, instead of being crowded out of the
+// limited candidate window by higher quality_score rows that merely share a token.
+const buildIngredientStrongClauses = (query: string): string[] => {
+  // Commas/parentheses are PostgREST `.or()` control characters; a raw one in the
+  // pattern breaks the whole query. Strip them so an accidental "(" never returns
+  // zero results.
+  const normQuery = normalizeInput(query).replace(/[(),]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!normQuery) return [];
 
   const likePattern = buildLooseIlikePattern(query).replace(/['"()]/g, '');
-  const startsWithNormPattern = `${normQuery}%`;
-  const startsWithLoosePattern = `${likePattern}%`;
-  const tokenClauses = buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
-
   return Array.from(
     new Set([
-      `name_norm_es.ilike.${startsWithNormPattern}`,
-      `name_es.ilike.${startsWithLoosePattern}`,
-      `name_en.ilike.${startsWithLoosePattern}`,
+      `name_norm_es.ilike.${normQuery}%`,
+      `name_es.ilike.${likePattern}%`,
+      `name_en.ilike.${likePattern}%`,
       `name_norm_es.ilike.%${normQuery}%`,
       `name_es.ilike.%${likePattern}%`,
       `name_en.ilike.%${likePattern}%`,
-      ...tokenClauses,
     ]),
   );
+};
+
+// "Broad" clauses match each token independently (order-independent recall, e.g.
+// "pollo pechuga" still finding "Pechuga de pollo"). Used only to top up results.
+const buildIngredientBroadClauses = (query: string): string[] =>
+  buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
+
+interface IngredientRowQueryOptions {
+  category?: IngredientsCategory | 'todas';
+  excludeIds?: string[];
+  candidateLimit: number;
+}
+
+const fetchIngredientRows = async (
+  orClauses: string[],
+  { category, excludeIds, candidateLimit }: IngredientRowQueryOptions,
+): Promise<IngredientRuntimeFields[]> => {
+  if (orClauses.length === 0) return [];
+
+  let supabaseQuery = supabase.from('ingredients').select('*');
+
+  if (category && category !== 'todas') {
+    supabaseQuery = supabaseQuery.eq('category', category);
+  }
+
+  supabaseQuery = supabaseQuery.or(orClauses.join(','));
+
+  if (excludeIds && excludeIds.length > 0) {
+    supabaseQuery = supabaseQuery.not('id', 'in', `(${excludeIds.join(',')})`);
+  }
+
+  supabaseQuery = supabaseQuery.order('quality_score', { ascending: false }).limit(candidateLimit);
+
+  const { data, error } = await withTimeout(
+    supabaseQuery.returns<IngredientRuntimeFields[]>(),
+    INGREDIENT_SEARCH_TIMEOUT_MS,
+  );
+
+  if (error) {
+    console.error('[ingredientsService] Candidate fetch error:', error);
+    return [];
+  }
+
+  return data ?? [];
+};
+
+const matchesLetter = (ingredient: IngredientSearchResult, letter: string): boolean => {
+  const firstLetterEs = (ingredient.name_es || '').trim().charAt(0).toLowerCase();
+  const firstLetterEn = (ingredient.name_en || '').trim().charAt(0).toLowerCase();
+  return firstLetterEs === letter || firstLetterEn === letter;
+};
+
+// Two-phase candidate fetch shared by the query-based searches: strong matches
+// first (always surface), then broad token matches to fill the remaining slots.
+const fetchRankedIngredients = async (
+  query: string,
+  languageCode: Locale,
+  maxResults: number,
+  options: { category?: IngredientsCategory | 'todas'; letter?: string } = {},
+): Promise<IngredientSearchResult[]> => {
+  const baseCandidateLimit = Math.max(maxResults * INGREDIENT_CANDIDATE_MULTIPLIER, INGREDIENT_CANDIDATE_FLOOR);
+  const candidateLimit = options.letter ? baseCandidateLimit * 2 : baseCandidateLimit;
+
+  const toLocalized = (rows: IngredientRuntimeFields[]): IngredientSearchResult[] =>
+    rows
+      .filter(item => !isRecipeOnlyIngredientSource(item.source_primary))
+      .map(item => mapIngredientResult(item, languageCode))
+      .filter(ing => matchesLoosely(query, ing.name_es, ing.name_en, ing.notes_es, ing.notes_en))
+      .filter(ing => !options.letter || matchesLetter(ing, options.letter));
+
+  try {
+    const strongRows = await fetchIngredientRows(buildIngredientStrongClauses(query), {
+      category: options.category,
+      candidateLimit,
+    });
+
+    const byId = new Map<string, IngredientSearchResult>();
+    toLocalized(strongRows).forEach(item => byId.set(item.id, item));
+
+    if (byId.size < maxResults) {
+      const broadRows = await fetchIngredientRows(buildIngredientBroadClauses(query), {
+        category: options.category,
+        excludeIds: Array.from(byId.keys()),
+        candidateLimit,
+      });
+      toLocalized(broadRows).forEach(item => {
+        if (!byId.has(item.id)) byId.set(item.id, item);
+      });
+    }
+
+    return sortIngredientResults(Array.from(byId.values()), query).slice(0, maxResults);
+  } catch (err) {
+    console.error('[ingredientsService] Unexpected error:', err);
+    return [];
+  }
 };
 
 export const searchIngredients = async (
@@ -123,40 +220,7 @@ export const searchIngredients = async (
   const normQuery = normalizeInput(query);
   if (!normQuery || normQuery.length < 2) return [];
 
-  const orClauses = buildIngredientSearchClauses(query);
-
-  try {
-    const candidateLimit = Math.max(maxResults * INGREDIENT_CANDIDATE_MULTIPLIER, INGREDIENT_CANDIDATE_FLOOR);
-    const { data, error } = await withTimeout(
-      supabase
-        .from('ingredients')
-        .select('*')
-        .or(orClauses.join(','))
-        .order('quality_score', { ascending: false })
-        .limit(candidateLimit)
-        .returns<IngredientRuntimeFields[]>(),
-      INGREDIENT_SEARCH_TIMEOUT_MS,
-    );
-
-    if (error) {
-      console.error('[ingredientsService] Search error:', JSON.stringify(error));
-      return [];
-    }
-
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    const localizedResults = data
-      .filter(item => !isRecipeOnlyIngredientSource(item.source_primary))
-      .map(item => mapIngredientResult(item, languageCode))
-      .filter(ing => matchesLoosely(query, ing.name_es, ing.name_en, ing.notes_es, ing.notes_en));
-
-    return sortIngredientResults(localizedResults, query).slice(0, maxResults);
-  } catch (err) {
-    console.error('[ingredientsService] Unexpected error:', err);
-    return [];
-  }
+  return fetchRankedIngredients(query, languageCode, maxResults);
 };
 
 // 3. Create (Manual)
@@ -190,30 +254,27 @@ export const searchIngredientsWithFilters = async (
   const hasQuery = !!query && query.length >= 2;
   const normalizedLetter = letter?.toLowerCase() ?? 'todas';
   const hasLetterFilter = normalizedLetter !== 'todas';
-  const orClauses = hasQuery ? buildIngredientSearchClauses(query) : [];
 
-  // Build query
+  // Text search: two-phase (strong-first) fetch so the typed term always surfaces.
+  if (hasQuery && query) {
+    return fetchRankedIngredients(query, languageCode, maxResults, {
+      category,
+      letter: hasLetterFilter ? normalizedLetter : undefined,
+    });
+  }
+
+  // Filter-only browsing (category and/or letter), ordered by quality.
   let supabaseQuery = supabase.from('ingredients').select('*');
 
-  // Filter by category
   if (category && category !== 'todas') {
     supabaseQuery = supabaseQuery.eq('category', category);
   }
 
-  // Filter by text query (partial match)
-  if (hasQuery && orClauses.length > 0) {
-    supabaseQuery = supabaseQuery.or(orClauses.join(','));
-  }
-
-  // When only letter filter is active, keep filtering at DB level for better coverage.
-  if (!hasQuery && hasLetterFilter) {
+  if (hasLetterFilter) {
     supabaseQuery = supabaseQuery.or(`name_es.ilike.${normalizedLetter}%,name_en.ilike.${normalizedLetter}%`);
   }
 
-  const baseCandidateLimit = Math.max(maxResults * INGREDIENT_CANDIDATE_MULTIPLIER, INGREDIENT_CANDIDATE_FLOOR);
-  const candidateLimit = hasQuery && hasLetterFilter ? baseCandidateLimit * 2 : baseCandidateLimit;
-
-  // Order and limit
+  const candidateLimit = Math.max(maxResults * INGREDIENT_CANDIDATE_MULTIPLIER, INGREDIENT_CANDIDATE_FLOOR);
   supabaseQuery = supabaseQuery.order('quality_score', { ascending: false }).limit(candidateLimit);
 
   try {
@@ -231,24 +292,10 @@ export const searchIngredientsWithFilters = async (
       return [];
     }
 
-    const localizedResults = data
+    return data
       .filter(item => !isRecipeOnlyIngredientSource(item.source_primary))
       .map(item => mapIngredientResult(item, languageCode))
-      .filter(ing => {
-        if (!hasLetterFilter) return true;
-
-        const firstLetterEs = (ing.name_es || '').trim().charAt(0).toLowerCase();
-        const firstLetterEn = (ing.name_en || '').trim().charAt(0).toLowerCase();
-        return firstLetterEs === normalizedLetter || firstLetterEn === normalizedLetter;
-      })
-      .filter(ing => !hasQuery || matchesLoosely(query, ing.name_es, ing.name_en, ing.notes_es, ing.notes_en));
-
-    // If there's a query, prioritize items that start with it
-    if (hasQuery) {
-      return sortIngredientResults(localizedResults, query).slice(0, maxResults);
-    }
-
-    return localizedResults
+      .filter(ing => !hasLetterFilter || matchesLetter(ing, normalizedLetter))
       .sort((a, b) => {
         const qualityDiff = (b.quality_score || 0) - (a.quality_score || 0);
         if (qualityDiff !== 0) return qualityDiff;

@@ -95,11 +95,31 @@ export function tokenizeSearchTerms(value: string): string[] {
   return Array.from(new Set(filteredTokens.length > 0 ? filteredTokens : baseTokens));
 }
 
-export function buildTokenIlikeClauses(query: string, columns: string[]): string[] {
-  const tokens = tokenizeSearchTerms(query);
+// Single/2-char tokens (e.g. "g", "gr") produce `ilike '%g%'` clauses that match
+// thousands of rows. Because callers fetch a limited candidate window ordered by
+// quality_score/id, those broad clauses crowd out the actually-relevant rows
+// (e.g. "Yogur griego" for "yogur gr"). The whole-query prefix/substring clauses
+// the callers add separately already cover short queries, so we drop short tokens.
+const MIN_SEARCH_TOKEN_LENGTH = 3;
+
+// Maps every (accented or plain) vowel to the single-char ilike wildcard `_`, so
+// an accent-insensitive match works on columns that have NO normalized variant
+// (e.g. exercises). "triceps" -> "tr_c_ps" matches "tríceps". Over-matching is
+// rescued by the accent-aware `matchesLoosely` post-filter. Not needed for
+// ingredients/recipes, which already query an accent-stripped `name_norm_es`.
+export function foldAccentsToWildcard(pattern: string): string {
+  return pattern.replace(/[aeiouáéíóúàèìòùäëïöûü]/gi, '_');
+}
+
+export function buildTokenIlikeClauses(
+  query: string,
+  columns: string[],
+  transform: (token: string) => string = token => token,
+): string[] {
+  const tokens = tokenizeSearchTerms(query).filter(token => token.length >= MIN_SEARCH_TOKEN_LENGTH);
   if (tokens.length === 0) return [];
 
-  return tokens.flatMap(token => columns.map(column => `${column}.ilike.%${token}%`));
+  return tokens.flatMap(token => columns.map(column => `${column}.ilike.%${transform(token)}%`));
 }
 
 export function buildLooseIlikePattern(value: string): string {
@@ -179,6 +199,19 @@ function calculateCandidateRelevance(
 
     score += exactTokenMatches * 140;
     score += Math.max(0, partialTokenMatches - exactTokenMatches) * 70;
+  }
+
+  // Tightness tie-breaker: among candidates that match the query equally well,
+  // prefer the one where the query covers more of the candidate (i.e. fewer
+  // trailing words). Without it, many same-score rows fall back to a pure
+  // alphabetical sort, which buries equally valid matches: "flex" returned only
+  // "Flexión …" rows and never reached "Flexiones …", and "curl biceps" filled
+  // every slot with "Curl bíceps …" so "Curl de bíceps …" never surfaced. The
+  // bonus is capped below the smallest scoring increment (70) so it can only
+  // break ties, never outrank a genuinely stronger match.
+  if (queryTokens.length > 0 && candidateTokens.length > 0) {
+    const extraTokens = Math.max(0, candidateTokens.length - queryTokens.length);
+    score += Math.round(60 / (1 + extraTokens));
   }
 
   return score;

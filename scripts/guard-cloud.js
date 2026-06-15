@@ -2,12 +2,14 @@
 // scripts/guard-cloud.js
 // Safety gate for the cloud start commands (start:*:cloud).
 //
-// Two checks must pass before pointing the app at the cloud Supabase project:
-//   1. The current git branch must be `main`. Running against cloud from a
-//      feature branch / open PR is forbidden because the PR's migrations are
-//      NOT applied to the cloud database yet — the schema would be out of sync.
-//   2. .env.cloud must exist and have every value filled in (no placeholders
-//      and no empty values).
+// Three checks must pass before pointing the app at the cloud Supabase project:
+//   1. The branch must not add any migration that is not yet in the cloud
+//      baseline (`origin/main`, falling back to `main`). Cloud is deployed from
+//      main via the Deploy Database Migrations workflow, so a branch carrying
+//      extra migrations would expect a schema the cloud doesn't have yet. A
+//      branch with NO pending migrations is safe regardless of its name.
+//   2. .env.cloud must exist and have every value filled in (no placeholders).
+//   3. No alzan-fe/.env.local-style file may shadow the generated env.
 //
 // Usage: node scripts/guard-cloud.js  (run automatically by prestart:cloud)
 
@@ -16,30 +18,68 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
-const REQUIRED_BRANCH = "main";
 const cloudEnvPath = path.join(ROOT, ".env.cloud");
+const migrationsDir = path.join(ROOT, "supabase", "migrations");
 
 function fail(message) {
   console.error(`\n❌  ${message}\n`);
   process.exit(1);
 }
 
-// ─── 1) Branch must be main ───────────────────────────────────────────────────
+function git(args) {
+  return execSync(`git ${args}`, { cwd: ROOT }).toString().trim();
+}
+
+// ─── 1) No migrations pending vs the cloud baseline ───────────────────────────
 let branch;
 try {
-  branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: ROOT })
-    .toString()
-    .trim();
+  branch = git("rev-parse --abbrev-ref HEAD");
 } catch {
   fail("No se pudo determinar la rama de git (¿estás dentro del repo?).");
 }
 
-if (branch !== REQUIRED_BRANCH) {
+// Cloud is deployed from main, so the baseline is origin/main when available
+// (closest to what's actually deployed), else local main.
+let baselineRef = null;
+for (const ref of ["origin/main", "main"]) {
+  try {
+    execSync(`git rev-parse --verify --quiet ${ref}`, { cwd: ROOT, stdio: "ignore" });
+    baselineRef = ref;
+    break;
+  } catch {
+    /* ref not found — try the next one */
+  }
+}
+if (!baselineRef) {
   fail(
-    `El arranque cloud solo está permitido en la rama "${REQUIRED_BRANCH}" — estás en "${branch}".\n` +
-      `   Las migraciones de un PR abierto todavía NO están aplicadas en la Supabase de la nube,\n` +
-      `   así que apuntar la app a cloud desde un PR rompería el esquema.\n` +
-      `   Mergea/cierra el PR, cambia a "${REQUIRED_BRANCH}" y vuelve a intentarlo.`,
+    `No encuentro la rama base ("origin/main" ni "main") para comparar migraciones.\n` +
+      `   Ejecuta "git fetch origin main" y reintenta.`,
+  );
+}
+
+const diskMigrations = fs.existsSync(migrationsDir)
+  ? fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql"))
+  : [];
+
+let baselineMigrations;
+try {
+  baselineMigrations = git(`ls-tree -r --name-only ${baselineRef} -- supabase/migrations/`)
+    .split("\n")
+    .map((line) => path.basename(line.trim()))
+    .filter((name) => name.endsWith(".sql"));
+} catch {
+  fail(`No se pudieron listar las migraciones de "${baselineRef}".`);
+}
+
+const baselineSet = new Set(baselineMigrations);
+const pendingMigrations = diskMigrations.filter((f) => !baselineSet.has(f)).sort();
+
+if (pendingMigrations.length) {
+  fail(
+    `Esta rama ("${branch}") tiene migraciones que aún NO están en "${baselineRef}" (de donde se despliega cloud):\n` +
+      pendingMigrations.map((f) => `     - ${f}`).join("\n") +
+      `\n   El esquema de la nube todavía no las tiene, así que apuntar la app a cloud la rompería.\n` +
+      `   Mergea la rama y lanza el workflow "Deploy Database Migrations", o arranca cloud desde una rama sin migraciones pendientes.`,
   );
 }
 
@@ -93,5 +133,5 @@ if (shadows.length) {
 }
 
 console.log(
-  `✅  Rama "${branch}", .env.cloud y alzan-fe/.env verificados — arrancando contra Supabase cloud.`,
+  `✅  Sin migraciones pendientes vs "${baselineRef}" (rama "${branch}"), .env.cloud y alzan-fe/.env verificados — arrancando contra Supabase cloud.`,
 );

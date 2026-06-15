@@ -91,6 +91,7 @@ export type TrainingStackParamList = {
     onExerciseSelected?: (exercise: ExerciseWithDetails) => void;
     fromScreen?: string;
     routineId?: string;
+    selectionMode?: 'single' | 'multi';
   };
   StartWorkout: { templateId: string; date?: string; planId?: string };
   ActiveWorkout: { sessionId: string };

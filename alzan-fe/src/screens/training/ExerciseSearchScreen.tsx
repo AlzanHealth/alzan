@@ -7,8 +7,6 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
-  Modal,
-  Pressable,
   ScrollView,
   DeviceEventEmitter,
 } from 'react-native';
@@ -20,7 +18,7 @@ import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useExercises } from '../../hooks/useExercises';
 import { useMuscleGroups } from '../../hooks/useMuscleGroups';
 import { useEquipment } from '../../hooks/useEquipment';
-import { Search, ArrowLeft, Dumbbell, Info, ChevronDown, Check } from 'lucide-react-native';
+import { Search, ArrowLeft, Dumbbell, Info, Check } from 'lucide-react-native';
 import { ExerciseWithDetails } from '../../types/training';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTranslation } from 'react-i18next';
@@ -38,11 +36,14 @@ export const ExerciseSearchScreen = () => {
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'ExerciseSearch'>>();
+  const isMultiSelect = route.params?.selectionMode === 'multi';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscleId, setSelectedMuscleId] = useState<number | null>(null);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
   const [visibleLimit, setVisibleLimit] = useState(EXERCISE_PAGE_SIZE);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  // Multi-select staging (used when launched from the routine editor).
+  const [selectedExercises, setSelectedExercises] = useState<ExerciseWithDetails[]>([]);
 
   const { exercises, isLoading, isFetching, hasMore } = useExercises({
     searchQuery: debouncedSearchQuery,
@@ -52,18 +53,6 @@ export const ExerciseSearchScreen = () => {
   });
   const { muscleGroups } = useMuscleGroups();
   const { equipment } = useEquipment();
-
-  // Modal states
-  const [showMuscleModal, setShowMuscleModal] = useState(false);
-  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
-
-  // Get selected names for display
-  const selectedMuscleName = selectedMuscleId
-    ? muscleGroups.find(m => m.id === selectedMuscleId)?.name
-    : t('training.allMuscles');
-  const selectedEquipmentName = selectedEquipmentId
-    ? equipment.find(e => e.id === selectedEquipmentId)?.name
-    : t('training.allEquipment');
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -94,122 +83,129 @@ export const ExerciseSearchScreen = () => {
     }
   };
 
+  const isExerciseSelected = (exerciseId: string) => selectedExercises.some(item => item.id === exerciseId);
+
+  const toggleExerciseSelection = (exercise: ExerciseWithDetails) => {
+    setSelectedExercises(prev =>
+      prev.some(item => item.id === exercise.id) ? prev.filter(item => item.id !== exercise.id) : [...prev, exercise],
+    );
+  };
+
+  // Multi-select: emit every staged exercise (the editor listener appends each
+  // one in order) and return once.
+  const handleConfirmMultiSelect = () => {
+    if (selectedExercises.length === 0) return;
+    selectedExercises.forEach(exercise => DeviceEventEmitter.emit('exerciseSelected', exercise));
+    navigation.goBack();
+  };
+
+  const handlePressExercise = (exercise: ExerciseWithDetails) => {
+    if (isMultiSelect) {
+      toggleExerciseSelection(exercise);
+      return;
+    }
+    handleSelectExercise(exercise);
+  };
+
   const handleShowInfo = (exercise: ExerciseWithDetails) => {
     navigation.navigate('ExerciseDetail', { exercise });
   };
 
-  const renderItem = ({ item }: { item: ExerciseWithDetails }) => (
-    <View style={[styles.card, dynamicStyles.glassCard]}>
-      <TouchableOpacity onPress={() => handleSelectExercise(item)} style={styles.cardContent}>
-        <View
-          style={[
-            styles.iconContainer,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : `${themeColors.primary}10` },
-          ]}
-        >
-          <Dumbbell size={24} color={themeColors.primary} />
-        </View>
-        <View style={styles.textContainer}>
-          <Text style={[styles.exerciseName, dynamicStyles.title]}>{item.name}</Text>
-          <View style={styles.metaRow}>
-            {item.muscle_name && <Text style={styles.muscleText}>{item.muscle_name}</Text>}
-            {item.muscle_name && item.equipment_name && <Text style={styles.separatorText}>•</Text>}
-            {item.equipment_name && <Text style={styles.equipmentText}>{item.equipment_name}</Text>}
-          </View>
-        </View>
-        <TouchableOpacity
-          onPress={() => handleShowInfo(item)}
-          style={styles.infoButton}
-          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-        >
-          <Info size={20} color={themeColors.primary} />
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </View>
-  );
+  const renderItem = ({ item }: { item: ExerciseWithDetails }) => {
+    const selected = isMultiSelect && isExerciseSelected(item.id);
 
-  // Render Compact Centered Modal (Less Invasive)
-  const renderFilterModal = (
-    visible: boolean,
-    onClose: () => void,
-    title: string,
-    itemType: 'muscle' | 'equipment',
+    return (
+      <View
+        style={[
+          styles.card,
+          dynamicStyles.glassCard,
+          selected && {
+            borderColor: themeColors.primary,
+            borderWidth: 1.5,
+            backgroundColor: `${themeColors.primary}0D`,
+          },
+        ]}
+      >
+        <TouchableOpacity onPress={() => handlePressExercise(item)} style={styles.cardContent}>
+          <View
+            style={[
+              styles.iconContainer,
+              { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : `${themeColors.primary}10` },
+            ]}
+          >
+            <Dumbbell size={24} color={themeColors.primary} />
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={[styles.exerciseName, dynamicStyles.title]}>{item.name}</Text>
+            <View style={styles.metaRow}>
+              {item.muscle_name && <Text style={styles.muscleText}>{item.muscle_name}</Text>}
+              {item.muscle_name && item.equipment_name && <Text style={styles.separatorText}>•</Text>}
+              {item.equipment_name && <Text style={styles.equipmentText}>{item.equipment_name}</Text>}
+            </View>
+          </View>
+          {isMultiSelect && (
+            <View
+              style={[
+                styles.checkbox,
+                selected
+                  ? { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
+                  : { borderColor: themeColors.textSecondary },
+              ]}
+            >
+              {selected && <Check size={15} color="#FFFFFF" strokeWidth={3} />}
+            </View>
+          )}
+          <TouchableOpacity
+            onPress={() => handleShowInfo(item)}
+            style={styles.infoButton}
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+          >
+            <Info size={20} color={themeColors.primary} />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Inline, horizontally-scrollable filter chips (faster than the old modals).
+  const renderFilterChips = (
+    allLabel: string,
     items: MuscleGroupOrEquipment[],
     selectedId: number | null,
     onSelect: (id: number | null) => void,
-  ) => (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View style={[styles.modalContent, dynamicStyles.modalContent]}>
-          <View
-            style={[
-              styles.modalHeader,
-              {
-                backgroundColor: isDark ? themeColors.surfaceSolid : '#FFFFFF',
-                borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5',
-              },
-            ]}
-          >
-            <Text style={[styles.modalTitle, dynamicStyles.title]}>{title}</Text>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.closeButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
-            >
-              <Text style={[styles.closeButtonText, { color: themeColors.textSecondary }]}>✕</Text>
-            </TouchableOpacity>
-          </View>
+  ) => {
+    const renderChip = (key: string, label: string, active: boolean, onPress: () => void) => (
+      <TouchableOpacity
+        key={key}
+        style={[
+          styles.filterChip,
+          {
+            backgroundColor: active ? themeColors.primary : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            borderColor: active ? themeColors.primary : 'transparent',
+          },
+        ]}
+        onPress={onPress}
+      >
+        <Text style={[styles.filterChipText, { color: active ? '#FFFFFF' : themeColors.textSecondary }]}>{label}</Text>
+      </TouchableOpacity>
+    );
 
-          <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-            <TouchableOpacity
-              style={[
-                styles.modalOption,
-                selectedId === null && { backgroundColor: `${themeColors.primary}08` },
-                { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : '#FAFAFA' },
-              ]}
-              onPress={() => onSelect(null)}
-            >
-              <Text
-                style={[
-                  styles.modalOptionText,
-                  selectedId === null && styles.modalOptionTextSelected,
-                  { color: selectedId === null ? themeColors.primary : themeColors.textPrimary },
-                ]}
-              >
-                {itemType === 'muscle' ? t('training.allMuscles') : t('training.allEquipment')}
-              </Text>
-              {selectedId === null && <Check size={18} color={themeColors.primary} />}
-            </TouchableOpacity>
-
-            {items.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.modalOption,
-                  selectedId === item.id && { backgroundColor: `${themeColors.primary}08` },
-                  { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : '#FAFAFA' },
-                ]}
-                onPress={() => onSelect(item.id)}
-              >
-                <Text
-                  style={[
-                    styles.modalOptionText,
-                    selectedId === item.id && styles.modalOptionTextSelected,
-                    {
-                      color: selectedId === item.id ? themeColors.primary : themeColors.textPrimary,
-                    },
-                  ]}
-                >
-                  {item.name}
-                </Text>
-                {selectedId === item.id && <Check size={18} color={themeColors.primary} />}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterChipsRow}
+        keyboardShouldPersistTaps="handled"
+      >
+        {renderChip('all', allLabel, selectedId === null, () => onSelect(null))}
+        {items.map(item =>
+          renderChip(String(item.id), item.name, selectedId === item.id, () =>
+            onSelect(selectedId === item.id ? null : item.id),
+          ),
+        )}
+      </ScrollView>
+    );
+  };
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
@@ -218,7 +214,26 @@ export const ExerciseSearchScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <ArrowLeft size={24} color={themeColors.textPrimary} />
           </TouchableOpacity>
-          <Text style={[styles.title, dynamicStyles.title]}>{t('training.selectExercise')}</Text>
+          <Text style={[styles.title, dynamicStyles.title]} numberOfLines={1}>
+            {isMultiSelect ? t('training.selectExercises') : t('training.selectExercise')}
+          </Text>
+          {isMultiSelect && (
+            <TouchableOpacity
+              onPress={handleConfirmMultiSelect}
+              disabled={selectedExercises.length === 0}
+              style={styles.headerConfirmButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text
+                style={[
+                  styles.headerConfirmText,
+                  { color: selectedExercises.length === 0 ? themeColors.textSecondary : themeColors.primary },
+                ]}
+              >
+                {t('training.addCountExercises', { count: selectedExercises.length })}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
         {/* ... rest of render ... */}
         <View style={styles.searchContainer}>
@@ -235,52 +250,9 @@ export const ExerciseSearchScreen = () => {
           </View>
         </View>
 
-        <View style={styles.filtersRow}>
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              dynamicStyles.glassCard,
-              selectedEquipmentId !== null && {
-                backgroundColor: themeColors.primary,
-                borderColor: themeColors.primary,
-              },
-            ]}
-            onPress={() => setShowEquipmentModal(true)}
-          >
-            <Text
-              style={[
-                styles.filterButtonText,
-                { color: selectedEquipmentId !== null ? '#FFFFFF' : themeColors.textSecondary },
-                selectedEquipmentId !== null && styles.filterButtonTextActive,
-              ]}
-            >
-              {selectedEquipmentName}
-            </Text>
-            <ChevronDown size={16} color={selectedEquipmentId !== null ? '#FFFFFF' : themeColors.textSecondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              dynamicStyles.glassCard,
-              selectedMuscleId !== null && {
-                backgroundColor: themeColors.primary,
-                borderColor: themeColors.primary,
-              },
-            ]}
-            onPress={() => setShowMuscleModal(true)}
-          >
-            <Text
-              style={[
-                styles.filterButtonText,
-                { color: selectedMuscleId !== null ? '#FFFFFF' : themeColors.textSecondary },
-                selectedMuscleId !== null && styles.filterButtonTextActive,
-              ]}
-            >
-              {selectedMuscleName}
-            </Text>
-            <ChevronDown size={16} color={selectedMuscleId !== null ? '#FFFFFF' : themeColors.textSecondary} />
-          </TouchableOpacity>
+        <View style={styles.filtersBlock}>
+          {renderFilterChips(t('training.allEquipment'), equipment, selectedEquipmentId, setSelectedEquipmentId)}
+          {renderFilterChips(t('training.allMuscles'), muscleGroups, selectedMuscleId, setSelectedMuscleId)}
         </View>
 
         {showInitialLoading ? (
@@ -292,6 +264,7 @@ export const ExerciseSearchScreen = () => {
             data={exercises}
             renderItem={renderItem}
             keyExtractor={item => item.id}
+            extraData={selectedExercises}
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={
@@ -318,31 +291,6 @@ export const ExerciseSearchScreen = () => {
             }
           />
         )}
-
-        {renderFilterModal(
-          showEquipmentModal,
-          () => setShowEquipmentModal(false),
-          t('training.equipment'),
-          'equipment',
-          equipment,
-          selectedEquipmentId,
-          id => {
-            setSelectedEquipmentId(id);
-            setShowEquipmentModal(false);
-          },
-        )}
-        {renderFilterModal(
-          showMuscleModal,
-          () => setShowMuscleModal(false),
-          t('training.muscleGroup'),
-          'muscle',
-          muscleGroups,
-          selectedMuscleId,
-          id => {
-            setSelectedMuscleId(id);
-            setShowMuscleModal(false);
-          },
-        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -365,6 +313,15 @@ const styles = StyleSheet.create({
   title: {
     ...typography.h3,
     color: colors.textPrimary,
+    flex: 1,
+  },
+  headerConfirmButton: {
+    paddingLeft: spacing.s,
+  },
+  headerConfirmText: {
+    ...typography.body,
+    fontWeight: '700',
+    fontSize: 16,
   },
   searchContainer: {
     paddingHorizontal: spacing.m,
@@ -389,42 +346,26 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 16,
   },
-  filtersRow: {
+  filtersBlock: {
+    paddingBottom: spacing.s,
+    gap: spacing.xs,
+  },
+  filterChipsRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.m,
-    paddingBottom: spacing.m,
+    paddingVertical: spacing.xs,
     gap: spacing.s,
   },
-  filterButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  filterChip: {
+    minHeight: 36,
     justifyContent: 'center',
-    paddingVertical: spacing.s + 4,
     paddingHorizontal: spacing.m,
-    backgroundColor: '#FFFFFF',
-    borderRadius: borderRadius.m,
-    gap: spacing.xs,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#EFEFEF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
   },
-  filterButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterButtonText: {
+  filterChipText: {
     ...typography.body,
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.textSecondary,
-  },
-  filterButtonTextActive: {
-    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '600',
   },
   loadingContainer: {
@@ -513,84 +454,13 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontWeight: '600',
   },
-
-  // Compact Centered Modal Styles
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center', // Center vertically
-    alignItems: 'center', // Center horizontally
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: spacing.l,
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 340, // Limit width for tablet/large screens
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20, // Nice rounded corners
-    maxHeight: '60%', // Don't take up full screen
-    overflow: 'hidden',
-    // Floating effect
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.m,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-    backgroundColor: '#FFFFFF',
-  },
-  modalTitle: {
-    ...typography.h4,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    fontSize: 16,
-  },
-  closeButton: {
-    padding: 4,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
+  checkbox: {
     width: 24,
     height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontWeight: 'bold',
-    marginTop: -1,
-  },
-  modalScroll: {
-    paddingVertical: 0,
-  },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.m,
-    paddingHorizontal: spacing.m,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FAFAFA',
-  },
-  modalOptionSelected: {
-    backgroundColor: `${colors.primary}08`,
-  },
-  modalOptionText: {
-    ...typography.body,
-    fontSize: 15,
-    color: colors.textPrimary,
-  },
-  modalOptionTextSelected: {
-    color: colors.primary,
-    fontWeight: '600',
+    marginLeft: spacing.s,
   },
 });

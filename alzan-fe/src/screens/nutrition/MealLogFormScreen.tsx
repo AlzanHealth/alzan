@@ -343,6 +343,8 @@ export const MealLogFormScreen = () => {
   // Manual Ingredient Form State
   const [manualIngName, setManualIngName] = useState('');
   const [amountInput, setAmountInput] = useState('');
+  // Last amount the user added in this session, for the quick-amount chips.
+  const [lastIngredientAmount, setLastIngredientAmount] = useState<number | null>(null);
   const [manualPer100g, setManualPer100g] = useState<{
     kcal_100: number;
     protein_g_100: number;
@@ -785,50 +787,73 @@ export const MealLogFormScreen = () => {
     };
   }, [builderWindow, recipeLibraryOriginFilter, recipeLibrarySearchPage, recipeLibrarySearchQuery, recipeLibraryView]);
 
-  // Meal Name Search Handler - searches recipes + precooked
-  const handleAiSearch = async () => {
-    console.log('[MealLogForm] Search triggered for name:', name);
+  // Meal Name Search - searches recipes + precooked. Shared by the explicit
+  // search button and the debounced auto-search effect below.
+  const performMealSearch = useCallback(
+    async (query: string) => {
+      setIsSearchingRecipe(true);
+      setSearchMessage(null);
+      setMealSearchResults([]);
+
+      try {
+        const currentUserId = await getCurrentUserId();
+        const results = await searchMealByName(query, {
+          locale: languageCode,
+          recipeScope: recipeSearchScope,
+          currentUserId,
+          favoriteRecipeIds,
+        });
+
+        if (results.length > 0) {
+          setMealSearchResults(results);
+          if (results.some(item => item.itemType === 'recipe')) {
+            setMealSearchFilter('recipe');
+          } else if (results.some(item => item.category === 'precocinado')) {
+            setMealSearchFilter('precooked');
+          } else {
+            setMealSearchFilter('all');
+          }
+        } else {
+          setSearchMessage({
+            type: 'info',
+            text: t('nutrition.searchNoResultsManual'),
+          });
+        }
+      } catch (error) {
+        console.error('[MealLogForm] Error in search:', error);
+        setSearchMessage({ type: 'error', text: t('nutrition.searchError') });
+      } finally {
+        setIsSearchingRecipe(false);
+      }
+    },
+    // getCurrentUserId is a stable component-scoped helper; intentionally omitted.
+    [favoriteRecipeIds, languageCode, recipeSearchScope, t],
+  );
+
+  // Explicit search trigger (button) - keeps the min-chars hint.
+  const handleAiSearch = () => {
     if (!name || name.length < 2) {
       setSearchMessage({ type: 'info', text: t('nutrition.searchMinChars') });
       return;
     }
-
-    setIsSearchingRecipe(true);
-    setSearchMessage(null);
-    setMealSearchResults([]);
-
-    try {
-      const currentUserId = await getCurrentUserId();
-      const results = await searchMealByName(name, {
-        locale: languageCode,
-        recipeScope: recipeSearchScope,
-        currentUserId,
-        favoriteRecipeIds,
-      });
-      console.log('[MealLogForm] Search results:', results.length);
-
-      if (results.length > 0) {
-        setMealSearchResults(results);
-        if (results.some(item => item.itemType === 'recipe')) {
-          setMealSearchFilter('recipe');
-        } else if (results.some(item => item.category === 'precocinado')) {
-          setMealSearchFilter('precooked');
-        } else {
-          setMealSearchFilter('all');
-        }
-      } else {
-        setSearchMessage({
-          type: 'info',
-          text: t('nutrition.searchNoResultsManual'),
-        });
-      }
-    } catch (error) {
-      console.error('[MealLogForm] Error in search:', error);
-      setSearchMessage({ type: 'error', text: t('nutrition.searchError') });
-    } finally {
-      setIsSearchingRecipe(false);
-    }
+    void performMealSearch(name);
   };
+
+  // Auto-search as the user types the meal name (debounced). Only while building
+  // a brand-new meal from scratch, so we never override a loaded/edited recipe.
+  useEffect(() => {
+    if (builderWindow !== 'ingredients' || inputMode !== 'search') return;
+    if (isEdit || isEditingRecipe || ingredients.length > 0) return;
+
+    const trimmedName = name.trim();
+    if (trimmedName.length < 2) return;
+
+    const timeoutId = setTimeout(() => {
+      void performMealSearch(trimmedName);
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [builderWindow, inputMode, isEdit, isEditingRecipe, ingredients.length, name, performMealSearch]);
 
   const trackRecipeUsage = (recipeId: string, origin: 'search' | 'saved'): void => {
     void (async () => {
@@ -1582,6 +1607,13 @@ export const MealLogFormScreen = () => {
 
   const getMealResultBadge = (item: MealComponent): { text: string; color: string } => {
     if (item.itemType === 'recipe') {
+      const isFavorite = item.external_id ? favoriteRecipeIds.includes(item.external_id) : false;
+      if (isFavorite) {
+        return {
+          text: t('nutrition.favoriteBadge'),
+          color: '#FF9F0A',
+        };
+      }
       return {
         text: t('nutrition.recipe'),
         color: '#34C759',
@@ -1599,6 +1631,52 @@ export const MealLogFormScreen = () => {
       text: t('nutrition.all'),
       color: themeColors.primary,
     };
+  };
+
+  // Quick-amount chips for the selected ingredient card: 50/100/150 g plus the
+  // last amount used this session. Tapping one fills the editable amount input.
+  const renderQuickAmountChips = () => {
+    const presets = [50, 100, 150];
+    const chipValues =
+      lastIngredientAmount != null && !presets.includes(lastIngredientAmount)
+        ? [...presets, lastIngredientAmount]
+        : presets;
+    const currentAmount = parseIngredientAmountInput(amountInput);
+
+    return (
+      <View style={styles.quickAmountRow}>
+        {chipValues.map(value => {
+          const isActive = currentAmount === value;
+          return (
+            <TouchableOpacity
+              key={value}
+              style={[
+                styles.quickAmountChip,
+                {
+                  backgroundColor: isActive
+                    ? themeColors.primary + '20'
+                    : isDark
+                      ? 'rgba(255,255,255,0.06)'
+                      : 'rgba(0,0,0,0.04)',
+                  borderColor: isActive ? themeColors.primary + '55' : 'transparent',
+                },
+              ]}
+              onPress={() => setAmountInput(formatIngredientAmount(value))}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Text
+                style={[
+                  styles.quickAmountChipText,
+                  { color: isActive ? themeColors.primary : themeColors.textSecondary },
+                ]}
+              >
+                {value} g
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
   };
 
   // --- Handlers ---
@@ -1678,11 +1756,11 @@ export const MealLogFormScreen = () => {
     }
 
     setIngredients([...ingredients, newIngredient]);
+    setLastIngredientAmount(amount);
 
     // Reset form
     setManualIngName('');
     setAmountInput('');
-    setSelectedFood(null);
     setSelectedFood(null);
     setManualPer100g({ kcal_100: 0, protein_g_100: 0, carbs_g_100: 0, fat_g_100: 0 });
     setManualMacroInputs({ kcal_100: '', protein_g_100: '', carbs_g_100: '', fat_g_100: '' });
@@ -2711,6 +2789,7 @@ export const MealLogFormScreen = () => {
                                 <X size={18} color={themeColors.textSecondary} />
                               </TouchableOpacity>
                             </View>
+                            {renderQuickAmountChips()}
                             <View style={styles.amountRow}>
                               <TextInput
                                 style={[
@@ -2829,6 +2908,7 @@ export const MealLogFormScreen = () => {
                                 <X size={18} color={themeColors.textSecondary} />
                               </TouchableOpacity>
                             </View>
+                            {renderQuickAmountChips()}
                             <View style={styles.amountRow}>
                               <TextInput
                                 style={[
@@ -4319,6 +4399,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  quickAmountRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  quickAmountChip: {
+    minHeight: 36,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  quickAmountChipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   amountInput: {
     flex: 1,
