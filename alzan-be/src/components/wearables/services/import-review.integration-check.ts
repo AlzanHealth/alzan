@@ -266,6 +266,48 @@ async function main(): Promise<void> {
       assert.equal(g.needs_strength_review, false, 'review flag cleared');
       pass('strength keep-as-new: session kept, flag cleared');
     }
+
+    // --- SAFETY: merge must never delete an app-created (non-imported) session ---
+    {
+      const manualA = await insertSession({
+        sport_type: 'running',
+        distance_m: 5000,
+        duration_s: 1500,
+        name: 'Manual A',
+      });
+      const manualB = await insertSession({
+        sport_type: 'running',
+        distance_m: 5000,
+        duration_s: 1500,
+        name: 'Manual B',
+      });
+      let threw = false;
+      try {
+        await review.mergeDuplicate(userId, manualA, manualB);
+      } catch {
+        threw = true;
+      }
+      assert.equal(threw, true, 'merge must refuse to delete an app-created session');
+      assert.equal(await exists(manualA), true, 'manual A preserved');
+      assert.equal(await exists(manualB), true, 'manual B preserved');
+      pass('safety: merge refuses to delete an app-created session');
+    }
+
+    // --- SAFETY: assign must never delete an app-created (non-imported) session ---
+    {
+      const target = await insertSession({ sport_type: 'strength', name: 'Target' });
+      const manualGeneric = await insertSession({ sport_type: 'strength', duration_s: 3000, name: 'Manual gym' });
+      let threw = false;
+      try {
+        await review.assignStrengthSession(userId, manualGeneric, target);
+      } catch {
+        threw = true;
+      }
+      assert.equal(threw, true, 'assign must refuse to delete an app-created session');
+      assert.equal(await exists(manualGeneric), true, 'manual gym session preserved');
+      assert.equal(await exists(target), true, 'target preserved');
+      pass('safety: assign refuses to delete an app-created session');
+    }
   } finally {
     // Cleanup: children cascade on session delete; remove sessions then user.
     for (const id of createdSessionIds) {

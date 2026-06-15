@@ -122,6 +122,11 @@ export class ImportReviewService {
     const source = importedIsExternal ? imported : target;
     const survivor = importedIsExternal ? target : imported;
     if (source.id === survivor.id) throw new BadRequestException('IMPORT_REVIEW_MERGE_TARGET_REQUIRED');
+    // Safety: only a watch-imported session may ever be deleted. A session the
+    // user created in the app (manual/interactive, no provenance) must survive.
+    if (!this.isImportedSession(source)) {
+      throw new BadRequestException('IMPORT_REVIEW_CANNOT_DELETE_APP_SESSION');
+    }
 
     const payload: ActivitySessionUpdate =
       survivor.sport_type === 'strength'
@@ -200,6 +205,11 @@ export class ImportReviewService {
       return sessionId;
     }
     if (targetSessionId === sessionId) throw new BadRequestException('IMPORT_REVIEW_ASSIGN_TARGET_INVALID');
+    // Safety: the session being absorbed+deleted must be the watch import, never
+    // an app-created session.
+    if (!this.isImportedSession(generic)) {
+      throw new BadRequestException('IMPORT_REVIEW_CANNOT_DELETE_APP_SESSION');
+    }
     const target = await this.getOwnedSession(userId, targetSessionId);
     if (target.sport_type !== 'strength' && target.sport_type !== 'gym') {
       throw new BadRequestException('IMPORT_REVIEW_ASSIGN_TARGET_INVALID');
@@ -294,6 +304,16 @@ export class ImportReviewService {
       source_updated_at: source.source_updated_at,
       raw_payload_id: source.raw_payload_id,
     };
+  }
+
+  /** A session is safe to delete only if it came from a watch/provider import. */
+  private isImportedSession(session: ActivitySessionRow): boolean {
+    return (
+      session.imported_at != null ||
+      session.provider_activity_id != null ||
+      session.source_record_id != null ||
+      session.source === 'imported'
+    );
   }
 
   /** Clears the unique provenance columns so they can be copied to another session. */
