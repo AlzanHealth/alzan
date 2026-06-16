@@ -119,6 +119,8 @@ const en = {
     manual: 'Manual',
     scan: 'Scan',
     search: 'Search',
+    trendsForYou: 'Trending for you',
+    trendChipMeta: '{{portion}} g · {{kcal}} kcal',
     max1kgLabel: 'Max 1kg',
     ingredientsTitleParen: 'Ingredients (',
     ingredientsTitleParenAllCaps: 'INGREDIENTS',

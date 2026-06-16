@@ -121,6 +121,8 @@ export default {
     manual: 'Manual',
     scan: 'Escanear',
     search: 'Buscar',
+    trendsForYou: 'Tendencias para ti',
+    trendChipMeta: '{{portion}} g · {{kcal}} kcal',
     max1kgLabel: 'Máximo 1kg',
     ingredientsTitleParen: 'Ingredientes (',
     ingredientsTitleParenAllCaps: 'INGREDIENTES',

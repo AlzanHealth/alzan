@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings } from 'lucide-react-native';
+import { Settings, Plus } from 'lucide-react-native';
 import { format } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -18,7 +18,7 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { DaySwitcher, DaySwitcherRef } from '../../components/common/DaySwitcher';
 import { NutritionScreenNavigationProp, TabParamList } from '../../types/navigation.types';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { BottomTabNavigationProp, useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
 
@@ -51,6 +51,7 @@ export const NutritionHomeScreen = () => {
   const navigation = useNavigation<NutritionScreenNavigationProp>();
   const { convertEnergyToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors } = useNutritionStyles();
+  const tabBarHeight = useBottomTabBarHeight();
 
   // Date Logic
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -141,6 +142,22 @@ export const NutritionHomeScreen = () => {
   // Actions
   const upsertLog = useUpsertMealLog();
   const deleteMealLog = useDeleteMealLog();
+
+  // The floating "+" defaults the meal slot to the current time of day so the
+  // user lands in the right section without scrolling to find it. Falls back to
+  // an enabled slot if the time-of-day pick is hidden by preferences.
+  const pickDefaultMealType = (): string => {
+    const hour = new Date().getHours();
+    let preferred: string;
+    if (hour >= 5 && hour < 11) preferred = MEAL_TYPES.BREAKFAST;
+    else if (hour >= 11 && hour < 13) preferred = MEAL_TYPES.ALMUERZO;
+    else if (hour >= 13 && hour < 17) preferred = MEAL_TYPES.LUNCH;
+    else if (hour >= 17 && hour < 20) preferred = MEAL_TYPES.MERIENDA;
+    else if (hour >= 20 && hour < 23) preferred = MEAL_TYPES.DINNER;
+    else preferred = MEAL_TYPES.SNACK;
+
+    return displayMealTypes.includes(preferred) ? preferred : displayMealTypes[0] || MEAL_TYPES.SNACK;
+  };
 
   // Handlers
   const handleAddFood = (type: string) => {
@@ -294,6 +311,17 @@ export const NutritionHomeScreen = () => {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        {/* Quick-add FAB: opens the log form on the meal slot matching the time of day */}
+        <TouchableOpacity
+          style={[styles.fab, { bottom: tabBarHeight + 16, backgroundColor: themeColors.primary }]}
+          onPress={() => handleAddFood(pickDefaultMealType())}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t('nutrition.addMeal')}
+        >
+          <Plus color="#FFFFFF" size={26} strokeWidth={2.6} />
+        </TouchableOpacity>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -324,5 +352,19 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 100,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });

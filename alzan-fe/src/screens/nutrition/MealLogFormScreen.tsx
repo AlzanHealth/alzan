@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 
 import { IngredientSearchPanel } from '../../modules/nutrition/components/IngredientSearchPanel';
+import { PersonalFoodTrends } from '../../modules/nutrition/components/PersonalFoodTrends';
 import { MacrosSummaryCard } from '../../modules/nutrition/components/MacrosSummaryCard';
 import { FoodScanner } from '../../modules/nutrition/components/FoodScanner';
 import {
@@ -1766,6 +1767,24 @@ export const MealLogFormScreen = () => {
     setManualMacroInputs({ kcal_100: '', protein_g_100: '', carbs_g_100: '', fat_g_100: '' });
   };
 
+  // One-tap add from "Tendencias para ti": append the food with the user's usual
+  // portion and seed the meal name if it's still empty.
+  const handlePickTrend = (food: MealComponent) => {
+    const amount = food.amount_g || 100;
+    const newIngredient: MealComponent = {
+      ...food,
+      id: `${Date.now()}-${food.id}`,
+      amount_g: amount,
+      calculated_macros: calculateMacros(food, amount),
+    };
+
+    setIngredients(prev => [...prev, newIngredient]);
+    setLastIngredientAmount(amount);
+    if (!name.trim()) {
+      setName(food.name);
+    }
+  };
+
   const handleRemoveIngredient = (id: string) => {
     setIngredients(ingredients.filter(i => i.id !== id));
   };
@@ -2762,13 +2781,16 @@ export const MealLogFormScreen = () => {
                     {inputMode === 'search' && (
                       <>
                         {!selectedFood ? (
-                          <IngredientSearchPanel
-                            onSelect={food => {
-                              setSelectedFood(food);
-                              setAmountInput('100');
-                            }}
-                            onGoToManual={() => setInputMode('manual')}
-                          />
+                          <>
+                            <PersonalFoodTrends mealType={mealType} onPick={handlePickTrend} />
+                            <IngredientSearchPanel
+                              onSelect={food => {
+                                setSelectedFood(food);
+                                setAmountInput('100');
+                              }}
+                              onGoToManual={() => setInputMode('manual')}
+                            />
+                          </>
                         ) : (
                           <View
                             style={[
