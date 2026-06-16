@@ -142,10 +142,13 @@ export type TrainingStackParamList = {
 export type NutritionStackParamList = {
   NutritionHome: undefined;
   NutritionSettings: undefined;
+  RecipeLibrary: undefined;
   MealLogForm: {
     date: string;
     mealItem?: { id?: string; name?: string; [key: string]: unknown };
     isExtra?: boolean;
+    presetRecipeId?: string;
+    presetRecipeName?: string;
   };
 };
 

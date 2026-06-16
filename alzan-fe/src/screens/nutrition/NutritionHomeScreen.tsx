@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, Plus } from 'lucide-react-native';
+import { Settings, Plus, BookOpen } from 'lucide-react-native';
 import { format } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -12,7 +12,7 @@ import { WaterTracker } from '../../modules/nutrition/components/WaterTracker';
 import { useDayNutrition } from '../../modules/nutrition/hooks/useDayNutritionLogic';
 import { useUpsertMealLog, useDeleteMealLog, useWaterIntake } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
-import { MEAL_TYPES, MEAL_TYPE_LABELS } from '../../modules/nutrition/constants';
+import { MEAL_TYPES, MEAL_TYPE_LABELS, getMealTypeByHour } from '../../modules/nutrition/constants';
 import { usePreferences } from '../../hooks/settings/usePreferences';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
@@ -147,15 +147,7 @@ export const NutritionHomeScreen = () => {
   // user lands in the right section without scrolling to find it. Falls back to
   // an enabled slot if the time-of-day pick is hidden by preferences.
   const pickDefaultMealType = (): string => {
-    const hour = new Date().getHours();
-    let preferred: string;
-    if (hour >= 5 && hour < 11) preferred = MEAL_TYPES.BREAKFAST;
-    else if (hour >= 11 && hour < 13) preferred = MEAL_TYPES.ALMUERZO;
-    else if (hour >= 13 && hour < 17) preferred = MEAL_TYPES.LUNCH;
-    else if (hour >= 17 && hour < 20) preferred = MEAL_TYPES.MERIENDA;
-    else if (hour >= 20 && hour < 23) preferred = MEAL_TYPES.DINNER;
-    else preferred = MEAL_TYPES.SNACK;
-
+    const preferred = getMealTypeByHour();
     return displayMealTypes.includes(preferred) ? preferred : displayMealTypes[0] || MEAL_TYPES.SNACK;
   };
 
@@ -253,6 +245,9 @@ export const NutritionHomeScreen = () => {
         <View style={styles.topBar}>
           <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>{t('tabs.nutrition')}</Text>
           <View style={styles.topActions}>
+            <TouchableOpacity onPress={() => navigation.navigate('RecipeLibrary')}>
+              <BookOpen color={themeColors.textPrimary} size={24} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
               <Settings color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
@@ -262,7 +257,10 @@ export const NutritionHomeScreen = () => {
         {/* Day Switcher - Removed external wrapper styles to let component handle margin */}
         <DaySwitcher ref={daySwitcherRef} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
-        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarHeight + 96 }]}
+        >
           {/* Calorie Summary Header */}
           <CalorieEquationHeader
             calories={{
@@ -314,7 +312,7 @@ export const NutritionHomeScreen = () => {
 
         {/* Quick-add FAB: opens the log form on the meal slot matching the time of day */}
         <TouchableOpacity
-          style={[styles.fab, { bottom: tabBarHeight + 16, backgroundColor: themeColors.primary }]}
+          style={[styles.fab, { bottom: tabBarHeight + 20, backgroundColor: themeColors.primary }]}
           onPress={() => handleAddFood(pickDefaultMealType())}
           activeOpacity={0.85}
           accessibilityRole="button"
@@ -345,6 +343,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     top: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   dateSection: {
     // marginBottom: 8 // Removed since DaySwitcher has its own spacing

@@ -55,6 +55,7 @@ export interface MealComponent extends Omit<Partial<DbIngredient>, 'source_prima
   recipe_uses_7d?: number;
   recipe_uses_30d?: number;
   recipe_uses_total?: number;
+  recipe_author_name?: string; // Resolved display name / username of a user recipe's owner
 
   // Flattened macros (from DbIngredient) are:
   // kcal_100, protein_g_100, carbs_g_100, fat_g_100 (Note: DB uses fat_g_100 not fats_g_100 check types!)

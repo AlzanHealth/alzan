@@ -1,4 +1,5 @@
 import { TranslationKey } from '../../../i18n/locales/en';
+import { MealType } from '../../../types/requests.types';
 
 export const MEAL_TYPES = {
   BREAKFAST: 'breakfast',
@@ -7,6 +8,18 @@ export const MEAL_TYPES = {
   MERIENDA: 'merienda',
   DINNER: 'dinner',
   SNACK: 'snack',
+};
+
+// Maps the current time of day to the most likely meal slot. Used to default
+// the quick-add entry points (home FAB, recipe library "Usar") to the right slot.
+export const getMealTypeByHour = (date = new Date()): MealType => {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 11) return 'breakfast';
+  if (hour >= 11 && hour < 13) return 'almuerzo';
+  if (hour >= 13 && hour < 17) return 'lunch';
+  if (hour >= 17 && hour < 20) return 'merienda';
+  if (hour >= 20 && hour < 23) return 'dinner';
+  return 'snack';
 };
 
 // Translating keys for UI Display would handle this,

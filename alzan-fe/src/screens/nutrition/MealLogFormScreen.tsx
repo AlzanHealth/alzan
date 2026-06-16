@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,7 +36,7 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useSaveMealWithIngredients, useMealItems } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
 import { format } from 'date-fns';
-import { getLocalizedIngredientNotes } from '../../services/localization';
+import { getCurrentAppLocale, getLocalizedIngredientNotes } from '../../services/localization';
 import { getRecipeIngredients } from '../../modules/nutrition/services/recipeService';
 import {
   FOOD_QUALITY_SCORE_VERSION,
@@ -44,11 +44,6 @@ import {
   toFoodCategory,
 } from '../../modules/nutrition/services/foodQualityScore';
 import {
-  duplicateRecipe,
-  getMostUsedRecipes,
-  getRecipeLibraryPage,
-  getTopHistoricalRecipes,
-  getTrendingRecipes,
   logRecipeUsage,
   publishRecipe,
   RecipeSearchScope,
@@ -61,23 +56,12 @@ import { fetchByBarcode } from '../../modules/nutrition/services/nutritionSearch
 import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 import { supabase } from '../../lib/supabaseClient';
 import { IngredientsCategory, MealItemsSource } from '../../types/requests.types';
-import {
-  getCurrentAppLocale,
-  getLocalizedIngredientName,
-  getLocalizedRecipeDescription,
-  getLocalizedRecipeName,
-} from '../../services/localization';
 import { usePreferences } from '../../hooks/settings/usePreferences';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 
 type InputMode = 'search' | 'scan' | 'manual' | 'photo';
 type MealSearchFilter = 'all' | 'recipe' | 'precooked';
-type BuilderWindow = 'ingredients' | 'recipes';
-type RecipeLibraryView = 'normal' | 'favorites' | 'search';
-type RecipeOriginFilter = 'all' | 'users' | 'system';
-const RECIPE_LIBRARY_PAGE_SIZE = 10;
-const RECIPE_LIBRARY_SAVED_PAGE_SIZE = 10;
 const MEAL_RECIPE_PAGE_SIZE = 5;
 const INGREDIENT_AMOUNT_DECIMALS = 1;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -185,75 +169,6 @@ const validateManualIngredientNutrition = ({
   return { isValid: true };
 };
 
-interface SavedRecipeDraft {
-  id: string;
-  name: string;
-  created_at: string;
-  updated_at: string;
-  quality_score: number;
-  source: 'user';
-  visibility: 'private' | 'public';
-  published_at: string | null;
-  public_slug: string | null;
-  origin_recipe_id: string | null;
-  ingredients: MealComponent[];
-}
-
-interface SavedRecipeRow {
-  id: string;
-  name_es: string;
-  name_en: string | null;
-  created_at: string;
-  updated_at: string;
-  quality_score: number | null;
-  source: 'user';
-  visibility: 'private' | 'public';
-  published_at: string | null;
-  public_slug: string | null;
-  origin_recipe_id: string | null;
-}
-
-interface SavedRecipeItemRow {
-  recipe_id: string;
-  order_index: number;
-  quantity: number;
-  ingredient_id: string;
-  ingredients: {
-    category: string | null;
-    name_es: string;
-    name_en: string | null;
-    kcal_100: number | null;
-    protein_g_100: number | null;
-    carbs_g_100: number | null;
-    fat_g_100: number | null;
-  } | null;
-}
-
-interface RecipeFavoriteRow {
-  recipe_id: string;
-}
-
-interface FavoriteRecipeLibraryRow {
-  id: string;
-  name_es: string;
-  name_en: string | null;
-  description_es: string | null;
-  description_en: string | null;
-  source: 'system' | 'user';
-  owner_user_id: string | null;
-  visibility: 'private' | 'public';
-  kcal_100: number | null;
-  protein_g_100: number | null;
-  carbs_g_100: number | null;
-  fat_g_100: number | null;
-  popularity_score: number | null;
-  favorites_total: number | null;
-  saves_total: number | null;
-  uses_7d: number | null;
-  uses_30d: number | null;
-  uses_total: number | null;
-}
-
 interface EditableRecipeSignature {
   name: string;
   ingredients: Array<{
@@ -268,13 +183,14 @@ export const MealLogFormScreen = () => {
   const { preferences } = usePreferences();
   const languageCode = getCurrentAppLocale();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
-  const isScreenFocused = useIsFocused();
   const route = useRoute<RouteProp<NutritionStackParamList, 'MealLogForm'>>();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
   const params = route.params as {
     date: string;
     mealItem?: DailyMealItem;
     isExtra?: boolean;
+    presetRecipeId?: string;
+    presetRecipeName?: string;
   };
   const { convertEnergyToUi, parseEnergyToKcal, units } = useUnitConversion();
   const mealItem = params.mealItem;
@@ -316,26 +232,9 @@ export const MealLogFormScreen = () => {
 
   // UI State
   const [inputMode, setInputMode] = useState<InputMode>('search');
-  const [builderWindow, setBuilderWindow] = useState<BuilderWindow>('ingredients');
   const [isSaving, setIsSaving] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [isBarcodeLookupPending, setIsBarcodeLookupPending] = useState(false);
-  const [savedRecipes, setSavedRecipes] = useState<SavedRecipeDraft[]>([]);
-  const [favoriteRecipeIds, setFavoriteRecipeIds] = useState<string[]>([]);
-  const [favoriteLibraryRecipes, setFavoriteLibraryRecipes] = useState<MealComponent[]>([]);
-  const [trendingRecipes, setTrendingRecipes] = useState<MealComponent[]>([]);
-  const [mostUsedRecipes, setMostUsedRecipes] = useState<MealComponent[]>([]);
-  const [topHistoricalRecipes, setTopHistoricalRecipes] = useState<MealComponent[]>([]);
-  const [isRecipeLibraryLoading, setIsRecipeLibraryLoading] = useState(false);
-  const [recipeLibraryView, setRecipeLibraryView] = useState<RecipeLibraryView>('normal');
-  const [recipeLibrarySearchQuery, setRecipeLibrarySearchQuery] = useState('');
-  const [recipeLibraryOriginFilter, setRecipeLibraryOriginFilter] = useState<RecipeOriginFilter>('all');
-  const [recipeLibrarySearchResults, setRecipeLibrarySearchResults] = useState<MealComponent[]>([]);
-  const [isRecipeLibrarySearching, setIsRecipeLibrarySearching] = useState(false);
-  const [recipeLibrarySearchPage, setRecipeLibrarySearchPage] = useState(1);
-  const [recipeLibrarySearchTotal, setRecipeLibrarySearchTotal] = useState(0);
-  const [recipeLibrarySavedPage, setRecipeLibrarySavedPage] = useState(1);
-  const [recipeLibraryReloadToken, setRecipeLibraryReloadToken] = useState(0);
   const [editingSavedRecipeId, setEditingSavedRecipeId] = useState<string | null>(null);
   const [editingSavedRecipeUpdatedAt, setEditingSavedRecipeUpdatedAt] = useState<string | null>(null);
   const [editingRecipeSignature, setEditingRecipeSignature] = useState<string | null>(null);
@@ -464,83 +363,6 @@ export const MealLogFormScreen = () => {
   const showMealRecipePagination =
     recipeSearchResults.length > MEAL_RECIPE_PAGE_SIZE && (mealSearchFilter === 'recipe' || mealSearchFilter === 'all');
 
-  const favoriteSavedRecipes = useMemo(
-    () => savedRecipes.filter(recipe => favoriteRecipeIds.includes(recipe.id)),
-    [favoriteRecipeIds, savedRecipes],
-  );
-
-  const sourceMatchesOriginFilter = (
-    recipeSource: MealComponent['recipe_source'] | SavedRecipeDraft['source'] | undefined,
-  ): boolean => {
-    if (recipeLibraryOriginFilter === 'all') return true;
-    if (recipeLibraryOriginFilter === 'users') return recipeSource === 'user';
-    return recipeSource === 'system';
-  };
-
-  const displayedSavedRecipes = useMemo(
-    () =>
-      (recipeLibraryView === 'favorites' ? favoriteSavedRecipes : savedRecipes).filter(recipe =>
-        sourceMatchesOriginFilter(recipe.source),
-      ),
-    [favoriteSavedRecipes, recipeLibraryView, savedRecipes, recipeLibraryOriginFilter],
-  );
-
-  const displayedFavoriteLibraryRecipes = useMemo(
-    () => favoriteLibraryRecipes.filter(recipe => sourceMatchesOriginFilter(recipe.recipe_source)),
-    [favoriteLibraryRecipes, recipeLibraryOriginFilter],
-  );
-
-  const filterDiscoverySection = (recipes: MealComponent[]): MealComponent[] => {
-    const filteredByScope = recipes.filter(recipe => sourceMatchesOriginFilter(recipe.recipe_source));
-    if (recipeLibraryView !== 'favorites') {
-      return filteredByScope;
-    }
-
-    return filteredByScope
-      .filter(recipe => Boolean(recipe.external_id && favoriteRecipeIds.includes(recipe.external_id)))
-      .sort((a, b) => (b.recipe_popularity_score || 0) - (a.recipe_popularity_score || 0));
-  };
-
-  const displayedTrendingRecipes = useMemo(
-    () => filterDiscoverySection(trendingRecipes),
-    [favoriteRecipeIds, recipeLibraryView, recipeLibraryOriginFilter, trendingRecipes],
-  );
-  const displayedMostUsedRecipes = useMemo(
-    () => filterDiscoverySection(mostUsedRecipes),
-    [favoriteRecipeIds, mostUsedRecipes, recipeLibraryView, recipeLibraryOriginFilter],
-  );
-  const displayedTopHistoricalRecipes = useMemo(
-    () => filterDiscoverySection(topHistoricalRecipes),
-    [favoriteRecipeIds, recipeLibraryView, recipeLibraryOriginFilter, topHistoricalRecipes],
-  );
-
-  const filteredDisplayedSavedRecipes = displayedSavedRecipes;
-  const savedRecipesTotalPages = useMemo(() => {
-    const sourceLength =
-      recipeLibraryView === 'favorites' ? displayedFavoriteLibraryRecipes.length : filteredDisplayedSavedRecipes.length;
-    return Math.max(1, Math.ceil(sourceLength / RECIPE_LIBRARY_SAVED_PAGE_SIZE));
-  }, [displayedFavoriteLibraryRecipes.length, filteredDisplayedSavedRecipes.length, recipeLibraryView]);
-
-  const paginatedFavoriteLibraryRecipes = useMemo(() => {
-    const from = (recipeLibrarySavedPage - 1) * RECIPE_LIBRARY_SAVED_PAGE_SIZE;
-    const to = from + RECIPE_LIBRARY_SAVED_PAGE_SIZE;
-    return displayedFavoriteLibraryRecipes
-      .slice()
-      .sort((a, b) => (b.recipe_popularity_score || 0) - (a.recipe_popularity_score || 0))
-      .slice(from, to);
-  }, [displayedFavoriteLibraryRecipes, recipeLibrarySavedPage]);
-
-  const paginatedMySavedRecipes = useMemo(() => {
-    const from = (recipeLibrarySavedPage - 1) * RECIPE_LIBRARY_SAVED_PAGE_SIZE;
-    const to = from + RECIPE_LIBRARY_SAVED_PAGE_SIZE;
-    return filteredDisplayedSavedRecipes.slice(from, to);
-  }, [filteredDisplayedSavedRecipes, recipeLibrarySavedPage]);
-  const displayedRecipeLibrarySearchResults = useMemo(
-    () => recipeLibrarySearchResults.filter(item => item.itemType === 'recipe'),
-    [recipeLibrarySearchResults],
-  );
-  const recipeLibrarySearchTotalPages = Math.max(1, Math.ceil(recipeLibrarySearchTotal / RECIPE_LIBRARY_PAGE_SIZE));
-
   const formatDetailValue = (value?: number | null): string => {
     if (typeof value !== 'number' || !Number.isFinite(value)) return '0';
     return Number(value.toFixed(2)).toString();
@@ -549,10 +371,6 @@ export const MealLogFormScreen = () => {
   const logRecipeQualityDebug = (payload: Record<string, unknown>) => {
     if (!__DEV__) return;
     console.info('[MealLogForm] Recipe quality score debug', payload);
-  };
-
-  const toRecipeDisplayName = (rawName: string): string => {
-    return rawName.replace(/\s*\((?:copia|copy)(?:\s+\d+)?\)\s*$/i, '').trim();
   };
 
   const buildRecipeSignature = (recipeName: string, recipeIngredients: MealComponent[]): string => {
@@ -652,10 +470,6 @@ export const MealLogFormScreen = () => {
     }
   };
 
-  const queueRecipeLibraryReload = useCallback(() => {
-    setRecipeLibraryReloadToken(prev => prev + 1);
-  }, []);
-
   const maybeRefreshRecipeAggregates = useCallback(async (force = false) => {
     const now = Date.now();
     if (!force && now - lastRecipeAggregateRefreshAtRef.current < 20_000) {
@@ -680,114 +494,6 @@ export const MealLogFormScreen = () => {
     setMealRecipePage(1);
   }, [mealSearchFilter, recipeSearchResults.length]);
 
-  useEffect(() => {
-    if (builderWindow !== 'recipes') return;
-
-    let isMounted = true;
-
-    const loadRecipeLibrary = async () => {
-      try {
-        setIsRecipeLibraryLoading(true);
-        await maybeRefreshRecipeAggregates();
-
-        const [trending, mostUsed, topHistorical, saved, favorites] = await Promise.all([
-          getTrendingRecipes(12),
-          getMostUsedRecipes(12),
-          getTopHistoricalRecipes(12),
-          loadSavedRecipesFromDb(),
-          loadFavoriteRecipeIdsFromDb(),
-        ]);
-        const favoriteLibrary = await loadFavoriteRecipesFromDb(favorites);
-        if (isMounted) {
-          setTrendingRecipes(trending);
-          setMostUsedRecipes(mostUsed);
-          setTopHistoricalRecipes(topHistorical);
-          setSavedRecipes(saved);
-          setFavoriteRecipeIds(favorites);
-          setFavoriteLibraryRecipes(favoriteLibrary);
-        }
-      } catch (error) {
-        console.error('[MealLogForm] Error loading recipe library:', error);
-      } finally {
-        if (isMounted) {
-          setIsRecipeLibraryLoading(false);
-        }
-      }
-    };
-
-    void loadRecipeLibrary();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [builderWindow, maybeRefreshRecipeAggregates, recipeLibraryReloadToken]);
-
-  useEffect(() => {
-    if (!isScreenFocused || builderWindow !== 'recipes') return;
-    if (lastRecipeAggregateRefreshAtRef.current === 0) return;
-    queueRecipeLibraryReload();
-  }, [builderWindow, isScreenFocused, queueRecipeLibraryReload]);
-
-  useEffect(() => {
-    if (recipeLibraryView === 'search') {
-      setRecipeLibrarySearchPage(1);
-    }
-  }, [recipeLibraryOriginFilter, recipeLibrarySearchQuery, recipeLibraryView]);
-
-  useEffect(() => {
-    if (recipeLibraryView !== 'search') {
-      setRecipeLibrarySavedPage(1);
-    }
-  }, [recipeLibraryOriginFilter, recipeLibraryView]);
-
-  useEffect(() => {
-    if (recipeLibraryView === 'search') return;
-    setRecipeLibrarySavedPage(prev => Math.min(prev, savedRecipesTotalPages));
-  }, [recipeLibraryView, savedRecipesTotalPages]);
-
-  useEffect(() => {
-    let isCancelled = false;
-    const query = recipeLibrarySearchQuery.trim();
-
-    if (builderWindow !== 'recipes' || recipeLibraryView !== 'search') {
-      setRecipeLibrarySearchResults([]);
-      setRecipeLibrarySearchTotal(0);
-      return;
-    }
-
-    setIsRecipeLibrarySearching(true);
-    const timeoutId = setTimeout(async () => {
-      try {
-        const { recipes, total } = await getRecipeLibraryPage({
-          query,
-          sourceFilter: recipeLibraryOriginFilter,
-          page: recipeLibrarySearchPage,
-          pageSize: RECIPE_LIBRARY_PAGE_SIZE,
-        });
-
-        if (!isCancelled) {
-          setRecipeLibrarySearchResults(recipes);
-          setRecipeLibrarySearchTotal(total);
-        }
-      } catch (error) {
-        console.error('[MealLogForm] Error searching recipes in library:', error);
-        if (!isCancelled) {
-          setRecipeLibrarySearchResults([]);
-          setRecipeLibrarySearchTotal(0);
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsRecipeLibrarySearching(false);
-        }
-      }
-    }, 250);
-
-    return () => {
-      isCancelled = true;
-      clearTimeout(timeoutId);
-    };
-  }, [builderWindow, recipeLibraryOriginFilter, recipeLibrarySearchPage, recipeLibrarySearchQuery, recipeLibraryView]);
-
   // Meal Name Search - searches recipes + precooked. Shared by the explicit
   // search button and the debounced auto-search effect below.
   const performMealSearch = useCallback(
@@ -802,7 +508,6 @@ export const MealLogFormScreen = () => {
           locale: languageCode,
           recipeScope: recipeSearchScope,
           currentUserId,
-          favoriteRecipeIds,
         });
 
         if (results.length > 0) {
@@ -828,7 +533,7 @@ export const MealLogFormScreen = () => {
       }
     },
     // getCurrentUserId is a stable component-scoped helper; intentionally omitted.
-    [favoriteRecipeIds, languageCode, recipeSearchScope, t],
+    [languageCode, recipeSearchScope, t],
   );
 
   // Explicit search trigger (button) - keeps the min-chars hint.
@@ -843,7 +548,7 @@ export const MealLogFormScreen = () => {
   // Auto-search as the user types the meal name (debounced). Only while building
   // a brand-new meal from scratch, so we never override a loaded/edited recipe.
   useEffect(() => {
-    if (builderWindow !== 'ingredients' || inputMode !== 'search') return;
+    if (inputMode !== 'search') return;
     if (isEdit || isEditingRecipe || ingredients.length > 0) return;
 
     const trimmedName = name.trim();
@@ -854,7 +559,7 @@ export const MealLogFormScreen = () => {
     }, 400);
 
     return () => clearTimeout(timeoutId);
-  }, [builderWindow, inputMode, isEdit, isEditingRecipe, ingredients.length, name, performMealSearch]);
+  }, [inputMode, isEdit, isEditingRecipe, ingredients.length, name, performMealSearch]);
 
   const trackRecipeUsage = (recipeId: string, origin: 'search' | 'saved'): void => {
     void (async () => {
@@ -955,12 +660,21 @@ export const MealLogFormScreen = () => {
     }
   };
 
-  const cloneRecipeIngredientsForMeal = (recipeIngredients: MealComponent[]): MealComponent[] =>
-    recipeIngredients.map((ingredient, index) => ({
-      ...ingredient,
-      id: `${ingredient.id}-clone-${Date.now()}-${index}`,
-      calculated_macros: calculateMacros(ingredient, ingredient.amount_g || 0),
-    }));
+  // Preload a recipe chosen from the Recipe Library ("Usar"). Runs once on mount.
+  const presetRecipeLoadedRef = useRef(false);
+  useEffect(() => {
+    if (presetRecipeLoadedRef.current) return;
+    const presetId = params.presetRecipeId;
+    if (!presetId) return;
+    presetRecipeLoadedRef.current = true;
+    void handleSelectMealResult({
+      id: `preset_${presetId}`,
+      external_id: presetId,
+      name: params.presetRecipeName || '',
+      source: 'database',
+      itemType: 'recipe',
+    });
+  }, [params.presetRecipeId, params.presetRecipeName]);
 
   const normalizeName = (value: string): string =>
     value
@@ -1076,229 +790,6 @@ export const MealLogFormScreen = () => {
     } finally {
       setIsRecipeDetailSourceLoading(false);
     }
-  };
-
-  const mapRecipeItemToMealComponent = (item: SavedRecipeItemRow, index: number): MealComponent | null => {
-    if (!item.ingredients) return null;
-
-    const ingredientName = getLocalizedIngredientName({
-      name_es: item.ingredients.name_es,
-      name_en: item.ingredients.name_en,
-    });
-
-    return {
-      id: `saved-recipe-item-${item.recipe_id}-${index}`,
-      name: ingredientName,
-      amount_g: roundIngredientAmount(item.quantity),
-      source: 'database',
-      external_id: item.ingredient_id,
-      category: toFoodCategory(item.ingredients.category),
-      itemType: 'ingredient',
-      kcal_100: item.ingredients.kcal_100 || 0,
-      protein_g_100: item.ingredients.protein_g_100 || 0,
-      carbs_g_100: item.ingredients.carbs_g_100 || 0,
-      fat_g_100: item.ingredients.fat_g_100 || 0,
-      calculated_macros: calculateMacros(
-        {
-          kcal_100: item.ingredients.kcal_100 || 0,
-          protein_g_100: item.ingredients.protein_g_100 || 0,
-          carbs_g_100: item.ingredients.carbs_g_100 || 0,
-          fat_g_100: item.ingredients.fat_g_100 || 0,
-        },
-        item.quantity,
-      ),
-    };
-  };
-
-  const loadSavedRecipesFromDb = async (): Promise<SavedRecipeDraft[]> => {
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) return [];
-
-    const { data: recipesData, error: recipesError } = await supabase
-      .from('recipes')
-      .select(
-        'id, name_es, name_en, created_at, updated_at, quality_score, source, visibility, published_at, public_slug, origin_recipe_id',
-      )
-      .eq('owner_user_id', currentUserId)
-      .eq('source', 'user')
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .returns<SavedRecipeRow[]>();
-
-    if (recipesError || !recipesData || recipesData.length === 0) {
-      if (recipesError) {
-        console.error('[MealLogForm] Error loading saved recipes:', recipesError);
-      }
-      return [];
-    }
-
-    const recipeIds = recipesData.map(recipe => recipe.id);
-    const { data: recipeItemsData, error: recipeItemsError } = await supabase
-      .from('recipe_items')
-      .select(
-        `
-          recipe_id,
-          order_index,
-          quantity,
-          ingredient_id,
-          ingredients (
-            category,
-            name_es,
-            name_en,
-            kcal_100,
-            protein_g_100,
-            carbs_g_100,
-            fat_g_100
-          )
-        `,
-      )
-      .in('recipe_id', recipeIds)
-      .order('order_index', { ascending: true })
-      .returns<SavedRecipeItemRow[]>();
-
-    if (recipeItemsError) {
-      console.error('[MealLogForm] Error loading saved recipe items:', recipeItemsError);
-      return [];
-    }
-
-    const groupedItems = new Map<string, SavedRecipeItemRow[]>();
-    for (const item of recipeItemsData || []) {
-      const current = groupedItems.get(item.recipe_id) || [];
-      current.push(item);
-      groupedItems.set(item.recipe_id, current);
-    }
-
-    return recipesData.map(recipe => ({
-      id: recipe.id,
-      name: toRecipeDisplayName(getLocalizedIngredientName({ name_es: recipe.name_es, name_en: recipe.name_en })),
-      created_at: recipe.created_at,
-      updated_at: recipe.updated_at,
-      quality_score: recipe.quality_score ?? 0.7,
-      source: 'user',
-      visibility: recipe.visibility,
-      published_at: recipe.published_at,
-      public_slug: recipe.public_slug,
-      origin_recipe_id: recipe.origin_recipe_id,
-      ingredients: (groupedItems.get(recipe.id) || [])
-        .map((item, index) => mapRecipeItemToMealComponent(item, index))
-        .filter((item): item is MealComponent => item !== null),
-    }));
-  };
-
-  const loadFavoriteRecipeIdsFromDb = async (): Promise<string[]> => {
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) return [];
-
-    const { data, error } = await supabase
-      .from('recipe_favorites')
-      .select('recipe_id')
-      .eq('user_id', currentUserId)
-      .returns<RecipeFavoriteRow[]>();
-
-    if (error || !data) {
-      if (error) {
-        console.error('[MealLogForm] Error loading favorite recipes:', error);
-      }
-      return [];
-    }
-
-    return data.map(row => row.recipe_id);
-  };
-
-  const loadFavoriteRecipesFromDb = async (favoriteIds: string[]): Promise<MealComponent[]> => {
-    if (favoriteIds.length === 0) return [];
-
-    const { data, error } = await supabase
-      .from('recipes')
-      .select(
-        'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total',
-      )
-      .in('id', favoriteIds)
-      .is('deleted_at', null)
-      .returns<FavoriteRecipeLibraryRow[]>();
-
-    if (error || !data) {
-      if (error) {
-        console.error('[MealLogForm] Error loading favorite recipe library:', error);
-      }
-      return [];
-    }
-
-    const byId = new Map<string, FavoriteRecipeLibraryRow>();
-    data.forEach(row => {
-      byId.set(row.id, row);
-    });
-
-    return favoriteIds
-      .map(id => byId.get(id))
-      .filter((row): row is FavoriteRecipeLibraryRow => Boolean(row))
-      .map(row => ({
-        id: `favorite_${row.id}`,
-        external_id: row.id,
-        name: toRecipeDisplayName(getLocalizedRecipeName({ name_es: row.name_es, name_en: row.name_en })),
-        description:
-          getLocalizedRecipeDescription({
-            description_es: row.description_es,
-            description_en: row.description_en,
-          }) ?? undefined,
-        source: 'database',
-        itemType: 'recipe',
-        recipe_source: row.source,
-        recipe_owner_user_id: row.owner_user_id,
-        recipe_visibility: row.visibility,
-        recipe_popularity_score: row.popularity_score || 0,
-        recipe_favorites_total: row.favorites_total || 0,
-        recipe_saves_total: row.saves_total || 0,
-        recipe_uses_7d: row.uses_7d || 0,
-        recipe_uses_30d: row.uses_30d || 0,
-        recipe_uses_total: row.uses_total || 0,
-        kcal_100: Math.round(row.kcal_100 || 0),
-        protein_g_100: Number((row.protein_g_100 || 0).toFixed(1)),
-        carbs_g_100: Number((row.carbs_g_100 || 0).toFixed(1)),
-        fat_g_100: Number((row.fat_g_100 || 0).toFixed(1)),
-      }));
-  };
-
-  const toggleRecipeFavorite = async (recipeId?: string): Promise<void> => {
-    if (!recipeId) return;
-
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) return;
-
-    const isFavorite = favoriteRecipeIds.includes(recipeId);
-    if (isFavorite) {
-      const { error } = await supabase
-        .from('recipe_favorites')
-        .delete()
-        .eq('user_id', currentUserId)
-        .eq('recipe_id', recipeId);
-      if (error) {
-        console.error('[MealLogForm] Error removing recipe favorite:', error);
-        Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-        return;
-      }
-      const refreshedFavorites = await loadFavoriteRecipeIdsFromDb();
-      setFavoriteRecipeIds(refreshedFavorites);
-      setFavoriteLibraryRecipes(await loadFavoriteRecipesFromDb(refreshedFavorites));
-      await maybeRefreshRecipeAggregates(true);
-      queueRecipeLibraryReload();
-      return;
-    }
-
-    const { error } = await supabase.from('recipe_favorites').insert({
-      user_id: currentUserId,
-      recipe_id: recipeId,
-    });
-    if (error) {
-      console.error('[MealLogForm] Error adding recipe favorite:', error);
-      Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-      return;
-    }
-    const refreshedFavorites = await loadFavoriteRecipeIdsFromDb();
-    setFavoriteRecipeIds(refreshedFavorites);
-    setFavoriteLibraryRecipes(await loadFavoriteRecipesFromDb(refreshedFavorites));
-    await maybeRefreshRecipeAggregates(true);
-    queueRecipeLibraryReload();
   };
 
   const handleSaveCurrentRecipe = async () => {
@@ -1446,14 +937,10 @@ export const MealLogFormScreen = () => {
         }
       }
 
-      const refreshedSavedRecipes = await loadSavedRecipesFromDb();
-      setSavedRecipes(refreshedSavedRecipes);
       await maybeRefreshRecipeAggregates(true);
-      queueRecipeLibraryReload();
       setEditingSavedRecipeId(null);
       setEditingSavedRecipeUpdatedAt(null);
       setEditingRecipeSignature(null);
-      setBuilderWindow('recipes');
       Alert.alert(t('nutrition.recipeSavedTitle'), t('nutrition.recipeSavedMessage'));
     } catch (error) {
       console.error('[MealLogForm] Error saving recipe:', error);
@@ -1463,158 +950,8 @@ export const MealLogFormScreen = () => {
     }
   };
 
-  const handleUseSavedRecipe = (recipe: SavedRecipeDraft) => {
-    trackRecipeUsage(recipe.id, 'saved');
-
-    setName(recipe.name);
-    const clonedIngredients = cloneRecipeIngredientsForMeal(recipe.ingredients);
-    setIngredients(clonedIngredients);
-    setEditingSavedRecipeId(recipe.id);
-    setEditingSavedRecipeUpdatedAt(recipe.updated_at);
-    setEditingRecipeSignature(buildRecipeSignature(recipe.name, clonedIngredients));
-    setBuilderWindow('ingredients');
-    setSearchMessage({ type: 'info', text: t('nutrition.recipeLoadedInBuilder') });
-  };
-
-  const handleShowSavedRecipeDetail = async (recipe: SavedRecipeDraft) => {
-    const totalRecipeAmount = recipe.ingredients.reduce((sum, ingredient) => sum + (ingredient.amount_g || 0), 0);
-    const totalMacros = calculateTotalMacros(recipe.ingredients);
-    const scaleTo100g = totalRecipeAmount > 0 ? 100 / totalRecipeAmount : 0;
-
-    const syntheticRecipe: MealComponent = {
-      id: recipe.id,
-      external_id: recipe.id,
-      name: recipe.name,
-      source: 'database',
-      itemType: 'recipe',
-      recipe_source: 'user',
-      quality_score: recipe.quality_score,
-      amount_g: totalRecipeAmount || 100,
-      // Keep parity with recipe search service: kcal as integer, macros with 1 decimal.
-      kcal_100: Math.round(totalMacros.kcal * scaleTo100g),
-      protein_g_100: Math.round(totalMacros.protein_g * scaleTo100g * 10) / 10,
-      carbs_g_100: Math.round(totalMacros.carbs_g * scaleTo100g * 10) / 10,
-      fat_g_100: Math.round(totalMacros.fats_g * scaleTo100g * 10) / 10,
-      calculated_macros: {
-        kcal: totalMacros.kcal,
-        protein_g: totalMacros.protein_g,
-        carbs_g: totalMacros.carbs_g,
-        fats_g: totalMacros.fats_g,
-      },
-      notes_en: null,
-      notes_es: null,
-    };
-
-    const syntheticIngredients: RecipeIngredientItem[] = recipe.ingredients.map((ingredient, index) => ({
-      id: `${recipe.id}-ingredient-${index}`,
-      ingredient_id: ingredient.external_id || `${recipe.id}-local-${index}`,
-      ingredient_name: ingredient.name,
-      ingredient_name_es: ingredient.name,
-      ingredient_name_en: ingredient.name,
-      quantity: roundIngredientAmount(ingredient.amount_g || 0),
-      unit: 'g',
-      order_index: index,
-      kcal_100: ingredient.kcal_100 || 0,
-      protein_g_100: ingredient.protein_g_100 || 0,
-      carbs_g_100: ingredient.carbs_g_100 || 0,
-      fat_g_100: ingredient.fat_g_100 || 0,
-    }));
-
-    await handleShowMealDetail(syntheticRecipe, syntheticIngredients);
-  };
-
-  const handleEditSavedRecipe = (recipe: SavedRecipeDraft) => {
-    setName(recipe.name);
-    const clonedIngredients = cloneRecipeIngredientsForMeal(recipe.ingredients);
-    setIngredients(clonedIngredients);
-    setEditingSavedRecipeId(recipe.id);
-    setEditingSavedRecipeUpdatedAt(recipe.updated_at);
-    setEditingRecipeSignature(buildRecipeSignature(recipe.name, clonedIngredients));
-    setBuilderWindow('ingredients');
-    setSearchMessage({ type: 'info', text: t('nutrition.recipeReadyToEdit') });
-  };
-
-  const handleToggleSavedRecipeFavorite = async (recipeId: string) => {
-    await toggleRecipeFavorite(recipeId);
-  };
-
-  const handleDeleteSavedRecipe = async (recipeId: string) => {
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) {
-      Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-      return;
-    }
-
-    const { error: deleteItemsError } = await supabase.from('recipe_items').delete().eq('recipe_id', recipeId);
-    if (deleteItemsError) {
-      console.error('[MealLogForm] Error deleting recipe items before recipe delete:', deleteItemsError);
-      Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-      return;
-    }
-
-    const { error: deleteAliasesError } = await supabase.from('recipe_aliases').delete().eq('recipe_id', recipeId);
-    if (deleteAliasesError) {
-      console.error('[MealLogForm] Error deleting recipe aliases before recipe delete:', deleteAliasesError);
-      Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-      return;
-    }
-
-    const { error: deleteRecipeError } = await supabase
-      .from('recipes')
-      .delete()
-      .eq('id', recipeId)
-      .eq('owner_user_id', currentUserId)
-      .eq('source', 'user');
-    if (deleteRecipeError) {
-      console.error('[MealLogForm] Error deleting saved recipe:', deleteRecipeError);
-      Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-      return;
-    }
-
-    setFavoriteRecipeIds(prev => prev.filter(id => id !== recipeId));
-    setFavoriteLibraryRecipes(prev => prev.filter(recipe => recipe.external_id !== recipeId));
-    setSavedRecipes(prev => prev.filter(recipe => recipe.id !== recipeId));
-    await maybeRefreshRecipeAggregates(true);
-    queueRecipeLibraryReload();
-    if (editingSavedRecipeId === recipeId) {
-      setEditingSavedRecipeId(null);
-      setEditingSavedRecipeUpdatedAt(null);
-      setEditingRecipeSignature(null);
-    }
-  };
-
-  const handleToggleFeaturedFavorite = async (recipeExternalId?: string) => {
-    await toggleRecipeFavorite(recipeExternalId);
-  };
-
-  const handleDuplicateRecipeFromLibrary = async (recipe: MealComponent) => {
-    if (!recipe.external_id) {
-      Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-      return;
-    }
-
-    try {
-      await duplicateRecipe(recipe.external_id);
-      const refreshedSavedRecipes = await loadSavedRecipesFromDb();
-      setSavedRecipes(refreshedSavedRecipes);
-      await maybeRefreshRecipeAggregates(true);
-      queueRecipeLibraryReload();
-      Alert.alert(t('nutrition.recipeSavedTitle'), t('nutrition.recipeSavedMessage'));
-    } catch (error) {
-      console.error('[MealLogForm] Error duplicating recipe from library:', error);
-      Alert.alert(t('common.error'), t('nutrition.saveMealError'));
-    }
-  };
-
   const getMealResultBadge = (item: MealComponent): { text: string; color: string } => {
     if (item.itemType === 'recipe') {
-      const isFavorite = item.external_id ? favoriteRecipeIds.includes(item.external_id) : false;
-      if (isFavorite) {
-        return {
-          text: t('nutrition.favoriteBadge'),
-          color: '#FF9F0A',
-        };
-      }
       return {
         text: t('nutrition.recipe'),
         color: '#34C759',
@@ -1819,7 +1156,7 @@ export const MealLogFormScreen = () => {
   // Calculate totals
   const computedMacros = useMemo(() => calculateTotalMacros(ingredients), [ingredients]);
   const finalMacros = ingredients.length > 0 ? computedMacros : manualMacros;
-  const canRegisterMeal = builderWindow === 'ingredients' && !isSaving && !!name;
+  const canRegisterMeal = !isSaving && !!name;
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -1867,337 +1204,6 @@ export const MealLogFormScreen = () => {
     }
   };
 
-  const renderPublicRecipeCard = (recipe: MealComponent) => {
-    const isFavorite = recipe.external_id ? favoriteRecipeIds.includes(recipe.external_id) : false;
-    const macroSummary = t('nutrition.recipeMacroSummaryDetailed', {
-      kcal: Math.round(recipe.kcal_100 || 0),
-      protein: Number((recipe.protein_g_100 || 0).toFixed(1)),
-      carbs: Number((recipe.carbs_g_100 || 0).toFixed(1)),
-      fat: Number((recipe.fat_g_100 || 0).toFixed(1)),
-    });
-
-    return (
-      <View
-        key={`discovery-${recipe.id}`}
-        style={[styles.recipeLibraryCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)' }]}
-      >
-        <View style={styles.recipeLibraryCardHeader}>
-          <Text style={[styles.recipeLibraryCardTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
-            {recipe.name}
-          </Text>
-        </View>
-        <Text style={[styles.recipeLibraryMacroText, { color: themeColors.textSecondary }]} numberOfLines={1}>
-          {macroSummary}
-        </Text>
-        <View style={styles.recipeCardActions}>
-          <TouchableOpacity
-            style={styles.recipeCardActionBtn}
-            onPress={async () => {
-              await handleSelectMealResult(recipe);
-              setBuilderWindow('ingredients');
-            }}
-          >
-            <Text style={[styles.recipeCardActionText, { color: themeColors.primary }]}>
-              {t('nutrition.useRecipeAction')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => handleShowMealDetail(recipe)}>
-            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-              {t('nutrition.viewDetailsAction')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.recipeCardActionBtn}
-            onPress={() => void handleDuplicateRecipeFromLibrary(recipe)}
-          >
-            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-              {t('nutrition.duplicateRecipeAction')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          style={styles.recipeFavoriteButton}
-          onPress={() => void handleToggleFeaturedFavorite(recipe.external_id)}
-        >
-          <Text style={[styles.recipeFavoriteText, { color: isFavorite ? '#FFD166' : themeColors.textSecondary }]}>
-            {isFavorite ? '★' : '☆'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderSavedRecipeCard = (recipe: SavedRecipeDraft, forceFavorite = false) => {
-    const isFavorite = forceFavorite || favoriteRecipeIds.includes(recipe.id);
-
-    return (
-      <View
-        key={recipe.id}
-        style={[styles.recipeLibraryCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)' }]}
-      >
-        <View style={styles.recipeLibraryCardHeader}>
-          <Text style={[styles.recipeLibraryCardTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
-            {recipe.name}
-          </Text>
-        </View>
-        <Text style={[styles.recipeLibraryMeta, { color: themeColors.textSecondary }]}>
-          {recipe.ingredients.length} {t('nutrition.ingredientsCountLabel')} ·{' '}
-          {recipe.visibility === 'public'
-            ? t('nutrition.recipeVisibilityPublicLabel')
-            : t('nutrition.recipeVisibilityPrivateLabel')}
-        </Text>
-        <View style={styles.recipeCardActions}>
-          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => handleUseSavedRecipe(recipe)}>
-            <Text style={[styles.recipeCardActionText, { color: themeColors.primary }]}>
-              {t('nutrition.useRecipeAction')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => void handleShowSavedRecipeDetail(recipe)}>
-            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>
-              {t('nutrition.viewDetailsAction')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => handleEditSavedRecipe(recipe)}>
-            <Text style={[styles.recipeCardActionText, { color: themeColors.textPrimary }]}>{t('common.edit')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.recipeCardActionBtn} onPress={() => void handleDeleteSavedRecipe(recipe.id)}>
-            <Text style={[styles.recipeCardActionText, { color: themeColors.danger }]}>{t('common.delete')}</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          style={styles.recipeFavoriteButton}
-          onPress={() => void handleToggleSavedRecipeFavorite(recipe.id)}
-        >
-          <Text style={[styles.recipeFavoriteText, { color: isFavorite ? '#FFD166' : themeColors.textSecondary }]}>
-            {isFavorite ? '★' : '☆'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderDiscoveryRecipeCard = (recipe: MealComponent) => {
-    const isFavorite = recipe.external_id ? favoriteRecipeIds.includes(recipe.external_id) : false;
-    const uses7d = Math.max(0, Math.round(recipe.recipe_uses_7d ?? 0));
-    const favoritesTotal = Math.max(0, Math.round(recipe.recipe_favorites_total ?? 0), isFavorite ? 1 : 0);
-    const savesTotal = Math.max(0, Math.round(recipe.recipe_saves_total ?? 0));
-    const sourceLabel =
-      recipe.recipe_source === 'system' ? t('nutrition.recipeOriginSystem') : t('nutrition.recipeOriginUsers');
-
-    const metrics: string[] = [];
-    if (uses7d > 0) metrics.push(`🔥 ${uses7d}`);
-    if (favoritesTotal > 0) metrics.push(`★ ${favoritesTotal}`);
-    if (savesTotal > 0) metrics.push(`📌 ${savesTotal}`);
-
-    return (
-      <View
-        key={`discovery-compact-${recipe.id}`}
-        style={[
-          styles.discoveryRecipeCard,
-          { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)' },
-        ]}
-      >
-        <View style={styles.discoveryRecipeHeader}>
-          <Text style={[styles.discoveryRecipeTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
-            {recipe.name}
-          </Text>
-          <TouchableOpacity
-            style={styles.discoveryFavoriteButton}
-            onPress={() => void handleToggleFeaturedFavorite(recipe.external_id)}
-          >
-            <Text style={[styles.discoveryFavoriteIcon, { color: isFavorite ? '#FFD166' : themeColors.textSecondary }]}>
-              {isFavorite ? '★' : '☆'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.discoveryRecipeMetaRow}>
-          <View
-            style={[
-              styles.discoverySourceBadge,
-              {
-                backgroundColor: isDark ? 'rgba(10,132,255,0.20)' : 'rgba(0,122,255,0.14)',
-              },
-            ]}
-          >
-            <Text style={[styles.discoverySourceBadgeText, { color: themeColors.primary }]}>{sourceLabel}</Text>
-          </View>
-          <Text style={[styles.discoveryRecipeMetaText, { color: themeColors.textSecondary }]}>
-            {t('nutrition.discoveryMacroSummary', {
-              kcal: Math.round(recipe.kcal_100 || 0),
-              protein: Number((recipe.protein_g_100 || 0).toFixed(1)),
-              carbs: Number((recipe.carbs_g_100 || 0).toFixed(1)),
-              fat: Number((recipe.fat_g_100 || 0).toFixed(1)),
-            })}
-          </Text>
-        </View>
-
-        {metrics.length > 0 && (
-          <View style={styles.discoveryMetricsRow}>
-            {metrics.map(metric => (
-              <View
-                key={`${recipe.id}-${metric}`}
-                style={[
-                  styles.discoveryMetricChip,
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.045)' },
-                ]}
-              >
-                <Text style={[styles.discoveryMetricText, { color: themeColors.textSecondary }]}>{metric}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        <View style={styles.discoveryRecipeActionsRow}>
-          <TouchableOpacity
-            style={styles.discoveryRecipeActionBtn}
-            onPress={async () => {
-              await handleSelectMealResult(recipe);
-              setBuilderWindow('ingredients');
-            }}
-          >
-            <Text style={[styles.discoveryRecipeActionPrimaryText, { color: themeColors.primary }]}>
-              {t('nutrition.useRecipeAction')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.discoveryRecipeActionBtn} onPress={() => void handleShowMealDetail(recipe)}>
-            <Text style={[styles.discoveryRecipeActionSecondaryText, { color: themeColors.textPrimary }]}>
-              {t('nutrition.viewDetailsAction')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.discoveryRecipeActionBtn}
-            onPress={() => void handleDuplicateRecipeFromLibrary(recipe)}
-          >
-            <Text style={[styles.discoveryRecipeActionSecondaryText, { color: themeColors.textPrimary }]}>
-              {t('nutrition.duplicateRecipeAction')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  const discoverySections = useMemo(
-    () => [
-      { key: 'trending', title: t('nutrition.trendingRecipesTitle'), recipes: displayedTrendingRecipes },
-      { key: 'most-used', title: t('nutrition.mostUsedRecipesTitle'), recipes: displayedMostUsedRecipes },
-      {
-        key: 'top-historical',
-        title: t('nutrition.topHistoricalRecipesTitle'),
-        recipes: displayedTopHistoricalRecipes,
-      },
-    ],
-    [displayedMostUsedRecipes, displayedTopHistoricalRecipes, displayedTrendingRecipes, t],
-  );
-
-  const discoverySectionSignatures = useMemo(
-    () =>
-      discoverySections
-        .filter(section => section.recipes.length > 0)
-        .map(section => section.recipes.map(recipe => recipe.external_id ?? recipe.id).join('|')),
-    [discoverySections],
-  );
-
-  const shouldCollapseDiscoverySections = useMemo(() => {
-    if (discoverySectionSignatures.length <= 1) {
-      return false;
-    }
-
-    const [firstSignature, ...restSignatures] = discoverySectionSignatures;
-    return restSignatures.every(signature => signature === firstSignature);
-  }, [discoverySectionSignatures]);
-
-  const mergedDiscoveryRecipes = useMemo(() => {
-    const recipeMap = new Map<string, MealComponent>();
-    [...displayedTrendingRecipes, ...displayedMostUsedRecipes, ...displayedTopHistoricalRecipes].forEach(recipe => {
-      const key = recipe.external_id ?? recipe.id;
-      if (!recipeMap.has(key)) {
-        recipeMap.set(key, recipe);
-      }
-    });
-
-    const bestRecipeByExactName = new Map<string, MealComponent>();
-    Array.from(recipeMap.values()).forEach(recipe => {
-      const exactNameKey = recipe.name.trim();
-      const currentBest = bestRecipeByExactName.get(exactNameKey);
-
-      if (!currentBest) {
-        bestRecipeByExactName.set(exactNameKey, recipe);
-        return;
-      }
-
-      const recipeFavorites = recipe.recipe_favorites_total ?? 0;
-      const currentBestFavorites = currentBest.recipe_favorites_total ?? 0;
-
-      if (recipeFavorites > currentBestFavorites) {
-        bestRecipeByExactName.set(exactNameKey, recipe);
-        return;
-      }
-
-      if (recipeFavorites === currentBestFavorites) {
-        const recipeSaves = recipe.recipe_saves_total ?? 0;
-        const currentBestSaves = currentBest.recipe_saves_total ?? 0;
-
-        if (recipeSaves > currentBestSaves) {
-          bestRecipeByExactName.set(exactNameKey, recipe);
-          return;
-        }
-
-        if (recipeSaves < currentBestSaves) {
-          return;
-        }
-
-        const recipeUsageScore =
-          (recipe.recipe_uses_30d ?? 0) * 1000 + (recipe.recipe_uses_7d ?? 0) * 100 + (recipe.recipe_uses_total ?? 0);
-        const currentBestUsageScore =
-          (currentBest.recipe_uses_30d ?? 0) * 1000 +
-          (currentBest.recipe_uses_7d ?? 0) * 100 +
-          (currentBest.recipe_uses_total ?? 0);
-
-        if (recipeUsageScore > currentBestUsageScore) {
-          bestRecipeByExactName.set(exactNameKey, recipe);
-          return;
-        }
-
-        if (recipeUsageScore < currentBestUsageScore) {
-          return;
-        }
-
-        const recipeIsSystem = recipe.recipe_source === 'system';
-        const currentBestIsSystem = currentBest.recipe_source === 'system';
-        if (recipeIsSystem && !currentBestIsSystem) {
-          bestRecipeByExactName.set(exactNameKey, recipe);
-          return;
-        }
-
-        const recipePopularity = recipe.recipe_popularity_score ?? 0;
-        const currentBestPopularity = currentBest.recipe_popularity_score ?? 0;
-        if (recipePopularity > currentBestPopularity) {
-          bestRecipeByExactName.set(exactNameKey, recipe);
-        }
-      }
-    });
-
-    return Array.from(bestRecipeByExactName.values()).slice(0, 12);
-  }, [displayedMostUsedRecipes, displayedTopHistoricalRecipes, displayedTrendingRecipes]);
-
-  const displayedDiscoverySections = useMemo(() => {
-    if (!shouldCollapseDiscoverySections) {
-      return discoverySections;
-    }
-
-    return [
-      {
-        key: 'popular',
-        title: t('nutrition.popularRecipesTitle'),
-        recipes: mergedDiscoveryRecipes,
-      },
-    ];
-  }, [discoverySections, mergedDiscoveryRecipes, shouldCollapseDiscoverySections, t]);
-
-  const hasDiscoveryResults = displayedDiscoverySections.some(section => section.recipes.length > 0);
-
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.container}>
       <SafeAreaView style={{ flex: 1, paddingBottom: 0 }}>
@@ -2243,1302 +1249,876 @@ export const MealLogFormScreen = () => {
             contentContainerStyle={[styles.scrollContent, { paddingBottom: contentBottomPadding }]}
             showsVerticalScrollIndicator={false}
           >
-            <View
+            <TouchableOpacity
               style={[
-                styles.builderWindowSwitcher,
-                { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+                styles.openRecipeLibraryButton,
+                {
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                  borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                },
               ]}
+              onPress={() => navigation.navigate('RecipeLibrary')}
+              activeOpacity={0.85}
             >
-              <TouchableOpacity
-                style={[
-                  styles.builderWindowTab,
-                  builderWindow === 'ingredients' && {
-                    backgroundColor: themeColors.primary + '20',
-                  },
-                ]}
-                onPress={() => setBuilderWindow('ingredients')}
-              >
-                <Text
-                  style={[
-                    styles.builderWindowTabText,
-                    { color: builderWindow === 'ingredients' ? themeColors.primary : themeColors.textSecondary },
-                  ]}
-                >
-                  {t('nutrition.ingredientsWindow')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.builderWindowTab,
-                  builderWindow === 'recipes' && {
-                    backgroundColor: themeColors.primary + '20',
-                  },
-                ]}
-                onPress={() => setBuilderWindow('recipes')}
-              >
-                <Text
-                  style={[
-                    styles.builderWindowTabText,
-                    { color: builderWindow === 'recipes' ? themeColors.primary : themeColors.textSecondary },
-                  ]}
-                >
-                  {t('nutrition.recipesWindow')}
-                </Text>
-              </TouchableOpacity>
-            </View>
+              <Bookmark size={16} color={themeColors.primary} strokeWidth={2.3} />
+              <Text style={[styles.openRecipeLibraryButtonText, { color: themeColors.primary }]}>
+                {t('nutrition.openRecipeLibrary')}
+              </Text>
+            </TouchableOpacity>
 
-            {builderWindow === 'ingredients' ? (
-              <>
-                {/* Name Input - Simple & Elegant */}
-                <View style={styles.nameSection}>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={[
-                        styles.nameInput,
-                        {
-                          color: themeColors.textPrimary,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                        },
-                      ]}
-                      placeholder={t('nutrition.mealName')}
-                      value={name}
-                      onChangeText={setName}
-                      placeholderTextColor={themeColors.textSecondary}
-                      autoFocus={!isEdit}
-                    />
-                    {/* Search Button - Apple Liquid Glass Style */}
-                    {name.length >= 2 && !isEdit && ingredients.length === 0 && (
-                      <TouchableOpacity style={styles.aiButton} onPress={handleAiSearch} disabled={isSearchingRecipe}>
-                        <LinearGradient
-                          colors={['#007AFF', '#00C6FF']} // Premium Blue Gradient
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.aiButtonGradient}
-                        >
-                          {isSearchingRecipe ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <Search size={18} color="#FFFFFF" strokeWidth={2.5} />
-                          )}
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {isEditingRecipe && (
-                    <View
-                      style={[
-                        styles.savedRecipeIndicator,
-                        {
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                          borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
-                        },
-                      ]}
-                    >
-                      <Bookmark size={13} color={themeColors.textSecondary} strokeWidth={2.3} />
-                      <Text style={[styles.savedRecipeIndicatorText, { color: themeColors.textSecondary }]}>
-                        {t('nutrition.savedRecipeIndicator')}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Search Message / Error */}
-                  {searchMessage && (
-                    <View
-                      style={[
-                        styles.messageCard,
-                        searchMessage.type === 'error' ? styles.messageError : styles.messageInfo,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.messageText,
-                          searchMessage.type === 'error' ? styles.messageTextError : styles.messageTextInfo,
-                        ]}
+            <>
+              {/* Name Input - Simple & Elegant */}
+              <View style={styles.nameSection}>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={[
+                      styles.nameInput,
+                      {
+                        color: themeColors.textPrimary,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                      },
+                    ]}
+                    placeholder={t('nutrition.mealName')}
+                    value={name}
+                    onChangeText={setName}
+                    placeholderTextColor={themeColors.textSecondary}
+                    autoFocus={!isEdit}
+                  />
+                  {/* Search Button - Apple Liquid Glass Style */}
+                  {name.length >= 2 && !isEdit && ingredients.length === 0 && (
+                    <TouchableOpacity style={styles.aiButton} onPress={handleAiSearch} disabled={isSearchingRecipe}>
+                      <LinearGradient
+                        colors={['#007AFF', '#00C6FF']} // Premium Blue Gradient
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.aiButtonGradient}
                       >
-                        {searchMessage.text}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Meal Search Results with Badges */}
-                  {mealSearchResults.length > 0 && (
-                    <View style={styles.mealSearchResults}>
-                      <View style={styles.resultsHeaderRow}>
-                        <Text style={[styles.resultsTitle, { color: themeColors.textSecondary }]}>
-                          {t('nutrition.resultsTitleParen')}
-                          {mealSearchResults.length})
-                        </Text>
-                        <View
-                          style={[
-                            styles.resultHintBadge,
-                            {
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.resultHintText, { color: themeColors.textSecondary }]}>
-                            {t('nutrition.recipe')}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.mealResultFiltersRow}>
-                        {[
-                          { key: 'recipe' as const, label: t('nutrition.recipe'), count: recipeSearchResults.length },
-                          {
-                            key: 'precooked' as const,
-                            label: t('nutrition.preCooked'),
-                            count: precookedSearchResults.length,
-                          },
-                          {
-                            key: 'all' as const,
-                            label: t('nutrition.all'),
-                            count: mealSearchResults.length,
-                          },
-                        ].map(filter => {
-                          const isActive = mealSearchFilter === filter.key;
-                          return (
-                            <TouchableOpacity
-                              key={filter.key}
-                              style={[
-                                styles.mealFilterChip,
-                                {
-                                  backgroundColor: isActive
-                                    ? themeColors.primary + '20'
-                                    : isDark
-                                      ? 'rgba(255,255,255,0.05)'
-                                      : 'rgba(0,0,0,0.04)',
-                                  borderColor: isActive ? themeColors.primary + '55' : 'transparent',
-                                },
-                              ]}
-                              onPress={() => setMealSearchFilter(filter.key)}
-                            >
-                              <Text
-                                style={[
-                                  styles.mealFilterChipText,
-                                  {
-                                    color: isActive ? themeColors.primary : themeColors.textSecondary,
-                                  },
-                                ]}
-                              >
-                                {filter.label} ({filter.count})
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-
-                      {(mealSearchFilter === 'all'
-                        ? [
-                            { section: t('nutrition.recipe'), data: paginatedRecipeSearchResults },
-                            { section: t('nutrition.preCooked'), data: precookedSearchResults },
-                          ]
-                        : [
-                            {
-                              section: null,
-                              data:
-                                mealSearchFilter === 'recipe'
-                                  ? paginatedRecipeSearchResults
-                                  : filteredMealSearchResults,
-                            },
-                          ]
-                      ).map((group, groupIndex) => {
-                        if (group.data.length === 0) return null;
-
-                        return (
-                          <View key={`${group.section ?? 'mixed'}-${groupIndex}`} style={styles.mealResultSection}>
-                            {group.section ? (
-                              <Text style={[styles.mealResultSectionTitle, { color: themeColors.textSecondary }]}>
-                                {group.section} ({group.data.length})
-                              </Text>
-                            ) : null}
-
-                            {group.data.map(item => {
-                              const badge = getMealResultBadge(item);
-
-                              return (
-                                <TouchableOpacity
-                                  key={item.id}
-                                  style={[
-                                    styles.mealResultItem,
-                                    {
-                                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                                    },
-                                  ]}
-                                  onPress={() => handleSelectMealResult(item)}
-                                >
-                                  <View style={styles.mealResultInfo}>
-                                    <Text
-                                      style={[styles.mealResultName, { color: themeColors.textPrimary }]}
-                                      numberOfLines={1}
-                                    >
-                                      {item.name}
-                                    </Text>
-                                    <View style={styles.mealResultMeta}>
-                                      <View style={[styles.mealBadge, { backgroundColor: badge.color + '20' }]}>
-                                        <Text style={[styles.mealBadgeText, { color: badge.color }]}>{badge.text}</Text>
-                                      </View>
-                                      <Text style={[styles.mealResultMacros, { color: themeColors.textSecondary }]}>
-                                        {item.kcal_100}
-                                        {t('nutrition.kcalPer100g')}
-                                      </Text>
-                                    </View>
-                                  </View>
-                                  <View style={styles.mealResultActions}>
-                                    <TouchableOpacity
-                                      style={styles.mealInfoBtn}
-                                      onPress={() => handleShowMealDetail(item)}
-                                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                    >
-                                      <Info size={18} color={themeColors.textSecondary} />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      style={styles.mealAddBtn}
-                                      onPress={() => handleSelectMealResult(item)}
-                                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                    >
-                                      <Plus size={20} color={themeColors.primary} />
-                                    </TouchableOpacity>
-                                  </View>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </View>
-                        );
-                      })}
-                      {showMealRecipePagination && (
-                        <View style={styles.recipePaginationRow}>
-                          <TouchableOpacity
-                            style={[
-                              styles.recipePaginationButton,
-                              mealRecipePage === 1 && styles.recipePaginationButtonDisabled,
-                              { borderColor: themeColors.border },
-                            ]}
-                            onPress={() => setMealRecipePage(prev => Math.max(1, prev - 1))}
-                            disabled={mealRecipePage === 1}
-                          >
-                            <Text
-                              style={[
-                                styles.recipePaginationButtonText,
-                                { color: mealRecipePage === 1 ? themeColors.textSecondary : themeColors.textPrimary },
-                              ]}
-                            >
-                              {t('nutrition.recipeLibraryPagePrev')}
-                            </Text>
-                          </TouchableOpacity>
-                          <Text style={[styles.recipePaginationLabel, { color: themeColors.textSecondary }]}>
-                            {t('nutrition.recipeLibraryPageIndicator', {
-                              current: mealRecipePage,
-                              total: mealRecipeTotalPages,
-                            })}
-                          </Text>
-                          <TouchableOpacity
-                            style={[
-                              styles.recipePaginationButton,
-                              mealRecipePage >= mealRecipeTotalPages && styles.recipePaginationButtonDisabled,
-                              { borderColor: themeColors.border },
-                            ]}
-                            onPress={() => setMealRecipePage(prev => Math.min(mealRecipeTotalPages, prev + 1))}
-                            disabled={mealRecipePage >= mealRecipeTotalPages}
-                          >
-                            <Text
-                              style={[
-                                styles.recipePaginationButtonText,
-                                {
-                                  color:
-                                    mealRecipePage >= mealRecipeTotalPages
-                                      ? themeColors.textSecondary
-                                      : themeColors.textPrimary,
-                                },
-                              ]}
-                            >
-                              {t('nutrition.recipeLibraryPageNext')}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
+                        {isSearchingRecipe ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Search size={18} color="#FFFFFF" strokeWidth={2.5} />
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
                   )}
                 </View>
 
-                {ingredients.length > 0 && (
-                  <View style={styles.ingredientsSection}>
-                    <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
-                      {t('nutrition.ingredientsTitleParen')}
-                      {ingredients.length})
+                {isEditingRecipe && (
+                  <View
+                    style={[
+                      styles.savedRecipeIndicator,
+                      {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                      },
+                    ]}
+                  >
+                    <Bookmark size={13} color={themeColors.textSecondary} strokeWidth={2.3} />
+                    <Text style={[styles.savedRecipeIndicatorText, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.savedRecipeIndicator')}
                     </Text>
-                    {ingredients.map(ing => {
-                      const isEditing = ing.id === editingIngredientId;
-                      return (
-                        <View
-                          key={ing.id}
-                          style={[
-                            styles.ingredientCard,
-                            dynamicStyles.card, // dynamic background
-                            { shadowColor: themeColors.shadow },
-                          ]}
-                        >
-                          <View style={styles.ingredientMain}>
-                            <View style={styles.ingredientInfo}>
-                              <Text style={[styles.ingredientName, { color: themeColors.textPrimary }]}>
-                                {ing.name}
-                              </Text>
-
-                              {isEditing ? (
-                                <View>
-                                  <View style={styles.editRow}>
-                                    <TextInput
-                                      style={[
-                                        styles.editInput,
-                                        {
-                                          color: themeColors.primary,
-                                          borderColor: themeColors.primary,
-                                        },
-                                      ]}
-                                      value={editAmountInput}
-                                      onChangeText={value => setEditAmountInput(sanitizeIngredientAmountInput(value))}
-                                      keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                                      autoFocus
-                                      selectTextOnFocus
-                                    />
-                                    <Text style={[styles.editUnit, { color: themeColors.textSecondary }]}>g</Text>
-                                  </View>
-                                  {isIngredientAmountOverLimit(editAmountInput) && (
-                                    <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4 }}>
-                                      {t('nutrition.max1kgLabel')}
-                                    </Text>
-                                  )}
-                                </View>
-                              ) : (
-                                <View style={styles.ingredientMeta}>
-                                  <Text style={[styles.ingredientAmount, { color: themeColors.primary }]}>
-                                    {formatIngredientAmount(ing.amount_g || 0)}g
-                                  </Text>
-                                  <View style={styles.dot} />
-                                  <Text style={[styles.ingredientSource, { color: themeColors.textSecondary }]}>
-                                    {convertEnergyToUi(ing.calculated_macros?.kcal || 0).label}
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-
-                            <View style={styles.ingredientActions}>
-                              {isEditing ? (
-                                <>
-                                  <TouchableOpacity
-                                    onPress={handleSaveEdit}
-                                    style={[
-                                      styles.actionBtn,
-                                      isIngredientAmountOverLimit(editAmountInput) && { opacity: 0.5 },
-                                    ]}
-                                    disabled={isIngredientAmountOverLimit(editAmountInput)}
-                                  >
-                                    <Check size={20} color={themeColors.primary} strokeWidth={2.5} />
-                                  </TouchableOpacity>
-                                  <TouchableOpacity onPress={handleCancelEdit} style={styles.actionBtn}>
-                                    <X size={20} color={themeColors.textSecondary} strokeWidth={2.5} />
-                                  </TouchableOpacity>
-                                </>
-                              ) : (
-                                <>
-                                  <TouchableOpacity onPress={() => handleStartEdit(ing)} style={styles.actionBtn}>
-                                    <Text style={[styles.actionBtnText, { color: themeColors.primary }]}>
-                                      {t('common.edit')}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    onPress={() => handleRemoveIngredient(ing.id)}
-                                    style={styles.actionBtn}
-                                  >
-                                    <Trash2 size={16} color={themeColors.danger} strokeWidth={2} />
-                                  </TouchableOpacity>
-                                </>
-                              )}
-                            </View>
-                          </View>
-                        </View>
-                      );
-                    })}
                   </View>
                 )}
 
-                <View style={styles.recipeBuilderActionsRow}>
-                  <TouchableOpacity
+                {/* Search Message / Error */}
+                {searchMessage && (
+                  <View
                     style={[
-                      styles.recipeBuilderSaveButton,
-                      {
-                        backgroundColor:
-                          canSubmitRecipe && !isSaving
-                            ? themeColors.primary
-                            : isDark
-                              ? 'rgba(255,255,255,0.14)'
-                              : 'rgba(0,0,0,0.12)',
-                      },
+                      styles.messageCard,
+                      searchMessage.type === 'error' ? styles.messageError : styles.messageInfo,
                     ]}
-                    onPress={handleSaveCurrentRecipe}
-                    disabled={!canSubmitRecipe || isSaving}
                   >
-                    <View style={styles.recipeBuilderSaveButtonContent}>
-                      {isSaving ? (
-                        <>
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                          <Text style={styles.recipeBuilderSaveButtonText}>
-                            {isEditingRecipe ? t('nutrition.updatingRecipeAction') : t('nutrition.savingRecipeAction')}
-                          </Text>
-                        </>
-                      ) : (
-                        <Text style={styles.recipeBuilderSaveButtonText}>
-                          {isEditingRecipe ? t('nutrition.updateRecipeAction') : t('nutrition.saveRecipeAction')}
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                  <Text style={[styles.recipeBuilderSaveHint, { color: themeColors.textSecondary }]}>
-                    {t('nutrition.saveRecipeHint')}
-                  </Text>
-                </View>
-
-                {/* Add Ingredient Section */}
-                <View style={styles.addSection}>
-                  {/* Simple Tab Selector */}
-                  <View style={styles.tabRow}>
-                    <TouchableOpacity
-                      onPress={() => setInputMode('search')}
+                    <Text
                       style={[
-                        styles.tab,
-                        { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
-                        inputMode === 'search' && { backgroundColor: themeColors.primary + '15' },
+                        styles.messageText,
+                        searchMessage.type === 'error' ? styles.messageTextError : styles.messageTextInfo,
                       ]}
                     >
-                      <Search
-                        size={16}
-                        color={inputMode === 'search' ? themeColors.primary : themeColors.textSecondary}
-                        strokeWidth={2}
-                      />
-                      <Text
-                        style={[
-                          styles.tabText,
-                          { color: themeColors.textSecondary },
-                          inputMode === 'search' && { color: themeColors.primary, fontWeight: '600' },
-                        ]}
-                      >
-                        {t('nutrition.search')}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => setInputMode('scan')}
-                      style={[
-                        styles.tab,
-                        { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
-                        inputMode === 'scan' && { backgroundColor: themeColors.primary + '15' },
-                      ]}
-                    >
-                      <ScanBarcode
-                        size={16}
-                        color={inputMode === 'scan' ? themeColors.primary : themeColors.textSecondary}
-                        strokeWidth={2}
-                      />
-                      <Text
-                        style={[
-                          styles.tabText,
-                          { color: themeColors.textSecondary },
-                          inputMode === 'scan' && { color: themeColors.primary, fontWeight: '600' },
-                        ]}
-                      >
-                        {t('nutrition.scan')}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => setInputMode('manual')}
-                      style={[
-                        styles.tab,
-                        { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
-                        inputMode === 'manual' && { backgroundColor: themeColors.primary + '15' },
-                      ]}
-                    >
-                      <Plus
-                        size={16}
-                        color={inputMode === 'manual' ? themeColors.primary : themeColors.textSecondary}
-                        strokeWidth={2}
-                      />
-                      <Text
-                        style={[
-                          styles.tabText,
-                          { color: themeColors.textSecondary },
-                          inputMode === 'manual' && { color: themeColors.primary, fontWeight: '600' },
-                        ]}
-                      >
-                        {t('nutrition.manual')}
-                      </Text>
-                    </TouchableOpacity>
+                      {searchMessage.text}
+                    </Text>
                   </View>
+                )}
 
-                  {/* Input Area */}
-                  <View style={styles.inputContainer}>
-                    {inputMode === 'search' && (
-                      <>
-                        {!selectedFood ? (
-                          <>
-                            <PersonalFoodTrends mealType={mealType} onPick={handlePickTrend} />
-                            <IngredientSearchPanel
-                              onSelect={food => {
-                                setSelectedFood(food);
-                                setAmountInput('100');
-                              }}
-                              onGoToManual={() => setInputMode('manual')}
-                            />
-                          </>
-                        ) : (
-                          <View
-                            style={[
-                              styles.selectedCard,
-                              {
-                                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                              },
-                            ]}
-                          >
-                            <View style={styles.selectedRow}>
-                              <Text style={[styles.selectedName, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                                {selectedFood.name}
-                              </Text>
-                              <TouchableOpacity
-                                onPress={() => setSelectedFood(null)}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                              >
-                                <X size={18} color={themeColors.textSecondary} />
-                              </TouchableOpacity>
-                            </View>
-                            {renderQuickAmountChips()}
-                            <View style={styles.amountRow}>
-                              <TextInput
-                                style={[
-                                  styles.amountInput,
-                                  {
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
-                                    color: themeColors.textPrimary,
-                                    borderColor: themeColors.border,
-                                  },
-                                ]}
-                                value={amountInput}
-                                onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
-                                keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                                placeholder="100"
-                                placeholderTextColor={themeColors.textSecondary}
-                                selectTextOnFocus
-                              />
-                              <Text style={[styles.amountUnit, { color: themeColors.textSecondary }]}>g</Text>
-                              <TouchableOpacity
-                                onPress={handleAddIngredient}
-                                style={[
-                                  styles.addBtn,
-                                  isIngredientAmountOverLimit(amountInput) && {
-                                    backgroundColor: themeColors.textSecondary,
-                                    opacity: 0.5,
-                                  },
-                                ]}
-                                disabled={isIngredientAmountOverLimit(amountInput)}
-                              >
-                                <Text style={styles.addBtnText}>{t('nutrition.add')}</Text>
-                              </TouchableOpacity>
-                            </View>
-                            {isIngredientAmountOverLimit(amountInput) && (
-                              <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
-                                {t('nutrition.maxInputLimit1kg')}
-                              </Text>
-                            )}
-                          </View>
-                        )}
-                      </>
-                    )}
-
-                    {inputMode === 'scan' && (
-                      <>
-                        {!selectedFood ? (
-                          isBarcodeLookupPending ? (
-                            <View
-                              style={[
-                                styles.scanLoadingCard,
-                                {
-                                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                                  borderColor: themeColors.border,
-                                },
-                              ]}
-                            >
-                              <View
-                                style={[
-                                  styles.scanLoadingIcon,
-                                  { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
-                                ]}
-                              >
-                                <ActivityIndicator size="small" color={themeColors.primary} />
-                              </View>
-                              <Text style={[styles.scanLoadingTitle, { color: themeColors.textPrimary }]}>
-                                {t('nutrition.searchingScannedProduct')}
-                              </Text>
-                              <Text style={[styles.scanLoadingSubtitle, { color: themeColors.textSecondary }]}>
-                                {t('nutrition.loadingBarcodeData')}
-                              </Text>
-                            </View>
-                          ) : (
-                            <TouchableOpacity
-                              style={[
-                                styles.scanButton,
-                                {
-                                  backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : themeColors.textPrimary,
-                                },
-                              ]}
-                              onPress={() => setShowScanner(true)}
-                            >
-                              <ScanBarcode
-                                size={40}
-                                color={isDark ? themeColors.textPrimary : themeColors.background}
-                                strokeWidth={2}
-                              />
-                              <Text
-                                style={[
-                                  styles.scanButtonText,
-                                  { color: isDark ? themeColors.textPrimary : themeColors.background },
-                                ]}
-                              >
-                                {t('nutrition.openBarcodeScanner')}
-                              </Text>
-                            </TouchableOpacity>
-                          )
-                        ) : (
-                          <View
-                            style={[
-                              styles.selectedCard,
-                              {
-                                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                              },
-                            ]}
-                          >
-                            <View style={styles.selectedRow}>
-                              <Text style={[styles.selectedName, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                                {selectedFood.name}
-                              </Text>
-                              <TouchableOpacity
-                                onPress={() => {
-                                  setSelectedFood(null);
-                                  setAmountInput('');
-                                }}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                              >
-                                <X size={18} color={themeColors.textSecondary} />
-                              </TouchableOpacity>
-                            </View>
-                            {renderQuickAmountChips()}
-                            <View style={styles.amountRow}>
-                              <TextInput
-                                style={[
-                                  styles.amountInput,
-                                  {
-                                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
-                                    color: themeColors.textPrimary,
-                                    borderColor: themeColors.border,
-                                  },
-                                ]}
-                                value={amountInput}
-                                onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
-                                keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                                placeholder="100"
-                                placeholderTextColor={themeColors.textSecondary}
-                                selectTextOnFocus
-                              />
-                              <Text style={[styles.amountUnit, { color: themeColors.textSecondary }]}>g</Text>
-                              <TouchableOpacity
-                                onPress={handleAddIngredient}
-                                style={[
-                                  styles.addBtn,
-                                  isIngredientAmountOverLimit(amountInput) && {
-                                    backgroundColor: themeColors.textSecondary,
-                                    opacity: 0.5,
-                                  },
-                                ]}
-                                disabled={isIngredientAmountOverLimit(amountInput)}
-                              >
-                                <Text style={styles.addBtnText}>{t('nutrition.add')}</Text>
-                              </TouchableOpacity>
-                            </View>
-                            {isIngredientAmountOverLimit(amountInput) && (
-                              <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
-                                {t('nutrition.maxInputLimit1kg')}
-                              </Text>
-                            )}
-                          </View>
-                        )}
-                      </>
-                    )}
-
-                    {inputMode === 'manual' && (
-                      <View style={styles.manualForm}>
-                        <TextInput
-                          style={[
-                            styles.manualInput,
-                            {
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
-                              color: themeColors.textPrimary,
-                              borderColor: themeColors.border,
-                            },
-                          ]}
-                          placeholder={t('nutrition.ingredientName')}
-                          value={manualIngName}
-                          onChangeText={setManualIngName}
-                          placeholderTextColor={themeColors.textSecondary}
-                        />
-                        <TextInput
-                          style={[
-                            styles.manualInput,
-                            {
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
-                              color: themeColors.textPrimary,
-                              borderColor: themeColors.border,
-                            },
-                          ]}
-                          value={amountInput}
-                          onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
-                          keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                          placeholder={t('nutrition.weightGrams')}
-                          placeholderTextColor={themeColors.textSecondary}
-                        />
-                        {isIngredientAmountOverLimit(amountInput) && (
-                          <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: -8, marginBottom: 4 }}>
-                            {t('nutrition.maxInputLimit1kg')}
-                          </Text>
-                        )}
-                        <Text style={[styles.manualLabel, { color: themeColors.textSecondary }]}>
-                          {t('nutrition.nutritionInfo100g')}
-                        </Text>
-                        <View style={styles.macrosGrid}>
-                          <View style={styles.macroField}>
-                            <Text style={[styles.macroFieldLabel, { color: themeColors.textSecondary }]}>
-                              {units.energy === 'kcal' ? t('nutrition.kcal') : t('nutrition.unitKj')}
-                            </Text>
-                            <TextInput
-                              style={[
-                                styles.macroFieldInput,
-                                {
-                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
-                                  color: themeColors.textPrimary,
-                                  borderColor: themeColors.border,
-                                },
-                              ]}
-                              placeholder="0"
-                              value={manualMacroInputs.kcal_100}
-                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                              placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={text => {
-                                const value = sanitizeIngredientAmountInput(text);
-                                setManualMacroInputs(prev => ({ ...prev, kcal_100: value }));
-                                setManualPer100g({
-                                  ...manualPer100g,
-                                  kcal_100: parseEnergyToKcal(parseManualMacroInput(value) ?? 0),
-                                });
-                              }}
-                            />
-                          </View>
-                          <View style={styles.macroField}>
-                            <Text style={[styles.macroFieldLabel, { color: themeColors.textSecondary }]}>
-                              {t('nutrition.proteinCaps')}
-                            </Text>
-                            <TextInput
-                              style={[
-                                styles.macroFieldInput,
-                                {
-                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
-                                  color: themeColors.textPrimary,
-                                  borderColor: themeColors.border,
-                                },
-                              ]}
-                              placeholder="0"
-                              value={manualMacroInputs.protein_g_100}
-                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                              placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={text => {
-                                const value = sanitizeIngredientAmountInput(text);
-                                setManualMacroInputs(prev => ({ ...prev, protein_g_100: value }));
-                                setManualPer100g({
-                                  ...manualPer100g,
-                                  protein_g_100: parseManualMacroInput(value) ?? 0,
-                                });
-                              }}
-                            />
-                          </View>
-                          <View style={styles.macroField}>
-                            <Text style={[styles.macroFieldLabel, { color: themeColors.textSecondary }]}>
-                              {t('nutrition.carbsShort')}
-                            </Text>
-                            <TextInput
-                              style={[
-                                styles.macroFieldInput,
-                                {
-                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
-                                  color: themeColors.textPrimary,
-                                  borderColor: themeColors.border,
-                                },
-                              ]}
-                              placeholder="0"
-                              value={manualMacroInputs.carbs_g_100}
-                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                              placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={text => {
-                                const value = sanitizeIngredientAmountInput(text);
-                                setManualMacroInputs(prev => ({ ...prev, carbs_g_100: value }));
-                                setManualPer100g({
-                                  ...manualPer100g,
-                                  carbs_g_100: parseManualMacroInput(value) ?? 0,
-                                });
-                              }}
-                            />
-                          </View>
-                          <View style={styles.macroField}>
-                            <Text style={[styles.macroFieldLabel, { color: themeColors.textSecondary }]}>
-                              {t('nutrition.fats')}
-                            </Text>
-                            <TextInput
-                              style={[
-                                styles.macroFieldInput,
-                                {
-                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
-                                  color: themeColors.textPrimary,
-                                  borderColor: themeColors.border,
-                                },
-                              ]}
-                              placeholder="0"
-                              value={manualMacroInputs.fat_g_100}
-                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
-                              placeholderTextColor={themeColors.textSecondary}
-                              onChangeText={text => {
-                                const value = sanitizeIngredientAmountInput(text);
-                                setManualMacroInputs(prev => ({ ...prev, fat_g_100: value }));
-                                setManualPer100g({
-                                  ...manualPer100g,
-                                  fat_g_100: parseManualMacroInput(value) ?? 0,
-                                });
-                              }}
-                            />
-                          </View>
-                        </View>
-                        {shouldShowManualIngredientNutritionWarning && (
-                          <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 6 }}>
-                            {t('nutrition.manualIngredientNutritionInvalid')}
-                          </Text>
-                        )}
-                        <TouchableOpacity
-                          onPress={handleAddIngredient}
-                          style={[
-                            styles.manualAddButton,
-                            !isManualIngredientFormComplete && {
-                              backgroundColor: themeColors.textSecondary,
-                              opacity: 0.5,
-                            },
-                          ]}
-                          disabled={!isManualIngredientFormComplete}
-                        >
-                          <Text style={styles.manualAddButtonText}>{t('nutrition.addIngredient')}</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </>
-            ) : (
-              <View style={styles.recipeLibrarySection}>
-                <View style={styles.recipeLibraryHeaderRow}>
-                  <Text style={[styles.recipeLibraryTitle, { color: themeColors.textPrimary }]}>
-                    {t('nutrition.recipeLibraryTitle')}
-                  </Text>
-                </View>
-                <View style={styles.recipeLibraryControlsRow}>
-                  <View style={[styles.recipeLibraryViewSwitcher, { backgroundColor: 'transparent' }]}>
-                    <TouchableOpacity
-                      style={[
-                        styles.recipeLibraryViewTab,
-                        recipeLibraryView === 'normal' && {
-                          backgroundColor: isDark ? 'rgba(10,132,255,0.22)' : 'rgba(0,122,255,0.14)',
-                          borderColor: isDark ? 'rgba(120,190,255,0.45)' : 'rgba(0,122,255,0.35)',
-                        },
-                        recipeLibraryView !== 'normal' && {
-                          borderColor: isDark ? 'rgba(255,255,255,0.16)' : '#D1D5DB',
-                        },
-                      ]}
-                      onPress={() => setRecipeLibraryView('normal')}
-                    >
-                      <Text
-                        style={[
-                          styles.recipeLibraryViewTabText,
-                          { color: recipeLibraryView === 'normal' ? themeColors.primary : themeColors.textSecondary },
-                        ]}
-                      >
-                        {t('nutrition.recipeLibraryViewNormal')}
+                {/* Meal Search Results with Badges */}
+                {mealSearchResults.length > 0 && (
+                  <View style={styles.mealSearchResults}>
+                    <View style={styles.resultsHeaderRow}>
+                      <Text style={[styles.resultsTitle, { color: themeColors.textSecondary }]}>
+                        {t('nutrition.resultsTitleParen')}
+                        {mealSearchResults.length})
                       </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.recipeLibraryViewTab,
-                        recipeLibraryView === 'favorites' && {
-                          backgroundColor: isDark ? 'rgba(10,132,255,0.22)' : 'rgba(0,122,255,0.14)',
-                          borderColor: isDark ? 'rgba(120,190,255,0.45)' : 'rgba(0,122,255,0.35)',
-                        },
-                        recipeLibraryView !== 'favorites' && {
-                          borderColor: isDark ? 'rgba(255,255,255,0.16)' : '#D1D5DB',
-                        },
-                      ]}
-                      onPress={() => setRecipeLibraryView('favorites')}
-                    >
-                      <Text
+                      <View
                         style={[
-                          styles.recipeLibraryViewTabText,
+                          styles.resultHintBadge,
                           {
-                            color: recipeLibraryView === 'favorites' ? themeColors.primary : themeColors.textSecondary,
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
                           },
                         ]}
                       >
-                        {t('nutrition.recipeLibraryViewFavorites')}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.recipeLibraryViewTab,
-                        recipeLibraryView === 'search' && {
-                          backgroundColor: isDark ? 'rgba(10,132,255,0.22)' : 'rgba(0,122,255,0.14)',
-                          borderColor: isDark ? 'rgba(120,190,255,0.45)' : 'rgba(0,122,255,0.35)',
-                        },
-                        recipeLibraryView !== 'search' && {
-                          borderColor: isDark ? 'rgba(255,255,255,0.16)' : '#D1D5DB',
-                        },
-                      ]}
-                      onPress={() => setRecipeLibraryView('search')}
-                    >
-                      <Text
-                        style={[
-                          styles.recipeLibraryViewTabText,
-                          { color: recipeLibraryView === 'search' ? themeColors.primary : themeColors.textSecondary },
-                        ]}
-                      >
-                        {t('nutrition.recipeLibraryViewSearch')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {recipeLibraryView === 'search' && (
-                  <>
-                    <View
-                      style={[
-                        styles.recipeLibrarySearchStandaloneBox,
-                        {
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)',
-                          borderColor: isDark ? 'rgba(255,255,255,0.12)' : '#D1D5DB',
-                        },
-                      ]}
-                    >
-                      <Search size={16} color={themeColors.textSecondary} />
-                      <TextInput
-                        style={[styles.recipeLibrarySearchStandaloneInput, { color: themeColors.textPrimary }]}
-                        placeholder={t('nutrition.recipeLibrarySearchPlaceholder')}
-                        placeholderTextColor={themeColors.textSecondary}
-                        value={recipeLibrarySearchQuery}
-                        onChangeText={setRecipeLibrarySearchQuery}
-                      />
-                      {recipeLibrarySearchQuery.length > 0 && (
-                        <TouchableOpacity
-                          onPress={() => setRecipeLibrarySearchQuery('')}
-                          style={styles.recipeLibraryClearBtn}
-                        >
-                          <X size={14} color={themeColors.textSecondary} />
-                        </TouchableOpacity>
-                      )}
+                        <Text style={[styles.resultHintText, { color: themeColors.textSecondary }]}>
+                          {t('nutrition.recipe')}
+                        </Text>
+                      </View>
                     </View>
 
-                    <View style={styles.recipeOriginFilterRow}>
+                    <View style={styles.mealResultFiltersRow}>
                       {[
-                        { key: 'all' as const, label: t('nutrition.recipeOriginAll') },
-                        { key: 'users' as const, label: t('nutrition.recipeOriginUsers') },
-                        { key: 'system' as const, label: t('nutrition.recipeOriginSystem') },
+                        { key: 'recipe' as const, label: t('nutrition.recipe'), count: recipeSearchResults.length },
+                        {
+                          key: 'precooked' as const,
+                          label: t('nutrition.preCooked'),
+                          count: precookedSearchResults.length,
+                        },
+                        {
+                          key: 'all' as const,
+                          label: t('nutrition.all'),
+                          count: mealSearchResults.length,
+                        },
                       ].map(filter => {
-                        const isActive = recipeLibraryOriginFilter === filter.key;
+                        const isActive = mealSearchFilter === filter.key;
                         return (
                           <TouchableOpacity
                             key={filter.key}
                             style={[
-                              styles.recipeOriginFilterChip,
+                              styles.mealFilterChip,
                               {
                                 backgroundColor: isActive
-                                  ? isDark
-                                    ? 'rgba(10,132,255,0.22)'
-                                    : 'rgba(0,122,255,0.14)'
+                                  ? themeColors.primary + '20'
                                   : isDark
                                     ? 'rgba(255,255,255,0.05)'
-                                    : 'rgba(0,0,0,0.03)',
-                                borderColor: isActive
-                                  ? isDark
-                                    ? 'rgba(120,190,255,0.45)'
-                                    : 'rgba(0,122,255,0.35)'
-                                  : 'transparent',
+                                    : 'rgba(0,0,0,0.04)',
+                                borderColor: isActive ? themeColors.primary + '55' : 'transparent',
                               },
                             ]}
-                            onPress={() => setRecipeLibraryOriginFilter(filter.key)}
+                            onPress={() => setMealSearchFilter(filter.key)}
                           >
                             <Text
                               style={[
-                                styles.recipeOriginFilterChipText,
-                                { color: isActive ? themeColors.primary : themeColors.textSecondary },
+                                styles.mealFilterChipText,
+                                {
+                                  color: isActive ? themeColors.primary : themeColors.textSecondary,
+                                },
                               ]}
                             >
-                              {filter.label}
+                              {filter.label} ({filter.count})
                             </Text>
                           </TouchableOpacity>
                         );
                       })}
                     </View>
-                  </>
-                )}
 
-                {recipeLibraryView !== 'search' && (
-                  <Text style={[styles.recipeSectionTitle, { color: themeColors.textPrimary }]}>
-                    {recipeLibraryView === 'favorites'
-                      ? t('nutrition.mySavedFavoriteRecipes')
-                      : t('nutrition.mySavedRecipes')}
-                  </Text>
-                )}
-                {recipeLibraryView !== 'search' &&
-                  (isRecipeLibraryLoading ? (
-                    <View style={styles.recipesLoadingRow}>
-                      <ActivityIndicator size="small" color={themeColors.primary} />
-                      <Text style={[styles.recipesLoadingText, { color: themeColors.textSecondary }]}>
-                        {t('common.loading')}
-                      </Text>
-                    </View>
-                  ) : (
-                      recipeLibraryView === 'favorites'
-                        ? paginatedFavoriteLibraryRecipes.length === 0
-                        : filteredDisplayedSavedRecipes.length === 0
-                    ) ? (
-                    <View
-                      style={[
-                        styles.recipeEmptyState,
-                        { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
-                      ]}
-                    >
-                      <Text style={[styles.recipeEmptyStateTitle, { color: themeColors.textPrimary }]}>
-                        {recipeLibraryView === 'favorites'
-                          ? t('nutrition.favoriteRecipesEmptyTitle')
-                          : t('nutrition.savedRecipesEmptyTitle')}
-                      </Text>
-                      <Text style={[styles.recipeEmptyStateText, { color: themeColors.textSecondary }]}>
-                        {recipeLibraryView === 'favorites'
-                          ? t('nutrition.favoriteRecipesEmptyMessage')
-                          : t('nutrition.savedRecipesEmptyMessage')}
-                      </Text>
-                    </View>
-                  ) : (
-                    <>
-                      {recipeLibraryView === 'favorites' ? (
-                        <View style={styles.recipeSubsection}>
-                          {paginatedFavoriteLibraryRecipes.map(renderPublicRecipeCard)}
-                        </View>
-                      ) : (
-                        <>
-                          {paginatedMySavedRecipes.some(recipe => favoriteRecipeIds.includes(recipe.id)) && (
-                            <View style={styles.recipeSubsection}>
-                              <Text style={[styles.recipeSubsectionTitle, { color: themeColors.textSecondary }]}>
-                                {t('nutrition.favoriteRecipesLabel')}
-                              </Text>
-                              {paginatedMySavedRecipes
-                                .filter(recipe => favoriteRecipeIds.includes(recipe.id))
-                                .map(recipe => renderSavedRecipeCard(recipe, true))}
-                            </View>
-                          )}
+                    {(mealSearchFilter === 'all'
+                      ? [
+                          { section: t('nutrition.recipe'), data: paginatedRecipeSearchResults },
+                          { section: t('nutrition.preCooked'), data: precookedSearchResults },
+                        ]
+                      : [
+                          {
+                            section: null,
+                            data:
+                              mealSearchFilter === 'recipe' ? paginatedRecipeSearchResults : filteredMealSearchResults,
+                          },
+                        ]
+                    ).map((group, groupIndex) => {
+                      if (group.data.length === 0) return null;
 
-                          <View style={styles.recipeSubsection}>
-                            {paginatedMySavedRecipes
-                              .filter(recipe => !favoriteRecipeIds.includes(recipe.id))
-                              .map(recipe => renderSavedRecipeCard(recipe))}
-                          </View>
-                        </>
-                      )}
-                    </>
-                  ))}
-
-                {recipeLibraryView === 'search' ? (
-                  <>
-                    <Text style={[styles.recipeSectionTitle, { color: themeColors.textPrimary }]}>
-                      {t('nutrition.recipeLibrarySearchResultsTitle')}
-                    </Text>
-                    {isRecipeLibraryLoading || isRecipeLibrarySearching ? (
-                      <View style={styles.recipesLoadingRow}>
-                        <ActivityIndicator size="small" color={themeColors.primary} />
-                        <Text style={[styles.recipesLoadingText, { color: themeColors.textSecondary }]}>
-                          {t('common.loading')}
-                        </Text>
-                      </View>
-                    ) : displayedRecipeLibrarySearchResults.length === 0 ? (
-                      <View
-                        style={[
-                          styles.recipeEmptyState,
-                          { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
-                        ]}
-                      >
-                        <Text style={[styles.recipeEmptyStateText, { color: themeColors.textSecondary }]}>
-                          {t('nutrition.recipeLibrarySearchEmpty')}
-                        </Text>
-                      </View>
-                    ) : (
-                      displayedRecipeLibrarySearchResults.map(renderPublicRecipeCard)
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {!isRecipeLibraryLoading && !hasDiscoveryResults ? (
-                      <View
-                        style={[
-                          styles.recipeEmptyState,
-                          { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
-                        ]}
-                      >
-                        <Text style={[styles.recipeEmptyStateText, { color: themeColors.textSecondary }]}>
-                          {t('nutrition.discoveryRecipesEmpty')}
-                        </Text>
-                      </View>
-                    ) : !isRecipeLibraryLoading ? (
-                      displayedDiscoverySections.map(section => {
-                        if (section.recipes.length === 0) {
-                          return null;
-                        }
-
-                        return (
-                          <View key={section.key} style={styles.recipeSubsection}>
-                            <Text style={[styles.recipeSectionTitle, { color: themeColors.textPrimary }]}>
-                              {section.title}
+                      return (
+                        <View key={`${group.section ?? 'mixed'}-${groupIndex}`} style={styles.mealResultSection}>
+                          {group.section ? (
+                            <Text style={[styles.mealResultSectionTitle, { color: themeColors.textSecondary }]}>
+                              {group.section} ({group.data.length})
                             </Text>
-                            <ScrollView
-                              horizontal
-                              showsHorizontalScrollIndicator={false}
-                              contentContainerStyle={styles.discoveryRecipeScrollContent}
-                            >
-                              {section.recipes.map(renderDiscoveryRecipeCard)}
-                            </ScrollView>
-                          </View>
-                        );
-                      })
-                    ) : null}
-                  </>
-                )}
-                {recipeLibraryView !== 'search' && savedRecipesTotalPages > 1 && (
-                  <View style={styles.recipePaginationRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.recipePaginationButton,
-                        recipeLibrarySavedPage === 1 && styles.recipePaginationButtonDisabled,
-                        { borderColor: themeColors.border },
-                      ]}
-                      onPress={() => setRecipeLibrarySavedPage(prev => Math.max(1, prev - 1))}
-                      disabled={recipeLibrarySavedPage === 1}
-                    >
-                      <Text
-                        style={[
-                          styles.recipePaginationButtonText,
-                          {
-                            color: recipeLibrarySavedPage === 1 ? themeColors.textSecondary : themeColors.textPrimary,
-                          },
-                        ]}
-                      >
-                        {t('nutrition.recipeLibraryPagePrev')}
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={[styles.recipePaginationLabel, { color: themeColors.textSecondary }]}>
-                      {t('nutrition.recipeLibraryPageIndicator', {
-                        current: recipeLibrarySavedPage,
-                        total: savedRecipesTotalPages,
-                      })}
-                    </Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.recipePaginationButton,
-                        recipeLibrarySavedPage >= savedRecipesTotalPages && styles.recipePaginationButtonDisabled,
-                        { borderColor: themeColors.border },
-                      ]}
-                      onPress={() => setRecipeLibrarySavedPage(prev => Math.min(savedRecipesTotalPages, prev + 1))}
-                      disabled={recipeLibrarySavedPage >= savedRecipesTotalPages}
-                    >
-                      <Text
-                        style={[
-                          styles.recipePaginationButtonText,
-                          {
-                            color:
-                              recipeLibrarySavedPage >= savedRecipesTotalPages
-                                ? themeColors.textSecondary
-                                : themeColors.textPrimary,
-                          },
-                        ]}
-                      >
-                        {t('nutrition.recipeLibraryPageNext')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                {recipeLibraryView === 'search' && recipeLibrarySearchTotalPages > 1 && (
-                  <View style={styles.recipePaginationRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.recipePaginationButton,
-                        recipeLibrarySearchPage === 1 && styles.recipePaginationButtonDisabled,
-                        { borderColor: themeColors.border },
-                      ]}
-                      onPress={() => setRecipeLibrarySearchPage(prev => Math.max(1, prev - 1))}
-                      disabled={recipeLibrarySearchPage === 1}
-                    >
-                      <Text
-                        style={[
-                          styles.recipePaginationButtonText,
-                          {
-                            color: recipeLibrarySearchPage === 1 ? themeColors.textSecondary : themeColors.textPrimary,
-                          },
-                        ]}
-                      >
-                        {t('nutrition.recipeLibraryPagePrev')}
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={[styles.recipePaginationLabel, { color: themeColors.textSecondary }]}>
-                      {t('nutrition.recipeLibraryPageIndicator', {
-                        current: recipeLibrarySearchPage,
-                        total: recipeLibrarySearchTotalPages,
-                      })}
-                    </Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.recipePaginationButton,
-                        recipeLibrarySearchPage >= recipeLibrarySearchTotalPages &&
-                          styles.recipePaginationButtonDisabled,
-                        { borderColor: themeColors.border },
-                      ]}
-                      onPress={() =>
-                        setRecipeLibrarySearchPage(prev => Math.min(recipeLibrarySearchTotalPages, prev + 1))
-                      }
-                      disabled={recipeLibrarySearchPage >= recipeLibrarySearchTotalPages}
-                    >
-                      <Text
-                        style={[
-                          styles.recipePaginationButtonText,
-                          {
-                            color:
-                              recipeLibrarySearchPage >= recipeLibrarySearchTotalPages
-                                ? themeColors.textSecondary
-                                : themeColors.textPrimary,
-                          },
-                        ]}
-                      >
-                        {t('nutrition.recipeLibraryPageNext')}
-                      </Text>
-                    </TouchableOpacity>
+                          ) : null}
+
+                          {group.data.map(item => {
+                            const badge = getMealResultBadge(item);
+
+                            return (
+                              <TouchableOpacity
+                                key={item.id}
+                                style={[
+                                  styles.mealResultItem,
+                                  {
+                                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                  },
+                                ]}
+                                onPress={() => handleSelectMealResult(item)}
+                              >
+                                <View style={styles.mealResultInfo}>
+                                  <Text
+                                    style={[styles.mealResultName, { color: themeColors.textPrimary }]}
+                                    numberOfLines={1}
+                                  >
+                                    {item.name}
+                                  </Text>
+                                  <View style={styles.mealResultMeta}>
+                                    <View style={[styles.mealBadge, { backgroundColor: badge.color + '20' }]}>
+                                      <Text style={[styles.mealBadgeText, { color: badge.color }]}>{badge.text}</Text>
+                                    </View>
+                                    <Text style={[styles.mealResultMacros, { color: themeColors.textSecondary }]}>
+                                      {item.kcal_100}
+                                      {t('nutrition.kcalPer100g')}
+                                    </Text>
+                                  </View>
+                                </View>
+                                <View style={styles.mealResultActions}>
+                                  <TouchableOpacity
+                                    style={styles.mealInfoBtn}
+                                    onPress={() => handleShowMealDetail(item)}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                  >
+                                    <Info size={18} color={themeColors.textSecondary} />
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={styles.mealAddBtn}
+                                    onPress={() => handleSelectMealResult(item)}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                  >
+                                    <Plus size={20} color={themeColors.primary} />
+                                  </TouchableOpacity>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      );
+                    })}
+                    {showMealRecipePagination && (
+                      <View style={styles.recipePaginationRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.recipePaginationButton,
+                            mealRecipePage === 1 && styles.recipePaginationButtonDisabled,
+                            { borderColor: themeColors.border },
+                          ]}
+                          onPress={() => setMealRecipePage(prev => Math.max(1, prev - 1))}
+                          disabled={mealRecipePage === 1}
+                        >
+                          <Text
+                            style={[
+                              styles.recipePaginationButtonText,
+                              { color: mealRecipePage === 1 ? themeColors.textSecondary : themeColors.textPrimary },
+                            ]}
+                          >
+                            {t('nutrition.recipeLibraryPagePrev')}
+                          </Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.recipePaginationLabel, { color: themeColors.textSecondary }]}>
+                          {t('nutrition.recipeLibraryPageIndicator', {
+                            current: mealRecipePage,
+                            total: mealRecipeTotalPages,
+                          })}
+                        </Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.recipePaginationButton,
+                            mealRecipePage >= mealRecipeTotalPages && styles.recipePaginationButtonDisabled,
+                            { borderColor: themeColors.border },
+                          ]}
+                          onPress={() => setMealRecipePage(prev => Math.min(mealRecipeTotalPages, prev + 1))}
+                          disabled={mealRecipePage >= mealRecipeTotalPages}
+                        >
+                          <Text
+                            style={[
+                              styles.recipePaginationButtonText,
+                              {
+                                color:
+                                  mealRecipePage >= mealRecipeTotalPages
+                                    ? themeColors.textSecondary
+                                    : themeColors.textPrimary,
+                              },
+                            ]}
+                          >
+                            {t('nutrition.recipeLibraryPageNext')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 )}
               </View>
-            )}
+
+              {ingredients.length > 0 && (
+                <View style={styles.ingredientsSection}>
+                  <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>
+                    {t('nutrition.ingredientsTitleParen')}
+                    {ingredients.length})
+                  </Text>
+                  {ingredients.map(ing => {
+                    const isEditing = ing.id === editingIngredientId;
+                    return (
+                      <View
+                        key={ing.id}
+                        style={[
+                          styles.ingredientCard,
+                          dynamicStyles.card, // dynamic background
+                          { shadowColor: themeColors.shadow },
+                        ]}
+                      >
+                        <View style={styles.ingredientMain}>
+                          <View style={styles.ingredientInfo}>
+                            <Text style={[styles.ingredientName, { color: themeColors.textPrimary }]}>{ing.name}</Text>
+
+                            {isEditing ? (
+                              <View>
+                                <View style={styles.editRow}>
+                                  <TextInput
+                                    style={[
+                                      styles.editInput,
+                                      {
+                                        color: themeColors.primary,
+                                        borderColor: themeColors.primary,
+                                      },
+                                    ]}
+                                    value={editAmountInput}
+                                    onChangeText={value => setEditAmountInput(sanitizeIngredientAmountInput(value))}
+                                    keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                                    autoFocus
+                                    selectTextOnFocus
+                                  />
+                                  <Text style={[styles.editUnit, { color: themeColors.textSecondary }]}>g</Text>
+                                </View>
+                                {isIngredientAmountOverLimit(editAmountInput) && (
+                                  <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4 }}>
+                                    {t('nutrition.max1kgLabel')}
+                                  </Text>
+                                )}
+                              </View>
+                            ) : (
+                              <View style={styles.ingredientMeta}>
+                                <Text style={[styles.ingredientAmount, { color: themeColors.primary }]}>
+                                  {formatIngredientAmount(ing.amount_g || 0)}g
+                                </Text>
+                                <View style={styles.dot} />
+                                <Text style={[styles.ingredientSource, { color: themeColors.textSecondary }]}>
+                                  {convertEnergyToUi(ing.calculated_macros?.kcal || 0).label}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <View style={styles.ingredientActions}>
+                            {isEditing ? (
+                              <>
+                                <TouchableOpacity
+                                  onPress={handleSaveEdit}
+                                  style={[
+                                    styles.actionBtn,
+                                    isIngredientAmountOverLimit(editAmountInput) && { opacity: 0.5 },
+                                  ]}
+                                  disabled={isIngredientAmountOverLimit(editAmountInput)}
+                                >
+                                  <Check size={20} color={themeColors.primary} strokeWidth={2.5} />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={handleCancelEdit} style={styles.actionBtn}>
+                                  <X size={20} color={themeColors.textSecondary} strokeWidth={2.5} />
+                                </TouchableOpacity>
+                              </>
+                            ) : (
+                              <>
+                                <TouchableOpacity onPress={() => handleStartEdit(ing)} style={styles.actionBtn}>
+                                  <Text style={[styles.actionBtnText, { color: themeColors.primary }]}>
+                                    {t('common.edit')}
+                                  </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  onPress={() => handleRemoveIngredient(ing.id)}
+                                  style={styles.actionBtn}
+                                >
+                                  <Trash2 size={16} color={themeColors.danger} strokeWidth={2} />
+                                </TouchableOpacity>
+                              </>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              <View style={styles.recipeBuilderActionsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.recipeBuilderSaveButton,
+                    {
+                      backgroundColor:
+                        canSubmitRecipe && !isSaving
+                          ? themeColors.primary
+                          : isDark
+                            ? 'rgba(255,255,255,0.14)'
+                            : 'rgba(0,0,0,0.12)',
+                    },
+                  ]}
+                  onPress={handleSaveCurrentRecipe}
+                  disabled={!canSubmitRecipe || isSaving}
+                >
+                  <View style={styles.recipeBuilderSaveButtonContent}>
+                    {isSaving ? (
+                      <>
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <Text style={styles.recipeBuilderSaveButtonText}>
+                          {isEditingRecipe ? t('nutrition.updatingRecipeAction') : t('nutrition.savingRecipeAction')}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={styles.recipeBuilderSaveButtonText}>
+                        {isEditingRecipe ? t('nutrition.updateRecipeAction') : t('nutrition.saveRecipeAction')}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+                <Text style={[styles.recipeBuilderSaveHint, { color: themeColors.textSecondary }]}>
+                  {t('nutrition.saveRecipeHint')}
+                </Text>
+              </View>
+
+              {/* Add Ingredient Section */}
+              <View style={styles.addSection}>
+                {/* Simple Tab Selector */}
+                <View style={styles.tabRow}>
+                  <TouchableOpacity
+                    onPress={() => setInputMode('search')}
+                    style={[
+                      styles.tab,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+                      inputMode === 'search' && { backgroundColor: themeColors.primary + '15' },
+                    ]}
+                  >
+                    <Search
+                      size={16}
+                      color={inputMode === 'search' ? themeColors.primary : themeColors.textSecondary}
+                      strokeWidth={2}
+                    />
+                    <Text
+                      style={[
+                        styles.tabText,
+                        { color: themeColors.textSecondary },
+                        inputMode === 'search' && { color: themeColors.primary, fontWeight: '600' },
+                      ]}
+                    >
+                      {t('nutrition.search')}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setInputMode('scan')}
+                    style={[
+                      styles.tab,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+                      inputMode === 'scan' && { backgroundColor: themeColors.primary + '15' },
+                    ]}
+                  >
+                    <ScanBarcode
+                      size={16}
+                      color={inputMode === 'scan' ? themeColors.primary : themeColors.textSecondary}
+                      strokeWidth={2}
+                    />
+                    <Text
+                      style={[
+                        styles.tabText,
+                        { color: themeColors.textSecondary },
+                        inputMode === 'scan' && { color: themeColors.primary, fontWeight: '600' },
+                      ]}
+                    >
+                      {t('nutrition.scan')}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setInputMode('manual')}
+                    style={[
+                      styles.tab,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
+                      inputMode === 'manual' && { backgroundColor: themeColors.primary + '15' },
+                    ]}
+                  >
+                    <Plus
+                      size={16}
+                      color={inputMode === 'manual' ? themeColors.primary : themeColors.textSecondary}
+                      strokeWidth={2}
+                    />
+                    <Text
+                      style={[
+                        styles.tabText,
+                        { color: themeColors.textSecondary },
+                        inputMode === 'manual' && { color: themeColors.primary, fontWeight: '600' },
+                      ]}
+                    >
+                      {t('nutrition.manual')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Input Area */}
+                <View style={styles.inputContainer}>
+                  {inputMode === 'search' && (
+                    <>
+                      {!selectedFood ? (
+                        <>
+                          <PersonalFoodTrends mealType={mealType} onPick={handlePickTrend} />
+                          <IngredientSearchPanel
+                            onSelect={food => {
+                              setSelectedFood(food);
+                              setAmountInput('100');
+                            }}
+                            onGoToManual={() => setInputMode('manual')}
+                          />
+                        </>
+                      ) : (
+                        <View
+                          style={[
+                            styles.selectedCard,
+                            {
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                            },
+                          ]}
+                        >
+                          <View style={styles.selectedRow}>
+                            <Text style={[styles.selectedName, { color: themeColors.textPrimary }]} numberOfLines={1}>
+                              {selectedFood.name}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => setSelectedFood(null)}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                              <X size={18} color={themeColors.textSecondary} />
+                            </TouchableOpacity>
+                          </View>
+                          {renderQuickAmountChips()}
+                          <View style={styles.amountRow}>
+                            <TextInput
+                              style={[
+                                styles.amountInput,
+                                {
+                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
+                                  color: themeColors.textPrimary,
+                                  borderColor: themeColors.border,
+                                },
+                              ]}
+                              value={amountInput}
+                              onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                              placeholder="100"
+                              placeholderTextColor={themeColors.textSecondary}
+                              selectTextOnFocus
+                            />
+                            <Text style={[styles.amountUnit, { color: themeColors.textSecondary }]}>g</Text>
+                            <TouchableOpacity
+                              onPress={handleAddIngredient}
+                              style={[
+                                styles.addBtn,
+                                isIngredientAmountOverLimit(amountInput) && {
+                                  backgroundColor: themeColors.textSecondary,
+                                  opacity: 0.5,
+                                },
+                              ]}
+                              disabled={isIngredientAmountOverLimit(amountInput)}
+                            >
+                              <Text style={styles.addBtnText}>{t('nutrition.add')}</Text>
+                            </TouchableOpacity>
+                          </View>
+                          {isIngredientAmountOverLimit(amountInput) && (
+                            <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                              {t('nutrition.maxInputLimit1kg')}
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  )}
+
+                  {inputMode === 'scan' && (
+                    <>
+                      {!selectedFood ? (
+                        isBarcodeLookupPending ? (
+                          <View
+                            style={[
+                              styles.scanLoadingCard,
+                              {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                borderColor: themeColors.border,
+                              },
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.scanLoadingIcon,
+                                { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
+                              ]}
+                            >
+                              <ActivityIndicator size="small" color={themeColors.primary} />
+                            </View>
+                            <Text style={[styles.scanLoadingTitle, { color: themeColors.textPrimary }]}>
+                              {t('nutrition.searchingScannedProduct')}
+                            </Text>
+                            <Text style={[styles.scanLoadingSubtitle, { color: themeColors.textSecondary }]}>
+                              {t('nutrition.loadingBarcodeData')}
+                            </Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={[
+                              styles.scanButton,
+                              {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : themeColors.textPrimary,
+                              },
+                            ]}
+                            onPress={() => setShowScanner(true)}
+                          >
+                            <ScanBarcode
+                              size={40}
+                              color={isDark ? themeColors.textPrimary : themeColors.background}
+                              strokeWidth={2}
+                            />
+                            <Text
+                              style={[
+                                styles.scanButtonText,
+                                { color: isDark ? themeColors.textPrimary : themeColors.background },
+                              ]}
+                            >
+                              {t('nutrition.openBarcodeScanner')}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      ) : (
+                        <View
+                          style={[
+                            styles.selectedCard,
+                            {
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                            },
+                          ]}
+                        >
+                          <View style={styles.selectedRow}>
+                            <Text style={[styles.selectedName, { color: themeColors.textPrimary }]} numberOfLines={1}>
+                              {selectedFood.name}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setSelectedFood(null);
+                                setAmountInput('');
+                              }}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                              <X size={18} color={themeColors.textSecondary} />
+                            </TouchableOpacity>
+                          </View>
+                          {renderQuickAmountChips()}
+                          <View style={styles.amountRow}>
+                            <TextInput
+                              style={[
+                                styles.amountInput,
+                                {
+                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
+                                  color: themeColors.textPrimary,
+                                  borderColor: themeColors.border,
+                                },
+                              ]}
+                              value={amountInput}
+                              onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                              placeholder="100"
+                              placeholderTextColor={themeColors.textSecondary}
+                              selectTextOnFocus
+                            />
+                            <Text style={[styles.amountUnit, { color: themeColors.textSecondary }]}>g</Text>
+                            <TouchableOpacity
+                              onPress={handleAddIngredient}
+                              style={[
+                                styles.addBtn,
+                                isIngredientAmountOverLimit(amountInput) && {
+                                  backgroundColor: themeColors.textSecondary,
+                                  opacity: 0.5,
+                                },
+                              ]}
+                              disabled={isIngredientAmountOverLimit(amountInput)}
+                            >
+                              <Text style={styles.addBtnText}>{t('nutrition.add')}</Text>
+                            </TouchableOpacity>
+                          </View>
+                          {isIngredientAmountOverLimit(amountInput) && (
+                            <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                              {t('nutrition.maxInputLimit1kg')}
+                            </Text>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  )}
+
+                  {inputMode === 'manual' && (
+                    <View style={styles.manualForm}>
+                      <TextInput
+                        style={[
+                          styles.manualInput,
+                          {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
+                            color: themeColors.textPrimary,
+                            borderColor: themeColors.border,
+                          },
+                        ]}
+                        placeholder={t('nutrition.ingredientName')}
+                        value={manualIngName}
+                        onChangeText={setManualIngName}
+                        placeholderTextColor={themeColors.textSecondary}
+                      />
+                      <TextInput
+                        style={[
+                          styles.manualInput,
+                          {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
+                            color: themeColors.textPrimary,
+                            borderColor: themeColors.border,
+                          },
+                        ]}
+                        value={amountInput}
+                        onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
+                        keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                        placeholder={t('nutrition.weightGrams')}
+                        placeholderTextColor={themeColors.textSecondary}
+                      />
+                      {isIngredientAmountOverLimit(amountInput) && (
+                        <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: -8, marginBottom: 4 }}>
+                          {t('nutrition.maxInputLimit1kg')}
+                        </Text>
+                      )}
+                      <Text style={[styles.manualLabel, { color: themeColors.textSecondary }]}>
+                        {t('nutrition.nutritionInfo100g')}
+                      </Text>
+                      <View style={styles.macrosGrid}>
+                        <View style={styles.macroField}>
+                          <Text style={[styles.macroFieldLabel, { color: themeColors.textSecondary }]}>
+                            {units.energy === 'kcal' ? t('nutrition.kcal') : t('nutrition.unitKj')}
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.macroFieldInput,
+                              {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
+                                color: themeColors.textPrimary,
+                                borderColor: themeColors.border,
+                              },
+                            ]}
+                            placeholder="0"
+                            value={manualMacroInputs.kcal_100}
+                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            placeholderTextColor={themeColors.textSecondary}
+                            onChangeText={text => {
+                              const value = sanitizeIngredientAmountInput(text);
+                              setManualMacroInputs(prev => ({ ...prev, kcal_100: value }));
+                              setManualPer100g({
+                                ...manualPer100g,
+                                kcal_100: parseEnergyToKcal(parseManualMacroInput(value) ?? 0),
+                              });
+                            }}
+                          />
+                        </View>
+                        <View style={styles.macroField}>
+                          <Text style={[styles.macroFieldLabel, { color: themeColors.textSecondary }]}>
+                            {t('nutrition.proteinCaps')}
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.macroFieldInput,
+                              {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
+                                color: themeColors.textPrimary,
+                                borderColor: themeColors.border,
+                              },
+                            ]}
+                            placeholder="0"
+                            value={manualMacroInputs.protein_g_100}
+                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            placeholderTextColor={themeColors.textSecondary}
+                            onChangeText={text => {
+                              const value = sanitizeIngredientAmountInput(text);
+                              setManualMacroInputs(prev => ({ ...prev, protein_g_100: value }));
+                              setManualPer100g({
+                                ...manualPer100g,
+                                protein_g_100: parseManualMacroInput(value) ?? 0,
+                              });
+                            }}
+                          />
+                        </View>
+                        <View style={styles.macroField}>
+                          <Text style={[styles.macroFieldLabel, { color: themeColors.textSecondary }]}>
+                            {t('nutrition.carbsShort')}
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.macroFieldInput,
+                              {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
+                                color: themeColors.textPrimary,
+                                borderColor: themeColors.border,
+                              },
+                            ]}
+                            placeholder="0"
+                            value={manualMacroInputs.carbs_g_100}
+                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            placeholderTextColor={themeColors.textSecondary}
+                            onChangeText={text => {
+                              const value = sanitizeIngredientAmountInput(text);
+                              setManualMacroInputs(prev => ({ ...prev, carbs_g_100: value }));
+                              setManualPer100g({
+                                ...manualPer100g,
+                                carbs_g_100: parseManualMacroInput(value) ?? 0,
+                              });
+                            }}
+                          />
+                        </View>
+                        <View style={styles.macroField}>
+                          <Text style={[styles.macroFieldLabel, { color: themeColors.textSecondary }]}>
+                            {t('nutrition.fats')}
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.macroFieldInput,
+                              {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFF',
+                                color: themeColors.textPrimary,
+                                borderColor: themeColors.border,
+                              },
+                            ]}
+                            placeholder="0"
+                            value={manualMacroInputs.fat_g_100}
+                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            placeholderTextColor={themeColors.textSecondary}
+                            onChangeText={text => {
+                              const value = sanitizeIngredientAmountInput(text);
+                              setManualMacroInputs(prev => ({ ...prev, fat_g_100: value }));
+                              setManualPer100g({
+                                ...manualPer100g,
+                                fat_g_100: parseManualMacroInput(value) ?? 0,
+                              });
+                            }}
+                          />
+                        </View>
+                      </View>
+                      {shouldShowManualIngredientNutritionWarning && (
+                        <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 6 }}>
+                          {t('nutrition.manualIngredientNutritionInvalid')}
+                        </Text>
+                      )}
+                      <TouchableOpacity
+                        onPress={handleAddIngredient}
+                        style={[
+                          styles.manualAddButton,
+                          !isManualIngredientFormComplete && {
+                            backgroundColor: themeColors.textSecondary,
+                            opacity: 0.5,
+                          },
+                        ]}
+                        disabled={!isManualIngredientFormComplete}
+                      >
+                        <Text style={styles.manualAddButtonText}>{t('nutrition.addIngredient')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </>
 
             {/* Legal Disclaimer */}
             <View style={styles.legalDisclaimerContainer}>
@@ -3813,7 +2393,6 @@ export const MealLogFormScreen = () => {
                   setShowMealDetailModal(false);
                   if (selectedMealDetail) {
                     await handleSelectMealResult(selectedMealDetail);
-                    setBuilderWindow('ingredients');
                   }
                 }}
               >
@@ -3891,104 +2470,22 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
 
-  builderWindowSwitcher: {
+  openRecipeLibraryButton: {
     flexDirection: 'row',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 14,
-    gap: 6,
-  },
-  builderWindowTab: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 12,
+    marginBottom: 14,
   },
-  builderWindowTabText: {
-    fontSize: 12,
+  openRecipeLibraryButtonText: {
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.25,
   },
 
-  recipeLibrarySection: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  recipeLibraryHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 10,
-  },
-  recipeLibraryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  recipeLibraryViewSwitcher: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  recipeLibraryControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  recipeLibrarySearchStandaloneBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    height: 42,
-  },
-  recipeLibrarySearchStandaloneInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    paddingVertical: 0,
-  },
-  recipeLibraryClearBtn: {
-    width: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recipeLibraryViewTab: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  recipeLibraryViewTabText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  recipeOriginFilterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: -2,
-  },
-  recipeOriginFilterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  recipeOriginFilterChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
   recipeBuilderActionsRow: {
     marginBottom: 14,
     gap: 8,
@@ -4012,184 +2509,6 @@ const styles = StyleSheet.create({
   recipeBuilderSaveHint: {
     fontSize: 10,
     lineHeight: 17,
-  },
-  recipeSectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  recipeSubsection: {
-    gap: 8,
-  },
-  discoveryRecipeScrollContent: {
-    gap: 10,
-    paddingRight: 4,
-  },
-  discoveryRecipeCard: {
-    width: 276,
-    borderRadius: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    gap: 9,
-  },
-  discoveryRecipeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  discoveryRecipeTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  discoveryFavoriteButton: {
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  discoveryFavoriteIcon: {
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-  discoveryRecipeMetaRow: {
-    gap: 7,
-  },
-  discoverySourceBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  discoverySourceBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  discoveryRecipeMetaText: {
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  discoveryMetricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  discoveryMetricChip: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  discoveryMetricText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  discoveryRecipeActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  discoveryRecipeActionBtn: {
-    paddingVertical: 2,
-  },
-  discoveryRecipeActionPrimaryText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  discoveryRecipeActionSecondaryText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  recipeSubsectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.25,
-    marginTop: 2,
-  },
-  recipeLibraryCard: {
-    position: 'relative',
-    borderRadius: 14,
-    padding: 12,
-    paddingRight: 48,
-    gap: 8,
-  },
-  recipeLibraryCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  recipeLibraryCardTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  recipeFavoriteText: {
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  recipeFavoriteButton: {
-    position: 'absolute',
-    right: 12,
-    top: '50%',
-    width: 28,
-    height: 28,
-    marginTop: -14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recipeLibraryMeta: {
-    fontSize: 12,
-  },
-  recipeLibraryDescription: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  recipeLibraryMacroText: {
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 17,
-  },
-  recipeCardActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  recipeCardActionBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  recipeCardActionText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  recipeEmptyState: {
-    borderRadius: 14,
-    padding: 14,
-    gap: 6,
-  },
-  recipeEmptyStateTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  recipeEmptyStateText: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  recipesLoadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-  },
-  recipesLoadingText: {
-    fontSize: 13,
-    fontWeight: '500',
   },
   recipePaginationRow: {
     marginTop: 8,
