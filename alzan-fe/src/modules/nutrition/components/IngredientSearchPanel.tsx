@@ -3,7 +3,17 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { Search, X, Plus, ChevronRight, SlidersHorizontal, ChevronDown, ChevronUp, Info } from 'lucide-react-native';
+import {
+  Search,
+  X,
+  Plus,
+  ChevronRight,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  ScanBarcode,
+} from 'lucide-react-native';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
 import { IngredientCategoryFilter, CATEGORY_LABELS } from './IngredientCategoryFilter';
 import { AlphabetFilter } from './AlphabetFilter';
@@ -17,11 +27,14 @@ import { getCurrentAppLocale } from '../../../services/localization';
 interface IngredientSearchPanelProps {
   onSelect: (food: FoodSearchResult) => void;
   onGoToManual: () => void;
+  // When provided, a barcode icon is shown inside the search bar (merges scan
+  // into search instead of a separate mode/tab).
+  onScan?: () => void;
 }
 
 const INGREDIENT_PAGE_SIZE = 10;
 
-export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ onSelect, onGoToManual }) => {
+export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ onSelect, onGoToManual, onScan }) => {
   const { t } = useTranslation();
   const languageCode = getCurrentAppLocale();
   const { colors: themeColors, isDark } = useNutritionStyles();
@@ -169,6 +182,17 @@ export const IngredientSearchPanel: React.FC<IngredientSearchPanelProps> = ({ on
           {query.length > 0 && (
             <TouchableOpacity onPress={handleClear} style={styles.clearBtn}>
               <X size={16} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+          )}
+          {onScan && (
+            <TouchableOpacity
+              onPress={onScan}
+              style={styles.scanBtn}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('nutrition.scan')}
+            >
+              <ScanBarcode size={18} color={themeColors.primary} strokeWidth={2.2} />
             </TouchableOpacity>
           )}
         </View>
@@ -352,6 +376,10 @@ const styles = StyleSheet.create({
   },
   clearBtn: {
     padding: 4,
+  },
+  scanBtn: {
+    padding: 4,
+    marginLeft: 2,
   },
   resetBtn: {
     paddingHorizontal: 12,

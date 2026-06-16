@@ -310,9 +310,9 @@ export const NutritionHomeScreen = () => {
           <View style={{ height: 40 }} />
         </ScrollView>
 
-        {/* Quick-add FAB: opens the log form on the meal slot matching the time of day */}
+        {/* Quick-add FAB: opens the quick-add sheet on the meal slot matching the time of day */}
         <TouchableOpacity
-          style={[styles.fab, { bottom: tabBarHeight + 20, backgroundColor: themeColors.primary }]}
+          style={[styles.fab, { bottom: tabBarHeight + 28, backgroundColor: themeColors.primary }]}
           onPress={() => handleAddFood(pickDefaultMealType())}
           activeOpacity={0.85}
           accessibilityRole="button"

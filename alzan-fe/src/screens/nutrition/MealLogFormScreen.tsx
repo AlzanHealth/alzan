@@ -1675,80 +1675,7 @@ export const MealLogFormScreen = () => {
 
               {/* Add Ingredient Section */}
               <View style={styles.addSection}>
-                {/* Simple Tab Selector */}
-                <View style={styles.tabRow}>
-                  <TouchableOpacity
-                    onPress={() => setInputMode('search')}
-                    style={[
-                      styles.tab,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
-                      inputMode === 'search' && { backgroundColor: themeColors.primary + '15' },
-                    ]}
-                  >
-                    <Search
-                      size={16}
-                      color={inputMode === 'search' ? themeColors.primary : themeColors.textSecondary}
-                      strokeWidth={2}
-                    />
-                    <Text
-                      style={[
-                        styles.tabText,
-                        { color: themeColors.textSecondary },
-                        inputMode === 'search' && { color: themeColors.primary, fontWeight: '600' },
-                      ]}
-                    >
-                      {t('nutrition.search')}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setInputMode('scan')}
-                    style={[
-                      styles.tab,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
-                      inputMode === 'scan' && { backgroundColor: themeColors.primary + '15' },
-                    ]}
-                  >
-                    <ScanBarcode
-                      size={16}
-                      color={inputMode === 'scan' ? themeColors.primary : themeColors.textSecondary}
-                      strokeWidth={2}
-                    />
-                    <Text
-                      style={[
-                        styles.tabText,
-                        { color: themeColors.textSecondary },
-                        inputMode === 'scan' && { color: themeColors.primary, fontWeight: '600' },
-                      ]}
-                    >
-                      {t('nutrition.scan')}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setInputMode('manual')}
-                    style={[
-                      styles.tab,
-                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
-                      inputMode === 'manual' && { backgroundColor: themeColors.primary + '15' },
-                    ]}
-                  >
-                    <Plus
-                      size={16}
-                      color={inputMode === 'manual' ? themeColors.primary : themeColors.textSecondary}
-                      strokeWidth={2}
-                    />
-                    <Text
-                      style={[
-                        styles.tabText,
-                        { color: themeColors.textSecondary },
-                        inputMode === 'manual' && { color: themeColors.primary, fontWeight: '600' },
-                      ]}
-                    >
-                      {t('nutrition.manual')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                {/* Search-first: barcode lives inside the search bar, manual appears on no results */}
 
                 {/* Input Area */}
                 <View style={styles.inputContainer}>
@@ -1763,6 +1690,7 @@ export const MealLogFormScreen = () => {
                               setAmountInput('100');
                             }}
                             onGoToManual={() => setInputMode('manual')}
+                            onScan={() => setShowScanner(true)}
                           />
                         </>
                       ) : (
@@ -1949,6 +1877,16 @@ export const MealLogFormScreen = () => {
 
                   {inputMode === 'manual' && (
                     <View style={styles.manualForm}>
+                      <TouchableOpacity
+                        style={styles.manualBackRow}
+                        onPress={() => setInputMode('search')}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <ChevronLeft size={18} color={themeColors.primary} strokeWidth={2.4} />
+                        <Text style={[styles.manualBackText, { color: themeColors.primary }]}>
+                          {t('nutrition.search')}
+                        </Text>
+                      </TouchableOpacity>
                       <TextInput
                         style={[
                           styles.manualInput,
@@ -2131,7 +2069,7 @@ export const MealLogFormScreen = () => {
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Bottom Summary - Liquid Glass (Keep as is) */}
+        {/* Bottom Summary - Liquid Glass; sits above the floating tab bar */}
         <MacrosSummaryCard totals={finalMacros} itemCount={ingredients.length} hasIncompleteData={false} />
 
         {/* Meal Detail Modal - Unified structure */}
@@ -2830,6 +2768,17 @@ const styles = StyleSheet.create({
 
   manualForm: {
     gap: 12,
+  },
+  manualBackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 2,
+  },
+  manualBackText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   manualInput: {
     height: 50,

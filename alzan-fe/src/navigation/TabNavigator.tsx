@@ -2,11 +2,12 @@ import React, { useRef, useEffect, useState } from 'react';
 import { BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useTranslation } from 'react-i18next';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Image, Dimensions } from 'react-native';
 import { Home, Dumbbell, Apple, Heart, PlayCircle, MessageCircle, User } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { LiquidGlassFooter } from '../components/common/LiquidGlassFooter';
 import { LinearGradient } from 'expo-linear-gradient';
+import { TabBarLayoutProvider, useTabBarLayout } from './tabBarLayout';
 
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { TrainingStack } from './TrainingStack';
@@ -72,6 +73,18 @@ const socialTabsConfig: TabConfig[] = [
 const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: CustomTabBarProps) => {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
+  const { setTopFromScreenBottom } = useTabBarLayout();
+  const containerRef = useRef<View>(null);
+
+  // Measure the floating bar's real on-screen position so overlays can sit above
+  // it on any device/orientation/platform (no hardcoded height or margin).
+  const measureTabBarPosition = () => {
+    containerRef.current?.measureInWindow((_x, y, _w, height) => {
+      if (height <= 0) return;
+      const screenHeight = Dimensions.get('window').height;
+      setTopFromScreenBottom(Math.round(screenHeight - y));
+    });
+  };
 
   const tabsConfig = isAlzanMode ? socialTabsConfig : mainTabsConfig;
   const totalTabs = tabsConfig.length;
@@ -148,7 +161,7 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
   };
 
   return (
-    <View style={styles.container}>
+    <View ref={containerRef} style={styles.container} onLayout={measureTabBarPosition}>
       <LiquidGlassFooter borderRadius={40} style={{ ...styles.blurContainer, height: 75 }}>
         <View
           style={styles.contentContainer}
@@ -238,41 +251,43 @@ export const TabNavigator = () => {
   const [isAlzanMode, setIsAlzanMode] = useState(false);
 
   return (
-    <View style={{ flex: 1 }}>
-      <Tab.Navigator
-        tabBar={props => <CustomTabBar {...props} isAlzanMode={isAlzanMode} setIsAlzanMode={setIsAlzanMode} />}
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        {isAlzanMode ? (
-          // === SOCIAL MODE TABS ===
-          <>
-            <Tab.Screen name="AlzanHome" component={AlzanHomeScreen} />
-            <Tab.Screen name="Clips" component={ClipsScreen} />
-            <Tab.Screen name="AppToggle" component={ModeTogglePlaceholder} />
-            <Tab.Screen name="Messages" component={MessagesScreen} />
-            <Tab.Screen name="AlzanProfile" component={UserProfileScreen} />
-          </>
-        ) : (
-          // === NORMAL APP TABS ===
-          <>
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Training" component={TrainingStack} />
-            <Tab.Screen name="AlzanToggle" component={ModeTogglePlaceholder} />
-            <Tab.Screen name="Nutrition" component={NutritionNavigator} />
-            <Tab.Screen name="Health" component={HealthNavigator} />
-          </>
-        )}
-        {/* Settings always available but hidden from tab bar? 
+    <TabBarLayoutProvider>
+      <View style={{ flex: 1 }}>
+        <Tab.Navigator
+          tabBar={props => <CustomTabBar {...props} isAlzanMode={isAlzanMode} setIsAlzanMode={setIsAlzanMode} />}
+          screenOptions={{
+            headerShown: false,
+          }}
+        >
+          {isAlzanMode ? (
+            // === SOCIAL MODE TABS ===
+            <>
+              <Tab.Screen name="AlzanHome" component={AlzanHomeScreen} />
+              <Tab.Screen name="Clips" component={ClipsScreen} />
+              <Tab.Screen name="AppToggle" component={ModeTogglePlaceholder} />
+              <Tab.Screen name="Messages" component={MessagesScreen} />
+              <Tab.Screen name="AlzanProfile" component={UserProfileScreen} />
+            </>
+          ) : (
+            // === NORMAL APP TABS ===
+            <>
+              <Tab.Screen name="Home" component={HomeScreen} />
+              <Tab.Screen name="Training" component={TrainingStack} />
+              <Tab.Screen name="AlzanToggle" component={ModeTogglePlaceholder} />
+              <Tab.Screen name="Nutrition" component={NutritionNavigator} />
+              <Tab.Screen name="Health" component={HealthNavigator} />
+            </>
+          )}
+          {/* Settings always available but hidden from tab bar? 
             Actually, Settings is usually accessed via Profile or separated.
             Legacy code had it. Let's keep it if needed, or maybe it's accessible via Profile now.
             In the user request "Perfil" loads "UserProfileScreen (Self)".
             I'll add Settings back as a hidden tab to be safe for navigation links.
         */}
-        <Tab.Screen name="Settings" component={SettingsNavigator} options={{ tabBarButton: () => null }} />
-      </Tab.Navigator>
-    </View>
+          <Tab.Screen name="Settings" component={SettingsNavigator} options={{ tabBarButton: () => null }} />
+        </Tab.Navigator>
+      </View>
+    </TabBarLayoutProvider>
   );
 };
 

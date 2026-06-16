@@ -136,6 +136,8 @@ export default {
     recipeDetailIngredients: 'Ingredientes',
     recipeDetailItemMeta: '{{qty}} g · {{kcal}} kcal',
     recipeDetailEmpty: 'Sin ingredientes',
+    quickAddedToast: '{{name}} añadido',
+    quickAddMoreOptions: 'Más opciones',
     max1kgLabel: 'Máximo 1kg',
     ingredientsTitleParen: 'Ingredientes (',
     ingredientsTitleParenAllCaps: 'INGREDIENTES',

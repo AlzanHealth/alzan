@@ -1,8 +1,8 @@
 // src/modules/nutrition/components/MacrosSummaryCard.tsx
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LiquidGlassFooter } from '../../../components/common/LiquidGlassFooter';
+import { useTabBarLayout } from '../../../navigation/tabBarLayout';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
 import { useTranslation } from 'react-i18next';
@@ -24,23 +24,18 @@ export const MacrosSummaryCard: React.FC<MacrosSummaryCardProps> = ({
   hasIncompleteData = false,
 }) => {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const { convertEnergyToUi } = useUnitConversion();
   const { colors, isDark } = useNutritionStyles();
+  const { topFromScreenBottom } = useTabBarLayout();
   const ingredientLabel = itemCount === 1 ? t('nutrition.ingredientSingular') : `${t('nutrition.ingredientSingular')}s`;
   const titleText = `${t('nutrition.mealWith')} ${itemCount} ${ingredientLabel}`;
 
-  // Match the same footer separation used by workout timers:
-  // keep a very small visual gap and compensate safe-area bottom
-  // so it never overlaps the floating tab bar on any device.
-  const floatingFooterHeight = 75;
-  const floatingFooterBottom = 30;
-  const summaryGapFromFooter = 2;
-  const footerTopFromScreenBottom = floatingFooterHeight + floatingFooterBottom;
-  const bottomPosition = Math.max(
-    summaryGapFromFooter,
-    footerTopFromScreenBottom - insets.bottom + summaryGapFromFooter,
-  );
+  // Sit just above the MEASURED top edge of the floating tab bar (reported by
+  // TabBarLayoutProvider). This adapts to any device/orientation/web/tablet
+  // without hardcoding the bar height or margin, so the summary never enters
+  // the tab bar zone.
+  const clearanceGap = 12;
+  const bottomPosition = topFromScreenBottom + clearanceGap;
 
   return (
     <View style={[styles.summaryFooterContainer, { bottom: bottomPosition }]}>

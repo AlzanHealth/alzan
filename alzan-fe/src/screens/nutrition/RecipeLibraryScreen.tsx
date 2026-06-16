@@ -125,33 +125,34 @@ export const RecipeLibraryScreen = () => {
 
   const renderCard = ({ item }: { item: MealComponent }) => {
     const isFav = item.external_id ? favoriteIds.includes(item.external_id) : false;
-    const isSystem = item.recipe_source === 'system';
     return (
       <View style={[styles.card, dynamicStyles.card, { backgroundColor: isDark ? themeColors.surfaceSolid : '#FFF' }]}>
         <View style={styles.cardTopRow}>
-          <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
+          <Text style={[styles.cardTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
             {item.name}
           </Text>
-          <TouchableOpacity
-            onPress={() => handleToggleFavorite(item)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityRole="button"
-          >
-            <Star
-              size={20}
-              color={isFav ? '#F5B301' : themeColors.textSecondary}
-              fill={isFav ? '#F5B301' : 'transparent'}
-              strokeWidth={2}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <View
-          style={[styles.badge, { backgroundColor: isSystem ? themeColors.primary + '20' : 'rgba(120,120,128,0.16)' }]}
-        >
-          <Text style={[styles.badgeText, { color: isSystem ? themeColors.primary : themeColors.textSecondary }]}>
-            {isSystem ? t('nutrition.recipeBadgeSystem') : item.recipe_author_name || t('nutrition.recipeBadgeUser')}
-          </Text>
+          <View style={styles.cardIcons}>
+            <TouchableOpacity
+              onPress={() => setDetailRecipe(item)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('nutrition.recipeDetail')}
+            >
+              <Info size={20} color={themeColors.textSecondary} strokeWidth={2} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleToggleFavorite(item)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+            >
+              <Star
+                size={20}
+                color={isFav ? '#F5B301' : themeColors.textSecondary}
+                fill={isFav ? '#F5B301' : 'transparent'}
+                strokeWidth={2}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={[styles.macroLine, { color: themeColors.textSecondary }]} numberOfLines={1}>
@@ -163,24 +164,14 @@ export const RecipeLibraryScreen = () => {
           })}
         </Text>
 
-        <View style={styles.cardActions}>
-          <TouchableOpacity
-            style={[styles.detailButton, { borderColor: themeColors.primary + '55' }]}
-            onPress={() => setDetailRecipe(item)}
-            activeOpacity={0.85}
-          >
-            <Info size={16} color={themeColors.primary} strokeWidth={2.4} />
-            <Text style={[styles.detailButtonText, { color: themeColors.primary }]}>{t('nutrition.recipeDetail')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.useButton, { backgroundColor: themeColors.primary }]}
-            onPress={() => handleUse(item)}
-            activeOpacity={0.85}
-          >
-            <Plus size={16} color="#FFFFFF" strokeWidth={2.6} />
-            <Text style={styles.useButtonText}>{t('nutrition.recipeUse')}</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.useButton, { backgroundColor: themeColors.primary }]}
+          onPress={() => handleUse(item)}
+          activeOpacity={0.85}
+        >
+          <Plus size={16} color="#FFFFFF" strokeWidth={2.6} />
+          <Text style={styles.useButtonText}>{t('nutrition.recipeUse')}</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -320,31 +311,18 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 15 },
   listContent: { padding: 16, gap: 12 },
-  card: { borderRadius: borderRadius.l, padding: 14 },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  cardTitle: { flex: 1, fontSize: 16, fontWeight: '700' },
-  badge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginTop: 8 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
+  card: { borderRadius: borderRadius.l, padding: 16 },
+  cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  cardTitle: { flex: 1, fontSize: 16, fontWeight: '700', lineHeight: 21 },
+  cardIcons: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingTop: 1 },
   macroLine: { fontSize: 13, marginTop: 8 },
-  cardActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  detailButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: borderRadius.m,
-    borderWidth: 1,
-  },
-  detailButtonText: { fontSize: 14, fontWeight: '700' },
   useButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 9,
+    marginTop: 14,
+    paddingVertical: 11,
     borderRadius: borderRadius.m,
   },
   useButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },

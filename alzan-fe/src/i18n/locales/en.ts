@@ -134,6 +134,8 @@ const en = {
     recipeDetailIngredients: 'Ingredients',
     recipeDetailItemMeta: '{{qty}} g · {{kcal}} kcal',
     recipeDetailEmpty: 'No ingredients',
+    quickAddedToast: '{{name}} added',
+    quickAddMoreOptions: 'More options',
     max1kgLabel: 'Max 1kg',
     ingredientsTitleParen: 'Ingredients (',
     ingredientsTitleParenAllCaps: 'INGREDIENTS',
