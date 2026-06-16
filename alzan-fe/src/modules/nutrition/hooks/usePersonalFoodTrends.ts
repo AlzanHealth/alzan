@@ -4,8 +4,8 @@ import { MealType } from '../../../types/requests.types';
 import { getPersonalFoodTrends } from '../services/personalTrendsService';
 
 /**
- * Recency-weighted "what you actually eat" suggestions for a meal slot.
- * Backed by the user's own meal_items history (see personalTrendsService).
+ * Recency-weighted "what you actually use/eat" suggestions.
+ * Recipes come first, then meal-slot foods fill the remaining space.
  */
 export function usePersonalFoodTrends(mealType?: MealType, limit = 8) {
   const { user } = useAuth();

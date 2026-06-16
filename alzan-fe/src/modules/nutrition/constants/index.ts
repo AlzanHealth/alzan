@@ -11,7 +11,7 @@ export const MEAL_TYPES = {
 };
 
 // Maps the current time of day to the most likely meal slot. Used to default
-// the quick-add entry points (home FAB, recipe library "Usar") to the right slot.
+// the Nutrition Home quick-add FAB to the right slot.
 export const getMealTypeByHour = (date = new Date()): MealType => {
   const hour = date.getHours();
   if (hour >= 5 && hour < 11) return 'breakfast';

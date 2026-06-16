@@ -14,9 +14,7 @@ interface PersonalFoodTrendsProps {
 }
 
 /**
- * Horizontal row of the user's most-eaten foods for a meal slot. Tapping a chip
- * adds the food with the user's usual portion — the one-tap path for the common
- * "I eat the same thing again" case.
+ * Horizontal row of the user's most-used recipes and foods.
  */
 export const PersonalFoodTrends: React.FC<PersonalFoodTrendsProps> = ({ mealType, onPick }) => {
   const { t } = useTranslation();
@@ -39,6 +37,7 @@ export const PersonalFoodTrends: React.FC<PersonalFoodTrendsProps> = ({ mealType
         keyboardShouldPersistTaps="handled"
       >
         {trends.map(food => {
+          const isRecipe = food.itemType === 'recipe';
           const kcal = Math.round(food.calculated_macros?.kcal ?? 0);
           const portion = food.amount_g ?? 100;
           return (
@@ -59,7 +58,9 @@ export const PersonalFoodTrends: React.FC<PersonalFoodTrendsProps> = ({ mealType
                   {food.name}
                 </Text>
                 <Text style={[styles.chipMeta, { color: themeColors.textSecondary }]} numberOfLines={1}>
-                  {t('nutrition.trendChipMeta', { portion, kcal })}
+                  {isRecipe
+                    ? t('nutrition.recipeTrendChipMeta', { kcal: Math.round(food.kcal_100 ?? 0) })
+                    : t('nutrition.trendChipMeta', { portion, kcal })}
                 </Text>
               </View>
               <View style={[styles.chipAdd, { backgroundColor: themeColors.primary + '22' }]}>

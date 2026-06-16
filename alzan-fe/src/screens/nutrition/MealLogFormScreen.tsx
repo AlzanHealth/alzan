@@ -1104,9 +1104,14 @@ export const MealLogFormScreen = () => {
     setManualMacroInputs({ kcal_100: '', protein_g_100: '', carbs_g_100: '', fat_g_100: '' });
   };
 
-  // One-tap add from "Tendencias para ti": append the food with the user's usual
-  // portion and seed the meal name if it's still empty.
+  // One-tap add from "Tendencias para ti": recipes load their ingredients;
+  // foods append with the user's usual portion and seed the meal name if empty.
   const handlePickTrend = (food: MealComponent) => {
+    if (food.itemType === 'recipe') {
+      void handleSelectMealResult(food);
+      return;
+    }
+
     const amount = food.amount_g || 100;
     const newIngredient: MealComponent = {
       ...food,
@@ -1194,8 +1199,11 @@ export const MealLogFormScreen = () => {
         ingredients: ingredientsPayload,
       });
 
-      // Return to NutritionHome preserving the selected day context there
-      navigation.goBack();
+      if (isEdit) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('NutritionHome', { date });
+      }
     } catch (error) {
       console.error(error);
       Alert.alert(t('common.error'), t('nutrition.saveMealError'));
@@ -1257,7 +1265,7 @@ export const MealLogFormScreen = () => {
                   borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
                 },
               ]}
-              onPress={() => navigation.navigate('RecipeLibrary')}
+              onPress={() => navigation.navigate('RecipeLibrary', { date, mealType })}
               activeOpacity={0.85}
             >
               <Bookmark size={16} color={themeColors.primary} strokeWidth={2.3} />

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Settings, Plus, BookOpen } from 'lucide-react-native';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
 import { MealSection } from '../../modules/nutrition/components/MealSection';
@@ -17,7 +17,8 @@ import { usePreferences } from '../../hooks/settings/usePreferences';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { DaySwitcher, DaySwitcherRef } from '../../components/common/DaySwitcher';
-import { NutritionScreenNavigationProp, TabParamList } from '../../types/navigation.types';
+import { NutritionScreenNavigationProp, NutritionStackParamList, TabParamList } from '../../types/navigation.types';
+import { MealType } from '../../types/requests.types';
 import { BottomTabNavigationProp, useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
@@ -49,6 +50,7 @@ const groupMealsByType = (meals: DailyMealItem[]) => {
 export const NutritionHomeScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
+  const route = useRoute<RouteProp<NutritionStackParamList, 'NutritionHome'>>();
   const { convertEnergyToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors } = useNutritionStyles();
   const tabBarHeight = useBottomTabBarHeight();
@@ -67,6 +69,24 @@ export const NutritionHomeScreen = () => {
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     });
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const routeDate = route.params?.date;
+      if (!routeDate) return;
+
+      const nextDate = parseISO(routeDate);
+      if (isValid(nextDate)) {
+        setSelectedDate(nextDate);
+        requestAnimationFrame(() => {
+          daySwitcherRef.current?.scrollToDate(nextDate);
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        });
+      }
+
+      navigation.setParams({ date: undefined });
+    }, [navigation, route.params?.date]),
+  );
 
   // Keep visible week aligned with the selected day whenever this screen gains focus
   useFocusEffect(
@@ -122,14 +142,7 @@ export const NutritionHomeScreen = () => {
   const macroDisplay = preferences?.nutrition_prefs?.macro_display || 'per_meal';
 
   // Default meal types in order
-  const defaultMealTypes = [
-    MEAL_TYPES.BREAKFAST,
-    MEAL_TYPES.ALMUERZO,
-    MEAL_TYPES.LUNCH,
-    MEAL_TYPES.MERIENDA,
-    MEAL_TYPES.DINNER,
-    MEAL_TYPES.SNACK,
-  ];
+  const defaultMealTypes: MealType[] = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'];
 
   // Filter meal types based on enabled_meals preferences
   const displayMealTypes = enabledMeals
@@ -146,13 +159,13 @@ export const NutritionHomeScreen = () => {
   // The floating "+" defaults the meal slot to the current time of day so the
   // user lands in the right section without scrolling to find it. Falls back to
   // an enabled slot if the time-of-day pick is hidden by preferences.
-  const pickDefaultMealType = (): string => {
+  const pickDefaultMealType = (): MealType => {
     const preferred = getMealTypeByHour();
-    return displayMealTypes.includes(preferred) ? preferred : displayMealTypes[0] || MEAL_TYPES.SNACK;
+    return displayMealTypes.includes(preferred) ? preferred : displayMealTypes[0] || 'snack';
   };
 
   // Handlers
-  const handleAddFood = (type: string) => {
+  const handleAddFood = (type: MealType) => {
     navigation.navigate('MealLogForm', {
       date: formattedDate,
       isExtra: true,
@@ -245,7 +258,7 @@ export const NutritionHomeScreen = () => {
         <View style={styles.topBar}>
           <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>{t('tabs.nutrition')}</Text>
           <View style={styles.topActions}>
-            <TouchableOpacity onPress={() => navigation.navigate('RecipeLibrary')}>
+            <TouchableOpacity onPress={() => navigation.navigate('RecipeLibrary', { date: formattedDate })}>
               <BookOpen color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
             <TouchableOpacity onPress={() => navigation.navigate('Settings')}>

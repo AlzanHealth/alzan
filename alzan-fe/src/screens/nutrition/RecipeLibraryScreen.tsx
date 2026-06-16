@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, ActivityIndicator, Modal } from 'react-native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -12,12 +12,14 @@ import { useTranslation } from 'react-i18next';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { useAuth } from '../../context/AuthContext';
 import { borderRadius } from '../../theme';
-import { NutritionScreenNavigationProp } from '../../types/navigation.types';
+import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../types/navigation.types';
 import { TranslationKey } from '../../i18n/locales/en';
+import { MealType } from '../../types/requests.types';
 import { MealComponent } from '../../modules/nutrition/types/ingredients';
 import { RecipeDetailModal } from '../../modules/nutrition/components/RecipeDetailModal';
 import { FilterDropdown } from '../../modules/nutrition/components/FilterDropdown';
-import { getMealTypeByHour } from '../../modules/nutrition/constants';
+import { MEAL_TYPE_LABELS } from '../../modules/nutrition/constants';
+import { usePreferences } from '../../hooks/settings/usePreferences';
 import {
   getDiscoverRecipes,
   getFavoriteRecipeIds,
@@ -32,6 +34,7 @@ import {
 type LibraryTab = 'discover' | 'mine' | 'favorites';
 
 const DISCOVER_PAGE_SIZE = 12;
+const DEFAULT_MEAL_TYPES: MealType[] = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'];
 
 const DISCOVER_SORTS: { key: DiscoverSort; labelKey: TranslationKey }[] = [
   { key: 'recommended', labelKey: 'nutrition.discoverSortRecommended' },
@@ -52,8 +55,12 @@ export const RecipeLibraryScreen = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
+  const route = useRoute<RouteProp<NutritionStackParamList, 'RecipeLibrary'>>();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
+  const { preferences } = usePreferences();
   const tabBarHeight = useBottomTabBarHeight();
+  const targetDate = route.params?.date ?? format(new Date(), 'yyyy-MM-dd');
+  const targetMealType = route.params?.mealType;
 
   const [tab, setTab] = useState<LibraryTab>('discover');
   const [query, setQuery] = useState('');
@@ -67,6 +74,13 @@ export const RecipeLibraryScreen = () => {
   const [discoverCategory, setDiscoverCategory] = useState<DiscoverCategory>('all');
 
   const [detailRecipe, setDetailRecipe] = useState<MealComponent | null>(null);
+  const [pendingMealRecipe, setPendingMealRecipe] = useState<MealComponent | null>(null);
+
+  const enabledMeals = preferences?.nutrition_prefs?.enabled_meals;
+  const selectableMealTypes = useMemo(() => {
+    const visibleTypes = DEFAULT_MEAL_TYPES.filter(type => !enabledMeals || enabledMeals[type] !== false);
+    return visibleTypes.length > 0 ? visibleTypes : DEFAULT_MEAL_TYPES;
+  }, [enabledMeals]);
 
   const favoriteIdsQuery = useQuery({
     queryKey: ['recipeFavoriteIds', user?.id],
@@ -129,15 +143,37 @@ export const RecipeLibraryScreen = () => {
     queryClient.invalidateQueries({ queryKey: ['recipeFavorites'] });
   };
 
+  const openRecipeInMealLog = useCallback(
+    (recipe: MealComponent, mealType: MealType) => {
+      if (!recipe.external_id) return;
+      navigation.navigate('MealLogForm', {
+        date: targetDate,
+        isExtra: true,
+        mealItem: { mealType },
+        presetRecipeId: recipe.external_id,
+        presetRecipeName: recipe.name,
+      });
+    },
+    [navigation, targetDate],
+  );
+
   const handleUse = (recipe: MealComponent) => {
     if (!recipe.external_id) return;
-    navigation.navigate('MealLogForm', {
-      date: format(new Date(), 'yyyy-MM-dd'),
-      isExtra: true,
-      mealItem: { mealType: getMealTypeByHour() },
-      presetRecipeId: recipe.external_id,
-      presetRecipeName: recipe.name,
-    });
+    setDetailRecipe(null);
+
+    if (targetMealType) {
+      openRecipeInMealLog(recipe, targetMealType);
+      return;
+    }
+
+    setPendingMealRecipe(recipe);
+  };
+
+  const handleSelectMealType = (mealType: MealType) => {
+    if (!pendingMealRecipe) return;
+    const recipe = pendingMealRecipe;
+    setPendingMealRecipe(null);
+    openRecipeInMealLog(recipe, mealType);
   };
 
   const listData =
@@ -324,6 +360,53 @@ export const RecipeLibraryScreen = () => {
           onClose={() => setDetailRecipe(null)}
           onUse={handleUse}
         />
+
+        <Modal
+          transparent
+          visible={pendingMealRecipe !== null}
+          animationType="fade"
+          onRequestClose={() => setPendingMealRecipe(null)}
+        >
+          <View style={styles.mealPickerBackdrop}>
+            <View style={[styles.mealPickerCard, { backgroundColor: isDark ? themeColors.surfaceSolid : '#FFFFFF' }]}>
+              <Text style={[styles.mealPickerTitle, { color: themeColors.textPrimary }]}>
+                {t('nutrition.selectMealForRecipe')}
+              </Text>
+              <Text style={[styles.mealPickerSubtitle, { color: themeColors.textSecondary }]} numberOfLines={2}>
+                {pendingMealRecipe?.name}
+              </Text>
+
+              <View style={styles.mealPickerOptions}>
+                {selectableMealTypes.map(mealType => (
+                  <TouchableOpacity
+                    key={mealType}
+                    style={[
+                      styles.mealPickerOption,
+                      {
+                        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                      },
+                    ]}
+                    onPress={() => handleSelectMealType(mealType)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.mealPickerOptionText, { color: themeColors.textPrimary }]}>
+                      {t(MEAL_TYPE_LABELS[mealType])}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={styles.mealPickerCancel}
+                onPress={() => setPendingMealRecipe(null)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.mealPickerCancelText, { color: themeColors.primary }]}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -398,4 +481,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadMoreText: { fontSize: 14, fontWeight: '600' },
+  mealPickerBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.36)',
+    padding: 16,
+  },
+  mealPickerCard: {
+    borderRadius: borderRadius.l,
+    padding: 16,
+    gap: 12,
+  },
+  mealPickerTitle: { fontSize: 18, fontWeight: '700' },
+  mealPickerSubtitle: { fontSize: 14, lineHeight: 19 },
+  mealPickerOptions: { gap: 8 },
+  mealPickerOption: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+  },
+  mealPickerOptionText: { fontSize: 15, fontWeight: '600' },
+  mealPickerCancel: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mealPickerCancelText: { fontSize: 15, fontWeight: '700' },
 });
