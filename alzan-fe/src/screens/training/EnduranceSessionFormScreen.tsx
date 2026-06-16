@@ -52,12 +52,33 @@ import {
 import { Alert } from '../../components/common/Alert';
 import { RouteMap } from '../../components/common/RouteMap';
 import { useTranslation } from 'react-i18next';
+import {
+  resolvePersistedSportSubtype,
+  resetSportSubtypeForSportChange,
+  shouldRenderModalitySelector,
+} from './helpers/sessionModality.helper';
 
 export type PopulatedEnduranceWorkoutTemplate = EnduranceWorkoutTemplate & { steps: EnduranceWorkoutStep[] };
 
 const TRAIL_SPORT_TYPE = 'trail' as SportType;
 const GOLF_SPORT_TYPE = 'golf' as SportType;
 const HYROX_SPORT_TYPE = 'hyrox' as SportType;
+const SPORTS_WITH_INLINE_MODALITY_SELECTOR = new Set([
+  'swimming',
+  'football',
+  'tennis',
+  'padel',
+  'hiking',
+  TRAIL_SPORT_TYPE,
+  'martial_arts',
+  'climbing',
+  'volleyball',
+  'surf',
+  'skiing',
+  'snowboard',
+  GOLF_SPORT_TYPE,
+  HYROX_SPORT_TYPE,
+]);
 
 interface SplitTab {
   key: string;
@@ -287,6 +308,8 @@ export const EnduranceSessionFormScreen = () => {
 
   // Resolve derived state
   const currentConfig = SPORTS_CONFIG[sportType] || SPORTS_CONFIG.other;
+  const modalityOptions = getOptions(sportType, 'modality');
+  const hasModalityOptions = shouldRenderModalitySelector(modalityOptions);
   const terrainOptions = getOptions(sportType, 'terrain');
   const hasTerrainOptions = terrainOptions.length > 0;
 
@@ -955,21 +978,6 @@ export const EnduranceSessionFormScreen = () => {
           Alert.alert(t('training.missingDataTitle'), t('training.durationRequiredForSport'));
           return;
         }
-        if (
-          (sportType === 'football' ||
-            sportType === 'tennis' ||
-            sportType === 'padel' ||
-            sportType === 'hiking' ||
-            sportType === TRAIL_SPORT_TYPE ||
-            sportType === 'surf' ||
-            sportType === 'skiing' ||
-            sportType === GOLF_SPORT_TYPE ||
-            sportType === HYROX_SPORT_TYPE) &&
-          !sportSubtype
-        ) {
-          Alert.alert(t('training.missingDataTitle'), t('training.modalityRequired'));
-          return;
-        }
       }
     }
 
@@ -1025,24 +1033,7 @@ export const EnduranceSessionFormScreen = () => {
         hyrox_station_focus?: string | null;
       } = {
         sport_type: (sportType === 'gym' ? 'strength' : sportType) as SportType,
-        sport_subtype: [
-          'swimming',
-          'football',
-          'tennis',
-          'padel',
-          'hiking',
-          'martial_arts',
-          'climbing',
-          'volleyball',
-          'trail',
-          'surf',
-          'skiing',
-          'snowboard',
-          'golf',
-          'hyrox',
-        ].includes(sportType)
-          ? sportSubtype
-          : null,
+        sport_subtype: resolvePersistedSportSubtype(sportSubtype, modalityOptions),
         pool_type: sportType === 'swimming' ? poolType : null,
         stroke: sportType === 'swimming' ? stroke : null,
         football_session_type: sportType === 'football' ? footballSessionType : null,
@@ -1449,7 +1440,18 @@ export const EnduranceSessionFormScreen = () => {
                           ]}
                           disabled={isLocked}
                           onPress={() => {
+                            const hasSportChanged = config.id !== sportType;
                             setSportType(config.id);
+                            setSportSubtype(previous =>
+                              resetSportSubtypeForSportChange(
+                                previous,
+                                getOptions(config.id, 'modality'),
+                                hasSportChanged,
+                              ),
+                            );
+                            if (hasSportChanged) {
+                              setPoolType(null);
+                            }
                             // Only auto-set name if it was empty or default
                             if (!name || (currentConfig && name === currentConfig.defaultTitle)) {
                               setName(t(config.defaultTitle));
@@ -1487,6 +1489,42 @@ export const EnduranceSessionFormScreen = () => {
                   onChangeText={setName}
                 />
               </View>
+
+              {hasModalityOptions && !SPORTS_WITH_INLINE_MODALITY_SELECTOR.has(sportType) && (
+                <View
+                  style={[
+                    {
+                      marginBottom: spacing.m,
+                      paddingHorizontal: spacing.m,
+                      paddingVertical: spacing.s,
+                      borderRadius: borderRadius.m,
+                    },
+                    dynamicStyles.glassCard,
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={[styles.formRow, { borderBottomWidth: 0 }]}
+                    onPress={() => setSportSubtypeModalVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('training.modalityLabel')}
+                  >
+                    <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                      {t('training.modalityLabel')}
+                    </Text>
+                    <View style={styles.rowRightValue}>
+                      <Text
+                        style={[
+                          styles.rowValueText,
+                          { color: sportSubtype ? themeColors.textPrimary : themeColors.textSecondary },
+                        ]}
+                      >
+                        {sportSubtype ? getOptionLabel(sportType, sportSubtype, 'modality') : t('common.select')}
+                      </Text>
+                      <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Swimming Specific Configuration Block */}
               {sportType === 'swimming' && (
@@ -3549,7 +3587,7 @@ export const EnduranceSessionFormScreen = () => {
               <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{t('training.modalityLabel')}</Text>
 
               <ScrollView style={styles.goalsScroll} showsVerticalScrollIndicator={false}>
-                {getOptions(sportType, 'modality').map(opt => {
+                {modalityOptions.map(opt => {
                   const isSelected = sportSubtype === opt.option_key;
                   return (
                     <TouchableOpacity

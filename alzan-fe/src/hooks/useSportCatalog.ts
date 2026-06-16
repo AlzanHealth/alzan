@@ -151,6 +151,11 @@ export const useSportCatalog = () => {
   };
 
   const getLocalizedOptionLabel = (option: SportCatalogOption): string => {
+    if (option.translation_key === 'training.sportOptionIndoorTrainer') {
+      const translatedLabel = t(asTranslationKey(option.translation_key));
+      if (translatedLabel && translatedLabel !== option.translation_key) return translatedLabel;
+    }
+
     if (languageCode === 'es' && option.sport_type === 'hyrox' && option.option_type === 'hyrox_station_focus') {
       const translatedLabel = t(asTranslationKey(option.translation_key));
       if (translatedLabel && translatedLabel !== option.translation_key) return translatedLabel;

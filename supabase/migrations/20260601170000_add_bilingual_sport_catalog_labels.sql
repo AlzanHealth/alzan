@@ -147,7 +147,7 @@ WITH catalog_labels(translation_key, label_es, label_en) AS (
     ('training.sportOptionHypertrophy', 'Hipertrofia', 'Hypertrophy'),
     ('training.sportOptionIndoorClimbing', 'Rocódromo', 'Climbing gym'),
     ('training.sportOptionIndoorCourt', 'Pista cubierta', 'Indoor court'),
-    ('training.sportOptionIndoorTrainer', 'Indoor / Rodillo', 'Indoor / Trainer'),
+    ('training.sportOptionIndoorTrainer', 'Bici estática', 'Stationary bike'),
     ('training.sportOptionIndoorVolleyball', 'Voleibol indoor', 'Indoor volleyball'),
     ('training.sportOptionIntervals', 'Series', 'Intervals'),
     ('training.sportOptionJiuJitsuBjj', 'Jiu-jitsu / BJJ', 'Jiu-jitsu / BJJ'),

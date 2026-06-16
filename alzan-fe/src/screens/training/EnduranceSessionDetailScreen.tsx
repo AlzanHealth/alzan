@@ -65,6 +65,14 @@ import { SPORT_COLORS } from '../../theme/sportColors';
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
 const HYROX_SPORT_TYPE = 'hyrox' as ActivitySession['sport_type'];
+const SPORTS_WITH_SPECIFIC_MODALITY_METRIC = new Set<string>([
+  VOLLEYBALL_SPORT_TYPE,
+  TRAIL_SPORT_TYPE,
+  'skiing',
+  'snowboard',
+  'golf',
+  HYROX_SPORT_TYPE,
+]);
 
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
@@ -644,6 +652,13 @@ export const EnduranceSessionDetailScreen = () => {
         key: 'recovery',
         label: t('training.recoveryTime'),
         value: `${recoveryHours} h`,
+      });
+    }
+    if (session.sport_subtype && !SPORTS_WITH_SPECIFIC_MODALITY_METRIC.has(session.sport_type)) {
+      secondaryMetrics.push({
+        key: 'modality',
+        label: t('training.modalityLabel'),
+        value: getOptionLabel(session.sport_type, session.sport_subtype, 'modality'),
       });
     }
     if (session.sport_type === 'football') {

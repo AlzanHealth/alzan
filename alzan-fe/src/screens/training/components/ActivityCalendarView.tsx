@@ -34,6 +34,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeColors } from '../../../context/ThemeContext';
 import { useEnduranceSessions } from '../../../hooks/useEnduranceSessions';
+import { useSportCatalog } from '../../../hooks/useSportCatalog';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import { SPORTS_CONFIG, getSportDefaultTitleKey } from '../../../constants/sports';
@@ -282,6 +283,7 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
 }) => {
   const { t } = useTranslation();
   const { convertDistanceToUi, convertWeightToUi } = useUnitConversion();
+  const { getOptionLabel } = useSportCatalog();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const now = new Date();
@@ -748,6 +750,9 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
     const caloriesLabel = Math.round(session.calories_kcal ?? 0).toLocaleString();
     const startTimeLabel = format(new Date(session.start_time), 'HH:mm');
     const hasRoute = hasSessionRoute(session);
+    const modalityLabel = session.sport_subtype
+      ? getOptionLabel(session.sport_type, session.sport_subtype, 'modality')
+      : '';
 
     return (
       <TouchableOpacity
@@ -771,6 +776,9 @@ export const ActivityCalendarView: React.FC<ActivityCalendarViewProps> = ({
             <Text style={[styles.sessionTitle, { color: themeColors.textPrimary }]}>{sessionTitle}</Text>
             <View style={styles.sessionMetaRow}>
               <Text style={[styles.sessionMeta, { color: themeColors.textSecondary }]}>{startTimeLabel}</Text>
+              {!!modalityLabel && (
+                <Text style={[styles.sessionMeta, { color: themeColors.textSecondary }]}>{modalityLabel}</Text>
+              )}
               {hasRoute && (
                 <View style={[styles.routeBadge, { backgroundColor: isDark ? `${color}30` : `${color}20` }]}>
                   <Text style={[styles.routeBadgeText, { color }]}>{t('training.routeAvailable')}</Text>
