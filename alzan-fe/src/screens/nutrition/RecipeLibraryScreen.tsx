@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { ChevronLeft, Search, Star, Plus, Info } from 'lucide-react-native';
+import { ChevronLeft, Search, Star, Plus, Info, Flame } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
@@ -13,20 +13,39 @@ import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { useAuth } from '../../context/AuthContext';
 import { borderRadius } from '../../theme';
 import { NutritionScreenNavigationProp } from '../../types/navigation.types';
+import { TranslationKey } from '../../i18n/locales/en';
 import { MealComponent } from '../../modules/nutrition/types/ingredients';
 import { RecipeDetailModal } from '../../modules/nutrition/components/RecipeDetailModal';
+import { FilterDropdown } from '../../modules/nutrition/components/FilterDropdown';
 import { getMealTypeByHour } from '../../modules/nutrition/constants';
 import {
   getDiscoverRecipes,
   getFavoriteRecipeIds,
   getFavoriteRecipes,
   getMySavedRecipes,
+  isRecipeRising,
   toggleFavoriteRecipe,
+  DiscoverSort,
+  DiscoverCategory,
 } from '../../modules/nutrition/services/recipeLibraryService';
 
 type LibraryTab = 'discover' | 'mine' | 'favorites';
 
 const DISCOVER_PAGE_SIZE = 12;
+
+const DISCOVER_SORTS: { key: DiscoverSort; labelKey: TranslationKey }[] = [
+  { key: 'recommended', labelKey: 'nutrition.discoverSortRecommended' },
+  { key: 'week', labelKey: 'nutrition.discoverSortWeek' },
+  { key: 'month', labelKey: 'nutrition.discoverSortMonth' },
+  { key: 'saved', labelKey: 'nutrition.discoverSortSaved' },
+];
+
+const DISCOVER_CATEGORIES: { key: DiscoverCategory; labelKey: TranslationKey }[] = [
+  { key: 'all', labelKey: 'nutrition.discoverCategoryAll' },
+  { key: 'high_protein', labelKey: 'nutrition.discoverCategoryProtein' },
+  { key: 'low_cal', labelKey: 'nutrition.discoverCategoryLowCal' },
+  { key: 'high_carb', labelKey: 'nutrition.discoverCategoryCarbs' },
+];
 
 export const RecipeLibraryScreen = () => {
   const { t } = useTranslation();
@@ -44,6 +63,8 @@ export const RecipeLibraryScreen = () => {
   const [discoverPage, setDiscoverPage] = useState(1);
   const [discoverTotal, setDiscoverTotal] = useState(0);
   const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverSort, setDiscoverSort] = useState<DiscoverSort>('recommended');
+  const [discoverCategory, setDiscoverCategory] = useState<DiscoverCategory>('all');
 
   const [detailRecipe, setDetailRecipe] = useState<MealComponent | null>(null);
 
@@ -76,7 +97,13 @@ export const RecipeLibraryScreen = () => {
     async (page: number, replace: boolean) => {
       setDiscoverLoading(true);
       try {
-        const { recipes, total } = await getDiscoverRecipes(debouncedQuery, page, DISCOVER_PAGE_SIZE);
+        const { recipes, total } = await getDiscoverRecipes({
+          query: debouncedQuery,
+          page,
+          pageSize: DISCOVER_PAGE_SIZE,
+          sort: discoverSort,
+          category: discoverCategory,
+        });
         setDiscoverTotal(total);
         setDiscover(prev => (replace ? recipes : [...prev, ...recipes]));
         setDiscoverPage(page);
@@ -86,7 +113,7 @@ export const RecipeLibraryScreen = () => {
         setDiscoverLoading(false);
       }
     },
-    [debouncedQuery],
+    [debouncedQuery, discoverSort, discoverCategory],
   );
 
   useEffect(() => {
@@ -125,6 +152,7 @@ export const RecipeLibraryScreen = () => {
 
   const renderCard = ({ item }: { item: MealComponent }) => {
     const isFav = item.external_id ? favoriteIds.includes(item.external_id) : false;
+    const rising = tab === 'discover' && isRecipeRising(item);
     return (
       <View style={[styles.card, dynamicStyles.card, { backgroundColor: isDark ? themeColors.surfaceSolid : '#FFF' }]}>
         <View style={styles.cardTopRow}>
@@ -154,6 +182,13 @@ export const RecipeLibraryScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {rising && (
+          <View style={[styles.risingBadge, { backgroundColor: '#FF6B0018' }]}>
+            <Flame size={13} color="#FF6B00" strokeWidth={2.4} />
+            <Text style={styles.risingBadgeText}>{t('nutrition.discoverRising')}</Text>
+          </View>
+        )}
 
         <Text style={[styles.macroLine, { color: themeColors.textSecondary }]} numberOfLines={1}>
           {t('nutrition.recipeMacroLine', {
@@ -225,6 +260,21 @@ export const RecipeLibraryScreen = () => {
               placeholderTextColor={themeColors.textSecondary}
               value={query}
               onChangeText={setQuery}
+            />
+          </View>
+        )}
+
+        {tab === 'discover' && (
+          <View style={styles.filtersRow}>
+            <FilterDropdown
+              value={discoverSort}
+              options={DISCOVER_SORTS.map(option => ({ key: option.key, label: t(option.labelKey) }))}
+              onChange={setDiscoverSort}
+            />
+            <FilterDropdown
+              value={discoverCategory}
+              options={DISCOVER_CATEGORIES.map(option => ({ key: option.key, label: t(option.labelKey) }))}
+              onChange={setDiscoverCategory}
             />
           </View>
         )}
@@ -310,8 +360,20 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
   },
   searchInput: { flex: 1, fontSize: 15 },
+  filtersRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 },
   listContent: { padding: 16, gap: 12 },
   card: { borderRadius: borderRadius.l, padding: 16 },
+  risingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  risingBadgeText: { fontSize: 12, fontWeight: '700', color: '#FF6B00' },
   cardTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   cardTitle: { flex: 1, fontSize: 16, fontWeight: '700', lineHeight: 21 },
   cardIcons: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingTop: 1 },
