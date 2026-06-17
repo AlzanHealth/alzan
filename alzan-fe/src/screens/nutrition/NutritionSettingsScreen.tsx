@@ -19,7 +19,6 @@ import { usePreferences } from '../../hooks/settings/usePreferences';
 import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { useSettingsNotifications, NotificationSettings } from '../../hooks/settings/useSettingsNotifications';
 import {
@@ -28,9 +27,11 @@ import {
   checkSequentialConflicts,
   checkAlternatingConflicts,
   deleteFutureWeeks,
+  deleteFutureMealLogsByType,
   deleteMealLogsInRange,
 } from '../../modules/nutrition/services/dietCopyService';
 import { getCatchUpHorizonISO } from '../../modules/nutrition/services/dietCopyPlanner';
+import { setUserRecipesVisibility } from '../../modules/nutrition/services/recipeService';
 import { generateDietPDF } from '../../modules/nutrition/services/pdfExportService';
 import type { WebExportWindow } from '../../modules/nutrition/services/pdfExportService';
 import { BlurView } from 'expo-blur';
@@ -308,18 +309,9 @@ export const NutritionSettingsScreen = () => {
     const nextVisibility: RecipeDefaultVisibility = makePublic ? 'public' : 'private';
 
     try {
-      const { error: recipeUpdateError } = await supabase
-        .from('recipes')
-        .update({
-          visibility: nextVisibility,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('owner_user_id', user.id)
-        .eq('source', 'user')
-        .is('deleted_at', null);
+      const result = await setUserRecipesVisibility(user.id, nextVisibility);
 
-      if (recipeUpdateError) {
-        console.error('[NutritionSettings] Error updating recipe visibility:', recipeUpdateError);
+      if (!result.success) {
         Alert.alert(t('common.error'), t('nutrition.recipeVisibilityUpdateErrorMessage'));
         return;
       }
@@ -364,49 +356,9 @@ export const NutritionSettingsScreen = () => {
   const deleteFutureMealData = async (mealType: MealType) => {
     if (!user) return;
 
-    try {
-      const today = new Date();
-      const todayStr = format(today, 'yyyy-MM-dd');
-
-      // 1. Get IDs of logs to delete
-      const { data: logsToDelete, error: fetchError } = await supabase
-        .from('meal_logs')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('meal_type', mealType)
-        .gte('date', todayStr);
-
-      if (fetchError) {
-        console.error('Error fetching logs to delete:', fetchError);
-        return;
-      }
-
-      if (!logsToDelete || logsToDelete.length === 0) {
-        console.log(`[NutritionSettings] No future logs found for ${mealType}`);
-        return;
-      }
-
-      const logIds = logsToDelete.map(l => l.id);
-
-      // 2. Delete dependent items first (to avoid FK violation)
-      const { error: itemsError } = await supabase.from('meal_items').delete().in('meal_log_id', logIds);
-
-      if (itemsError) {
-        console.error('Error deleting dependent meal items:', itemsError);
-        // Continue anyway? If items fail, logs will likely fail too, but let's try or return.
-        return;
-      }
-
-      // 3. Delete the logs
-      const { error } = await supabase.from('meal_logs').delete().in('id', logIds);
-
-      if (error) {
-        console.error('Error deleting future meal data:', error);
-      } else {
-        console.log(`[NutritionSettings] Future meals deleted for ${mealType} starting ${todayStr}`);
-      }
-    } catch (err) {
-      console.error('Error in deleteFutureMealData:', err);
+    const result = await deleteFutureMealLogsByType(user.id, mealType);
+    if (!result.success) {
+      console.error('[NutritionSettings] Error deleting future meal data:', result.error);
     }
   };
 

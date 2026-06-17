@@ -1,5 +1,6 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
+import { MealType } from '../../../types/requests.types';
 import {
   DietCopyMode,
   WeekCopyOp,
@@ -293,20 +294,22 @@ export const checkAndCopyNewWeek = async (
 export const copyCurrentWeekToNextWeeks = copySequentialOnActivate;
 
 /**
- * Delete meal logs (and their items) within an optional date range.
+ * Delete meal logs (and their items) within an optional date range / meal type.
  *
- * @param range.start Inclusive 'yyyy-MM-dd' lower bound (omit for no lower bound).
- * @param range.end   Inclusive 'yyyy-MM-dd' upper bound (omit for no upper bound).
- *                    Omitting both deletes ALL meal logs for the user.
+ * @param options.start    Inclusive 'yyyy-MM-dd' lower bound (omit for none).
+ * @param options.end      Inclusive 'yyyy-MM-dd' upper bound (omit for none).
+ * @param options.mealType Restrict deletion to a single meal type (omit for all).
+ *                         Omitting every option deletes ALL meal logs for the user.
  */
 export const deleteMealLogsInRange = async (
   userId: string,
-  range: { start?: string; end?: string } = {},
+  options: { start?: string; end?: string; mealType?: MealType } = {},
 ): Promise<{ success: boolean; deletedCount: number; error?: string }> => {
   try {
     let query = supabase.from('meal_logs').select('id').eq('user_id', userId);
-    if (range.start) query = query.gte('date', range.start);
-    if (range.end) query = query.lte('date', range.end);
+    if (options.start) query = query.gte('date', options.start);
+    if (options.end) query = query.lte('date', options.end);
+    if (options.mealType) query = query.eq('meal_type', options.mealType);
 
     const { data: logsToDelete, error: fetchError } = await query;
     if (fetchError) throw fetchError;
@@ -330,6 +333,18 @@ export const deleteMealLogsInRange = async (
     const message = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, deletedCount: 0, error: message };
   }
+};
+
+/**
+ * Delete future meal logs of a single meal type (from TODAY onwards).
+ * Used when a meal type is disabled in settings.
+ */
+export const deleteFutureMealLogsByType = async (
+  userId: string,
+  mealType: MealType,
+): Promise<{ success: boolean; deletedCount: number; error?: string }> => {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  return deleteMealLogsInRange(userId, { start: today, mealType });
 };
 
 /**

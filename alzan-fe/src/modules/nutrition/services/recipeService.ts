@@ -256,3 +256,30 @@ export async function getRecipeIngredients(recipeId: string, locale?: Locale) {
     return [];
   }
 }
+
+export type RecipeVisibility = 'private' | 'public';
+
+/**
+ * Set the visibility of all of a user's own (source = 'user', not deleted) recipes.
+ */
+export const setUserRecipesVisibility = async (
+  userId: string,
+  visibility: RecipeVisibility,
+): Promise<{ success: boolean; error?: string }> => {
+  const { error } = await supabase
+    .from('recipes')
+    .update({
+      visibility,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('owner_user_id', userId)
+    .eq('source', 'user')
+    .is('deleted_at', null);
+
+  if (error) {
+    console.error('[recipeService] Error updating recipe visibility:', error);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+};
