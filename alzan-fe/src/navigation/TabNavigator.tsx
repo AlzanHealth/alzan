@@ -284,7 +284,11 @@ export const TabNavigator = () => {
             In the user request "Perfil" loads "UserProfileScreen (Self)".
             I'll add Settings back as a hidden tab to be safe for navigation links.
         */}
-          <Tab.Screen name="Settings" component={SettingsNavigator} options={{ tabBarButton: () => null }} />
+          <Tab.Screen
+            name="Settings"
+            component={SettingsNavigator}
+            options={{ tabBarButton: () => null, popToTopOnBlur: true }}
+          />
         </Tab.Navigator>
       </View>
     </TabBarLayoutProvider>
