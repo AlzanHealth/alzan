@@ -40,6 +40,12 @@ export class ProvidersController {
     @Res() res: Response,
     @Query() query: OAuthCallbackQueryDto,
   ): Promise<void> {
+    // Keep the OAuth popup's window.opener intact across this cross-origin
+    // redirect chain so the web client can finish the handshake and auto-close
+    // the popup. Helmet defaults COOP to `same-origin`, which would otherwise
+    // sever the opener and leave the popup stuck on the callback screen.
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+
     const { code, state, error, error_description: errorDescription } = query;
     const oauthProvider = this.providersRegistry.getOAuthProvider(provider);
 

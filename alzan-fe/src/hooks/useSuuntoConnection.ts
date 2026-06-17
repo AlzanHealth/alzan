@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
+import { Alert } from '../components/common/Alert';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
@@ -11,11 +12,21 @@ import { wearablesLocalHealthApi } from '../modules/wearables';
 const SUUNTO_PROVIDER = 'suunto';
 const QUERY_KEY = ['suuntoConnection'];
 
+// On web the OAuth popup may lose its window.opener across the cross-origin
+// redirect chain (helmet sets COOP: same-origin on the backend callback), which
+// prevents expo-web-browser from messaging us back / auto-closing the popup. To
+// stay robust we poll the backend for the connection the callback creates.
+const WEB_CONNECT_TIMEOUT_MS = 90_000;
+const WEB_CONNECT_POLL_MS = 1500;
+
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
 interface SuuntoConnection {
   id: string;
   created_at: string | null;
   last_synced_at: string | null;
   status: string | null;
+  updated_at: string | null;
 }
 
 const getSuuntoRedirectUri = (): string => {
@@ -37,12 +48,54 @@ const getOAuthErrorMessage = (url?: string): string | null => {
 const getSuuntoConnection = async (userId: string): Promise<SuuntoConnection | null> => {
   const { data, error } = await supabase
     .from('user_connections')
-    .select('id, created_at, last_synced_at, status')
+    .select('id, created_at, last_synced_at, status, updated_at')
     .eq('user_id', userId)
     .eq('provider', SUUNTO_PROVIDER)
     .maybeSingle();
   if (error) throw error;
   return data;
+};
+
+type AuthSessionResult = Awaited<ReturnType<typeof WebBrowser.openAuthSessionAsync>>;
+
+/**
+ * Web OAuth completion that doesn't depend on the popup being able to message
+ * the opener back. We open the auth session and poll the backend until the
+ * connection the callback creates shows up (or the popup reports an error /
+ * cancellation), so a severed window.opener no longer leaves us hanging.
+ */
+const connectSuuntoOnWeb = async (userId: string, authorizationUrl: string, redirectUri: string): Promise<void> => {
+  const baseline = await getSuuntoConnection(userId);
+  const isFreshConnection = (connection: SuuntoConnection | null): boolean =>
+    !!connection && (!baseline || connection.updated_at !== baseline.updated_at);
+
+  // Held in an object so TS keeps the union types after the async callbacks.
+  const auth: { result: AuthSessionResult | null; error: Error | null } = { result: null, error: null };
+  void WebBrowser.openAuthSessionAsync(authorizationUrl, redirectUri, { showInRecents: true })
+    .then(result => {
+      auth.result = result;
+    })
+    .catch((error: unknown) => {
+      auth.error = error instanceof Error ? error : new Error(String(error));
+    });
+
+  const deadline = Date.now() + WEB_CONNECT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (isFreshConnection(await getSuuntoConnection(userId))) return;
+
+    if (auth.error) throw auth.error;
+    if (auth.result) {
+      const oauthError = getOAuthErrorMessage(auth.result.type === 'success' ? auth.result.url : undefined);
+      if (oauthError) throw new Error(oauthError);
+      // Popup finished (closed/dismissed): give the callback a final moment.
+      if (isFreshConnection(await getSuuntoConnection(userId))) return;
+      throw new Error('OAuth flow was cancelled or failed.');
+    }
+
+    await delay(WEB_CONNECT_POLL_MS);
+  }
+
+  throw new Error('OAuth connection timed out. Please try again.');
 };
 
 export function useSuuntoConnection() {
@@ -79,17 +132,20 @@ export function useSuuntoConnection() {
         query: { user_id: user.id, redirect_uri: redirectUri },
       });
       if (!data?.authorization_url) throw new Error('Failed to get authorization URL from backend');
+
+      if (Platform.OS === 'web') {
+        await connectSuuntoOnWeb(user.id, data.authorization_url, redirectUri);
+        return;
+      }
+
+      // Native: the deep-link redirect resolves the auth session directly.
       const result = await WebBrowser.openAuthSessionAsync(data.authorization_url, redirectUri, {
         showInRecents: true,
       });
       const oauthError = getOAuthErrorMessage(result.type === 'success' ? result.url : undefined);
       if (oauthError) throw new Error(oauthError);
-      if (result.type !== 'success' && !(Platform.OS === 'web' && result.type === 'dismiss')) {
+      if (result.type !== 'success') {
         throw new Error('OAuth flow was cancelled or failed.');
-      }
-      if (Platform.OS === 'web') {
-        const connection = await getSuuntoConnection(user.id);
-        if (!connection) throw new Error('OAuth flow was cancelled or failed.');
       }
     },
     onSuccess: () => {

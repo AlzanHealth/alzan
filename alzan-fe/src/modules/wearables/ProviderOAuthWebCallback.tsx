@@ -9,12 +9,28 @@ export const ProviderOAuthWebCallback = () => {
   const [message, setMessage] = useState(t('settings.oauthCallbackCompleting'));
 
   useEffect(() => {
+    const showManualClose = () => setMessage(t('settings.oauthCallbackManualClose'));
+
     try {
       const result = WebBrowser.maybeCompleteAuthSession();
-      if (result.type === 'failed') setMessage(t('settings.oauthCallbackManualClose'));
+      if (result.type === 'failed') showManualClose();
     } catch {
-      setMessage(t('settings.oauthCallbackManualClose'));
+      showManualClose();
     }
+
+    // Best-effort: close the popup ourselves in case expo couldn't (e.g. the
+    // window.opener was severed across the OAuth redirect chain). If the browser
+    // refuses, fall back to the manual hint.
+    const timer = setTimeout(() => {
+      try {
+        if (typeof window !== 'undefined') window.close();
+      } catch {
+        // Ignore: closing may be blocked; the manual hint covers this case.
+      }
+      showManualClose();
+    }, 400);
+
+    return () => clearTimeout(timer);
   }, [t]);
 
   return (
