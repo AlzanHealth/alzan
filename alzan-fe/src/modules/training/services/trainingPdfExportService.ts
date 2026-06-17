@@ -90,7 +90,12 @@ interface CatalogOptionRecord {
 
 type DailyStepsPdfRow = Pick<DailySteps, 'date' | 'total_steps' | 'is_manual' | 'source_package'>;
 
-const aggregateDailyStepsTotal = (rows: DailyStepsPdfRow[] | null | undefined): number => {
+interface AggregatedDailyStepsPdfRow {
+  date: string;
+  totalSteps: number;
+}
+
+const aggregateDailyStepsByDate = (rows: DailyStepsPdfRow[] | null | undefined): AggregatedDailyStepsPdfRow[] => {
   const byDate = new Map<string, { value: number; manual: boolean }>();
 
   (rows ?? []).forEach(row => {
@@ -111,7 +116,9 @@ const aggregateDailyStepsTotal = (rows: DailyStepsPdfRow[] | null | undefined): 
     }
   });
 
-  return Array.from(byDate.values()).reduce((sum, row) => sum + row.value, 0);
+  return Array.from(byDate.entries())
+    .map(([date, row]) => ({ date, totalSteps: row.value }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 };
 
 const PHASE_COLORS: Record<string, string> = {
@@ -125,8 +132,11 @@ const PHASE_COLORS: Record<string, string> = {
 
 const t = (key: TranslationKey) => String(i18n.t(key));
 const isEnglish = () => i18n.language?.startsWith('en');
+const getLocaleTag = () => (isEnglish() ? 'en-US' : 'es-ES');
 const getPdfDatePattern = () => (isEnglish() ? 'MMMM d, yyyy' : 'd MMMM yyyy');
 const getPdfDateTimePattern = () => (isEnglish() ? 'EEEE, MMMM d, HH:mm' : 'EEEE d MMMM, HH:mm');
+
+const formatInteger = (value: number): string => Math.round(value).toLocaleString(getLocaleTag());
 
 const formatDuration = (seconds: number): string => {
   const normalized = Math.max(0, Math.round(seconds));
@@ -319,9 +329,10 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       .order('start_time', { ascending: true });
 
     if (sessionsError) throw new Error(getErrorMessage(sessionsError));
-    if (!sessions?.length) throw new Error(t('training.pdfNoWorkoutsInRange'));
 
-    const sportTypes = Array.from(new Set(sessions.map(session => session.sport_type).filter(Boolean)));
+    const sessionRows = sessions ?? [];
+
+    const sportTypes = Array.from(new Set(sessionRows.map(session => session.sport_type).filter(Boolean)));
     const { data: catalogOptions } =
       sportTypes.length > 0
         ? await supabase
@@ -347,7 +358,7 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       return catalogLabelByKey.get(`${sportType}:${optionType}:${optionKey}`) ?? null;
     };
 
-    const sessionIds = sessions.map(session => session.id);
+    const sessionIds = sessionRows.map(session => session.id);
     const heartRateZonesBySessionId: Record<string, ActivityHeartRateZone[]> = {};
     if (sessionIds.length > 0) {
       const { data: heartRateZones, error: heartRateZonesError } = await supabase
@@ -366,7 +377,7 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
     }
 
     const templateIdSet = new Set<string>();
-    sessions.forEach(session => {
+    sessionRows.forEach(session => {
       if (session.endurance_template_id) {
         templateIdSet.add(session.endurance_template_id);
       }
@@ -400,7 +411,12 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
 
     if (dailyStepsError) throw new Error(getErrorMessage(dailyStepsError));
 
-    const dailyStepsTotal = aggregateDailyStepsTotal(dailyStepsRows as DailyStepsPdfRow[] | null | undefined);
+    const dailyStepsByDate = aggregateDailyStepsByDate(dailyStepsRows as DailyStepsPdfRow[] | null | undefined);
+    const dailyStepsTotal = dailyStepsByDate.reduce((sum, row) => sum + row.totalSteps, 0);
+
+    if (sessionRows.length === 0 && dailyStepsByDate.length === 0) {
+      throw new Error(t('training.pdfNoWorkoutsInRange'));
+    }
 
     let totalVolume = 0;
     let totalDurationSeconds = 0;
@@ -411,7 +427,7 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
     let totalElevLossM = 0;
     const avgHrSamples: number[] = [];
 
-    const processedSessions = sessions.map(session => {
+    const processedSessions = sessionRows.map(session => {
       let sessionVolume = 0;
       const isGym = session.sport_type === 'strength';
       const exerciseMap = new Map<string, WorkoutSet[]>();
@@ -483,16 +499,16 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       const cards: Array<{ value: string; label: string }> = [];
 
       if (totalCalories > 0) {
-        cards.push({ value: `${Math.round(totalCalories)}`, label: `${t('training.pdfMetricCalories')} (kcal)` });
+        cards.push({ value: formatInteger(totalCalories), label: `${t('training.pdfMetricCalories')} (kcal)` });
       }
       if (averageHeartRate != null) {
         cards.push({ value: `${averageHeartRate}`, label: `${t('training.pdfAvgHr')} (bpm)` });
       }
       if (totalSteps > 0) {
-        cards.push({ value: `${Math.round(totalSteps)}`, label: t('training.pdfMetricSteps') });
+        cards.push({ value: formatInteger(totalSteps), label: t('training.pdfMetricSteps') });
       }
       if (dailyStepsTotal > 0) {
-        cards.push({ value: `${Math.round(dailyStepsTotal)}`, label: t('training.pdfDailySteps') });
+        cards.push({ value: formatInteger(dailyStepsTotal), label: t('training.pdfDailySteps') });
       }
       if (totalElevGainM > 0 || totalElevLossM > 0) {
         cards.push({
@@ -511,6 +527,26 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
                 <div class="summary-card summary-card-secondary">
                   <div class="summary-val">${escapeHtml(card.value)}</div>
                   <div class="summary-label">${escapeHtml(card.label)}</div>
+                </div>
+              `,
+            )
+            .join('')}
+        </div>
+      `;
+    };
+
+    const renderDailyStepsSection = (): string => {
+      if (dailyStepsByDate.length === 0) return '';
+
+      return `
+        <div class="section-title">${escapeHtml(t('training.pdfDailySteps'))}</div>
+        <div class="daily-steps-grid">
+          ${dailyStepsByDate
+            .map(
+              row => `
+                <div class="daily-steps-item avoid-break">
+                  <div class="daily-steps-date">${escapeHtml(format(parseISO(row.date), datePattern, { locale: dateLocale }))}</div>
+                  <div class="daily-steps-value">${escapeHtml(formatInteger(row.totalSteps))} ${escapeHtml(t('training.pdfMetricSteps').toLowerCase())}</div>
                 </div>
               `,
             )
@@ -1117,6 +1153,33 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
             color: var(--text-secondary);
             background: #FAFAFA;
           }
+          .daily-steps-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 30px;
+          }
+          .daily-steps-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: #FAFAFA;
+            padding: 12px 14px;
+          }
+          .daily-steps-date {
+            font-size: 12px;
+            color: var(--text);
+            font-weight: 600;
+          }
+          .daily-steps-value {
+            font-size: 13px;
+            color: var(--primary);
+            font-weight: 800;
+            white-space: nowrap;
+          }
           .footer {
             position: fixed;
             bottom: 20px;
@@ -1162,70 +1225,77 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
           </div>
         </div>
         ${renderOptionalSummaryCards()}
+        ${renderDailyStepsSection()}
 
-        <div class="section-title">${escapeHtml(t('training.pdfSessionDetails'))}</div>
-        ${processedSessions
-          .map(session => {
-            const sportConfig = SPORT_CONFIG[session.sport_type] || SPORT_CONFIG.other;
-            const sessionVolumeUi = convertWeightToUi(session.volume, weightUnit, 0);
-            const sportType = toSportType(session.sport_type);
-            const sessionStats = renderSessionMetrics(session);
+        ${
+          processedSessions.length > 0
+            ? `
+              <div class="section-title">${escapeHtml(t('training.pdfSessionDetails'))}</div>
+              ${processedSessions
+                .map(session => {
+                  const sportConfig = SPORT_CONFIG[session.sport_type] || SPORT_CONFIG.other;
+                  const sessionVolumeUi = convertWeightToUi(session.volume, weightUnit, 0);
+                  const sportType = toSportType(session.sport_type);
+                  const sessionStats = renderSessionMetrics(session);
 
-            return `
-              <div class="session-block avoid-break">
-                <div class="session-header" style="background: ${sportConfig.color}10;">
-                  <div>
-                    <span class="sport-badge" style="background: ${sportConfig.color};">${escapeHtml(t(sportConfig.label))}</span>
-                    <div class="session-title">${escapeHtml(normalizeText(session.name) || t('training.pdfWorkoutFallback'))}</div>
-                    <div class="session-meta">${escapeHtml(format(parseISO(session.start_time), dateTimePattern, { locale: dateLocale }))}</div>
-                  </div>
-                  <div style="text-align: right;">
-                    <div style="font-weight: 700; font-size: 16px;">${escapeHtml(formatDuration(session.duration_s || 0))}</div>
-                    ${session.isGym ? `<div class="session-meta">${escapeHtml(`${sessionVolumeUi.label} ${t('training.pdfVolumeShort')}`)}</div>` : ''}
-                  </div>
-                </div>
-                <div class="session-body">
-                  ${sessionStats ? `<div class="stats-line">${sessionStats}</div>` : ''}
-                  ${
-                    session.sessionNotes
-                      ? `<div class="session-note"><b>${escapeHtml(`${t('training.pdfSessionNotes')}:`)}</b> ${escapeHtml(session.sessionNotes)}</div>`
-                      : ''
-                  }
-                  ${
-                    session.isGym
-                      ? session.exercises.length > 0
-                        ? `
-                          ${session.exercises
-                            .map(
-                              exercise => `
-                                <div class="exercise-block">
-                                  <div class="exercise-name">${escapeHtml(exercise.name)}</div>
-                                  ${exercise.sets.map(set => renderSetDetails(set)).join('')}
-                                </div>
-                              `,
-                            )
-                            .join('')}
-                        `
-                        : `<div class="empty-block">${escapeHtml(t('training.pdfNoStrengthSets'))}</div>`
-                      : ''
-                  }
-                  ${renderHeartRateZones(session.heartRateZones)}
-                  ${!session.isGym && session.laps.length > 0 ? renderSessionLaps(session.laps, sportType) : ''}
-                  ${
-                    session.templateSteps.length > 0
-                      ? `
-                        <div class="template-section">
-                          <div class="template-title">${escapeHtml(t('training.scheduledWorkout'))}</div>
-                          ${renderTemplateSteps(session.templateSteps, sportType)}
+                  return `
+                    <div class="session-block avoid-break">
+                      <div class="session-header" style="background: ${sportConfig.color}10;">
+                        <div>
+                          <span class="sport-badge" style="background: ${sportConfig.color};">${escapeHtml(t(sportConfig.label))}</span>
+                          <div class="session-title">${escapeHtml(normalizeText(session.name) || t('training.pdfWorkoutFallback'))}</div>
+                          <div class="session-meta">${escapeHtml(format(parseISO(session.start_time), dateTimePattern, { locale: dateLocale }))}</div>
                         </div>
+                        <div style="text-align: right;">
+                          <div style="font-weight: 700; font-size: 16px;">${escapeHtml(formatDuration(session.duration_s || 0))}</div>
+                          ${session.isGym ? `<div class="session-meta">${escapeHtml(`${sessionVolumeUi.label} ${t('training.pdfVolumeShort')}`)}</div>` : ''}
+                        </div>
+                      </div>
+                      <div class="session-body">
+                        ${sessionStats ? `<div class="stats-line">${sessionStats}</div>` : ''}
+                        ${
+                          session.sessionNotes
+                            ? `<div class="session-note"><b>${escapeHtml(`${t('training.pdfSessionNotes')}:`)}</b> ${escapeHtml(session.sessionNotes)}</div>`
+                            : ''
+                        }
+                        ${
+                          session.isGym
+                            ? session.exercises.length > 0
+                              ? `
+                                ${session.exercises
+                                  .map(
+                                    exercise => `
+                                      <div class="exercise-block">
+                                        <div class="exercise-name">${escapeHtml(exercise.name)}</div>
+                                        ${exercise.sets.map(set => renderSetDetails(set)).join('')}
+                                      </div>
+                                    `,
+                                  )
+                                  .join('')}
+                              `
+                              : `<div class="empty-block">${escapeHtml(t('training.pdfNoStrengthSets'))}</div>`
+                            : ''
+                        }
+                        ${renderHeartRateZones(session.heartRateZones)}
+                        ${!session.isGym && session.laps.length > 0 ? renderSessionLaps(session.laps, sportType) : ''}
+                        ${
+                          session.templateSteps.length > 0
+                            ? `
+                              <div class="template-section">
+                                <div class="template-title">${escapeHtml(t('training.scheduledWorkout'))}</div>
+                                ${renderTemplateSteps(session.templateSteps, sportType)}
+                              </div>
+                            `
+                            : ''
+                        }
+                      </div>
+                    </div>
+                  `;
+                })
+                .join('')}
                       `
-                      : ''
-                  }
-                </div>
-              </div>
-            `;
-          })
-          .join('')}
+            : ''
+        }
 
         <div class="footer">${escapeHtml(t('training.pdfGeneratedBy'))} - ${escapeHtml(format(new Date(), datePattern, { locale: dateLocale }))}</div>
       </body>
