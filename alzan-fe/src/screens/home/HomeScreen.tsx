@@ -97,7 +97,6 @@ export const HomeScreen = () => {
   const { latestSleep } = useHealthInsights();
   const { data: todaySteps } = useTodaySteps();
   const { homeCards } = useHomeCards();
-  const isCompactHome = homeMode === 'compact';
   const pendingWorkout = !activeTodayWorkout && scheduledWorkouts.length > 0 ? scheduledWorkouts[0] : null;
   const { totals, targets, meals } = useDayNutrition(new Date());
   const latestWeight = health?.weight?.weight_kg;
@@ -383,44 +382,26 @@ export const HomeScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity onPress={handlePrimaryAction} activeOpacity={0.78}>
-            <GlassCard style={[styles.primaryActionCard, isCompactHome && styles.primaryActionCardCompact]}>
-              <View style={styles.cardContentRow}>
-                <View style={[styles.primaryActionIcon, { backgroundColor: colors.primary }]}>
-                  <PrimaryActionIcon color={colors.white} size={22} />
+          {homeMode !== 'compact' && (
+            <TouchableOpacity onPress={handlePrimaryAction} activeOpacity={0.78}>
+              <GlassCard style={styles.primaryActionCard}>
+                <View style={styles.cardContentRow}>
+                  <View style={[styles.primaryActionIcon, { backgroundColor: colors.primary }]}>
+                    <PrimaryActionIcon color={colors.white} size={22} />
+                  </View>
+                  <View style={styles.agendaContent}>
+                    <Text style={[styles.primaryActionTitle, { color: colors.textPrimary }]}>
+                      {primaryActionConfig.title}
+                    </Text>
+                    <Text style={[styles.agendaSubtitle, { color: colors.textSecondary }]}>
+                      {primaryActionConfig.subtitle}
+                    </Text>
+                  </View>
+                  <ChevronRight color={colors.textSecondary} size={20} />
                 </View>
-                <View style={styles.agendaContent}>
-                  <Text style={[styles.primaryActionTitle, { color: colors.textPrimary }]}>
-                    {primaryActionConfig.title}
-                  </Text>
-                  <Text style={[styles.agendaSubtitle, { color: colors.textSecondary }]}>
-                    {primaryActionConfig.subtitle}
-                  </Text>
-                </View>
-                <ChevronRight color={colors.textSecondary} size={20} />
-              </View>
-            </GlassCard>
-          </TouchableOpacity>
-
-          <GlassCard style={[styles.weeklyCard, isCompactHome && styles.weeklyCardCompact]}>
-            <View style={styles.weeklyHeader}>
-              <Text style={[styles.weeklyTitle, { color: colors.textPrimary }]}>{t('home.weeklyBalance')}</Text>
-              {!isCompactHome && (
-                <Text style={[styles.weeklySubtitle, { color: colors.textSecondary }]}>
-                  {t('home.weeklyBalanceSubtitle')}
-                </Text>
-              )}
-            </View>
-            <View style={styles.weeklyStatsRow}>
-              {weeklyStats.map(item => (
-                <View key={item.label} style={styles.weeklyStat}>
-                  <Text style={[styles.weeklyValue, { color: colors.textPrimary }]}>{item.value}</Text>
-                  <Text style={[styles.weeklyUnit, { color: colors.textSecondary }]}>{item.unit}</Text>
-                  <Text style={[styles.weeklyLabel, { color: colors.textSecondary }]}>{item.label}</Text>
-                </View>
-              ))}
-            </View>
-          </GlassCard>
+              </GlassCard>
+            </TouchableOpacity>
+          )}
 
           {/* Daily Snapshot */}
           <Text style={[styles.sectionTitle, { marginTop: spacing.s, color: colors.textPrimary }]}>
@@ -433,22 +414,14 @@ export const HomeScreen = () => {
                   const Icon = card.icon;
                   return (
                     <TouchableOpacity key={card.key} style={styles.halfWidth} onPress={card.onPress}>
-                      <GlassCard style={[styles.statsCard, isCompactHome && styles.statsCardCompact]}>
+                      <GlassCard style={styles.statsCard}>
                         <View style={styles.cardContentColumn}>
                           <View style={styles.statsHeader}>
                             <Icon color={colors.primary} size={20} />
                             <Text style={[styles.statsLabel, { color: colors.textPrimary }]}>{card.label}</Text>
                           </View>
                           <View style={styles.statsValueContainer}>
-                            <Text
-                              style={[
-                                styles.statsValue,
-                                isCompactHome && styles.statsValueCompact,
-                                { color: colors.textPrimary },
-                              ]}
-                            >
-                              {card.value}
-                            </Text>
+                            <Text style={[styles.statsValue, { color: colors.textPrimary }]}>{card.value}</Text>
                             {!!card.unit && (
                               <Text style={[styles.statsUnit, { color: colors.textSecondary }]}>{card.unit}</Text>
                             )}
@@ -467,7 +440,7 @@ export const HomeScreen = () => {
           <View style={styles.agendaContainer}>
             {/* Next Meal Item */}
             <TouchableOpacity onPress={() => navigation.navigate('Nutrition', { screen: 'NutritionHome' })}>
-              <GlassCard style={[styles.agendaItem, isCompactHome && styles.agendaItemCompact]}>
+              <GlassCard style={styles.agendaItem}>
                 <View style={styles.cardContentRow}>
                   <View style={styles.agendaIconContainer}>
                     <View
@@ -500,7 +473,7 @@ export const HomeScreen = () => {
             {/* Workout Agenda Item */}
             {activeTodayWorkout || pendingWorkout ? (
               <TouchableOpacity onPress={handleAgendaWorkout}>
-                <GlassCard style={[styles.agendaItem, isCompactHome && styles.agendaItemCompact]}>
+                <GlassCard style={styles.agendaItem}>
                   <View style={styles.cardContentRow}>
                     <View style={styles.agendaIconContainer}>
                       {activeTodayWorkout ? (
@@ -531,7 +504,7 @@ export const HomeScreen = () => {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity onPress={() => navigation.navigate('Training', { screen: 'TrainingHome' })}>
-                <GlassCard style={[styles.agendaItem, isCompactHome && styles.agendaItemCompact]}>
+                <GlassCard style={styles.agendaItem}>
                   <View style={styles.cardContentRow}>
                     <View style={[styles.agendaIconContainer, { backgroundColor: 'rgba(0,0,0,0.03)' }]}>
                       <Dumbbell color={colors.textPrimary} size={24} />
@@ -548,6 +521,25 @@ export const HomeScreen = () => {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Weekly Balance */}
+          <GlassCard style={[styles.weeklyCard, { marginTop: spacing.l }]}>
+            <View style={styles.weeklyHeader}>
+              <Text style={[styles.weeklyTitle, { color: colors.textPrimary }]}>{t('home.weeklyBalance')}</Text>
+              <Text style={[styles.weeklySubtitle, { color: colors.textSecondary }]}>
+                {t('home.weeklyBalanceSubtitle')}
+              </Text>
+            </View>
+            <View style={styles.weeklyStatsRow}>
+              {weeklyStats.map(item => (
+                <View key={item.label} style={styles.weeklyStat}>
+                  <Text style={[styles.weeklyValue, { color: colors.textPrimary }]}>{item.value}</Text>
+                  <Text style={[styles.weeklyUnit, { color: colors.textSecondary }]}>{item.unit}</Text>
+                  <Text style={[styles.weeklyLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </GlassCard>
         </ScrollView>
 
         {/* Direct Weight Log Modal */}
