@@ -18,6 +18,7 @@ import {
   LucideIcon,
 } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
+import { format } from 'date-fns';
 
 import { spacing, borderRadius, typography } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
@@ -31,6 +32,8 @@ import { SPORT_COLORS } from '../../theme/sportColors';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { NotificationSettings, useSettingsNotifications } from '../../hooks/settings/useSettingsNotifications';
 import { useMediaPermissions } from '../../hooks/useMediaPermissions';
+import { useHomeSettings } from '../../hooks/settings/useHomeSettings';
+import { useHomeWeeklySummary } from '../../hooks/useHomeWeeklySummary';
 
 import { useHealthInsights } from '../../modules/health/hooks/useHealthInsights';
 import { useTodaySteps } from '../../modules/health/hooks/useSteps';
@@ -75,6 +78,8 @@ export const HomeScreen = () => {
 
   const { convertWeightToUi, convertEnergyToUi } = useUnitConversion();
   const { settings: notifSettings, refetch: refetchSettings } = useSettingsNotifications(); // Get settings
+  const { homeMode, homePrimaryAction } = useHomeSettings();
+  const { data: weeklySummary } = useHomeWeeklySummary();
   useMediaPermissions(); // Request camera/mic permissions on mount
 
   // Auto-refresh when screen comes into focus
@@ -92,6 +97,7 @@ export const HomeScreen = () => {
   const { latestSleep } = useHealthInsights();
   const { data: todaySteps } = useTodaySteps();
   const { homeCards } = useHomeCards();
+  const isCompactHome = homeMode === 'compact';
   const pendingWorkout = !activeTodayWorkout && scheduledWorkouts.length > 0 ? scheduledWorkouts[0] : null;
   const { totals, targets, meals } = useDayNutrition(new Date());
   const latestWeight = health?.weight?.weight_kg;
@@ -135,6 +141,7 @@ export const HomeScreen = () => {
   const nextMealLabel = MEAL_TYPE_LABELS[nextMealType] || 'settings.lunch';
 
   const remainingKcal = (targets.kcal || 2000) - (totals.kcal || 0);
+  const todayDateString = format(new Date(), 'yyyy-MM-dd');
 
   // Summary card definitions, keyed so Home can render the user-selected set.
   const summaryCardConfig: Record<
@@ -223,6 +230,99 @@ export const HomeScreen = () => {
     handleStartPendingWorkout();
   };
 
+  const handleAddMeal = () => {
+    navigation.navigate('Nutrition', {
+      screen: 'MealLogForm',
+      params: {
+        date: todayDateString,
+        isExtra: true,
+        mealItem: { mealType: nextMealType },
+      },
+    });
+  };
+
+  const handlePrimaryAction = () => {
+    switch (homePrimaryAction) {
+      case 'add_meal':
+        handleAddMeal();
+        return;
+      case 'log_weight':
+        setShowWeightModal(true);
+        return;
+      case 'open_nutrition':
+        navigation.navigate('Nutrition', { screen: 'NutritionHome' });
+        return;
+      case 'smart_workout':
+        if (activeTodayWorkout || pendingWorkout) {
+          handleAgendaWorkout();
+          return;
+        }
+        navigation.navigate('Training', { screen: 'TrainingHome' });
+    }
+  };
+
+  const primaryActionConfig: { icon: LucideIcon; title: string; subtitle: string } = (() => {
+    switch (homePrimaryAction) {
+      case 'add_meal':
+        return {
+          icon: Utensils,
+          title: t('home.primaryActionAddMeal'),
+          subtitle: `${t('home.nextMeal')} ${t(nextMealLabel)}`,
+        };
+      case 'log_weight':
+        return {
+          icon: Scale,
+          title: t('home.primaryActionLogWeight'),
+          subtitle: t('home.primaryActionLogWeightSubtitle'),
+        };
+      case 'open_nutrition':
+        return {
+          icon: Utensils,
+          title: t('home.primaryActionOpenNutrition'),
+          subtitle: t('home.primaryActionOpenNutritionSubtitle'),
+        };
+      case 'smart_workout':
+        if (activeTodayWorkout) {
+          return {
+            icon: Play,
+            title: t('home.primaryActionResumeWorkout'),
+            subtitle: t('home.inProgressTodayAction'),
+          };
+        }
+        if (pendingWorkout) {
+          return {
+            icon: Play,
+            title: t('home.primaryActionStartWorkout'),
+            subtitle: t('home.scheduledTodayAction'),
+          };
+        }
+        return {
+          icon: Dumbbell,
+          title: t('home.primaryActionOpenTraining'),
+          subtitle: t('home.primaryActionOpenTrainingSubtitle'),
+        };
+    }
+  })();
+
+  const PrimaryActionIcon = primaryActionConfig.icon;
+  const weeklyStats = [
+    {
+      label: t('home.weeklyTraining'),
+      value: `${weeklySummary?.workoutsCount ?? 0}`,
+      unit: t('home.weeklyWorkoutsUnit'),
+    },
+    {
+      label: t('home.weeklyNutrition'),
+      value: `${weeklySummary?.nutritionDays ?? 0}`,
+      unit: t('home.weeklyDaysUnit'),
+    },
+    {
+      label: t('home.weeklyHealth'),
+      value: `${weeklySummary?.healthDays ?? 0}`,
+      unit: t('home.weeklyDaysUnit'),
+    },
+  ];
+
   // Helper for Icon and Color
   const getWorkoutVisuals = (workout: UseDashboardDataScheduledWorkout) => {
     if (workout.gym_template_id) {
@@ -283,6 +383,45 @@ export const HomeScreen = () => {
             </TouchableOpacity>
           </View>
 
+          <TouchableOpacity onPress={handlePrimaryAction} activeOpacity={0.78}>
+            <GlassCard style={[styles.primaryActionCard, isCompactHome && styles.primaryActionCardCompact]}>
+              <View style={styles.cardContentRow}>
+                <View style={[styles.primaryActionIcon, { backgroundColor: colors.primary }]}>
+                  <PrimaryActionIcon color={colors.white} size={22} />
+                </View>
+                <View style={styles.agendaContent}>
+                  <Text style={[styles.primaryActionTitle, { color: colors.textPrimary }]}>
+                    {primaryActionConfig.title}
+                  </Text>
+                  <Text style={[styles.agendaSubtitle, { color: colors.textSecondary }]}>
+                    {primaryActionConfig.subtitle}
+                  </Text>
+                </View>
+                <ChevronRight color={colors.textSecondary} size={20} />
+              </View>
+            </GlassCard>
+          </TouchableOpacity>
+
+          <GlassCard style={[styles.weeklyCard, isCompactHome && styles.weeklyCardCompact]}>
+            <View style={styles.weeklyHeader}>
+              <Text style={[styles.weeklyTitle, { color: colors.textPrimary }]}>{t('home.weeklyBalance')}</Text>
+              {!isCompactHome && (
+                <Text style={[styles.weeklySubtitle, { color: colors.textSecondary }]}>
+                  {t('home.weeklyBalanceSubtitle')}
+                </Text>
+              )}
+            </View>
+            <View style={styles.weeklyStatsRow}>
+              {weeklyStats.map(item => (
+                <View key={item.label} style={styles.weeklyStat}>
+                  <Text style={[styles.weeklyValue, { color: colors.textPrimary }]}>{item.value}</Text>
+                  <Text style={[styles.weeklyUnit, { color: colors.textSecondary }]}>{item.unit}</Text>
+                  <Text style={[styles.weeklyLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </GlassCard>
+
           {/* Daily Snapshot */}
           <Text style={[styles.sectionTitle, { marginTop: spacing.s, color: colors.textPrimary }]}>
             {t('home.todaysSummary')}
@@ -294,14 +433,22 @@ export const HomeScreen = () => {
                   const Icon = card.icon;
                   return (
                     <TouchableOpacity key={card.key} style={styles.halfWidth} onPress={card.onPress}>
-                      <GlassCard style={styles.statsCard}>
+                      <GlassCard style={[styles.statsCard, isCompactHome && styles.statsCardCompact]}>
                         <View style={styles.cardContentColumn}>
                           <View style={styles.statsHeader}>
                             <Icon color={colors.primary} size={20} />
                             <Text style={[styles.statsLabel, { color: colors.textPrimary }]}>{card.label}</Text>
                           </View>
                           <View style={styles.statsValueContainer}>
-                            <Text style={[styles.statsValue, { color: colors.textPrimary }]}>{card.value}</Text>
+                            <Text
+                              style={[
+                                styles.statsValue,
+                                isCompactHome && styles.statsValueCompact,
+                                { color: colors.textPrimary },
+                              ]}
+                            >
+                              {card.value}
+                            </Text>
                             {!!card.unit && (
                               <Text style={[styles.statsUnit, { color: colors.textSecondary }]}>{card.unit}</Text>
                             )}
@@ -320,7 +467,7 @@ export const HomeScreen = () => {
           <View style={styles.agendaContainer}>
             {/* Next Meal Item */}
             <TouchableOpacity onPress={() => navigation.navigate('Nutrition', { screen: 'NutritionHome' })}>
-              <GlassCard style={styles.agendaItem}>
+              <GlassCard style={[styles.agendaItem, isCompactHome && styles.agendaItemCompact]}>
                 <View style={styles.cardContentRow}>
                   <View style={styles.agendaIconContainer}>
                     <View
@@ -353,7 +500,7 @@ export const HomeScreen = () => {
             {/* Workout Agenda Item */}
             {activeTodayWorkout || pendingWorkout ? (
               <TouchableOpacity onPress={handleAgendaWorkout}>
-                <GlassCard style={styles.agendaItem}>
+                <GlassCard style={[styles.agendaItem, isCompactHome && styles.agendaItemCompact]}>
                   <View style={styles.cardContentRow}>
                     <View style={styles.agendaIconContainer}>
                       {activeTodayWorkout ? (
@@ -384,7 +531,7 @@ export const HomeScreen = () => {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity onPress={() => navigation.navigate('Training', { screen: 'TrainingHome' })}>
-                <GlassCard style={styles.agendaItem}>
+                <GlassCard style={[styles.agendaItem, isCompactHome && styles.agendaItemCompact]}>
                   <View style={styles.cardContentRow}>
                     <View style={[styles.agendaIconContainer, { backgroundColor: 'rgba(0,0,0,0.03)' }]}>
                       <Dumbbell color={colors.textPrimary} size={24} />
@@ -440,6 +587,67 @@ const styles = StyleSheet.create({
     ...typography.h3,
     marginBottom: spacing.m,
   },
+  primaryActionCard: {
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    marginBottom: spacing.m,
+    minHeight: 76,
+  },
+  primaryActionCardCompact: {
+    minHeight: 64,
+    paddingVertical: spacing.s,
+  },
+  primaryActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryActionTitle: {
+    ...typography.h4,
+    marginBottom: 2,
+  },
+  weeklyCard: {
+    padding: spacing.m,
+    borderRadius: borderRadius.l,
+    marginBottom: spacing.l,
+  },
+  weeklyCardCompact: {
+    paddingVertical: spacing.s,
+    marginBottom: spacing.m,
+  },
+  weeklyHeader: {
+    marginBottom: spacing.m,
+  },
+  weeklyTitle: {
+    ...typography.h4,
+    fontWeight: '700',
+  },
+  weeklySubtitle: {
+    ...typography.caption,
+    marginTop: 2,
+  },
+  weeklyStatsRow: {
+    flexDirection: 'row',
+    gap: spacing.s,
+  },
+  weeklyStat: {
+    flex: 1,
+  },
+  weeklyValue: {
+    ...typography.h2,
+    fontWeight: '800',
+  },
+  weeklyUnit: {
+    ...typography.caption,
+    marginTop: -2,
+  },
+  weeklyLabel: {
+    ...typography.caption,
+    fontWeight: '700',
+    marginTop: 4,
+  },
   statsGrid: {
     gap: spacing.m,
     marginBottom: spacing.l,
@@ -455,6 +663,10 @@ const styles = StyleSheet.create({
     padding: spacing.m,
     borderRadius: borderRadius.l,
     height: 100, // Fixed height for consistency
+  },
+  statsCardCompact: {
+    height: 86,
+    padding: spacing.s,
   },
   cardContentColumn: {
     flex: 1,
@@ -478,6 +690,9 @@ const styles = StyleSheet.create({
     ...typography.h1,
     fontSize: 28, // Slightly smaller than massive header
   },
+  statsValueCompact: {
+    fontSize: 23,
+  },
   statsUnit: {
     ...typography.caption,
     marginBottom: 4, // Align baseline
@@ -490,6 +705,10 @@ const styles = StyleSheet.create({
   agendaItem: {
     padding: spacing.m,
     minHeight: 80,
+  },
+  agendaItemCompact: {
+    paddingVertical: spacing.s,
+    minHeight: 68,
   },
   cardContentRow: {
     flex: 1,

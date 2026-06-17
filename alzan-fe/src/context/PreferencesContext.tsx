@@ -5,6 +5,12 @@ import { UserPreference, UserPreferenceInsert } from '../types/requests.types';
 import { useAuth } from './AuthContext';
 import { changeLanguage, DEFAULT_LOCALE, isValidLocale } from '../i18n';
 import {
+  DEFAULT_HOME_MODE,
+  DEFAULT_HOME_PDF_SECTION_ORDER,
+  DEFAULT_HOME_PRIMARY_ACTION,
+  DEFAULT_HOME_CARDS_ORDER,
+} from '../constants/homeSettings';
+import {
   AppearanceSettingsJson,
   NotificationSettingsJson,
   NutritionSettingsJson,
@@ -19,6 +25,10 @@ const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettingsJson = {
     reduceMotion: false,
     largeText: false,
   },
+  home_cards: DEFAULT_HOME_CARDS_ORDER,
+  home_mode: DEFAULT_HOME_MODE,
+  home_primary_action: DEFAULT_HOME_PRIMARY_ACTION,
+  home_pdf_section_order: DEFAULT_HOME_PDF_SECTION_ORDER,
 };
 
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettingsJson = {

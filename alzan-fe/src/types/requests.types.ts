@@ -42,6 +42,9 @@ export interface AppearanceSettingsJson {
   };
   /** Keys of the 4 summary cards shown on the Home screen (see HomeCardKey). */
   home_cards?: string[];
+  home_mode?: 'compact' | 'detailed';
+  home_primary_action?: 'smart_workout' | 'add_meal' | 'log_weight' | 'open_nutrition';
+  home_pdf_section_order?: Array<'health' | 'training' | 'nutrition'>;
 }
 
 // 2. Notifications

@@ -2,10 +2,20 @@ import { useCallback, useMemo } from 'react';
 import { usePreferencesContext } from '../../context/PreferencesContext';
 import { AppearanceSettingsJson } from '../../types/requests.types';
 import { HomeCardKey, normalizeHomeCards } from '../../constants/homeCards';
+import {
+  DEFAULT_HOME_CARDS_ORDER,
+  DEFAULT_HOME_MODE,
+  DEFAULT_HOME_PDF_SECTION_ORDER,
+  DEFAULT_HOME_PRIMARY_ACTION,
+} from '../../constants/homeSettings';
 
 const DEFAULT_APPEARANCE: AppearanceSettingsJson = {
   theme: 'system',
   accessibility: { reduceMotion: false, largeText: false },
+  home_cards: DEFAULT_HOME_CARDS_ORDER,
+  home_mode: DEFAULT_HOME_MODE,
+  home_primary_action: DEFAULT_HOME_PRIMARY_ACTION,
+  home_pdf_section_order: DEFAULT_HOME_PDF_SECTION_ORDER,
 };
 
 /**

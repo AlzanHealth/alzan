@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Check } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, Check } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { spacing, typography, borderRadius, shadows } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
@@ -37,6 +37,16 @@ export const HomeCardsSettingsScreen = () => {
     });
   };
 
+  const moveSelected = (index: number, direction: -1 | 1) => {
+    setSelected(prev => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
   const canSave = selected.length === HOME_CARDS_COUNT && !updating;
 
   const handleSave = async () => {
@@ -57,6 +67,62 @@ export const HomeCardsSettingsScreen = () => {
           {t('settings.homeCardsSelected', { selected: selected.length, total: HOME_CARDS_COUNT })}
         </Text>
 
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('settings.homeCardsOrderTitle')}</Text>
+        <View style={[styles.card, { backgroundColor: cardBg }]}>
+          {selected.map((key, index) => {
+            const def = HOME_CARD_DEFINITIONS.find(item => item.key === key);
+            if (!def) return null;
+            const Icon = def.icon;
+            const isLast = index === selected.length - 1;
+            return (
+              <React.Fragment key={key}>
+                <View style={styles.orderRow}>
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.background },
+                    ]}
+                  >
+                    <Icon size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.orderText}>
+                    <Text style={[styles.label, { color: colors.textPrimary }]}>{t(def.labelKey)}</Text>
+                    <Text style={[styles.orderMeta, { color: colors.textSecondary }]}>
+                      {t('settings.homeCardsOrderPosition', { position: index + 1 })}
+                    </Text>
+                  </View>
+                  <View style={styles.orderButtons}>
+                    <TouchableOpacity
+                      style={[
+                        styles.orderButton,
+                        { borderColor: colors.border },
+                        index === 0 && styles.disabledControl,
+                      ]}
+                      onPress={() => moveSelected(index, -1)}
+                      disabled={index === 0}
+                      accessibilityLabel={t('training.moveUp')}
+                    >
+                      <ArrowUp size={16} color={colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.orderButton, { borderColor: colors.border }, isLast && styles.disabledControl]}
+                      onPress={() => moveSelected(index, 1)}
+                      disabled={isLast}
+                      accessibilityLabel={t('training.moveDown')}
+                    >
+                      <ArrowDown size={16} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {!isLast && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+              </React.Fragment>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+          {t('settings.homeCardsAvailableTitle')}
+        </Text>
         <View style={[styles.card, { backgroundColor: cardBg }]}>
           {HOME_CARD_DEFINITIONS.map((def, index) => {
             const Icon = def.icon;
@@ -134,9 +200,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: spacing.m,
   },
+  sectionLabel: {
+    ...typography.caption,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginBottom: spacing.s,
+    marginLeft: spacing.xs,
+  },
   card: {
     borderRadius: borderRadius.m,
     overflow: 'hidden',
+    marginBottom: spacing.l,
     ...shadows.soft,
   },
   row: {
@@ -155,6 +229,35 @@ const styles = StyleSheet.create({
   label: {
     ...typography.body,
     flex: 1,
+  },
+  orderRow: {
+    minHeight: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.m,
+  },
+  orderText: {
+    flex: 1,
+    paddingRight: spacing.s,
+  },
+  orderMeta: {
+    ...typography.caption,
+    marginTop: 2,
+  },
+  orderButtons: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  orderButton: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.s,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledControl: {
+    opacity: 0.35,
   },
   checkbox: {
     width: 24,

@@ -10,6 +10,7 @@ import { generateHealthPDF } from '../../modules/health/services/healthPdfExport
 import type { WebExportWindow } from '../../modules/health/services/healthPdfExportService';
 import { generateDietPDF } from '../../modules/nutrition/services/pdfExportService';
 import { generateTrainingPDF } from '../../modules/training/services/trainingPdfExportService';
+import { HomePdfSectionKey, normalizeHomePdfSectionOrder } from '../../constants/homeSettings';
 import { createCombinedPdfHtml, createStatusSectionHtml } from './settingsCombinedPdfHtml';
 
 type CombinedPdfUser = {
@@ -22,10 +23,11 @@ type CombinedPdfExportOptions = {
   startDate: string;
   endDate: string;
   user: CombinedPdfUser;
+  sectionOrder?: HomePdfSectionKey[];
   webPrintWindow?: WebExportWindow | null;
 };
 
-type CombinedPdfReportKey = 'health' | 'training' | 'nutrition';
+type CombinedPdfReportKey = HomePdfSectionKey;
 
 type CombinedPdfReportTask = {
   key: CombinedPdfReportKey;
@@ -86,6 +88,7 @@ export const generateCombinedSettingsPDF = async ({
   startDate,
   endDate,
   user,
+  sectionOrder,
   webPrintWindow,
 }: CombinedPdfExportOptions): Promise<CombinedPdfExportResult> => {
   const displayName =
@@ -93,8 +96,8 @@ export const generateCombinedSettingsPDF = async ({
   const dateLocale = getDateFnsLocale();
   const datePattern = getPdfDatePattern();
 
-  const tasks: CombinedPdfReportTask[] = [
-    {
+  const taskByKey: Record<CombinedPdfReportKey, CombinedPdfReportTask> = {
+    health: {
       key: 'health',
       label: t('tabs.health'),
       run: () =>
@@ -109,7 +112,7 @@ export const generateCombinedSettingsPDF = async ({
           returnHtml: true,
         }),
     },
-    {
+    training: {
       key: 'training',
       label: t('settings.workout'),
       run: () =>
@@ -124,7 +127,7 @@ export const generateCombinedSettingsPDF = async ({
           returnHtml: true,
         }),
     },
-    {
+    nutrition: {
       key: 'nutrition',
       label: t('tabs.nutrition'),
       run: () =>
@@ -139,7 +142,8 @@ export const generateCombinedSettingsPDF = async ({
           returnHtml: true,
         }),
     },
-  ];
+  };
+  const tasks = normalizeHomePdfSectionOrder(sectionOrder).map(key => taskByKey[key]);
 
   const sections: Array<{ label: string; html: string }> = [];
   const exportedLabels: string[] = [];

@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Alert } from '../../components/common/Alert';
 import { formatLocalizedDate } from '../../i18n/dateLocale';
 import type { WebExportWindow } from '../../modules/health/services/healthPdfExportService';
+import { useHomeSettings } from '../../hooks/settings/useHomeSettings';
 import { generateCombinedSettingsPDF } from './settingsCombinedPdfExportService';
 import {
   formatSettingsPdfExportDate,
@@ -42,6 +43,7 @@ const joinLabels = (labels: string[]) => labels.join(', ');
 export const useSettingsCombinedPdfExport = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { homePdfSectionOrder } = useHomeSettings();
   const defaultRange = React.useMemo(getDefaultSettingsPdfExportRange, []);
 
   const [isModalVisible, setIsModalVisible] = React.useState(false);
@@ -131,6 +133,7 @@ export const useSettingsCombinedPdfExport = () => {
           display_name: displayName,
           email: user.email,
         },
+        sectionOrder: homePdfSectionOrder,
         webPrintWindow,
       });
 
@@ -167,7 +170,7 @@ export const useSettingsCombinedPdfExport = () => {
     } finally {
       setIsExporting(false);
     }
-  }, [endDate, rangeErrorMessage, startDate, t, user]);
+  }, [endDate, homePdfSectionOrder, rangeErrorMessage, startDate, t, user]);
 
   return {
     isModalVisible,

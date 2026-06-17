@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
-import { UserPreferenceInsert } from '../../types/requests.types';
+import { AppearanceSettingsJson, UserPreferenceInsert } from '../../types/requests.types';
 import { useAuth } from '../../context/AuthContext';
 import { changeLanguage, Locale } from '../../i18n';
 
@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS: AppearanceSettings = {
 export const useSettingsAppearance = () => {
   const { user } = useAuth();
   const [settings, setSettings] = useState<AppearanceSettings>(DEFAULT_SETTINGS);
+  const [storedAppearance, setStoredAppearance] = useState<Partial<AppearanceSettingsJson>>({});
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const { i18n, t } = useTranslation();
@@ -49,7 +50,8 @@ export const useSettingsAppearance = () => {
       }
 
       if (data) {
-        const stored = (data.appearance_settings as Partial<AppearanceSettings>) || {};
+        const stored = (data.appearance_settings as Partial<AppearanceSettingsJson>) || {};
+        setStoredAppearance(stored);
         setSettings({
           language: data.language_code || 'es',
           theme: stored.theme || 'system',
@@ -90,10 +92,13 @@ export const useSettingsAppearance = () => {
       }
 
       // Store theme and accessibility in appearance_settings jsonb
-      dbUpdate.appearance_settings = {
+      const nextAppearance: AppearanceSettingsJson = {
+        ...storedAppearance,
         theme: newSettings.theme,
         accessibility: newSettings.accessibility,
       };
+      dbUpdate.appearance_settings = nextAppearance;
+      setStoredAppearance(nextAppearance);
 
       const { error } = await supabase.from('user_preferences').upsert(
         {
