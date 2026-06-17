@@ -19,6 +19,7 @@ export const useImportReview = (sessionId?: string) => {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
     queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+    queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
     queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
     queryClient.invalidateQueries({ queryKey: ['sessionLaps'] });
     queryClient.invalidateQueries({ queryKey: ['sessionHeartRateZones'] });

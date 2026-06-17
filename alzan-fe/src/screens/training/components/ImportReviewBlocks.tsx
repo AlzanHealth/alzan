@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { AlertTriangle, Link2, Sparkles, Watch } from 'lucide-react-native';
 import { GlassCard } from '../../../components/GlassCard';
-import { PrimaryButton } from '../../../components/PrimaryButton';
 import { Alert } from '../../../components/common/Alert';
+import { PrimaryButton } from '../../../components/PrimaryButton';
 import { borderRadius, spacing, typography } from '../../../theme';
 import { useTrainingStyles } from '../../../hooks/useTrainingStyles';
 import { useAuth } from '../../../context/AuthContext';
@@ -15,8 +15,7 @@ import { useImportReview } from '../../../hooks/useImportReview';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { ActivitySession } from '../../../types/requests.types';
 import { formatDuration, getSportDefaultTitleKey } from '../../../constants/sports';
-
-const STRONG_DUPLICATE_THRESHOLD = 80;
+import { getImportReviewDetailState } from '../helpers/importReviewPipeline.helper';
 
 interface TemplateOption {
   id: string;
@@ -54,10 +53,6 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   const [plannedRoutineDismissed, setPlannedRoutineDismissed] = useState(false);
   const [reviewActionCompleted, setReviewActionCompleted] = useState(false);
 
-  useEffect(() => {
-    setReviewActionCompleted(false);
-  }, [session.id]);
-
   const isStrength = session.sport_type === 'strength';
   const sportLabel = t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype));
   const reviewActionPending =
@@ -70,11 +65,30 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
     review.assignStrengthSession.isPending;
   const duplicatePending =
     !reviewActionCompleted && session.duplicate_resolution === 'pending' && session.duplicate_of_session_id != null;
-  const duplicateScore = session.duplicate_score ?? 0;
-  const hasPendingWatchMetrics = !reviewActionCompleted && session.pending_watch_metrics != null;
   const associatedTemplateId = isStrength ? session.workout_template_id : session.endurance_template_id;
 
-  const showError = () => Alert.alert(t('common.error'), t('training.importReviewActionError'));
+  useEffect(() => {
+    setReviewActionCompleted(false);
+  }, [
+    associatedTemplateId,
+    session.duplicate_resolution,
+    session.id,
+    session.needs_strength_review,
+    session.pending_watch_metrics,
+    session.suggested_endurance_template_id,
+  ]);
+
+  const showError = (err: unknown) => {
+    console.error('Import review action error:', err);
+    Alert.alert(t('common.error'), t('training.importReviewActionError'));
+  };
+  const closeTemplatePicker = () => {
+    if (Platform.OS === 'web') {
+      const activeElement = globalThis.document?.activeElement as { blur?: () => void } | null | undefined;
+      activeElement?.blur?.();
+    }
+    setTemplatePickerVisible(false);
+  };
 
   const handleReviewActionSuccess = (survivorId: string) => {
     setReviewActionCompleted(true);
@@ -152,6 +166,55 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
     return { from: dayStart.toISOString(), to: dayEnd.toISOString() };
   }, [session.start_time]);
 
+  // Previous app metric values the watch overrode (for the optional revert UI).
+  const watchPrevious = useMemo<Record<string, number> | null>(() => {
+    const raw = session.pending_watch_metrics;
+    if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const previous = (raw as Record<string, unknown>).previous;
+    if (previous == null || typeof previous !== 'object' || Array.isArray(previous)) return null;
+    const entries = Object.entries(previous as Record<string, unknown>).filter(
+      (entry): entry is [string, number] => typeof entry[1] === 'number',
+    );
+    return entries.length > 0 ? Object.fromEntries(entries) : null;
+  }, [session.pending_watch_metrics]);
+
+  const formatMetricValue = (column: string, value: number | null | undefined): string | null => {
+    if (value == null) return null;
+    if (column === 'duration_s') return formatDuration(value);
+    if (column === 'calories_kcal') return t('training.importSessionKcal', { kcal: Math.round(value) });
+    return String(Math.round(value));
+  };
+
+  const watchComparison = useMemo(() => {
+    if (!watchPrevious) return [] as Array<{ before: string; after: string }>;
+    const current = session as unknown as Record<string, number | null>;
+    return Object.keys(watchPrevious)
+      .map(column => {
+        const before = formatMetricValue(column, watchPrevious[column]);
+        const after = formatMetricValue(column, current[column]);
+        return before && after ? { before, after } : null;
+      })
+      .filter((row): row is { before: string; after: string } => row != null);
+  }, [watchPrevious, session]);
+
+  // Severity-tinted header used by every review block (chip + title + optional subtitle/badge).
+  const renderHeader = (icon: React.ReactNode, tint: string, title: string, subtitle?: string, badge?: string) => (
+    <View style={styles.blockHeader}>
+      <View style={[styles.headerChip, { backgroundColor: tint + '22' }]}>{icon}</View>
+      <View style={{ flex: 1 }}>
+        <Text style={[typography.body, styles.blockTitle, { color: themeColors.textPrimary }]}>{title}</Text>
+        {subtitle ? (
+          <Text style={[typography.caption, { color: themeColors.textSecondary, marginTop: 2 }]}>{subtitle}</Text>
+        ) : null}
+      </View>
+      {badge ? (
+        <View style={[styles.badge, { backgroundColor: tint + '22' }]}>
+          <Text style={[styles.badgeText, { color: tint }]}>{badge}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+
   const { data: todaysStrengthSessions = [] } = useQuery({
     queryKey: ['importReviewStrengthCandidates', user?.id, session.id, sessionDayRange.from],
     queryFn: async (): Promise<ActivitySession[]> => {
@@ -196,11 +259,9 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   });
 
   const handleAssociateTemplate = (templateId: string) => {
-    setTemplatePickerVisible(false);
+    closeTemplatePicker();
     review.associateTemplate.mutate(
-      isStrength
-        ? { workoutTemplateId: templateId, targetSessionId: reviewTargetSessionId }
-        : { enduranceTemplateId: templateId, targetSessionId: reviewTargetSessionId },
+      isStrength ? { workoutTemplateId: templateId } : { enduranceTemplateId: templateId },
       {
         onSuccess: survivorId => {
           handleReviewActionSuccess(survivorId);
@@ -224,7 +285,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
         style: 'destructive',
         onPress: () =>
           review.associateTemplate.mutate(
-            { enduranceTemplateId: null, targetSessionId: reviewTargetSessionId, workoutTemplateId: null },
+            { enduranceTemplateId: null, workoutTemplateId: null },
             { onError: showError, onSuccess: handleReviewActionSuccess },
           ),
       },
@@ -253,7 +314,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
 
   const handleDismissSuggestion = () => {
     review.dismissSuggestion.mutate(
-      { targetSessionId: reviewTargetSessionId },
+      {},
       {
         onSuccess: handleReviewActionSuccess,
         onError: showError,
@@ -263,7 +324,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
 
   const handleKeepWatchMetrics = () => {
     review.keepWatchMetrics.mutate(
-      { targetSessionId: reviewTargetSessionId },
+      {},
       {
         onSuccess: handleReviewActionSuccess,
         onError: showError,
@@ -273,7 +334,7 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
 
   const handleRevertWatchMetrics = () => {
     review.revertWatchMetrics.mutate(
-      { targetSessionId: reviewTargetSessionId },
+      {},
       {
         onSuccess: handleReviewActionSuccess,
         onError: showError,
@@ -340,17 +401,24 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   };
 
   const renderTemplatePicker = () => (
-    <Modal
-      visible={templatePickerVisible}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setTemplatePickerVisible(false)}
-    >
-      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setTemplatePickerVisible(false)}>
+    <Modal visible={templatePickerVisible} transparent animationType="fade" onRequestClose={closeTemplatePicker}>
+      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={closeTemplatePicker}>
         <View style={[styles.modalCard, { backgroundColor: themeColors.background }]}>
-          <Text style={[typography.h3, { color: themeColors.textPrimary, marginBottom: spacing.m }]}>
-            {t(isStrength ? 'training.importChooseStrengthTemplate' : 'training.importChooseEnduranceTemplate')}
-          </Text>
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[typography.h3, { color: themeColors.textPrimary }]}>
+                {t(isStrength ? 'training.importChooseStrengthTemplate' : 'training.importChooseEnduranceTemplate')}
+              </Text>
+              <Text style={[typography.caption, { color: themeColors.textSecondary, marginTop: 2 }]}>
+                {t('training.importChooseTemplateHint')}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={closeTemplatePicker} hitSlop={8}>
+              <Text style={[typography.body, { color: themeColors.primary, fontWeight: '700' }]}>
+                {t('common.cancel')}
+              </Text>
+            </TouchableOpacity>
+          </View>
           {templateOptions.length === 0 ? (
             <Text style={[typography.body, { color: themeColors.textSecondary }]}>
               {t('training.importNoTemplatesAvailable')}
@@ -366,14 +434,19 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
                   disabled={reviewActionPending || reviewActionCompleted}
                   onPress={() => handleAssociateTemplate(item.id)}
                 >
-                  <Text style={[typography.body, { color: themeColors.textPrimary, fontWeight: '600' }]}>
-                    {item.name}
-                  </Text>
-                  {item.description ? (
-                    <Text style={[typography.caption, { color: themeColors.textSecondary }]} numberOfLines={2}>
-                      {item.description}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[typography.body, { color: themeColors.textPrimary, fontWeight: '600' }]}>
+                      {item.name}
                     </Text>
-                  ) : null}
+                    {item.description ? (
+                      <Text style={[typography.caption, { color: themeColors.textSecondary }]} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text style={[typography.caption, styles.templateRowAction, { color: themeColors.primary }]}>
+                    {t('training.importSelectTemplate')}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
@@ -383,28 +456,45 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
     </Modal>
   );
 
+  const reviewState = getImportReviewDetailState({
+    session,
+    reviewActionCompleted,
+    hasSuggestedTemplate: suggestedTemplate != null,
+    hasPlannedRoutine: isStrength && plannedRoutine != null && !plannedRoutineDismissed,
+    associatedTemplateId,
+  });
+  const duplicateScore = reviewState.duplicateScore;
+  const showStrongDuplicate = reviewState.mainStep === 'strong_duplicate';
+  const showWeakDuplicateNotice = reviewState.hasWeakDuplicateNotice;
+  const showNeedsReview = reviewState.mainStep === 'strength_assignment';
+  const showConflict = reviewState.mainStep === 'watch_metrics';
+  const showSuggestedTemplate = reviewState.mainStep === 'suggested_template';
+  const showPlannedRoutine = reviewState.mainStep === 'planned_routine';
+  const showTemplateBlock = reviewState.mainStep === 'template_management';
+
   return (
-    <View>
+    <View style={styles.container}>
       {/* 1. Priority duplicate prompt (score >= 80, pending) */}
-      {duplicatePending && duplicateScore >= STRONG_DUPLICATE_THRESHOLD && (
+      {showStrongDuplicate && (
         <GlassCard style={styles.blockCard}>
-          <View style={styles.blockHeader}>
-            <AlertTriangle size={20} color={themeColors.warning} />
-            <Text style={[typography.body, styles.blockTitle, { color: themeColors.textPrimary }]}>
-              {isStrength
-                ? t('training.importPossibleDuplicate')
-                : t('training.importDuplicatePriorityTitle', { sport: sportLabel })}
-            </Text>
-          </View>
+          {renderHeader(
+            <AlertTriangle size={18} color={themeColors.warning} />,
+            themeColors.warning,
+            isStrength
+              ? t('training.importPossibleDuplicate')
+              : t('training.importDuplicatePriorityTitle', { sport: sportLabel }),
+            undefined,
+            duplicateScore > 0 ? `${Math.round(duplicateScore)}%` : undefined,
+          )}
           {duplicateTarget && (
             <View style={[styles.comparisonBox, { borderColor: themeColors.border }]}>
               <View style={styles.comparisonColumn}>
-                <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
-                  {t('training.importWatchActivity')}
+                <Text style={[typography.caption, { color: themeColors.textSecondary, fontWeight: '600' }]}>
+                  {t('training.importWatchActivity').toUpperCase()}
                 </Text>
                 <Text
-                  style={[typography.body, { color: themeColors.textPrimary, fontWeight: '600' }]}
-                  numberOfLines={1}
+                  style={[typography.body, { color: themeColors.textPrimary, fontWeight: '700' }]}
+                  numberOfLines={3}
                 >
                   {session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
                 </Text>
@@ -414,12 +504,12 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               </View>
               <View style={[styles.comparisonDivider, { backgroundColor: themeColors.border }]} />
               <View style={styles.comparisonColumn}>
-                <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
-                  {t('training.importExistingWorkout')}
+                <Text style={[typography.caption, { color: themeColors.textSecondary, fontWeight: '600' }]}>
+                  {t('training.importExistingWorkout').toUpperCase()}
                 </Text>
                 <Text
-                  style={[typography.body, { color: themeColors.textPrimary, fontWeight: '600' }]}
-                  numberOfLines={1}
+                  style={[typography.body, { color: themeColors.textPrimary, fontWeight: '700' }]}
+                  numberOfLines={3}
                 >
                   {duplicateTarget.name ||
                     t(getSportDefaultTitleKey(duplicateTarget.sport_type, duplicateTarget.sport_subtype))}
@@ -430,9 +520,28 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               </View>
             </View>
           )}
-          <Text style={[typography.caption, { color: themeColors.textSecondary, marginBottom: spacing.s }]}>
-            {t(isStrength ? 'training.importStrengthMergeExplanation' : 'training.importMergeExplanation')}
-          </Text>
+
+          <View style={styles.blockText}>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.primary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importMergeKeepExisting')}:</Text>{' '}
+                {t(
+                  isStrength ? 'training.importMergeKeepExistingStrengthHint' : 'training.importMergeKeepExistingHint',
+                )}
+              </Text>
+            </View>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.textSecondary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>
+                  {t(isStrength ? 'training.importNoKeepBoth' : 'training.importKeepBoth')}:
+                </Text>{' '}
+                {t('training.importKeepBothHint')}
+              </Text>
+            </View>
+          </View>
+
           <View style={styles.buttonRow}>
             <PrimaryButton
               title={t('training.importMergeKeepExisting')}
@@ -454,59 +563,150 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
       )}
 
       {/* 2. Subtle same-day notice (score < 80, pending) */}
-      {duplicatePending && duplicateScore < STRONG_DUPLICATE_THRESHOLD && (
+      {showWeakDuplicateNotice && (
         <GlassCard style={styles.blockCard}>
-          <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
+          {renderHeader(
+            <AlertTriangle size={18} color={themeColors.warning} />,
+            themeColors.warning,
+            t('training.importPossibleDuplicate'),
+            undefined,
+            duplicateScore > 0 ? `${Math.round(duplicateScore)}%` : undefined,
+          )}
+          <Text style={[typography.body, { color: themeColors.textPrimary, marginBottom: spacing.m }]}>
             {t('training.importDuplicateSubtle', { sport: sportLabel })}
           </Text>
-          <TouchableOpacity onPress={handleMerge} disabled={reviewActionPending || reviewActionCompleted}>
-            <Text style={[typography.caption, styles.linkText, { color: themeColors.primary }]}>
-              {t('training.importMergeManually')}
-            </Text>
-          </TouchableOpacity>
+
+          <View style={styles.blockText}>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.primary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importMergeKeepExisting')}:</Text>{' '}
+                {t('training.importMergeWeakHint')}
+              </Text>
+            </View>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.textSecondary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importKeepBoth')}:</Text>{' '}
+                {t('training.importKeepBothHint')}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.buttonRow}>
+            <PrimaryButton
+              title={t('training.importMergeKeepExisting')}
+              onPress={handleMerge}
+              loading={review.mergeDuplicate.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
+              style={styles.rowButton}
+            />
+            <PrimaryButton
+              title={t('training.importKeepBoth')}
+              onPress={handleKeepBoth}
+              loading={review.keepBothDuplicates.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
+              variant="outline"
+              style={styles.rowButton}
+            />
+          </View>
         </GlassCard>
       )}
 
       {/* 3. Multiple strength sessions chooser */}
-      {!reviewActionCompleted && session.needs_strength_review && (
+      {showNeedsReview && (
         <GlassCard style={styles.blockCard}>
-          <View style={styles.blockHeader}>
-            <Link2 size={20} color={themeColors.primary} />
-            <Text style={[typography.body, styles.blockTitle, { color: themeColors.textPrimary }]}>
-              {t('training.importMultipleStrengthPrompt')}
-            </Text>
+          {renderHeader(
+            <Link2 size={18} color={themeColors.primary} />,
+            themeColors.primary,
+            t('training.importMultipleStrengthPrompt'),
+          )}
+
+          <View style={{ marginBottom: spacing.m }}>
+            {todaysStrengthSessions.map(candidate => (
+              <TouchableOpacity
+                key={candidate.id}
+                activeOpacity={0.8}
+                onPress={() => handleAssign(candidate.id)}
+                disabled={reviewActionPending || reviewActionCompleted}
+                style={[styles.candidateRow, { borderColor: themeColors.border, backgroundColor: themeColors.surface }]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[typography.body, { color: themeColors.textPrimary, fontWeight: '700' }]}>
+                    {sessionDisplayName(candidate)}
+                  </Text>
+                  <Text style={[typography.caption, { color: themeColors.textSecondary, marginTop: 2 }]}>
+                    {sessionMetricSummary(candidate)}
+                  </Text>
+                </View>
+                {review.assignStrengthSession.isPending ? (
+                  <ActivityIndicator color={themeColors.primary} />
+                ) : (
+                  <Text style={[styles.actionArrow, { color: themeColors.primary }]}>›</Text>
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
-          {todaysStrengthSessions.map(candidate => (
-            <PrimaryButton
-              key={candidate.id}
-              title={t('training.importAssignToSessionKeepingData', { name: sessionDisplayName(candidate) })}
-              onPress={() => handleAssign(candidate.id)}
-              loading={review.assignStrengthSession.isPending}
-              disabled={reviewActionPending || reviewActionCompleted}
-              variant="secondary"
-              style={styles.stackedButton}
-            />
-          ))}
+
           <PrimaryButton
             title={t('training.importKeepAsNew')}
             onPress={handleKeepAsNewStrength}
             loading={review.assignStrengthSession.isPending}
             disabled={reviewActionPending || reviewActionCompleted}
             variant="outline"
-            style={styles.stackedButton}
+            style={{ borderRadius: borderRadius.m }}
           />
         </GlassCard>
       )}
 
       {/* 4. Watch metrics applied (watch wins by default; optional revert) */}
-      {hasPendingWatchMetrics && (
+      {showConflict && (
         <GlassCard style={styles.blockCard}>
-          <View style={styles.blockHeader}>
-            <Watch size={20} color={themeColors.primary} />
-            <Text style={[typography.body, styles.blockTitle, { color: themeColors.textPrimary }]}>
-              {t('training.importWatchDataPrompt')}
-            </Text>
+          {renderHeader(
+            <Watch size={18} color={themeColors.primary} />,
+            themeColors.primary,
+            t('training.importWatchDataPrompt'),
+          )}
+          {watchComparison.length > 0 && (
+            <View style={[styles.metricCompareRow, { marginBottom: spacing.m }]}>
+              <View style={[styles.metricCompareCell, { backgroundColor: themeColors.border }]}>
+                <Text style={[typography.caption, { color: themeColors.textSecondary, fontWeight: '700' }]}>
+                  {t('training.importWatchYourValue').toUpperCase()}
+                </Text>
+                <Text
+                  style={[typography.caption, { color: themeColors.textSecondary, textDecorationLine: 'line-through' }]}
+                >
+                  {watchComparison.map(row => row.before).join(' · ')}
+                </Text>
+              </View>
+              <View style={[styles.metricCompareCell, { backgroundColor: themeColors.primary + '14' }]}>
+                <Text style={[typography.caption, { color: themeColors.primary, fontWeight: '700' }]}>
+                  {t('training.importWatchWatchValue').toUpperCase()}
+                </Text>
+                <Text style={[typography.caption, { color: themeColors.textPrimary, fontWeight: '700' }]}>
+                  {watchComparison.map(row => row.after).join(' · ')}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.blockText}>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.primary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importKeepWatchData')}:</Text>{' '}
+                {t('training.importKeepWatchDataHint')}
+              </Text>
+            </View>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.textSecondary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importKeepMine')}:</Text>{' '}
+                {t('training.importKeepMineHint')}
+              </Text>
+            </View>
           </View>
+
           <View style={styles.buttonRow}>
             <PrimaryButton
               title={t('training.importKeepWatchData')}
@@ -528,17 +728,34 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
       )}
 
       {/* 4b. Planned gym routine suggestion (strength BPMN) */}
-      {isStrength && !reviewActionCompleted && !associatedTemplateId && plannedRoutine && !plannedRoutineDismissed && (
+      {showPlannedRoutine && plannedRoutine && (
         <GlassCard style={styles.blockCard}>
-          <View style={styles.blockHeader}>
-            <Sparkles size={20} color={themeColors.success} />
-            <Text style={[typography.body, styles.blockTitle, { color: themeColors.textPrimary }]}>
-              {t('training.importSuggestedTemplate', { templateName: plannedRoutine.name })}
-            </Text>
+          {renderHeader(
+            <Sparkles size={18} color={themeColors.success} />,
+            themeColors.success,
+            t('training.importSuggestedTemplate', { templateName: plannedRoutine.name }),
+          )}
+
+          <View style={styles.blockText}>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.primary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importAssociateToTemplate')}:</Text>{' '}
+                {t('training.importAssociatePlannedHint', { templateName: plannedRoutine.name })}
+              </Text>
+            </View>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.textSecondary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importKeepGeneric')}:</Text>{' '}
+                {t('training.importKeepGenericHint')}
+              </Text>
+            </View>
           </View>
+
           <View style={styles.buttonRow}>
             <PrimaryButton
-              title={t('training.importAssociate')}
+              title={t('training.importAssociateToTemplate')}
               onPress={() => handleAssociateTemplate(plannedRoutine.id)}
               loading={review.associateTemplate.isPending}
               disabled={reviewActionPending || reviewActionCompleted}
@@ -556,22 +773,36 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
       )}
 
       {/* 5. Template suggestion (60-79%) */}
-      {!reviewActionCompleted && !associatedTemplateId && suggestedTemplate && (
+      {showSuggestedTemplate && suggestedTemplate && (
         <GlassCard style={styles.blockCard}>
-          <View style={styles.blockHeader}>
-            <Sparkles size={20} color={themeColors.success} />
-            <Text style={[typography.body, styles.blockTitle, { color: themeColors.textPrimary }]}>
-              {t('training.importSuggestedTemplate', { templateName: suggestedTemplate.name })}
-            </Text>
-          </View>
-          {session.template_match_score != null && (
-            <Text style={[typography.caption, { color: themeColors.textSecondary, marginBottom: spacing.s }]}>
-              {t('training.importMatchScoreLabel', { score: Math.round(session.template_match_score) })}
-            </Text>
+          {renderHeader(
+            <Sparkles size={18} color={themeColors.success} />,
+            themeColors.success,
+            t('training.importSuggestedTemplate', { templateName: suggestedTemplate.name }),
+            undefined,
+            session.template_match_score != null ? `${Math.round(session.template_match_score)}%` : undefined,
           )}
+
+          <View style={styles.blockText}>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.primary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importAssociateToTemplate')}:</Text>{' '}
+                {t('training.importAssociateSuggestedHint', { templateName: suggestedTemplate.name })}
+              </Text>
+            </View>
+            <View style={styles.bulletItem}>
+              <Text style={[styles.bulletDot, { color: themeColors.textSecondary }]}>•</Text>
+              <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
+                <Text style={{ fontWeight: '700' }}>{t('training.importKeepGeneric')}:</Text>{' '}
+                {t('training.importDismissSuggestionHint')}
+              </Text>
+            </View>
+          </View>
+
           <View style={styles.buttonRow}>
             <PrimaryButton
-              title={t('training.importAssociate')}
+              title={t('training.importAssociateToTemplate')}
               onPress={() => handleAssociateTemplate(suggestedTemplate.id)}
               loading={review.associateTemplate.isPending}
               disabled={reviewActionPending || reviewActionCompleted}
@@ -589,94 +820,101 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
         </GlassCard>
       )}
 
-      {/* 6. Template association management */}
-      {associatedTemplateId && associatedTemplate ? (
-        <GlassCard style={styles.blockCard}>
-          <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
-            {t('training.importAssociatedTemplate')}
-          </Text>
-          <Text style={[typography.h3, { color: themeColors.textPrimary, marginTop: 2 }]}>
-            {associatedTemplate.name}
-          </Text>
-          {associatedTemplate.description ? (
-            <View style={{ marginTop: spacing.s }}>
-              <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
-                {t('training.importTemplateGoal')}
-              </Text>
-              <Text style={[typography.body, { color: themeColors.textPrimary }]}>
-                {associatedTemplate.description}
-              </Text>
-            </View>
-          ) : null}
-          {session.template_match_score != null && (
-            <Text style={[typography.caption, { color: themeColors.textSecondary, marginTop: spacing.s }]}>
-              {t('training.importMatchScoreLabel', { score: Math.round(session.template_match_score) })}
+      {/* 6. Template association management (only once decisions are resolved) */}
+      {showTemplateBlock &&
+        (associatedTemplateId && associatedTemplate ? (
+          <GlassCard style={styles.blockCard}>
+            <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
+              {t('training.importAssociatedTemplate')}
             </Text>
-          )}
-          <View style={[styles.buttonRow, { marginTop: spacing.m }]}>
-            <PrimaryButton
-              title={t('training.importChangeTemplate')}
-              onPress={handleOpenTemplatePicker}
-              disabled={reviewActionPending || reviewActionCompleted}
-              variant="secondary"
-              style={styles.rowButton}
-            />
-            <PrimaryButton
-              title={t('training.importRemoveAssociation')}
-              onPress={handleRemoveAssociation}
-              loading={review.associateTemplate.isPending}
-              disabled={reviewActionPending || reviewActionCompleted}
-              variant="outline"
-              style={styles.rowButton}
-            />
-          </View>
-          {isStrength && !hasSets && (
-            <PrimaryButton
-              title={t('training.importCompleteExercises')}
-              onPress={handleCompleteExercises}
-              disabled={reviewActionPending || reviewActionCompleted}
-              variant="secondary"
-              style={styles.stackedButton}
-            />
-          )}
-        </GlassCard>
-      ) : (
-        <GlassCard style={styles.blockCard}>
-          {isStrength ? (
-            <>
-              <Text style={[typography.body, { color: themeColors.textPrimary, marginBottom: spacing.s }]}>
-                {t('training.importAssociateStrengthTemplate')}
-              </Text>
-              <View style={styles.buttonRow}>
-                <PrimaryButton
-                  title={t('training.importAssociate')}
-                  onPress={handleOpenTemplatePicker}
-                  disabled={reviewActionPending || reviewActionCompleted}
-                  style={styles.rowButton}
-                />
-                {!hasSets && (
-                  <PrimaryButton
-                    title={t('training.importCompleteExercises')}
-                    onPress={handleCompleteExercises}
-                    disabled={reviewActionPending || reviewActionCompleted}
-                    variant="outline"
-                    style={styles.rowButton}
-                  />
-                )}
+            <Text style={[typography.h3, { color: themeColors.textPrimary, marginTop: 2, fontWeight: '700' }]}>
+              {associatedTemplate.name}
+            </Text>
+            {associatedTemplate.description ? (
+              <View style={{ marginTop: spacing.s }}>
+                <Text style={[typography.caption, { color: themeColors.textSecondary }]}>
+                  {t('training.importTemplateGoal')}
+                </Text>
+                <Text style={[typography.body, { color: themeColors.textPrimary }]}>
+                  {associatedTemplate.description}
+                </Text>
               </View>
-            </>
-          ) : (
-            <TouchableOpacity
-              onPress={handleOpenTemplatePicker}
-              disabled={reviewActionPending || reviewActionCompleted}
-            >
-              <Text style={[typography.body, styles.linkText, { color: themeColors.primary }]}>
-                {t('training.importAssociateTemplate')}
+            ) : null}
+            {session.template_match_score != null && (
+              <Text style={[typography.caption, { color: themeColors.textSecondary, marginTop: spacing.s }]}>
+                {t('training.importMatchScoreLabel', { score: Math.round(session.template_match_score) })}
               </Text>
-            </TouchableOpacity>
-          )}
-        </GlassCard>
-      )}
+            )}
+            <View style={[styles.buttonRow, { marginTop: spacing.m }]}>
+              <PrimaryButton
+                title={t('training.importChangeTemplate')}
+                onPress={handleOpenTemplatePicker}
+                disabled={reviewActionPending || reviewActionCompleted}
+                variant="outline"
+                style={styles.rowButton}
+              />
+              <PrimaryButton
+                title={t('training.importRemoveAssociation')}
+                onPress={handleRemoveAssociation}
+                loading={review.associateTemplate.isPending}
+                disabled={reviewActionPending || reviewActionCompleted}
+                variant="outline"
+                style={styles.rowButton}
+                textStyle={{ color: themeColors.danger }}
+              />
+            </View>
+            {isStrength && !hasSets && (
+              <View style={{ marginTop: spacing.s }}>
+                <PrimaryButton
+                  title={t('training.importCompleteExercises')}
+                  onPress={handleCompleteExercises}
+                  disabled={reviewActionPending || reviewActionCompleted}
+                  style={{ borderRadius: borderRadius.m }}
+                />
+              </View>
+            )}
+          </GlassCard>
+        ) : (
+          <GlassCard style={styles.blockCard}>
+            {isStrength ? (
+              <>
+                <Text
+                  style={[
+                    typography.body,
+                    { color: themeColors.textPrimary, marginBottom: spacing.m, fontWeight: '500' },
+                  ]}
+                >
+                  {t('training.importAssociateStrengthTemplate')}
+                </Text>
+                <View style={styles.actionStack}>
+                  <PrimaryButton
+                    title={t('training.importAssociateTemplate')}
+                    onPress={handleOpenTemplatePicker}
+                    disabled={reviewActionPending || reviewActionCompleted}
+                    style={{ borderRadius: borderRadius.m }}
+                  />
+                  {!hasSets && (
+                    <PrimaryButton
+                      title={t('training.importCompleteExercises')}
+                      onPress={handleCompleteExercises}
+                      disabled={reviewActionPending || reviewActionCompleted}
+                      variant="outline"
+                      style={{ borderRadius: borderRadius.m }}
+                    />
+                  )}
+                </View>
+              </>
+            ) : (
+              <PrimaryButton
+                title={t('training.importAssociateTemplate')}
+                onPress={handleOpenTemplatePicker}
+                disabled={reviewActionPending || reviewActionCompleted}
+                variant="outline"
+                style={{ borderRadius: borderRadius.m }}
+              />
+            )}
+          </GlassCard>
+        ))}
 
       {renderTemplatePicker()}
     </View>
@@ -684,32 +922,73 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
 };
 
 const styles = StyleSheet.create({
+  container: {
+    marginTop: spacing.l,
+  },
   blockCard: {
     marginBottom: spacing.m,
     padding: spacing.m,
   },
   blockHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.s,
     marginBottom: spacing.m,
   },
+  headerChip: {
+    width: 34,
+    height: 34,
+    borderRadius: borderRadius.s,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   blockTitle: {
-    flex: 1,
     fontWeight: '600',
   },
-  buttonRow: {
+  badge: {
+    paddingHorizontal: spacing.s,
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  metricCompareRow: {
     flexDirection: 'row',
     gap: spacing.s,
   },
-  rowButton: {
+  metricCompareCell: {
     flex: 1,
-    height: 44,
+    gap: 2,
+    borderRadius: borderRadius.m,
+    paddingVertical: spacing.s,
     paddingHorizontal: spacing.s,
   },
-  stackedButton: {
-    marginTop: spacing.s,
-    height: 44,
+  actionStack: {
+    gap: spacing.s,
+  },
+  actionTile: {
+    minHeight: 62,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: borderRadius.m,
+    paddingVertical: spacing.s,
+    paddingHorizontal: spacing.m,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  actionText: {
+    flex: 1,
+    gap: 2,
+  },
+  actionTitle: {
+    fontWeight: '700',
+  },
+  actionArrow: {
+    fontSize: 28,
+    lineHeight: 28,
+    fontWeight: '300',
   },
   comparisonBox: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -741,12 +1020,60 @@ const styles = StyleSheet.create({
     padding: spacing.l,
     maxHeight: '70%',
   },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.m,
+    marginBottom: spacing.m,
+  },
   modalList: {
     flexGrow: 0,
   },
   templateRow: {
     paddingVertical: spacing.m,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.m,
+  },
+  templateRowAction: {
+    fontWeight: '700',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: spacing.s,
+    marginTop: spacing.s,
+  },
+  rowButton: {
+    flex: 1,
+  },
+  blockText: {
+    marginBottom: spacing.m,
+  },
+  bulletItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    marginBottom: 6,
+  },
+  bulletDot: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  candidateRow: {
+    paddingVertical: spacing.s,
+    paddingHorizontal: spacing.m,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.m,
+    marginBottom: spacing.s,
   },
 });
 

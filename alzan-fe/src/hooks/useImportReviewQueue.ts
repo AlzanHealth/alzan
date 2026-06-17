@@ -1,45 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { ActivitySession } from '../types/requests.types';
+import {
+  getImportReviewConflictReason,
+  sortImportReviewItems,
+  type ImportReviewItem,
+} from '../screens/training/helpers/importReviewPipeline.helper';
 
-const STRONG_DUPLICATE_THRESHOLD = 80;
-const NEW_IMPORT_WINDOW_HOURS = 72;
+const NEW_IMPORT_WINDOW_HOURS = 168; // 7 days (7 * 24 hours)
 
-export type ImportReviewReason = 'duplicate' | 'strength_assignment' | 'new_import';
-
-export interface ImportReviewItem {
-  session: ActivitySession;
-  reason: ImportReviewReason;
-  /** Hard reviews persist until resolved; soft ones clear once seen or after the window. */
-  hard: boolean;
-}
-
-/**
- * Hard, blocking review states that surface regardless of age until resolved.
- * Watch-metric differences are NOT here: the watch wins by default, so they are
- * a soft, reversible notice shown only inside the activity detail.
- */
-function hardReason(session: ActivitySession): ImportReviewReason | null {
-  if (
-    session.duplicate_resolution === 'pending' &&
-    session.duplicate_of_session_id != null &&
-    (session.duplicate_score ?? 0) >= STRONG_DUPLICATE_THRESHOLD
-  ) {
-    return 'duplicate';
-  }
-  if (session.needs_strength_review) return 'strength_assignment';
-  return null;
-}
+export type { ImportReviewItem, ImportReviewReason } from '../screens/training/helpers/importReviewPipeline.helper';
 
 /**
  * Prioritized review queue surfaced when the user enters Training:
- * - Hard conflicts (strong duplicate, multiple-strength) surface for every
- *   affected activity, any age, until resolved.
- * - The single most recent imported activity not yet reviewed (< 72h) surfaces
+ * - Hard conflicts (strong duplicate, multiple-strength, watch metrics) surface
+ *   one at a time, any age, until resolved.
+ * - The single most recent imported activity not yet reviewed (< 7 days) surfaces
  *   as a soft "new activity" summary (Strava-like), until opened or dismissed.
- * Soft signals (weak duplicate, 60-79% suggestion, watch-metric revert) never
- * surface here; they live inside the activity detail.
+ * Soft signals (weak duplicate, 60-79% suggestion) never surface here; they
+ * live inside the activity detail.
  */
 export const useImportReviewQueue = () => {
   const { user } = useAuth();
@@ -57,37 +36,55 @@ export const useImportReviewQueue = () => {
         .select('*')
         .eq('user_id', user.id)
         .neq('status', 'cancelled')
-        .or('needs_strength_review.eq.true,and(duplicate_resolution.eq.pending,duplicate_of_session_id.not.is.null)')
-        .order('start_time', { ascending: false });
+        .or(
+          'needs_strength_review.eq.true,pending_watch_metrics.not.is.null,and(duplicate_resolution.eq.pending,duplicate_of_session_id.not.is.null)',
+        );
       if (hardError) throw hardError;
 
       const hardItems: ImportReviewItem[] = [];
       for (const session of hardRows ?? []) {
-        const reason = hardReason(session);
+        const reason = getImportReviewConflictReason(session);
         if (reason) hardItems.push({ session, reason, hard: true });
       }
 
-      // Soft "new import": the single most recent imported activity the user
-      // has not reviewed yet, within the surfacing window.
-      const { data: newRows, error: newError } = await supabase
+      // Soft/hard "new import" candidate: the last activity loaded in the last 7 days.
+      // If there are multiple, prioritize conflicts (hard conflicts), otherwise the absolute last import.
+      const { data: recentImports, error: recentError } = await supabase
         .from('activity_sessions')
         .select('*')
         .eq('user_id', user.id)
         .neq('status', 'cancelled')
         .not('imported_at', 'is', null)
-        .is('import_review_seen_at', null)
         .gte('imported_at', windowStart)
-        .order('imported_at', { ascending: false })
-        .limit(1);
-      if (newError) throw newError;
+        .order('imported_at', { ascending: false });
+      if (recentError) throw recentError;
 
-      const latestNew = newRows?.[0];
-      const hardIds = new Set(hardItems.map(item => item.session.id));
-      const latestNewImport: ImportReviewItem | null =
-        latestNew && !hardIds.has(latestNew.id) ? { session: latestNew, reason: 'new_import', hard: false } : null;
+      let latestNewImport: ImportReviewItem | null = null;
+      if (recentImports && recentImports.length > 0) {
+        // Find if there is any conflict in the recent imports
+        const conflictImports = recentImports.filter(session => {
+          const reason = getImportReviewConflictReason(session);
+          return reason !== null;
+        });
 
-      const items = [...hardItems];
-      if (latestNewImport) items.push(latestNewImport);
+        // The target session is the latest conflict if any exists, else the absolute latest import
+        const targetSession = conflictImports.length > 0 ? conflictImports[0] : recentImports[0];
+
+        // Only auto-open if it has not been marked seen yet
+        if (targetSession.import_review_seen_at === null) {
+          const reason = getImportReviewConflictReason(targetSession) ?? 'new_import';
+          latestNewImport = {
+            session: targetSession,
+            reason,
+            hard: reason !== 'new_import',
+          };
+        }
+      }
+
+      const items = sortImportReviewItems(hardItems);
+      if (latestNewImport && latestNewImport.reason === 'new_import') {
+        items.push(latestNewImport);
+      }
       return { items, latestNewImport };
     },
     enabled: !!user,

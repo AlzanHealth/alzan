@@ -38,16 +38,20 @@ export class AuthGuard implements CanActivate {
     }
 
     try {
-      // Validate JWT using the admin client (bypasses RLS for auth operations)
-      const { data, error } = await this.supabaseAdminService.client.auth.getUser(token);
+      // Validate JWT using a per-request client initialized with the user's token
+      const authenticatedClient = this.supabaseAdminService.getAuthenticatedClient(token);
+      const { data, error } = await authenticatedClient.auth.getUser(token);
 
       if (error || !data.user) {
+        this.logger.error(
+          `Supabase Auth getUser validation failed. Error: ${error ? error.message : 'none'} (status: ${error ? error.status : 'n/a'}). User found: ${!!data.user}. Token prefix: ${token ? token.substring(0, 10) : 'none'}...`,
+        );
         throw new UnauthorizedException('Unauthorized!');
       }
 
       // Attach user, token, and a per-request RLS-scoped client to the request
       request.token = token;
-      request.supabase = this.supabaseAdminService.getAuthenticatedClient(token);
+      request.supabase = authenticatedClient;
       request.supabaseUser = data.user;
       request.user = await this.userService.getUserById(request, data.user.id);
 

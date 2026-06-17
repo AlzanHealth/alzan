@@ -27,6 +27,9 @@ export const LiquidBackground: React.FC<LiquidBackgroundProps> = ({
   // Extract alignment and content styles to apply to the inner content View
   const flatStyle = StyleSheet.flatten(style) || {};
   const {
+    flexDirection,
+    flexWrap,
+    alignContent,
     alignItems,
     justifyContent,
     padding,
@@ -37,10 +40,15 @@ export const LiquidBackground: React.FC<LiquidBackgroundProps> = ({
     paddingHorizontal,
     paddingVertical,
     gap,
+    rowGap,
+    columnGap,
     ...containerStyle
   } = flatStyle;
 
   const contentStyle = {
+    flexDirection,
+    flexWrap,
+    alignContent,
     alignItems,
     justifyContent,
     padding,
@@ -51,6 +59,8 @@ export const LiquidBackground: React.FC<LiquidBackgroundProps> = ({
     paddingHorizontal,
     paddingVertical,
     gap,
+    rowGap,
+    columnGap,
   };
 
   // Liquid Glass Effect - Higher opacity for much better content readability

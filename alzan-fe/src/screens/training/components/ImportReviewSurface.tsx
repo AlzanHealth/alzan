@@ -14,7 +14,7 @@ import { BlurView } from 'expo-blur';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { AlertTriangle, Bell, ChevronRight, X } from 'lucide-react-native';
+import { AlertTriangle, ChevronRight, X } from 'lucide-react-native';
 import { GlassCard } from '../../../components/GlassCard';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { borderRadius, spacing, typography } from '../../../theme';
@@ -36,6 +36,7 @@ const REASON_TITLE_KEY: Record<ImportReviewReason, TranslationKey> = {
   new_import: 'training.importReviewNewActivityTitle',
   duplicate: 'training.importReviewDuplicateTitle',
   strength_assignment: 'training.importReviewStrengthAssignTitle',
+  watch_metrics: 'training.importReviewWatchMetricsTitle',
 };
 
 /**
@@ -48,11 +49,12 @@ export const ImportReviewSurface: React.FC<ImportReviewSurfaceProps> = ({ onOpen
   const { t } = useTranslation();
   const { colors: themeColors, isDark } = useTrainingStyles();
   const queryClient = useQueryClient();
-  const { items, latestNewImport, topItem, markSeen } = useImportReviewQueue();
+  const { items, latestNewImport, markSeen } = useImportReviewQueue();
 
   const [sheetSession, setSheetSession] = useState<ActivitySession | null>(null);
   const [nameValue, setNameValue] = useState('');
   const autoShownIdRef = useRef<string | null>(null);
+
 
   // Auto-open the sheet once for the latest unreviewed import.
   useEffect(() => {
@@ -74,15 +76,8 @@ export const ImportReviewSurface: React.FC<ImportReviewSurfaceProps> = ({ onOpen
     onOpenSession(session);
   };
 
-  const handleBannerPress = (item: ImportReviewItem) => {
-    if (item.hard) {
-      onOpenSession(item.session);
-    } else {
-      // Soft new-import: reopen the lightweight summary sheet.
-      setSheetSession(item.session);
-      setNameValue(item.session.name ?? '');
-    }
-  };
+  // The banner only carries conflicts, which open the full detail to resolve.
+  const handleBannerPress = (item: ImportReviewItem) => onOpenSession(item.session);
 
   const saveName = async (session: ActivitySession) => {
     const trimmed = nameValue.trim();
@@ -97,31 +92,32 @@ export const ImportReviewSurface: React.FC<ImportReviewSurfaceProps> = ({ onOpen
     }
   };
 
-  const extraCount = Math.max(0, items.length - 1);
+  // The banner only ever surfaces conflicts (one at a time). A brand-new import
+  // with no conflict is shown through the auto-opening sheet instead, so the two
+  // never overlap.
+  const bannerItem = items.find(item => item.hard) ?? null;
+  const conflictCount = items.filter(item => item.hard).length;
+  const extraCount = Math.max(0, conflictCount - 1);
 
   return (
     <>
-      {topItem && (
-        <TouchableOpacity activeOpacity={0.85} onPress={() => handleBannerPress(topItem)}>
-          <GlassCard style={[styles.banner, topItem.hard && { borderColor: themeColors.warning, borderWidth: 1 }]}>
-            <View style={styles.bannerIcon}>
-              {topItem.hard ? (
-                <AlertTriangle size={22} color={themeColors.warning} />
-              ) : (
-                <Bell size={22} color={themeColors.primary} />
-              )}
+      {bannerItem && (
+        <TouchableOpacity activeOpacity={0.85} onPress={() => handleBannerPress(bannerItem)}>
+          <GlassCard style={[styles.banner, { borderColor: themeColors.warning, borderWidth: 1 }]}>
+            <View style={[styles.bannerIcon, { backgroundColor: themeColors.warning + '18' }]}>
+              <AlertTriangle size={18} color={themeColors.warning} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[typography.body, { color: themeColors.textPrimary, fontWeight: '600' }]}>
-                {t(REASON_TITLE_KEY[topItem.reason])}
+            <View style={styles.bannerTextContainer}>
+              <Text style={[typography.body, styles.bannerTitle, { color: themeColors.textPrimary }]}>
+                {t(REASON_TITLE_KEY[bannerItem.reason])}
               </Text>
               <Text style={[typography.caption, { color: themeColors.textSecondary }]} numberOfLines={1}>
-                {topItem.session.name ||
-                  t(getSportDefaultTitleKey(topItem.session.sport_type, topItem.session.sport_subtype))}
+                {bannerItem.session.name ||
+                  t(getSportDefaultTitleKey(bannerItem.session.sport_type, bannerItem.session.sport_subtype))}
                 {extraCount > 0 ? ` · ${t('training.importReviewPendingCount', { count: extraCount })}` : ''}
               </Text>
             </View>
-            <ChevronRight size={20} color={themeColors.textSecondary} />
+            <ChevronRight size={18} color={themeColors.textSecondary} />
           </GlassCard>
         </TouchableOpacity>
       )}
@@ -240,16 +236,25 @@ const styles = StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.s,
+    gap: spacing.m,
     padding: spacing.m,
+    marginHorizontal: 16,
     marginBottom: spacing.m,
+    borderRadius: borderRadius.m,
   },
   bannerIcon: {
     width: 36,
     height: 36,
-    borderRadius: borderRadius.full,
+    borderRadius: borderRadius.m,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bannerTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  bannerTitle: {
+    fontWeight: '700',
   },
   sheetRoot: {
     flex: 1,

@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
 import { GlassCard } from '../../components/GlassCard';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { SPORTS_CONFIG, formatDuration, getSportDefaultTitleKey } from '../../constants/sports';
@@ -74,13 +75,26 @@ const SPORTS_WITH_SPECIFIC_MODALITY_METRIC = new Set<string>([
   HYROX_SPORT_TYPE,
 ]);
 
+const createPendingDetailSession = (sessionId?: string): ActivitySession =>
+  ({
+    id: sessionId ?? 'pending-detail-session',
+    sport_type: 'other',
+    start_time: new Date().toISOString(),
+    status: 'completed',
+    __pendingDetailSession: true,
+  }) as unknown as ActivitySession;
+
+const isPendingDetailSession = (session: ActivitySession): boolean =>
+  (session as ActivitySession & { __pendingDetailSession?: boolean }).__pendingDetailSession === true;
+
 export const EnduranceSessionDetailScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'EnduranceSessionDetail'>>();
   const { session: initialSession, sessionId: sessionIdParam } = route.params || {};
-  const [session, setSession] = useState<ActivitySession | undefined>(initialSession);
+  const [session, setSession] = useState<ActivitySession>(initialSession ?? createPendingDetailSession(sessionIdParam));
+  const isPendingSession = isPendingDetailSession(session);
   const queryClient = useQueryClient();
   const { preferences, toDisplayWeight } = useUserPreferences();
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
@@ -103,7 +117,7 @@ export const EnduranceSessionDetailScreen = () => {
   const [renameValue, setRenameValue] = useState('');
   const [renameSaving, setRenameSaving] = useState(false);
 
-  const [routePolyline, setRoutePolyline] = useState<string | null>(session?.route_polyline ?? null);
+  const [routePolyline, setRoutePolyline] = useState<string | null>(initialSession?.route_polyline ?? null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
 
   // Controls parent ScrollView scrolling — disabled while the user interacts with the map.
@@ -118,8 +132,13 @@ export const EnduranceSessionDetailScreen = () => {
 
   // Fresh session row — keeps import-review state (duplicates, suggestions,
   // pending watch metrics) in sync after review actions.
-  const activeSessionId = session?.id ?? sessionIdParam;
-  const { data: freshSession } = useQuery({
+  const activeSessionId = sessionIdParam ?? (isPendingSession ? undefined : session.id);
+  const {
+    data: freshSession,
+    isLoading: isSessionLoading,
+    isFetching: isSessionFetching,
+    refetch: refetchSession,
+  } = useQuery({
     queryKey: ['activitySession', activeSessionId],
     queryFn: async (): Promise<ActivitySession | null> => {
       if (!activeSessionId) return null;
@@ -133,6 +152,17 @@ export const EnduranceSessionDetailScreen = () => {
     },
     enabled: !!activeSessionId,
   });
+  useEffect(() => {
+    if (initialSession) {
+      setSession(initialSession);
+      setRoutePolyline(initialSession.route_polyline ?? null);
+      return;
+    }
+    if (sessionIdParam && session.id !== sessionIdParam) {
+      setSession(createPendingDetailSession(sessionIdParam));
+      setRoutePolyline(null);
+    }
+  }, [initialSession, session.id, sessionIdParam]);
   useEffect(() => {
     if (freshSession) {
       setSession(freshSession);
@@ -155,18 +185,20 @@ export const EnduranceSessionDetailScreen = () => {
       });
   }, [freshSession?.id, freshSession?.imported_at, freshSession?.import_review_seen_at, queryClient]);
 
+  const resolvedSessionId = isPendingSession ? undefined : session.id;
+
   // Fetch workout sets for gym sessions
-  const { data: sessionDetail } = useSessionDetail(session?.sport_type === 'strength' ? session?.id : undefined);
+  const { data: sessionDetail } = useSessionDetail(session.sport_type === 'strength' ? resolvedSessionId : undefined);
   const exerciseGroups = sessionDetail?.exerciseGroups || [];
   const supersetLinks = sessionDetail?.supersetLinks || [];
 
   // Fetch data for endurance template steps (use endurance_template_id for non-gym)
-  const { data: templateSteps } = useEnduranceTemplateSteps(session?.endurance_template_id);
+  const { data: templateSteps } = useEnduranceTemplateSteps(session.endurance_template_id);
 
   // Fetch laps
-  const { data: laps } = useSessionLaps(session?.id);
-  const { data: heartRateZones } = useSessionHeartRateZones(session?.id);
-  const { data: importedStrengthSummary } = useSessionImportedStrengthSummary(session?.id);
+  const { data: laps } = useSessionLaps(resolvedSessionId);
+  const { data: heartRateZones } = useSessionHeartRateZones(resolvedSessionId);
+  const { data: importedStrengthSummary } = useSessionImportedStrengthSummary(resolvedSessionId);
 
   // Fetch template details to get surface and environment type
   const { data: template } = useQuery({
@@ -438,8 +470,6 @@ export const EnduranceSessionDetailScreen = () => {
       },
     );
   }, [applyStrengthActivityImport, session, t]);
-
-  if (!session) return null;
 
   const config = SPORTS_CONFIG[session.sport_type] || SPORTS_CONFIG.other;
   // Explicitly use Dumbbell for gym/strength sessions, otherwise use config icon
@@ -1150,6 +1180,26 @@ export const EnduranceSessionDetailScreen = () => {
     );
   };
 
+  if (isPendingSession) {
+    const isWaitingForSession = !!activeSessionId && (isSessionLoading || isSessionFetching);
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]}>
+        <View style={styles.sessionFallback}>
+          {isWaitingForSession ? <ActivityIndicator color={themeColors.primary} size="large" /> : null}
+          <Text style={[typography.h3, styles.sessionFallbackTitle, { color: themeColors.textPrimary }]}>
+            {isWaitingForSession ? t('training.importDetailLoading') : t('training.importDetailLoadError')}
+          </Text>
+          {!isWaitingForSession ? (
+            <View style={styles.sessionFallbackActions}>
+              <PrimaryButton title={t('training.importRetry')} onPress={() => void refetchSession()} />
+              <PrimaryButton title={t('common.back')} onPress={() => navigation.goBack()} variant="outline" />
+            </View>
+          ) : null}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
       <SafeAreaView style={[styles.container, dynamicStyles.container]}>
@@ -1234,13 +1284,20 @@ export const EnduranceSessionDetailScreen = () => {
             </View>
             <TouchableOpacity
               onPress={openRenameModal}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: spacing.s,
+                paddingHorizontal: spacing.l,
+                alignSelf: 'stretch',
+              }}
               accessibilityLabel={t('training.importRenameActivity')}
             >
-              <Text style={[styles.activityName, dynamicStyles.title]}>
+              <Text style={[styles.activityName, dynamicStyles.title, { textAlign: 'center', flexShrink: 1 }]}>
                 {session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
               </Text>
-              <Pencil size={16} color={themeColors.textSecondary} />
+              <Pencil size={16} color={themeColors.textSecondary} style={{ flexShrink: 0 }} />
             </TouchableOpacity>
             <Text style={[styles.date, dynamicStyles.subtitle]}>
               {format(new Date(session.start_time), 'EEEE d MMMM, yyyy \u00B7 HH:mm', {
@@ -2051,6 +2108,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  sessionFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.m,
+    padding: spacing.xl,
+  },
+  sessionFallbackTitle: {
+    textAlign: 'center',
+  },
+  sessionFallbackActions: {
+    width: '100%',
+    maxWidth: 320,
+    gap: spacing.s,
   },
   header: {
     flexDirection: 'row',

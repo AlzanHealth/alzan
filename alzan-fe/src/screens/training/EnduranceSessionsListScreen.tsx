@@ -332,7 +332,7 @@ export const EnduranceSessionsListScreen = () => {
     } else {
       // View details (works for finished gym too if we have a detail screen, or fallback)
       // Currently assuming EnduranceSessionDetail can show generic session info
-      navigation.navigate('EnduranceSessionDetail', { session });
+      navigation.navigate('EnduranceSessionDetail', { sessionId: session.id });
     }
   };
 

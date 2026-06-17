@@ -127,7 +127,10 @@ export class CanonicalActivityWriterService {
         );
         await this.importReconciliationService.completePlansForAssociatedSession(input.userId, sessionId);
       } else {
-        sessionId = await this.insertSession(sessionPayload as ActivitySessionInsert);
+        sessionId = await this.insertSession({
+          ...sessionPayload,
+          ...(directive.extraFields ?? {}),
+        } as ActivitySessionInsert);
         shouldRunEnduranceTemplateMatch = directive.runTemplateMatch;
       }
     }

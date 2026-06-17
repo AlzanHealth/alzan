@@ -39,7 +39,7 @@ export type StrengthWriteDirective =
   | { kind: 'associate'; targetSessionId: string; payload: ActivitySessionUpdate };
 
 export type EnduranceWriteDirective =
-  | { kind: 'insert'; runTemplateMatch: boolean }
+  | { kind: 'insert'; runTemplateMatch: boolean; extraFields?: Partial<ActivitySessionInsert> }
   | { kind: 'associate'; targetSessionId: string };
 
 interface TemplateMatchResult {
@@ -110,6 +110,20 @@ export class ImportReconciliationService {
       );
       if (plan.duplicateOfSessionId != null && plan.autoMerge) {
         return { kind: 'associate', targetSessionId: plan.duplicateOfSessionId };
+      }
+      // Weak same-day duplicate (< threshold): still create the session, but
+      // flag it so the detail shows the subtle "you already have another
+      // {sport} today" notice and lets the user merge manually if it really is.
+      if (plan.duplicateOfSessionId != null) {
+        return {
+          kind: 'insert',
+          runTemplateMatch: plan.runTemplateMatch,
+          extraFields: {
+            duplicate_of_session_id: plan.duplicateOfSessionId,
+            duplicate_score: plan.duplicateScore,
+            duplicate_resolution: 'pending',
+          },
+        };
       }
       return { kind: 'insert', runTemplateMatch: plan.runTemplateMatch };
     } catch (error) {

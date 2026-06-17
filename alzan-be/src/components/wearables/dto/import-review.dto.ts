@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Expose } from 'class-transformer';
 import { IsOptional, IsUUID } from 'class-validator';
 
 export class TemplateAssociationInputDto {
@@ -40,6 +41,7 @@ export class StrengthAssignmentInputDto {
 }
 
 export class ImportReviewSessionOutputDto {
+  @Expose()
   @ApiProperty({ name: 'session_id', format: 'uuid', description: 'Surviving/updated session id after the action.' })
   session_id!: string;
 }

@@ -734,7 +734,9 @@ export const TrainingHomeScreen = () => {
         />
 
         <ScrollView contentContainerStyle={styles.content}>
-          <ImportReviewSurface onOpenSession={session => navigation.navigate('EnduranceSessionDetail', { session })} />
+          <ImportReviewSurface
+            onOpenSession={session => navigation.navigate('EnduranceSessionDetail', { sessionId: session.id })}
+          />
 
           {renderDailyPlan()}
 
