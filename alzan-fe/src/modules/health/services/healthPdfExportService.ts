@@ -21,6 +21,7 @@ interface PDFExportOptions {
     email?: string;
   };
   webPrintWindow?: WebExportWindow | null;
+  returnHtml?: boolean;
 }
 
 interface WebExportWindow {
@@ -204,7 +205,7 @@ const getLatestMeasurementByType = (
   }, {});
 };
 
-export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWindow }: PDFExportOptions) => {
+export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWindow, returnHtml }: PDFExportOptions) => {
   try {
     const start = parseISO(startDate);
     const end = parseISO(endDate);
@@ -757,6 +758,8 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
 
     const rawFileName = `${t('health.pdfFilePrefix')}_${startDate}_${endDate}.pdf`;
     const fileName = rawFileName.replace(/[\\/:*?"<>|]/g, '-');
+
+    if (returnHtml) return html;
 
     if (Platform.OS === 'web') {
       const targetWindow = webPrintWindow ?? openWebExportWindow();

@@ -196,6 +196,7 @@ export type SettingsStackParamList = {
   TrainingSettings: undefined;
   NutritionSettings: undefined;
   HealthSettings: undefined;
+  HomeSettings: undefined;
   HomeCards: undefined;
   StatsGlobal: undefined;
 };

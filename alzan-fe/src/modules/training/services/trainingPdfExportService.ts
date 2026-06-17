@@ -42,6 +42,7 @@ interface PDFExportOptions {
     email?: string;
   };
   webPrintWindow?: WebExportWindow | null;
+  returnHtml?: boolean;
 }
 
 interface WebExportWindow {
@@ -279,7 +280,13 @@ const openWebExportWindow = (): WebExportWindow | null => {
   return maybeGlobal.open('', '_blank');
 };
 
-export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWindow }: PDFExportOptions) => {
+export const generateTrainingPDF = async ({
+  startDate,
+  endDate,
+  user,
+  webPrintWindow,
+  returnHtml,
+}: PDFExportOptions) => {
   try {
     const userId = user.id;
     if (!userId) throw new Error('User ID not provided');
@@ -1304,6 +1311,8 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
 
     const rawFileName = `${t('training.pdfFilePrefix')}_${startDate}_${endDate}.pdf`;
     const fileName = rawFileName.replace(/[\\/:*?"<>|]/g, '-');
+
+    if (returnHtml) return html;
 
     if (Platform.OS === 'web') {
       const targetWindow = webPrintWindow ?? openWebExportWindow();

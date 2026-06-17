@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet, TouchableOpacity } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from '../context/ThemeContext';
 import { SettingsHomeScreen } from '../screens/settings/SettingsHomeScreen';
@@ -16,7 +17,9 @@ import TrainingSettingsScreen from '../screens/training/TrainingSettingsScreen';
 import { NutritionSettingsScreen } from '../screens/nutrition/NutritionSettingsScreen';
 import { HealthSettingsScreen } from '../screens/settings/HealthSettingsScreen';
 import { HomeCardsSettingsScreen } from '../screens/settings/HomeCardsSettingsScreen';
+import { HomeSettingsScreen } from '../screens/settings/HomeSettingsScreen';
 import { useTranslation } from 'react-i18next';
+import { ChevronLeft } from 'lucide-react-native';
 
 export type SettingsStackParamList = {
   SettingsHome: undefined;
@@ -33,6 +36,7 @@ export type SettingsStackParamList = {
   TrainingSettings: undefined;
   NutritionSettings: undefined;
   HealthSettings: undefined;
+  HomeSettings: undefined;
   HomeCards: undefined;
   StatsGlobal: undefined;
 };
@@ -45,10 +49,22 @@ export const SettingsNavigator = () => {
 
   return (
     <Stack.Navigator
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerShown: true,
         headerTintColor: colors.textPrimary,
-        headerBackTitle: t('tabs.settings'),
+        headerBackTitle: ' ',
+        headerLeft: () =>
+          navigation.canGoBack() ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t('common.back')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <ChevronLeft size={26} color={colors.textPrimary} strokeWidth={2.5} />
+            </TouchableOpacity>
+          ) : null,
         headerStyle: {
           backgroundColor: colors.background,
           shadowColor: 'transparent',
@@ -61,7 +77,7 @@ export const SettingsNavigator = () => {
           backgroundColor: colors.background,
           flex: 1,
         },
-      }}
+      })}
     >
       <Stack.Screen name="SettingsHome" component={SettingsHomeScreen} options={{ headerShown: false }} />
       <Stack.Screen
@@ -108,6 +124,11 @@ export const SettingsNavigator = () => {
         options={{ title: t('navigation.healthSettings') }}
       />
       <Stack.Screen
+        name="HomeSettings"
+        component={HomeSettingsScreen}
+        options={{ title: t('navigation.homeSettings') }}
+      />
+      <Stack.Screen
         name="HomeCards"
         component={HomeCardsSettingsScreen}
         options={{ title: t('navigation.homeCards') }}
@@ -121,3 +142,13 @@ export const SettingsNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  backButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+});
