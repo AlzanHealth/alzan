@@ -155,25 +155,28 @@ SELECT
   'garmin-steps-' || to_char(day::date, 'YYYY-MM-DD')
 FROM generate_series(CURRENT_DATE - 364, CURRENT_DATE, INTERVAL '1 day') AS days(day)
 CROSS JOIN LATERAL (
-  SELECT greatest(
-    1800,
-    least(
-      24500,
-      round(
-        7600
-        + (1400 * sin((extract(doy from day)::numeric / 365) * 2 * pi() + 0.5))
-        + CASE
-            WHEN extract(dow from day) = 0 THEN -1800
-            WHEN extract(dow from day) = 6 THEN 2400
-            WHEN extract(dow from day) = 2 THEN 1300
-            ELSE 0
-          END
-        + (900 * sin((CURRENT_DATE - day::date) / 5.5))
-        + ((365 - (CURRENT_DATE - day::date)) * 2.5)
-        + CASE WHEN extract(month from day) IN (3, 4, 9, 10) THEN 900 ELSE 0 END
+  SELECT CASE
+    WHEN day::date = CURRENT_DATE - 2 THEN 22234
+    ELSE greatest(
+      1800,
+      least(
+        24500,
+        round(
+          7600
+          + (1400 * sin((extract(doy from day)::numeric / 365) * 2 * pi() + 0.5))
+          + CASE
+              WHEN extract(dow from day) = 0 THEN -1800
+              WHEN extract(dow from day) = 6 THEN 2400
+              WHEN extract(dow from day) = 2 THEN 1300
+              ELSE 0
+            END
+          + (900 * sin((CURRENT_DATE - day::date) / 5.5))
+          + ((365 - (CURRENT_DATE - day::date)) * 2.5)
+          + CASE WHEN extract(month from day) IN (3, 4, 9, 10) THEN 900 ELSE 0 END
+        )
       )
     )
-  )::integer AS total_steps
+  END::integer AS total_steps
 ) AS steps
 WHERE NOT EXISTS (
   SELECT 1

@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useImperativeHandle, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { GestureResponderEvent } from 'react-native';
 import {
   eachMonthOfInterval,
   endOfMonth,
@@ -19,6 +20,12 @@ import { aggregateStepsByDate, useStepsRange } from '../hooks/useSteps';
 type TimeRange = 'S' | 'M' | '6M' | 'A';
 
 const RANGES: TimeRange[] = ['S', 'M', '6M', 'A'];
+const CHART_TOP_PADDING_STEPS = 2000;
+const CHART_AXIS_STEP = 500;
+
+export type StepsChartHandle = {
+  clearSelection: () => void;
+};
 
 type Bucket = {
   /** Anchor date for the bucket (day for S/M, month start for 6M/A). */
@@ -33,17 +40,7 @@ type Bucket = {
   isMonthly: boolean;
 };
 
-const niceCeil = (value: number): number => {
-  if (value <= 0) return 1000;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
-  const normalized = value / magnitude;
-  let step: number;
-  if (normalized <= 1) step = 1;
-  else if (normalized <= 2) step = 2;
-  else if (normalized <= 5) step = 5;
-  else step = 10;
-  return step * magnitude;
-};
+const roundDownToAxisStep = (value: number): number => Math.floor(value / CHART_AXIS_STEP) * CHART_AXIS_STEP;
 
 const formatSteps = (value: number): string => {
   const rounded = Math.round(value);
@@ -55,7 +52,7 @@ const formatAxis = (value: number): string => {
   return `${Math.round(value)}`;
 };
 
-export const StepsChart: React.FC = () => {
+export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
   const [range, setRange] = useState<TimeRange>('S');
@@ -147,13 +144,31 @@ export const StepsChart: React.FC = () => {
   const chartHeight = 220;
   const plotHeight = 174;
 
-  const maxValue = useMemo(() => niceCeil(Math.max(...buckets.map(b => b.value), 1)), [buckets]);
-  const yTicks = useMemo(() => [0, maxValue / 2, maxValue], [maxValue]);
+  const maxValue = useMemo(() => {
+    const highestVisibleValue = Math.max(...buckets.map(b => b.value), 0);
+    const paddedValue = highestVisibleValue + CHART_TOP_PADDING_STEPS;
+    return Math.max(roundDownToAxisStep(paddedValue), CHART_AXIS_STEP);
+  }, [buckets]);
+  const yTicks = useMemo(() => {
+    const midpoint = roundDownToAxisStep(maxValue / 2);
+    return Array.from(new Set([0, midpoint, maxValue]));
+  }, [maxValue]);
 
   const barColor = themeColors.primary;
+  const clearSelection = useCallback(() => setSelectedIndex(null), []);
+  const stopPropagation = useCallback((event: GestureResponderEvent) => event.stopPropagation(), []);
+  const selectBucket = useCallback(
+    (event: GestureResponderEvent, index: number) => {
+      event.stopPropagation();
+      setSelectedIndex(selectedIndex === index ? null : index);
+    },
+    [selectedIndex],
+  );
+
+  useImperativeHandle(ref, () => ({ clearSelection }), [clearSelection]);
 
   return (
-    <View style={styles.container}>
+    <Pressable style={styles.container} onPress={stopPropagation}>
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('home.steps')}</Text>
       </View>
@@ -205,7 +220,7 @@ export const StepsChart: React.FC = () => {
             <ActivityIndicator color={barColor} size="large" />
           </View>
         ) : (
-          <View style={[styles.chartArea, { height: chartHeight }]}>
+          <Pressable style={[styles.chartArea, { height: chartHeight }]} onPress={clearSelection}>
             <View style={styles.chartRow}>
               <View style={[styles.yAxis, { height: plotHeight }]}>
                 {[...yTicks].reverse().map(tick => (
@@ -243,25 +258,26 @@ export const StepsChart: React.FC = () => {
                     const isThisMonth = isMonthly && isSameMonth(bucket.date, new Date());
 
                     return (
-                      <Pressable
-                        key={`${bucket.fullLabel}-${i}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${bucket.fullLabel}, ${formatSteps(bucket.value)} ${t('steps.unit')}`}
-                        onPress={() => setSelectedIndex(isSel ? null : i)}
-                        style={styles.barTouch}
-                      >
+                      <View key={`${bucket.fullLabel}-${i}`} style={styles.barTouch}>
                         <View style={[styles.barColumn, { height: plotHeight }]}>
                           {bucket.hasData && (
-                            <View
-                              style={[
-                                styles.bar,
-                                {
-                                  height: barHeight,
-                                  backgroundColor: barColor,
-                                  opacity: selectedIndex === null || isSel ? 1 : 0.35,
-                                },
-                              ]}
-                            />
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel={`${bucket.fullLabel}, ${formatSteps(bucket.value)} ${t('steps.unit')}`}
+                              onPress={event => selectBucket(event, i)}
+                              style={[styles.barHitBox, { height: Math.max(barHeight, 44) }]}
+                            >
+                              <View
+                                style={[
+                                  styles.bar,
+                                  {
+                                    height: barHeight,
+                                    backgroundColor: barColor,
+                                    opacity: selectedIndex === null || isSel ? 1 : 0.35,
+                                  },
+                                ]}
+                              />
+                            </Pressable>
                           )}
                         </View>
                         <Text
@@ -277,22 +293,22 @@ export const StepsChart: React.FC = () => {
                         >
                           {showLabel ? bucket.label : ' '}
                         </Text>
-                      </Pressable>
+                      </View>
                     );
                   })}
                 </View>
               </View>
             </View>
-          </View>
+          </Pressable>
         )}
 
         {!isLoading && dataBuckets.length === 0 && (
           <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>{t('steps.empty')}</Text>
         )}
       </GlassCard>
-    </View>
+    </Pressable>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -413,6 +429,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   barColumn: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  barHitBox: {
     width: '100%',
     alignItems: 'center',
     justifyContent: 'flex-end',

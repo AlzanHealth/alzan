@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useRef } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { ChevronLeft, Plus } from 'lucide-react-native';
@@ -8,12 +8,13 @@ import { useTranslation } from 'react-i18next';
 import { colors, typography } from '../../../theme';
 import { HealthScreenNavigationProp } from '../../../types/navigation.types';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
-import { StepsChart } from '../components/StepsChart';
+import { StepsChart, StepsChartHandle } from '../components/StepsChart';
 
 export const StepsStatisticsScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const { styles: dynamicStyles, colors: themeColors } = useHealthStyles();
+  const stepsChartRef = useRef<StepsChartHandle>(null);
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.container}>
@@ -33,7 +34,9 @@ export const StepsStatisticsScreen = () => {
         </View>
 
         <ScrollView contentContainerStyle={styles.content}>
-          <StepsChart />
+          <Pressable style={styles.clearSelectionLayer} onPress={() => stepsChartRef.current?.clearSelection()}>
+            <StepsChart ref={stepsChartRef} />
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -67,6 +70,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
+    flexGrow: 1,
     padding: 20,
+  },
+  clearSelectionLayer: {
+    flexGrow: 1,
   },
 });
