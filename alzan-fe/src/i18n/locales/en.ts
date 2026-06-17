@@ -392,6 +392,8 @@ const en = {
     recordsDeletedSuccessfully: 'Records deleted successfully.',
     recordsRangeDeletedSuccessfully: 'Range records deleted successfully.',
     allRecordsDeleted: 'All records have been deleted.',
+    noRecordsToDeleteMessage: 'No records found to delete.',
+    deleteRecordsErrorMessage: 'Could not delete the records. Please try again.',
     deleteMealTitle: 'Delete meal',
     deleteMealConfirm: 'Are you sure you want to delete this log?',
     deleteMealError: 'Could not delete the meal.',

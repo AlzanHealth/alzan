@@ -397,6 +397,8 @@ export default {
     recordsDeletedSuccessfully: 'Registros eliminados correctamente.',
     recordsRangeDeletedSuccessfully: 'Registros del rango eliminados correctamente.',
     allRecordsDeleted: 'Todos los registros han sido eliminados.',
+    noRecordsToDeleteMessage: 'No se encontraron registros para eliminar.',
+    deleteRecordsErrorMessage: 'No se pudieron eliminar los registros. Inténtalo de nuevo.',
     deleteMealTitle: 'Eliminar comida',
     deleteMealConfirm: '¿Estás seguro de que quieres eliminar este registro?',
     deleteMealError: 'No se pudo eliminar la comida.',

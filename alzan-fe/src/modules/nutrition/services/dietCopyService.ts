@@ -1,43 +1,25 @@
 import { supabase } from '../../../lib/supabaseClient';
-import { startOfWeek, endOfWeek, addWeeks, format, parseISO, getISOWeek, getYear } from 'date-fns';
+import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
+import {
+  DietCopyMode,
+  WeekCopyOp,
+  getAlternatingActivationPlan,
+  getCatchUpHorizonISO,
+  getCatchUpSource,
+  getCatchUpTargets,
+  getSequentialActivationPlan,
+  getVisibleWeekRange,
+} from './dietCopyPlanner';
+
+// Re-exported so existing imports keep working and callers share one source of truth.
+export { getISOWeekString, getVisibleWeekRange } from './dietCopyPlanner';
 
 /**
- * Get ISO week string in format "YYYY-WXX"
- */
-export const getISOWeekString = (date: Date): string => {
-  const year = getYear(date);
-  const week = getISOWeek(date);
-  return `${year}-W${week.toString().padStart(2, '0')}`;
-};
-
-/**
- * Get the visible week range (2 past weeks + current week + 3 future weeks = 6 total)
- */
-export const getVisibleWeekRange = (): { start: Date; end: Date; weeks: Date[]; currentWeekIndex: number } => {
-  const today = new Date();
-  const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 });
-
-  const weeks: Date[] = [];
-  // W-2, W-1, W0 (current), W+1, W+2, W+3
-  for (let i = -2; i <= 4; i++) {
-    weeks.push(addWeeks(currentWeekStart, i));
-  }
-
-  return {
-    start: addWeeks(currentWeekStart, -2),
-    end: addWeeks(currentWeekStart, 4),
-    weeks,
-    currentWeekIndex: 2, // W0 is at index 2
-  };
-};
-
-/**
- * Check if sequential activation would overwrite data
- * Returns true if ANY target week (W+1, W+2, W+3) has data
+ * Check if sequential activation would overwrite data.
+ * Returns true if ANY target week (W+1 … W+4) has data.
  */
 export const checkSequentialConflicts = async (userId: string): Promise<boolean> => {
   const { weeks, currentWeekIndex } = getVisibleWeekRange();
-  // Check W+1, W+2, W+3
   for (let i = 1; i <= 4; i++) {
     if (await weekHasData(userId, weeks[currentWeekIndex + i])) return true;
   }
@@ -45,12 +27,11 @@ export const checkSequentialConflicts = async (userId: string): Promise<boolean>
 };
 
 /**
- * Check if alternating activation would overwrite data
- * Returns true if ANY target week (W+2, W+3) has data
+ * Check if alternating activation would overwrite data.
+ * Returns true if ANY target week (W+2, W+3, W+4) has data.
  */
 export const checkAlternatingConflicts = async (userId: string): Promise<boolean> => {
   const { weeks, currentWeekIndex } = getVisibleWeekRange();
-  // Check W+2, W+3
   if (await weekHasData(userId, weeks[currentWeekIndex + 2])) return true;
   if (await weekHasData(userId, weeks[currentWeekIndex + 3])) return true;
   if (await weekHasData(userId, weeks[currentWeekIndex + 4])) return true;
@@ -58,8 +39,8 @@ export const checkAlternatingConflicts = async (userId: string): Promise<boolean
 };
 
 /**
- * Copy meal logs from one week to another
- * @param overwrite If true, deletes existing logs in target week before copying
+ * Copy meal logs from one week to another.
+ * @param overwrite If true, deletes existing logs in target week before copying.
  */
 export const copyWeekToWeek = async (
   userId: string,
@@ -73,12 +54,7 @@ export const copyWeekToWeek = async (
     const targetStart = startOfWeek(targetWeekStart, { weekStartsOn: 1 });
     const targetEnd = endOfWeek(targetWeekStart, { weekStartsOn: 1 });
 
-    console.log(
-      `[dietCopyService] Copiando: ${format(sourceStart, 'yyyy-MM-dd')} → ${format(targetWeekStart, 'yyyy-MM-dd')} (Overwrite: ${overwrite})`,
-    );
-
-    // 1. OVERWRITE PROTECTION & HANDLING
-    // 1. OVERWRITE PROTECTION & HANDLING
+    // 1. Overwrite protection & handling
     const { data: logsToDelete, error: fetchError1 } = await supabase
       .from('meal_logs')
       .select('id')
@@ -93,32 +69,27 @@ export const copyWeekToWeek = async (
 
     if (logsToDelete && logsToDelete.length > 0) {
       if (!overwrite) {
-        console.log('[dietCopyService] ⚠️ La semana destino ya tiene datos. Se omite (sin overwrite).');
+        // Target week already has data → skip it (non-destructive).
         return { success: true, copiedCount: 0 };
-      } else {
-        console.log('[dietCopyService] 🗑️ Eliminando datos existentes en destino (Overwrite mode)...');
+      }
 
-        const logIds = logsToDelete.map(l => l.id);
+      const logIds = logsToDelete.map(l => l.id);
 
-        // A. DELETE DEPENDENT ITEMS FIRST
-        const { error: itemsDelError } = await supabase.from('meal_items').delete().in('meal_log_id', logIds);
+      // Delete dependent items first to avoid FK violations.
+      const { error: itemsDelError } = await supabase.from('meal_items').delete().in('meal_log_id', logIds);
+      if (itemsDelError) {
+        console.error('[dietCopyService] Error deleting target meal items:', itemsDelError);
+        return { success: false, copiedCount: 0, error: itemsDelError.message };
+      }
 
-        if (itemsDelError) {
-          console.error('[dietCopyService] Error borrando ingredientes destino:', itemsDelError);
-          return { success: false, copiedCount: 0, error: itemsDelError.message };
-        }
-
-        // B. DELETE THE LOGS
-        const { error: delError } = await supabase.from('meal_logs').delete().in('id', logIds);
-
-        if (delError) {
-          console.error('[dietCopyService] Error borrando destino:', delError);
-          return { success: false, copiedCount: 0, error: delError.message };
-        }
+      const { error: delError } = await supabase.from('meal_logs').delete().in('id', logIds);
+      if (delError) {
+        console.error('[dietCopyService] Error deleting target meal logs:', delError);
+        return { success: false, copiedCount: 0, error: delError.message };
       }
     }
 
-    // 2. Fetch source logs with ingredients
+    // 2. Fetch source logs
     const { data: sourceLogs, error: fetchError } = await supabase
       .from('meal_logs')
       .select('*')
@@ -129,7 +100,7 @@ export const copyWeekToWeek = async (
     if (fetchError) throw fetchError;
     if (!sourceLogs || sourceLogs.length === 0) return { success: true, copiedCount: 0 };
 
-    // Fetch ingredients
+    // Fetch ingredients for those logs
     const sourceLogIds = sourceLogs.map(l => l.id);
     const { data: sourceIngredients, error: ingError } = await supabase
       .from('meal_items')
@@ -138,27 +109,25 @@ export const copyWeekToWeek = async (
 
     if (ingError) throw ingError;
 
-    // Group ingredients
-
-    const ingredientsByLog = sourceIngredients.reduce(
+    // Group ingredients by their source log
+    const ingredientsByLog = (sourceIngredients ?? []).reduce(
       (acc, ing) => {
         if (!acc[ing.meal_log_id]) acc[ing.meal_log_id] = [];
         acc[ing.meal_log_id].push(ing);
         return acc;
       },
-      {} as Record<string, typeof sourceIngredients>,
+      {} as Record<string, NonNullable<typeof sourceIngredients>>,
     );
 
     let copiedCount = 0;
 
-    // 3. Insert Logs and Ingredients
+    // 3. Insert logs and their ingredients
     for (const log of sourceLogs) {
       const sourceDate = parseISO(log.date);
       const dayOffset = Math.floor((sourceDate.getTime() - sourceStart.getTime()) / (24 * 60 * 60 * 1000));
       const targetDate = new Date(targetStart.getTime() + dayOffset * 24 * 60 * 60 * 1000);
       const targetDateStr = format(targetDate, 'yyyy-MM-dd');
 
-      // Insert new log
       const { data: newLog, error: insertError } = await supabase
         .from('meal_logs')
         .insert({
@@ -184,17 +153,16 @@ export const copyWeekToWeek = async (
 
       if (insertError) {
         console.error(`[dietCopyService] Error inserting log for ${targetDateStr}:`, insertError);
-        continue; // Skip this one but try others? Or break?
+        continue;
       }
 
       if (newLog) {
         copiedCount++;
 
-        // 4. Insert Ingredients for this log
         const originalIngredients = ingredientsByLog[log.id];
         if (originalIngredients && originalIngredients.length > 0) {
           const ingredientsToInsert = originalIngredients.map(ing => ({
-            meal_log_id: newLog.id, // Linking to the NEW log
+            meal_log_id: newLog.id, // Link to the NEW log
             user_id: userId,
             name: ing.name,
             quantity_g: ing.quantity_g,
@@ -214,7 +182,6 @@ export const copyWeekToWeek = async (
           }));
 
           const { error: ingInsertError } = await supabase.from('meal_items').insert(ingredientsToInsert);
-
           if (ingInsertError) {
             console.error(`[dietCopyService] Error copying ingredients for log ${newLog.id}:`, ingInsertError);
           }
@@ -222,7 +189,6 @@ export const copyWeekToWeek = async (
       }
     }
 
-    console.log(`[dietCopyService] ✅ Copiados ${copiedCount} registros con ingredientes`);
     return { success: true, copiedCount };
   } catch (error: unknown) {
     console.error('[dietCopyService] Error:', error);
@@ -231,76 +197,43 @@ export const copyWeekToWeek = async (
   }
 };
 
+/** Run an ordered list of week-copy operations, stopping on the first failure. */
+const runCopyPlan = async (
+  userId: string,
+  ops: WeekCopyOp[],
+  overwrite: boolean,
+): Promise<{ success: boolean; totalCopied: number }> => {
+  let totalCopied = 0;
+  for (const op of ops) {
+    const result = await copyWeekToWeek(userId, op.source, op.target, overwrite);
+    if (!result.success) return { success: false, totalCopied };
+    totalCopied += result.copiedCount;
+  }
+  return { success: true, totalCopied };
+};
+
 /**
- * Sequential mode activation: W0 → W1, W2, W3
+ * Sequential mode activation: W0 → W+1, W+2, W+3, W+4.
  */
 export const copySequentialOnActivate = async (
   userId: string,
   overwrite: boolean = false,
 ): Promise<{ success: boolean; totalCopied: number }> => {
-  console.log('═══════════════════════════════════════════════════');
-  console.log(`[dietCopyService] 🔄 MODO SECUENCIAL: Activando (Overwrite: ${overwrite})`);
-  console.log('═══════════════════════════════════════════════════');
-
-  const { weeks, currentWeekIndex } = getVisibleWeekRange();
-  const w0 = weeks[currentWeekIndex]; // W0 is current week (index 2)
-  let totalCopied = 0;
-
-  // Copy W0 to W+1, W+2, W+3, W+4 (indices 3, 4, 5, 6)
-  for (let i = currentWeekIndex + 1; i <= currentWeekIndex + 4; i++) {
-    const result = await copyWeekToWeek(userId, w0, weeks[i], overwrite);
-    if (!result.success) {
-      return { success: false, totalCopied };
-    }
-    totalCopied += result.copiedCount;
-  }
-
-  console.log(`[dietCopyService] ✅ Total copiados: ${totalCopied}`);
-  console.log('═══════════════════════════════════════════════════');
-  return { success: true, totalCopied };
+  return runCopyPlan(userId, getSequentialActivationPlan(), overwrite);
 };
 
 /**
- * Alternating mode activation: W0 → W2, W1 → W3
+ * Alternating mode activation: W-1 → W+1/W+3 (Plan A), W0 → W+2/W+4 (Plan B).
  */
 export const copyAlternatingOnActivate = async (
   userId: string,
   overwrite: boolean = false,
 ): Promise<{ success: boolean; totalCopied: number }> => {
-  console.log('═══════════════════════════════════════════════════');
-  console.log(`[dietCopyService] 🔄 MODO ALTERNO: Activando (Overwrite: ${overwrite})`);
-  console.log('═══════════════════════════════════════════════════');
-
-  const { weeks, currentWeekIndex } = getVisibleWeekRange();
-  let totalCopied = 0;
-
-  // 1. Copy Previous Week (W-1) to Next Week (W+1) and W+3
-  // This propagates the "Plan B"
-  let result = await copyWeekToWeek(userId, weeks[currentWeekIndex - 1], weeks[currentWeekIndex + 1], overwrite); // W-1 -> W+1
-  if (!result.success) return { success: false, totalCopied };
-  totalCopied += result.copiedCount;
-
-  result = await copyWeekToWeek(userId, weeks[currentWeekIndex - 1], weeks[currentWeekIndex + 3], overwrite); // W-1 -> W+3
-  if (!result.success) return { success: false, totalCopied };
-  totalCopied += result.copiedCount;
-
-  // 2. Copy Current Week (W0) to W+2 and W+4
-  // This propagates the "Plan A"
-  result = await copyWeekToWeek(userId, weeks[currentWeekIndex], weeks[currentWeekIndex + 2], overwrite); // W0 -> W+2
-  if (!result.success) return { success: false, totalCopied };
-  totalCopied += result.copiedCount;
-
-  result = await copyWeekToWeek(userId, weeks[currentWeekIndex], weeks[currentWeekIndex + 4], overwrite); // W0 -> W+4
-  if (!result.success) return { success: false, totalCopied };
-  totalCopied += result.copiedCount;
-
-  console.log(`[dietCopyService] ✅ Total copiados: ${totalCopied}`);
-  console.log('═══════════════════════════════════════════════════');
-  return { success: true, totalCopied };
+  return runCopyPlan(userId, getAlternatingActivationPlan(), overwrite);
 };
 
 /**
- * Check if a week has any meal logs
+ * Check if a week has any meal logs.
  */
 export const weekHasData = async (userId: string, weekStart: Date): Promise<boolean> => {
   const start = startOfWeek(weekStart, { weekStartsOn: 1 });
@@ -322,198 +255,93 @@ export const weekHasData = async (userId: string, weekStart: Date): Promise<bool
 };
 
 /**
- * Helper to converting YYYY-WXX to Date (Monday of that week)
- */
-const getDateFromISOWeekString = (isoStr: string): Date => {
-  const [yearStr, weekStr] = isoStr.split('-W');
-  const year = parseInt(yearStr, 10);
-  const week = parseInt(weekStr, 10);
-
-  // Simple algo: Jan 4th is always in week 1
-  const d = new Date(year, 0, 4);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay() || 7; // 1=Mon, 7=Sun
-  // Move to start of Week 1
-  const startWeek1 = new Date(d.getTime() - (day - 1) * 24 * 60 * 60 * 1000);
-
-  // Add (week - 1) weeks
-  return addWeeks(startWeek1, week - 1);
-};
-
-/**
- * Check and copy if new week(s) visible and empty
- * Handles gap filling if user hasn't opened app in multiple weeks
+ * Check and copy newly-visible empty weeks (runs on app entry).
+ * Handles gap filling if the user hasn't opened the app in several weeks.
  */
 export const checkAndCopyNewWeek = async (
   userId: string,
-  mode: 'sequential' | 'alternating',
+  mode: DietCopyMode,
   lastVisibleWeek: string | undefined,
 ): Promise<{ copied: boolean; newLastVisibleWeek: string; copiedCount: number }> => {
-  console.log('┌─────────────────────────────────────────────────┐');
-  console.log('│ [dietCopyService] 🔍 VERIFICANDO NUEVAS SEMANAS │');
-  console.log('└─────────────────────────────────────────────────┘');
+  const today = new Date();
+  const horizonISO = getCatchUpHorizonISO(today);
+  const targets = getCatchUpTargets(today, lastVisibleWeek);
 
-  const { weeks } = getVisibleWeekRange();
-  // Weeks array has: [W-2, W-1, W0(current), W+1, W+2, W+3(target)]
-  // We want to ensure everything up to W+3 is checked/filled if needed.
-
-  // Target horizon is W+4 (last index)
-  const targetHorizonDate = weeks[weeks.length - 1];
-  const targetHorizonISO = getISOWeekString(targetHorizonDate);
-
-  console.log(`[dietCopyService] Última visible guardada: ${lastVisibleWeek || 'ninguna'}`);
-  console.log(`[dietCopyService] Horizonte actual: ${targetHorizonISO}`);
-
-  // If no last visible week, we assume it's the first time running or enabled.
-  // We shouldn't backfill history from 1970.
-  // We treat "now" as the starting point?
-  // Or we just check the single target week (W+3)?
-  // Let's assume if it's undefined, we only check the standard "new week" (W+3).
-  // Better yet: if undefined, we can default to W+2 (so we check W+3).
-  let lastCheckedDate: Date;
-  if (!lastVisibleWeek) {
-    // Default to checking ONLY the furthest one (W+4) by setting "last checked" to W+3
-    lastCheckedDate = weeks[weeks.length - 2];
-  } else {
-    lastCheckedDate = getDateFromISOWeekString(lastVisibleWeek);
+  if (targets.length === 0) {
+    return { copied: false, newLastVisibleWeek: horizonISO, copiedCount: 0 };
   }
 
-  // Safety check: if lastCheckedDate is in the future relative to horizon, nothing to do
-  // (Shouldn't happen unless time travel)
-  if (getISOWeekString(lastCheckedDate) === targetHorizonISO) {
-    console.log('[dietCopyService] ✓ Al día. No hay nuevas semanas.');
-    return { copied: false, newLastVisibleWeek: targetHorizonISO, copiedCount: 0 };
-  }
-
-  // Start checking from the week AFTER lastChecked
-  let currentCheckDate = addWeeks(lastCheckedDate, 1);
   let totalCopied = 0;
   let somethingCopied = false;
 
-  // Loop until we reach (inclusive) the target horizon
-  // Limit iterations to prevent infinite loops (e.g. max 10 weeks catchup)
-  let safetyCounter = 0;
-  while (safetyCounter < 12) {
-    const currentISO = getISOWeekString(currentCheckDate);
+  for (const target of targets) {
+    // Skip weeks that already have data.
+    if (await weekHasData(userId, target)) continue;
 
-    // Break if we passed the horizon
-    // (Simple comparison of time)
-    if (currentCheckDate.getTime() > targetHorizonDate.getTime() + 1000) {
-      break;
+    const source = getCatchUpSource(mode, target);
+    const result = await copyWeekToWeek(userId, source, target);
+    if (result.success && result.copiedCount > 0) {
+      totalCopied += result.copiedCount;
+      somethingCopied = true;
     }
-
-    console.log(`[dietCopyService] 👉 Procesando semana: ${currentISO}`);
-
-    // 1. Check if empty
-    const hasData = await weekHasData(userId, currentCheckDate);
-
-    if (hasData) {
-      console.log(`[dietCopyService]    - Tiene datos. Saltando.`);
-    } else {
-      console.log(`[dietCopyService]    - Vacía. Intentando copiar (${mode})...`);
-
-      let result: { success: boolean; copiedCount: number } = { success: false, copiedCount: 0 };
-
-      if (mode === 'sequential') {
-        // Determine Source: Previous Week (currentCheckDate - 1 week)
-        // We trust that if the previous week was empty, it was filled in the previous iteration of this loop!
-        const sourceDate = addWeeks(currentCheckDate, -1);
-
-        // Extra check: Does source have data?
-        // It might not if the user's very first week was empty too and we couldn't fill it.
-        // But generally, for sequential, we just try.
-        result = await copyWeekToWeek(userId, sourceDate, currentCheckDate);
-      } else {
-        // Alternating
-        // Source: currentCheckDate - 2 weeks
-        // Even -> copy from Even. Odd -> copy from Odd.
-        // Works simply by looking back 2 weeks.
-        const sourceDate = addWeeks(currentCheckDate, -2);
-        result = await copyWeekToWeek(userId, sourceDate, currentCheckDate);
-      }
-
-      if (result.success && result.copiedCount > 0) {
-        totalCopied += result.copiedCount;
-        somethingCopied = true;
-        console.log(`[dietCopyService]    ✅ Copiados ${result.copiedCount} items.`);
-      } else {
-        console.log(`[dietCopyService]    ⚠️ No se pudo copiar (origen vacío o error).`);
-      }
-    }
-
-    // Next week
-    currentCheckDate = addWeeks(currentCheckDate, 1);
-    safetyCounter++;
   }
 
-  if (somethingCopied) {
-    console.log(`[dietCopyService] ✅ Proceso de relleno completado. Total: ${totalCopied}`);
-  } else {
-    console.log(`[dietCopyService] ✓ Proceso finalizado. Nada nuevo copiado.`);
-  }
-
-  return { copied: somethingCopied, newLastVisibleWeek: targetHorizonISO, copiedCount: totalCopied };
+  return { copied: somethingCopied, newLastVisibleWeek: horizonISO, copiedCount: totalCopied };
 };
 
-// Keep old function for backward compatibility during migration
+// Keep old name for backward compatibility during migration.
 export const copyCurrentWeekToNextWeeks = copySequentialOnActivate;
 
 /**
- * Delete ALL future weeks data (from TOMORROW onwards)
+ * Delete meal logs (and their items) within an optional date range.
+ *
+ * @param range.start Inclusive 'yyyy-MM-dd' lower bound (omit for no lower bound).
+ * @param range.end   Inclusive 'yyyy-MM-dd' upper bound (omit for no upper bound).
+ *                    Omitting both deletes ALL meal logs for the user.
  */
-export const deleteFutureWeeks = async (userId: string): Promise<{ success: boolean; error?: string }> => {
-  console.log('═══════════════════════════════════════════════════');
-  console.log('[dietCopyService] 🗑️ ELIMINANDO DATOS FUTUROS (Desde Mañana)...');
-  console.log('═══════════════════════════════════════════════════');
-
+export const deleteMealLogsInRange = async (
+  userId: string,
+  range: { start?: string; end?: string } = {},
+): Promise<{ success: boolean; deletedCount: number; error?: string }> => {
   try {
-    const { weeks } = getVisibleWeekRange();
+    let query = supabase.from('meal_logs').select('id').eq('user_id', userId);
+    if (range.start) query = query.gte('date', range.start);
+    if (range.end) query = query.lte('date', range.end);
 
-    // Target start date is TOMORROW
-    // We want to keep today safe.
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const targetStartStr = format(tomorrow, 'yyyy-MM-dd');
-
-    // Target end date is W+4 (furthest visible)
-    const targetEnd = weeks[weeks.length - 1];
-    const targetEndStr = format(endOfWeek(targetEnd, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-
-    console.log(`[dietCopyService] Rango a borrar: ${targetStartStr} -> ${targetEndStr}`);
-
-    // FETCH LOGS TO DELETE
-    const { data: logsToDelete, error: fetchError } = await supabase
-      .from('meal_logs')
-      .select('id')
-      .eq('user_id', userId)
-      .gte('date', targetStartStr);
-    // We could use lte targetEndStr, but actually deleting EVERYTHING future is safer/cleaner?
-    // User said "todo lo que puede ver el usuario".
-    // Let's stick to the visual range to avoid deleting waaay future data if exists (unlikely but safe).
-    // .lte('date', targetEndStr);
-
+    const { data: logsToDelete, error: fetchError } = await query;
     if (fetchError) throw fetchError;
 
     if (!logsToDelete || logsToDelete.length === 0) {
-      console.log('[dietCopyService] ✓ No se encontraron registros futuros.');
-      return { success: true };
+      return { success: true, deletedCount: 0 };
     }
 
     const logIds = logsToDelete.map(l => l.id);
 
-    // DELETE ITEMS FIRST
+    // Delete dependent items first to avoid FK violations.
     const { error: itemsError } = await supabase.from('meal_items').delete().in('meal_log_id', logIds);
     if (itemsError) throw itemsError;
 
-    // DELETE LOGS
     const { error: logsError } = await supabase.from('meal_logs').delete().in('id', logIds);
     if (logsError) throw logsError;
 
-    console.log('[dietCopyService] ✅ Futuro eliminado correctamente.');
-    return { success: true };
+    return { success: true, deletedCount: logIds.length };
   } catch (error: unknown) {
-    console.error('[dietCopyService] Error deleting future weeks:', error);
+    console.error('[dietCopyService] Error deleting meal logs:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: message };
+    return { success: false, deletedCount: 0, error: message };
   }
+};
+
+/**
+ * Delete ALL future weeks data (from TOMORROW onwards). Today and the past are
+ * preserved.
+ */
+export const deleteFutureWeeks = async (userId: string): Promise<{ success: boolean; error?: string }> => {
+  // Target start date is tomorrow; we keep today safe.
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const targetStartStr = format(tomorrow, 'yyyy-MM-dd');
+
+  const result = await deleteMealLogsInRange(userId, { start: targetStartStr });
+  return { success: result.success, error: result.error };
 };

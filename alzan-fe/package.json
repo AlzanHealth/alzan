@@ -19,7 +19,8 @@
     "postinstall": "pnpm openapi:generate",
     "eas-build-post-install": "pnpm openapi:generate",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\" --fix",
-    "lint:check": "eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\""
+    "lint:check": "eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\"",
+    "verify:diet-copy": "tsx src/modules/nutrition/services/dietCopyPlanner.spec.ts"
   },
   "dependencies": {
     "@callstack/liquid-glass": "^0.7.0",

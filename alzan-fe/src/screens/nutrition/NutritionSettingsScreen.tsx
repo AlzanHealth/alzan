@@ -28,7 +28,9 @@ import {
   checkSequentialConflicts,
   checkAlternatingConflicts,
   deleteFutureWeeks,
+  deleteMealLogsInRange,
 } from '../../modules/nutrition/services/dietCopyService';
+import { getCatchUpHorizonISO } from '../../modules/nutrition/services/dietCopyPlanner';
 import { generateDietPDF } from '../../modules/nutrition/services/pdfExportService';
 import type { WebExportWindow } from '../../modules/nutrition/services/pdfExportService';
 import { BlurView } from 'expo-blur';
@@ -207,6 +209,7 @@ export const NutritionSettingsScreen = () => {
   const [showDeleteRangeMode, setShowDeleteRangeMode] = useState(false);
   const [deleteStart, setDeleteStart] = useState(new Date());
   const [deleteEnd, setDeleteEnd] = useState(new Date());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Track loading state for each meal toggle
   const [loadingMeals, setLoadingMeals] = useState<Record<string, boolean>>({});
@@ -605,7 +608,11 @@ export const NutritionSettingsScreen = () => {
     setDietCopyMode(mode);
 
     if (user) {
-      await updateNutritionPrefs({ copy_mode: mode }); // Using updateNutritionPrefs wrapper
+      // Initialize the catch-up pointer to the current horizon so the next app
+      // open doesn't redundantly re-process the weeks we just filled.
+      const prefUpdates: Partial<NutritionSettingsJson> = { copy_mode: mode };
+      if (mode !== 'none') prefUpdates.last_visible_week = getCatchUpHorizonISO();
+      await updateNutritionPrefs(prefUpdates);
 
       if (mode === 'sequential') {
         await copySequentialOnActivate(user.id, overwrite);
@@ -619,8 +626,41 @@ export const NutritionSettingsScreen = () => {
   };
 
   // Delete actions
+  const closeDeleteModals = () => {
+    setShowDeleteModal(false);
+    setShowDeleteRangeMode(false);
+    setDeleteConfirmAll(false);
+  };
+
+  // Actually deletes meal logs (and their items) in the given inclusive range.
+  // Omit start/end to delete everything for the user.
+  const executeDelete = async (range: { start?: Date; end?: Date }, successMessage: string) => {
+    if (!user || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteMealLogsInRange(user.id, {
+        start: range.start ? format(range.start, 'yyyy-MM-dd') : undefined,
+        end: range.end ? format(range.end, 'yyyy-MM-dd') : undefined,
+      });
+
+      if (!result.success) {
+        Alert.alert(t('common.error'), result.error || t('nutrition.deleteRecordsErrorMessage'));
+        return;
+      }
+
+      closeDeleteModals();
+      Alert.alert(
+        t('nutrition.deletedTitle'),
+        result.deletedCount > 0 ? successMessage : t('nutrition.noRecordsToDeleteMessage'),
+      );
+    } catch (error) {
+      Alert.alert(t('common.error'), getErrorMessage(error));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleDeleteOption = (option: 'today' | '7days' | 'range' | 'all') => {
-    console.log(`[NutritionSettings] Delete option selected: ${option}`);
     if (option === 'all') {
       setDeleteConfirmAll(true);
       return;
@@ -631,22 +671,26 @@ export const NutritionSettingsScreen = () => {
       return;
     }
 
-    const messages: Record<string, string> = {
+    const today = new Date();
+    const ranges: Record<'today' | '7days', { start: Date; end: Date }> = {
+      today: { start: today, end: today },
+      '7days': { start: subDays(today, 6), end: today },
+    };
+    const labels: Record<'today' | '7days', string> = {
       today: t('nutrition.recordsToday'),
       '7days': t('nutrition.recordsLast7Days'),
     };
 
     Alert.alert(
       t('nutrition.confirmDeletionTitle'),
-      t('nutrition.confirmDeleteRecordsMessage', { target: messages[option] }),
+      t('nutrition.confirmDeleteRecordsMessage', { target: labels[option] }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
-            Alert.alert(t('nutrition.deletedTitle'), t('nutrition.recordsDeletedSuccessfully'));
-            setShowDeleteModal(false);
+            void executeDelete(ranges[option], t('nutrition.recordsDeletedSuccessfully'));
           },
         },
       ],
@@ -666,12 +710,7 @@ export const NutritionSettingsScreen = () => {
           text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
-            console.log(
-              `[NutritionSettings] Delete range: ${format(deleteStart, 'yyyy-MM-dd')} to ${format(deleteEnd, 'yyyy-MM-dd')}`,
-            );
-            Alert.alert(t('nutrition.deletedTitle'), t('nutrition.recordsRangeDeletedSuccessfully'));
-            setShowDeleteRangeMode(false);
-            setShowDeleteModal(false);
+            void executeDelete({ start: deleteStart, end: deleteEnd }, t('nutrition.recordsRangeDeletedSuccessfully'));
           },
         },
       ],
@@ -679,9 +718,7 @@ export const NutritionSettingsScreen = () => {
   };
 
   const confirmDeleteAll = () => {
-    Alert.alert(t('nutrition.deletedTitle'), t('nutrition.allRecordsDeleted'));
-    setDeleteConfirmAll(false);
-    setShowDeleteModal(false);
+    void executeDelete({}, t('nutrition.allRecordsDeleted'));
   };
 
   // Time Picker Handlers
@@ -1311,9 +1348,18 @@ export const NutritionSettingsScreen = () => {
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={handleDeleteRange}
-                      style={[styles.modalBtnConfirm, { backgroundColor: themeColors.danger }]}
+                      disabled={isDeleting}
+                      style={[
+                        styles.modalBtnConfirm,
+                        { backgroundColor: themeColors.danger },
+                        isDeleting && { opacity: 0.6 },
+                      ]}
                     >
-                      <Text style={styles.modalBtnTextConfirm}>{t('common.delete')}</Text>
+                      {isDeleting ? (
+                        <ActivityIndicator size="small" color={colors.white} />
+                      ) : (
+                        <Text style={styles.modalBtnTextConfirm}>{t('common.delete')}</Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </>
@@ -1405,9 +1451,18 @@ export const NutritionSettingsScreen = () => {
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={confirmDeleteAll}
-                      style={[styles.modalBtnConfirm, { backgroundColor: themeColors.danger }]}
+                      disabled={isDeleting}
+                      style={[
+                        styles.modalBtnConfirm,
+                        { backgroundColor: themeColors.danger },
+                        isDeleting && { opacity: 0.6 },
+                      ]}
                     >
-                      <Text style={styles.modalBtnTextConfirm}>{t('nutrition.deleteAll')}</Text>
+                      {isDeleting ? (
+                        <ActivityIndicator size="small" color={colors.white} />
+                      ) : (
+                        <Text style={styles.modalBtnTextConfirm}>{t('nutrition.deleteAll')}</Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </>

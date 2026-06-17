@@ -55,7 +55,6 @@ export const ImportReviewSurface: React.FC<ImportReviewSurfaceProps> = ({ onOpen
   const [nameValue, setNameValue] = useState('');
   const autoShownIdRef = useRef<string | null>(null);
 
-
   // Auto-open the sheet once for the latest unreviewed import.
   useEffect(() => {
     if (!latestNewImport) return;
