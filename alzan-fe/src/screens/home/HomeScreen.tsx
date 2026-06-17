@@ -4,7 +4,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { HomeScreenNavigationProp, TabParamList } from '../../types/navigation.types';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Utensils, Scale, ChevronRight, CheckCircle, Flame, Dumbbell, Moon, Settings } from 'lucide-react-native';
+import {
+  Play,
+  Utensils,
+  Scale,
+  ChevronRight,
+  CheckCircle,
+  Flame,
+  Dumbbell,
+  Moon,
+  Footprints,
+  Settings,
+  LucideIcon,
+} from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { spacing, borderRadius, typography } from '../../theme';
@@ -21,6 +33,10 @@ import { NotificationSettings, useSettingsNotifications } from '../../hooks/sett
 import { useMediaPermissions } from '../../hooks/useMediaPermissions';
 
 import { useHealthInsights } from '../../modules/health/hooks/useHealthInsights';
+import { useTodaySteps } from '../../modules/health/hooks/useSteps';
+import { useHomeCards } from '../../hooks/settings/useHomeCards';
+import { HomeCardKey } from '../../constants/homeCards';
+import { getLocaleTag } from '../../i18n/dateLocale';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedDate } from '../../i18n/dateLocale';
@@ -74,6 +90,8 @@ export const HomeScreen = () => {
   // Data
   const { completedWorkoutsCount, health, scheduledWorkouts, activeTodayWorkout } = useDashboardData();
   const { latestSleep } = useHealthInsights();
+  const { data: todaySteps } = useTodaySteps();
+  const { homeCards } = useHomeCards();
   const pendingWorkout = !activeTodayWorkout && scheduledWorkouts.length > 0 ? scheduledWorkouts[0] : null;
   const { totals, targets, meals } = useDayNutrition(new Date());
   const latestWeight = health?.weight?.weight_kg;
@@ -117,6 +135,52 @@ export const HomeScreen = () => {
   const nextMealLabel = MEAL_TYPE_LABELS[nextMealType] || 'settings.lunch';
 
   const remainingKcal = (targets.kcal || 2000) - (totals.kcal || 0);
+
+  // Summary card definitions, keyed so Home can render the user-selected set.
+  const summaryCardConfig: Record<
+    HomeCardKey,
+    { icon: LucideIcon; label: string; value: string; unit: string; onPress: () => void }
+  > = {
+    weight: {
+      icon: Scale,
+      label: t('settings.weight'),
+      value: latestWeight ? convertWeightToUi(latestWeight).value.toFixed(1) : '--',
+      unit: latestWeight ? convertWeightToUi(latestWeight).unit : '',
+      onPress: () => setShowWeightModal(true),
+    },
+    sleep: {
+      icon: Moon,
+      label: t('settings.sleep'),
+      value: latestSleep?.total_sleep_min
+        ? `${Math.floor(latestSleep.total_sleep_min / 60)}h ${latestSleep.total_sleep_min % 60}m`
+        : '--',
+      unit: '',
+      onPress: () => navigation.navigate('Health', { screen: 'HealthHome' }),
+    },
+    kcal: {
+      icon: Flame,
+      label: convertEnergyToUi(0).unit,
+      value: `${convertEnergyToUi(totals.kcal || 0).value}`,
+      unit: `/ ${convertEnergyToUi(targets.kcal || 2000).value} ${convertEnergyToUi(0).unit}`,
+      onPress: () => navigation.navigate('Nutrition', { screen: 'NutritionHome' }),
+    },
+    steps: {
+      icon: Footprints,
+      label: t('home.steps'),
+      value: todaySteps != null ? todaySteps.toLocaleString(getLocaleTag()) : '--',
+      unit: t('steps.unit'),
+      onPress: () => navigation.navigate('Health', { screen: 'StepsStatistics' }),
+    },
+    workouts: {
+      icon: CheckCircle,
+      label: t('home.workouts'),
+      value: `${completedWorkoutsCount}`,
+      unit: t('home.completed'),
+      onPress: () => navigation.navigate('Training', { screen: 'TrainingHome' }),
+    },
+  };
+
+  const visibleCards = homeCards.map(key => ({ key, ...summaryCardConfig[key] }));
 
   const handleResumeWorkout = () => {
     if (!activeTodayWorkout) return;
@@ -224,94 +288,31 @@ export const HomeScreen = () => {
             {t('home.todaysSummary')}
           </Text>
           <View style={styles.statsGrid}>
-            {/* Row 1: Weight & Sleep */}
-            <View style={styles.statsRow}>
-              <TouchableOpacity style={styles.halfWidth} onPress={() => setShowWeightModal(true)}>
-                <GlassCard style={styles.statsCard}>
-                  <View style={styles.cardContentColumn}>
-                    <View style={styles.statsHeader}>
-                      <Scale color={colors.primary} size={20} />
-                      <Text style={[styles.statsLabel, { color: colors.textPrimary }]}>{t('settings.weight')}</Text>
-                    </View>
-                    <View style={styles.statsValueContainer}>
-                      <Text style={[styles.statsValue, { color: colors.textPrimary }]}>
-                        {latestWeight ? convertWeightToUi(latestWeight).value.toFixed(1) : '--'}
-                      </Text>
-                      <Text style={[styles.statsUnit, { color: colors.textSecondary }]}>
-                        {latestWeight ? convertWeightToUi(latestWeight).unit : ''}
-                      </Text>
-                    </View>
-                  </View>
-                </GlassCard>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.halfWidth}
-                onPress={() => navigation.navigate('Health', { screen: 'HealthHome' })}
-              >
-                <GlassCard style={styles.statsCard}>
-                  <View style={styles.cardContentColumn}>
-                    <View style={styles.statsHeader}>
-                      <Moon color={colors.primary} size={20} />
-                      <Text style={[styles.statsLabel, { color: colors.textPrimary }]}>{t('settings.sleep')}</Text>
-                    </View>
-                    <View style={styles.statsValueContainer}>
-                      <Text style={[styles.statsValue, { color: colors.textPrimary }]}>
-                        {latestSleep?.total_sleep_min
-                          ? `${Math.floor(latestSleep.total_sleep_min / 60)}h ${latestSleep.total_sleep_min % 60}m`
-                          : '--'}
-                      </Text>
-                      <Text style={[styles.statsUnit, { color: colors.textSecondary }]}></Text>
-                    </View>
-                  </View>
-                </GlassCard>
-              </TouchableOpacity>
-            </View>
-
-            {/* Row 2: Kcal & Workouts */}
-            <View style={styles.statsRow}>
-              <TouchableOpacity
-                style={styles.halfWidth}
-                onPress={() => navigation.navigate('Nutrition', { screen: 'NutritionHome' })}
-              >
-                <GlassCard style={styles.statsCard}>
-                  <View style={styles.cardContentColumn}>
-                    <View style={styles.statsHeader}>
-                      <Flame color={colors.primary} size={20} />
-                      <Text style={[styles.statsLabel, { color: colors.textPrimary }]}>
-                        {convertEnergyToUi(0).unit}
-                      </Text>
-                    </View>
-                    <View style={styles.statsValueContainer}>
-                      <Text style={[styles.statsValue, { color: colors.textPrimary }]}>
-                        {convertEnergyToUi(totals.kcal || 0).value}
-                      </Text>
-                      <Text style={[styles.statsUnit, { color: colors.textSecondary }]}>
-                        / {convertEnergyToUi(targets.kcal || 2000).value} {convertEnergyToUi(0).unit}
-                      </Text>
-                    </View>
-                  </View>
-                </GlassCard>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.halfWidth}
-                onPress={() => navigation.navigate('Training', { screen: 'TrainingHome' })}
-              >
-                <GlassCard style={styles.statsCard}>
-                  <View style={styles.cardContentColumn}>
-                    <View style={styles.statsHeader}>
-                      <CheckCircle color={colors.primary} size={20} />
-                      <Text style={[styles.statsLabel, { color: colors.textPrimary }]}>{t('home.workouts')}</Text>
-                    </View>
-                    <View style={styles.statsValueContainer}>
-                      <Text style={[styles.statsValue, { color: colors.textPrimary }]}>{completedWorkoutsCount}</Text>
-                      <Text style={[styles.statsUnit, { color: colors.textSecondary }]}>{t('home.completed')}</Text>
-                    </View>
-                  </View>
-                </GlassCard>
-              </TouchableOpacity>
-            </View>
+            {[0, 2].map(rowStart => (
+              <View style={styles.statsRow} key={`stats-row-${rowStart}`}>
+                {visibleCards.slice(rowStart, rowStart + 2).map(card => {
+                  const Icon = card.icon;
+                  return (
+                    <TouchableOpacity key={card.key} style={styles.halfWidth} onPress={card.onPress}>
+                      <GlassCard style={styles.statsCard}>
+                        <View style={styles.cardContentColumn}>
+                          <View style={styles.statsHeader}>
+                            <Icon color={colors.primary} size={20} />
+                            <Text style={[styles.statsLabel, { color: colors.textPrimary }]}>{card.label}</Text>
+                          </View>
+                          <View style={styles.statsValueContainer}>
+                            <Text style={[styles.statsValue, { color: colors.textPrimary }]}>{card.value}</Text>
+                            {!!card.unit && (
+                              <Text style={[styles.statsUnit, { color: colors.textSecondary }]}>{card.unit}</Text>
+                            )}
+                          </View>
+                        </View>
+                      </GlassCard>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </View>
 
           {/* Agenda de Hoy */}

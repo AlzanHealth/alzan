@@ -127,25 +127,62 @@ INSERT INTO public.sleep_biomarker_samples (id, user_id, sleep_session_id, sourc
  (CURRENT_DATE) + TIME '04:00' AT TIME ZONE 'Europe/Madrid', 'hrv_rmssd', 55, 'ms');
 
 -- ---------------------------------------------------------------------------
--- daily_steps (7 days for Alice)
+-- daily_steps (12 months for Alice)
 -- ---------------------------------------------------------------------------
 INSERT INTO public.daily_steps (id, user_id, date, timezone, source, total_steps, distance_m, calories_kcal,
   active_calories_kcal, sedentary_minutes, lightly_active_min, fairly_active_min, very_active_min,
-  step_goal, goal_achieved, data_quality, source_record_id) VALUES
-('00900000-0000-0000-0001-000000000001','4424c5d6-5751-4038-aa39-bd85895ddb78',CURRENT_DATE - 6,'Europe/Madrid','garmin',
- 8542,6120,1820,420,620,180,45,35,10000,false,'complete','garmin-steps-001'),
-('00900000-0000-0000-0001-000000000002','4424c5d6-5751-4038-aa39-bd85895ddb78',CURRENT_DATE - 5,'Europe/Madrid','garmin',
- 11230,8050,2150,580,540,210,60,50,10000,true,'complete','garmin-steps-002'),
-('00900000-0000-0000-0001-000000000003','4424c5d6-5751-4038-aa39-bd85895ddb78',CURRENT_DATE - 4,'Europe/Madrid','garmin',
- 5680,4070,1540,280,720,140,30,15,10000,false,'complete','garmin-steps-003'),
-('00900000-0000-0000-0001-000000000004','4424c5d6-5751-4038-aa39-bd85895ddb78',CURRENT_DATE - 3,'Europe/Madrid','garmin',
- 9870,7080,1960,480,580,200,55,40,10000,false,'complete','garmin-steps-004'),
-('00900000-0000-0000-0001-000000000005','4424c5d6-5751-4038-aa39-bd85895ddb78',CURRENT_DATE - 2,'Europe/Madrid','garmin',
- 12450,8930,2320,650,480,230,70,55,10000,true,'complete','garmin-steps-005'),
-('00900000-0000-0000-0001-000000000006','4424c5d6-5751-4038-aa39-bd85895ddb78',CURRENT_DATE - 1,'Europe/Madrid','garmin',
- 7320,5250,1680,360,660,160,40,25,10000,false,'complete','garmin-steps-006'),
-('00900000-0000-0000-0001-000000000007','4424c5d6-5751-4038-aa39-bd85895ddb78',CURRENT_DATE,'Europe/Madrid','garmin',
- 3200,2300,980,150,480,80,15,5,10000,false,'partial','garmin-steps-007');
+  step_goal, goal_achieved, data_quality, source_channel, source_package, source_provider_key, source_record_id)
+SELECT
+  gen_random_uuid(),
+  '4424c5d6-5751-4038-aa39-bd85895ddb78',
+  day::date,
+  'Europe/Madrid',
+  'garmin',
+  steps.total_steps,
+  round(steps.total_steps * 0.72),
+  round(steps.total_steps * 0.045),
+  round(steps.total_steps * 0.022),
+  greatest(420, 780 - round(steps.total_steps / 75.0))::integer,
+  greatest(55, round(steps.total_steps / 52.0))::integer,
+  greatest(8, round(steps.total_steps / 170.0))::integer,
+  greatest(0, round((steps.total_steps - 7000) / 130.0))::integer,
+  10000,
+  steps.total_steps >= 10000,
+  (CASE WHEN day::date = CURRENT_DATE THEN 'partial' ELSE 'complete' END)::public.health_data_quality_enum,
+  'cloud',
+  NULL,
+  'garmin-connect',
+  'garmin-steps-' || to_char(day::date, 'YYYY-MM-DD')
+FROM generate_series(CURRENT_DATE - 364, CURRENT_DATE, INTERVAL '1 day') AS days(day)
+CROSS JOIN LATERAL (
+  SELECT greatest(
+    1800,
+    least(
+      24500,
+      round(
+        7600
+        + (1400 * sin((extract(doy from day)::numeric / 365) * 2 * pi() + 0.5))
+        + CASE
+            WHEN extract(dow from day) = 0 THEN -1800
+            WHEN extract(dow from day) = 6 THEN 2400
+            WHEN extract(dow from day) = 2 THEN 1300
+            ELSE 0
+          END
+        + (900 * sin((CURRENT_DATE - day::date) / 5.5))
+        + ((365 - (CURRENT_DATE - day::date)) * 2.5)
+        + CASE WHEN extract(month from day) IN (3, 4, 9, 10) THEN 900 ELSE 0 END
+      )
+    )
+  )::integer AS total_steps
+) AS steps
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM public.daily_steps existing_steps
+  WHERE existing_steps.user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78'
+    AND existing_steps.date = day::date
+    AND existing_steps.source = 'garmin'
+    AND existing_steps.source_package IS NULL
+);
 
 -- ---------------------------------------------------------------------------
 -- daily_recovery (7 days for Alice, linked to sleep sessions)

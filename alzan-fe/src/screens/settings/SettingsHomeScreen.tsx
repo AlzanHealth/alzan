@@ -18,6 +18,7 @@ import {
   Apple,
   Heart,
   ChevronLeft,
+  LayoutGrid,
   LucideIcon,
 } from 'lucide-react-native';
 import { spacing, typography, borderRadius, shadows } from '../../theme';
@@ -195,6 +196,12 @@ export const SettingsHomeScreen = () => {
           <View style={styles.section}>
             <Text style={[styles.sectionHeader, dynamicStyles.sectionHeader]}>{t('settings.configurationTitle')}</Text>
             <View style={[styles.card, dynamicStyles.card]}>
+              <SettingsItem
+                icon={LayoutGrid}
+                label={t('navigation.homeCards')}
+                onPress={() => navigation.navigate('HomeCards')}
+                {...itemProps}
+              />
               <SettingsItem
                 icon={Shield}
                 label={t('navigation.privacyData')}

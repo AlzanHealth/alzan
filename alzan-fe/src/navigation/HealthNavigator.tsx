@@ -11,6 +11,7 @@ import { SleepAdd } from '../modules/health/screens/SleepAdd';
 import { RestingHRList } from '../modules/health/screens/RestingHRList';
 import { HealthStatisticsScreen } from '../modules/health/screens/HealthStatisticsScreen';
 import { BodyCompositionDetail } from '../modules/health/screens/BodyCompositionDetail';
+import { StepsStatisticsScreen } from '../modules/health/screens/StepsStatisticsScreen';
 import { HealthStackParamList } from '../types/navigation.types';
 
 const Stack = createStackNavigator<HealthStackParamList>();
@@ -33,6 +34,7 @@ export const HealthNavigator = () => {
       <Stack.Screen name="SleepList" component={SleepList} />
       <Stack.Screen name="SleepAdd" component={SleepAdd} />
       <Stack.Screen name="RestingHRList" component={RestingHRList} />
+      <Stack.Screen name="StepsStatistics" component={StepsStatisticsScreen} />
     </Stack.Navigator>
   );
 };

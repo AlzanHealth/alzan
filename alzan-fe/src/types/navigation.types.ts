@@ -27,6 +27,7 @@ export type RootStackParamList = {
 
   // Modal Screens
   WeightAdd: { date?: string } | undefined;
+  StepsAdd: { date?: string } | undefined;
 
   // Social Screens
   OtherUserProfile: { userId: string };
@@ -173,6 +174,7 @@ export type HealthStackParamList = {
   SleepList: undefined;
   SleepAdd: undefined;
   RestingHRList: undefined;
+  StepsStatistics: undefined;
 };
 
 // ============================================================================
@@ -194,6 +196,7 @@ export type SettingsStackParamList = {
   TrainingSettings: undefined;
   NutritionSettings: undefined;
   HealthSettings: undefined;
+  HomeCards: undefined;
   StatsGlobal: undefined;
 };
 
@@ -228,7 +231,7 @@ export type NutritionScreenNavigationProp = CompositeNavigationProp<
 // Health screens can navigate within health stack AND to Tab Navigator
 export type HealthScreenNavigationProp = CompositeNavigationProp<
   StackNavigationProp<HealthStackParamList>,
-  BottomTabNavigationProp<TabParamList>
+  CompositeNavigationProp<BottomTabNavigationProp<TabParamList>, StackNavigationProp<RootStackParamList>>
 >;
 
 // Settings screens can navigate within settings stack

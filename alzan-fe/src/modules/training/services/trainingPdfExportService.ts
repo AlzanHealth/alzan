@@ -9,6 +9,7 @@ import { convertDistanceToUi, convertSpeedToUi, convertWeightToUi } from '../../
 import {
   ActivityHeartRateZone,
   ActivityLap,
+  DailySteps,
   DistanceUnit,
   EnduranceWorkoutStep,
   SportType,
@@ -86,6 +87,32 @@ interface CatalogOptionRecord {
   label_es: string | null;
   label_en: string | null;
 }
+
+type DailyStepsPdfRow = Pick<DailySteps, 'date' | 'total_steps' | 'is_manual' | 'source_package'>;
+
+const aggregateDailyStepsTotal = (rows: DailyStepsPdfRow[] | null | undefined): number => {
+  const byDate = new Map<string, { value: number; manual: boolean }>();
+
+  (rows ?? []).forEach(row => {
+    if (row.total_steps <= 0) return;
+    const existing = byDate.get(row.date);
+    if (!existing) {
+      byDate.set(row.date, { value: row.total_steps, manual: row.is_manual });
+      return;
+    }
+
+    if (row.is_manual && !existing.manual) {
+      byDate.set(row.date, { value: row.total_steps, manual: true });
+      return;
+    }
+
+    if (row.is_manual === existing.manual && row.total_steps > existing.value) {
+      byDate.set(row.date, { value: row.total_steps, manual: existing.manual });
+    }
+  });
+
+  return Array.from(byDate.values()).reduce((sum, row) => sum + row.value, 0);
+};
 
 const PHASE_COLORS: Record<string, string> = {
   warmup: '#34C759',
@@ -362,6 +389,19 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       });
     }
 
+    const { data: dailyStepsRows, error: dailyStepsError } = await supabase
+      .from('daily_steps')
+      .select('date,total_steps,is_manual,source_package')
+      .eq('user_id', userId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .gt('total_steps', 0)
+      .order('date', { ascending: true });
+
+    if (dailyStepsError) throw new Error(getErrorMessage(dailyStepsError));
+
+    const dailyStepsTotal = aggregateDailyStepsTotal(dailyStepsRows as DailyStepsPdfRow[] | null | undefined);
+
     let totalVolume = 0;
     let totalDurationSeconds = 0;
     let totalDistanceM = 0;
@@ -450,6 +490,9 @@ export const generateTrainingPDF = async ({ startDate, endDate, user, webPrintWi
       }
       if (totalSteps > 0) {
         cards.push({ value: `${Math.round(totalSteps)}`, label: t('training.pdfMetricSteps') });
+      }
+      if (dailyStepsTotal > 0) {
+        cards.push({ value: `${Math.round(dailyStepsTotal)}`, label: t('training.pdfDailySteps') });
       }
       if (totalElevGainM > 0 || totalElevLossM > 0) {
         cards.push({

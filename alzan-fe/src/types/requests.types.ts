@@ -40,6 +40,8 @@ export interface AppearanceSettingsJson {
     reduceMotion: boolean;
     largeText: boolean;
   };
+  /** Keys of the 4 summary cards shown on the Home screen (see HomeCardKey). */
+  home_cards?: string[];
 }
 
 // 2. Notifications
@@ -1330,6 +1332,10 @@ export type BodyMeasurementUpdate = Update<'body_measurements'>;
 export type WeightLog = Row<'weight_logs'>;
 export type WeightLogInsert = Insert<'weight_logs'>;
 export type WeightLogUpdate = Update<'weight_logs'>;
+
+export type DailySteps = Row<'daily_steps'>;
+export type DailyStepsInsert = Insert<'daily_steps'>;
+export type DailyStepsUpdate = Update<'daily_steps'>;
 
 export type RestingHRLog = Row<'resting_hr_logs'>;
 export type RestingHRLogInsert = Insert<'resting_hr_logs'>;

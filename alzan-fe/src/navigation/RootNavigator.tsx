@@ -16,6 +16,7 @@ import { ResetPasswordScreen } from '../screens/auth/ResetPasswordScreen';
 import { VerifyEmailScreen } from '../screens/auth/VerifyEmailScreen';
 import { RootStackParamList } from '../types/navigation.types';
 import { WeightAdd } from '../modules/health/screens/WeightAdd';
+import { StepsAdd } from '../modules/health/screens/StepsAdd';
 import { UserProfileScreen } from '../screens/alzan/UserProfileScreen';
 import { useTranslation } from 'react-i18next';
 
@@ -202,6 +203,11 @@ export const RootNavigator = () => {
             <Stack.Screen
               name="WeightAdd"
               component={WeightAdd}
+              options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
+              name="StepsAdd"
+              component={StepsAdd}
               options={{ presentation: 'transparentModal', animation: 'slide_from_bottom' }}
             />
             <Stack.Screen
