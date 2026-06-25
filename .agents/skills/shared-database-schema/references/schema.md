@@ -406,6 +406,24 @@ source text NOT NULL DEFAULT 'user'::text,
 CONSTRAINT diet_templates_pkey PRIMARY KEY (id),
 CONSTRAINT diet_templates_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.endurance_workout_step_progressions (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+template_id uuid NOT NULL,
+progression_key uuid NOT NULL,
+week_index integer NOT NULL CHECK (week_index >= 1),
+duration_s integer CHECK (duration_s IS NULL OR duration_s >= 0),
+distance_m integer CHECK (distance_m IS NULL OR distance_m >= 0),
+target_type USER-DEFINED,
+target_min numeric,
+target_max numeric,
+repetitions integer CHECK (repetitions IS NULL OR repetitions >= 1),
+load_kg numeric CHECK (load_kg IS NULL OR load_kg >= 0::numeric),
+reps integer CHECK (reps IS NULL OR reps >= 0),
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT endurance_workout_step_progressions_pkey PRIMARY KEY (id),
+CONSTRAINT endurance_workout_step_progressions_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.endurance_workout_templates(id)
+);
 CREATE TABLE public.endurance_workout_steps (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
 template_id uuid NOT NULL,
@@ -426,6 +444,7 @@ hyrox_step_type text CHECK (hyrox_step_type IS NULL OR (hyrox_step_type = ANY (A
 hyrox_station_key text,
 load_kg numeric,
 reps integer,
+progression_key uuid NOT NULL DEFAULT gen_random_uuid(),
 CONSTRAINT endurance_workout_steps_pkey PRIMARY KEY (id),
 CONSTRAINT endurance_workout_steps_parent_step_id_fkey FOREIGN KEY (parent_step_id) REFERENCES public.endurance_workout_steps(id),
 CONSTRAINT endurance_workout_steps_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.endurance_workout_templates(id),
@@ -463,6 +482,8 @@ slope_type text,
 snowboard_type text,
 golf_club_focus text,
 hyrox_station_focus text,
+recurrence_start_date date,
+recurrence_end_date date,
 CONSTRAINT endurance_workout_templates_pkey PRIMARY KEY (id),
 CONSTRAINT endurance_workout_templates_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
