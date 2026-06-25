@@ -51,6 +51,7 @@ import { useTranslation } from 'react-i18next';
 import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
 import { ExerciseWithDetails } from '../../types/training';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { calculateRoutineTotalSets, normalizeTargetSetsInput } from './helpers/gymRoutineEditorTotals.helper';
 
 export const GymRoutineEditorScreen = () => {
   const { t } = useTranslation();
@@ -91,6 +92,7 @@ export const GymRoutineEditorScreen = () => {
 
   const LINE_FLOW_DURATION_MS = 1000;
   const EXERCISE_FILL_DURATION_MS = 900;
+  const totalSets = calculateRoutineTotalSets(exercises);
 
   const getExerciseDisplayName = (exercise: unknown) => {
     if (!exercise || typeof exercise !== 'object') return t('training.exercise');
@@ -648,6 +650,11 @@ export const GymRoutineEditorScreen = () => {
           target_reps_min: normalizedReps,
           target_reps_max: normalizedReps,
         };
+      } else if (field === 'target_sets') {
+        newEx[index] = {
+          ...newEx[index],
+          target_sets: normalizeTargetSetsInput(value),
+        };
       } else {
         newEx[index] = { ...newEx[index], [field]: value };
       }
@@ -835,9 +842,7 @@ export const GymRoutineEditorScreen = () => {
 
                     <View style={[styles.summaryMetricCard, { backgroundColor: `${themeColors.primary}12` }]}>
                       <InfinityIcon size={18} color={themeColors.primary} />
-                      <Text style={[styles.summaryMetricValue, { color: themeColors.textPrimary }]}>
-                        {exercises.reduce((acc, curr) => acc + (curr.target_sets || 0), 0)}
-                      </Text>
+                      <Text style={[styles.summaryMetricValue, { color: themeColors.textPrimary }]}>{totalSets}</Text>
                       <Text style={[styles.summaryMetricLabel, { color: themeColors.textSecondary }]}>
                         {t('training.totalSets')}
                       </Text>
@@ -888,9 +893,7 @@ export const GymRoutineEditorScreen = () => {
                     <View style={[styles.builderMetricCard, { backgroundColor: `${themeColors.primary}12` }]}>
                       <View style={styles.builderMetricTopRow}>
                         <InfinityIcon size={14} color={themeColors.primary} />
-                        <Text style={[styles.builderMetricValue, { color: themeColors.textPrimary }]}>
-                          {exercises.reduce((acc, curr) => acc + (curr.target_sets || 0), 0)}
-                        </Text>
+                        <Text style={[styles.builderMetricValue, { color: themeColors.textPrimary }]}>{totalSets}</Text>
                       </View>
                       <Text style={[styles.builderMetricLabel, { color: themeColors.textSecondary }]}>
                         {t('training.totalSets').toUpperCase()}
