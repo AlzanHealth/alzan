@@ -46,6 +46,7 @@ import { ActivitySessionSupersetLink, WorkoutTemplateExercise } from '../../type
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
+import { getDefaultGymExerciseTargets } from '../../modules/training/helpers/gymExerciseDefaults.helper';
 
 export type WorkoutTemplateExerciseWithDetails = WorkoutTemplateExercise & { exercise: ExerciseWithType | null };
 type AutoPlayQueue = {
@@ -1066,14 +1067,15 @@ export const ActiveWorkoutScreen = () => {
   };
 
   const handleAddAdhocExercise = (exercise: ExerciseWithDetails) => {
+    const defaultTargets = getDefaultGymExerciseTargets(exercise.exercise_type_code);
     const newAdhoc = {
       id: `local-${exercise.id}-${Date.now()}`,
       exercise_id: exercise.id,
       exercise: exercise,
       is_warmup: false,
       target_sets: 3,
-      target_reps_min: 0,
-      target_reps_max: 0,
+      target_reps_min: defaultTargets.target_reps_min,
+      target_reps_max: defaultTargets.target_reps_max,
       target_weight_kg: 0,
       rest_seconds: 60,
       start_order: 9999,

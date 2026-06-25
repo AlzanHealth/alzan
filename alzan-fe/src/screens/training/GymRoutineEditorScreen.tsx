@@ -52,6 +52,7 @@ import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../service
 import { ExerciseWithDetails } from '../../types/training';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { calculateRoutineTotalSets, normalizeTargetSetsInput } from './helpers/gymRoutineEditorTotals.helper';
+import { getDefaultGymExerciseTargets } from '../../modules/training/helpers/gymExerciseDefaults.helper';
 
 export const GymRoutineEditorScreen = () => {
   const { t } = useTranslation();
@@ -203,6 +204,7 @@ export const GymRoutineEditorScreen = () => {
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('exerciseSelected', (selectedExercise: ExerciseWithDetails) => {
       setExercises(prev => {
+        const defaultTargets = getDefaultGymExerciseTargets(selectedExercise.exercise_type_code);
         const nextExercise: RoutineDataExercise = {
           id: `tmp-${selectedExercise.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           workout_template_id: routineId || '',
@@ -210,8 +212,8 @@ export const GymRoutineEditorScreen = () => {
           order_index: prev.length,
           is_warmup: false,
           target_sets: 3,
-          target_reps_min: 8,
-          target_reps_max: 8,
+          target_reps_min: defaultTargets.target_reps_min,
+          target_reps_max: defaultTargets.target_reps_max,
           target_weight_kg: null,
           target_rpe: null,
           notes: null,

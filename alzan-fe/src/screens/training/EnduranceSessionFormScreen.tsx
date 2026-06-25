@@ -49,6 +49,7 @@ import {
   EnduranceWorkoutTemplate,
   SportType,
 } from '../../types/requests.types';
+import { fetchTemplateWithProgressedSteps } from '../../modules/training/services/enduranceProgressionService';
 import { Alert } from '../../components/common/Alert';
 import { RouteMap } from '../../components/common/RouteMap';
 import { useTranslation } from 'react-i18next';
@@ -172,31 +173,30 @@ export const EnduranceSessionFormScreen = () => {
   // Fetch Template if ID provided but no object, OR if template provided but steps missing
   useEffect(() => {
     const loadTemplate = async () => {
-      if (templateId && !template) {
-        // Fetch template AND steps
-        const { data, error } = await supabase
-          .from('endurance_workout_templates')
-          .select('*, steps:endurance_workout_steps(*)')
-          .eq('id', templateId)
-          .single();
+      const plannedDate = initialDateStr ? initialDateStr.split('T')[0] : null;
 
-        if (data && !error) {
-          setFetchedTemplate(data);
+      if (templateId && !template) {
+        try {
+          const data = await fetchTemplateWithProgressedSteps(templateId, plannedDate);
+          if (data) {
+            setFetchedTemplate(data);
+          }
+        } catch (error) {
+          console.error('[EnduranceSessionForm] Failed to load progressed template:', error);
         }
       } else if (template && !template.steps && template.id) {
-        // Template passed but steps missing (e.g. from list view that didn't join steps)
-        const { data, error } = await supabase
-          .from('endurance_workout_steps')
-          .select('*')
-          .eq('template_id', template.id);
-
-        if (data && !error) {
-          setFetchedTemplate({ ...template, steps: data }); // augment template with steps
+        try {
+          const data = await fetchTemplateWithProgressedSteps(template.id, plannedDate);
+          if (data) {
+            setFetchedTemplate({ ...template, steps: data.steps });
+          }
+        } catch (error) {
+          console.error('[EnduranceSessionForm] Failed to load progressed template steps:', error);
         }
       }
     };
     loadTemplate();
-  }, [templateId, template]);
+  }, [initialDateStr, templateId, template]);
 
   // Manual weight state for fallback
   const [manualWeight, setManualWeight] = useState('');

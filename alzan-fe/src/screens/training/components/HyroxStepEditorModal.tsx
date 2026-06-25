@@ -108,6 +108,7 @@ export const HyroxStepEditorModal = ({
     const hasDistance = parsedDistance !== null && parsedDistance > 0;
     const nextStep: BuilderStep = {
       id: initialStep?.id || Math.random().toString(),
+      progression_key: initialStep?.progression_key,
       phase_type: stepType === 'rest' ? 'recovery' : 'interval',
       duration_type: hasDistance ? 'distance' : 'time',
       duration_s: hasTime ? Math.round(parsedDurationMin * 60) : undefined,

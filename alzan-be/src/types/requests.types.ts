@@ -1336,6 +1336,10 @@ export type WeightLog = Row<'weight_logs'>;
 export type WeightLogInsert = Insert<'weight_logs'>;
 export type WeightLogUpdate = Update<'weight_logs'>;
 
+export type DailySteps = Row<'daily_steps'>;
+export type DailyStepsInsert = Insert<'daily_steps'>;
+export type DailyStepsUpdate = Update<'daily_steps'>;
+
 export type RestingHRLog = Row<'resting_hr_logs'>;
 export type RestingHRLogInsert = Insert<'resting_hr_logs'>;
 export type RestingHRLogUpdate = Update<'resting_hr_logs'>;
@@ -1381,6 +1385,10 @@ export type EnduranceWorkoutTemplateUpdate = Update<'endurance_workout_templates
 export type EnduranceWorkoutStep = Row<'endurance_workout_steps'>;
 export type EnduranceWorkoutStepInsert = Insert<'endurance_workout_steps'>;
 export type EnduranceWorkoutStepUpdate = Update<'endurance_workout_steps'>;
+
+export type EnduranceWorkoutStepProgression = Row<'endurance_workout_step_progressions'>;
+export type EnduranceWorkoutStepProgressionInsert = Insert<'endurance_workout_step_progressions'>;
+export type EnduranceWorkoutStepProgressionUpdate = Update<'endurance_workout_step_progressions'>;
 
 // --- Database Enums ---
 // Enum objects for easy usage throughout the codebase

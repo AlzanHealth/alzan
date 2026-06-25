@@ -1,6 +1,7 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { addDays, format, startOfWeek, getDay } from 'date-fns';
 import { WorkoutPlanInsert } from '../../../types/requests.types';
+import { expireEndedEnduranceRecurrences, isDateWithinEnduranceRecurrence } from './enduranceProgressionService';
 
 interface RecurringGym {
   id: string;
@@ -9,7 +10,9 @@ interface RecurringGym {
 
 interface RecurringEndurance {
   id: string;
-  scheduled_day: number;
+  scheduled_day: number | null;
+  recurrence_start_date: string | null;
+  recurrence_end_date: string | null;
 }
 
 // Module-level lock to prevent concurrent propagation
@@ -44,6 +47,9 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
 
     const startDateStr = format(startOfCurrentWeek, 'yyyy-MM-dd');
     const endDateStr = format(endOfWindow, 'yyyy-MM-dd');
+    const todayStr = format(today, 'yyyy-MM-dd');
+
+    await expireEndedEnduranceRecurrences(userId, todayStr);
 
     // Fetch recurring gym templates
     const { data: recurringGym, error: gymError } = await supabase
@@ -61,7 +67,7 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
     // Fetch recurring endurance templates
     const { data: recurringEndurance, error: enduranceError } = await supabase
       .from('endurance_workout_templates')
-      .select('id, scheduled_day')
+      .select('id, scheduled_day, recurrence_start_date, recurrence_end_date')
       .eq('user_id', userId)
       .not('scheduled_day', 'is', null)
       .returns<RecurringEndurance[]>();
@@ -101,8 +107,6 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
 
     const plansToInsert: WorkoutPlanInsert[] = [];
 
-    const todayStr = format(today, 'yyyy-MM-dd');
-
     // Iterate through every day in the window
     for (let i = 0; i < daysToCheck; i++) {
       const currentDate = addDays(startOfCurrentWeek, i);
@@ -130,7 +134,7 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
 
       // Check Endurance Templates
       recurringEndurance?.forEach((template: RecurringEndurance) => {
-        if (template.scheduled_day === dayOfWeek) {
+        if (template.scheduled_day === dayOfWeek && isDateWithinEnduranceRecurrence(dateStr, template)) {
           const key = `${dateStr}_end_${template.id}`;
           if (!existingSet.has(key)) {
             plansToInsert.push({

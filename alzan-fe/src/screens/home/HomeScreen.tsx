@@ -199,6 +199,7 @@ export const HomeScreen = () => {
 
   const handleStartPendingWorkout = () => {
     if (!pendingWorkout) return;
+    const plannedDate = pendingWorkout.planned_date || new Date().toISOString();
 
     if (pendingWorkout.gym_template_id) {
       navigation.navigate('Training', {
@@ -206,7 +207,7 @@ export const HomeScreen = () => {
         params: {
           templateId: pendingWorkout.gym_template_id,
           planId: pendingWorkout.id,
-          date: new Date().toISOString(),
+          date: plannedDate,
         },
       });
     } else if (pendingWorkout.endurance_template_id) {
@@ -214,7 +215,7 @@ export const HomeScreen = () => {
         screen: 'EnduranceSessionForm',
         params: {
           templateId: pendingWorkout.endurance_template_id,
-          date: new Date().toISOString(),
+          date: plannedDate,
         },
       });
     }

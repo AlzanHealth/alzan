@@ -1449,6 +1449,65 @@ export type Database = {
           },
         ]
       }
+      endurance_workout_step_progressions: {
+        Row: {
+          created_at: string
+          distance_m: number | null
+          duration_s: number | null
+          id: string
+          load_kg: number | null
+          progression_key: string
+          repetitions: number | null
+          reps: number | null
+          target_max: number | null
+          target_min: number | null
+          target_type: Database["public"]["Enums"]["target_type_enum"] | null
+          template_id: string
+          updated_at: string
+          week_index: number
+        }
+        Insert: {
+          created_at?: string
+          distance_m?: number | null
+          duration_s?: number | null
+          id?: string
+          load_kg?: number | null
+          progression_key: string
+          repetitions?: number | null
+          reps?: number | null
+          target_max?: number | null
+          target_min?: number | null
+          target_type?: Database["public"]["Enums"]["target_type_enum"] | null
+          template_id: string
+          updated_at?: string
+          week_index: number
+        }
+        Update: {
+          created_at?: string
+          distance_m?: number | null
+          duration_s?: number | null
+          id?: string
+          load_kg?: number | null
+          progression_key?: string
+          repetitions?: number | null
+          reps?: number | null
+          target_max?: number | null
+          target_min?: number | null
+          target_type?: Database["public"]["Enums"]["target_type_enum"] | null
+          template_id?: string
+          updated_at?: string
+          week_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "endurance_workout_step_progressions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "endurance_workout_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       endurance_workout_steps: {
         Row: {
           created_at: string
@@ -1463,6 +1522,7 @@ export type Database = {
           order_index: number
           parent_step_id: string | null
           phase_type: Database["public"]["Enums"]["phase_type_enum"]
+          progression_key: string
           repetitions: number | null
           reps: number | null
           target_max: number | null
@@ -1484,6 +1544,7 @@ export type Database = {
           order_index: number
           parent_step_id?: string | null
           phase_type: Database["public"]["Enums"]["phase_type_enum"]
+          progression_key?: string
           repetitions?: number | null
           reps?: number | null
           target_max?: number | null
@@ -1505,6 +1566,7 @@ export type Database = {
           order_index?: number
           parent_step_id?: string | null
           phase_type?: Database["public"]["Enums"]["phase_type_enum"]
+          progression_key?: string
           repetitions?: number | null
           reps?: number | null
           target_max?: number | null
@@ -1549,6 +1611,8 @@ export type Database = {
           notes: string | null
           pool_type: string | null
           racket_used: string | null
+          recurrence_end_date: string | null
+          recurrence_start_date: string | null
           rival: string | null
           scheduled_day: number | null
           ski_type: string | null
@@ -1582,6 +1646,8 @@ export type Database = {
           notes?: string | null
           pool_type?: string | null
           racket_used?: string | null
+          recurrence_end_date?: string | null
+          recurrence_start_date?: string | null
           rival?: string | null
           scheduled_day?: number | null
           ski_type?: string | null
@@ -1615,6 +1681,8 @@ export type Database = {
           notes?: string | null
           pool_type?: string | null
           racket_used?: string | null
+          recurrence_end_date?: string | null
+          recurrence_start_date?: string | null
           rival?: string | null
           scheduled_day?: number | null
           ski_type?: string | null

@@ -1386,6 +1386,10 @@ export type EnduranceWorkoutStep = Row<'endurance_workout_steps'>;
 export type EnduranceWorkoutStepInsert = Insert<'endurance_workout_steps'>;
 export type EnduranceWorkoutStepUpdate = Update<'endurance_workout_steps'>;
 
+export type EnduranceWorkoutStepProgression = Row<'endurance_workout_step_progressions'>;
+export type EnduranceWorkoutStepProgressionInsert = Insert<'endurance_workout_step_progressions'>;
+export type EnduranceWorkoutStepProgressionUpdate = Update<'endurance_workout_step_progressions'>;
+
 // --- Database Enums ---
 // Enum objects for easy usage throughout the codebase
 

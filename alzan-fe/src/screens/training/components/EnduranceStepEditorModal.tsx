@@ -23,6 +23,7 @@ import { getPhaseLabel } from '../helpers/phase.helper';
 
 interface Step {
   id: string;
+  progression_key?: string | null;
   phase_type: PhaseType;
   duration_type: DurationType;
   duration_s?: number;
@@ -239,6 +240,7 @@ export const EnduranceStepEditorModal = ({
   const handleSave = () => {
     const newStep: Step = {
       id: initialStep?.id || Math.random().toString(),
+      progression_key: initialStep?.progression_key,
       phase_type: phase,
       duration_type: durationType,
       repetitions: 1, // Default for single step

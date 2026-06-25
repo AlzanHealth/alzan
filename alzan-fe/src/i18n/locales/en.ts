@@ -1319,6 +1319,12 @@ const en = {
     hour: 'Hour',
     date: 'Date',
     startDate: 'Start date',
+    recurrenceEndDate: 'End repeat date',
+    recurrenceEndDateInvalid: 'Choose an end date on or after the first planned workout.',
+    weeklyProgression: 'Weekly interval progression',
+    weeklyProgressionSubtitle:
+      'Adjust only the key interval values for each week. Warm-up, recovery and cooldown stay unchanged.',
+    weekNumber: 'Week {{count}}',
     effortRpe: 'Effort (RPE 1-10)',
     avgHeartRate: 'Avg HR (bpm)',
     maxHeartRate: 'Max HR (bpm)',

@@ -1,6 +1,11 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { startOfWeek, addWeeks, getISOWeek, getYear, format, addDays } from 'date-fns';
 import { WorkoutPlanInsert } from '../../../types/requests.types';
+import {
+  expireEndedEnduranceRecurrences,
+  isDateWithinEnduranceRecurrence,
+  RecurringEnduranceTemplate,
+} from './enduranceProgressionService';
 
 /**
  * Get ISO week string in format "YYYY-WXX"
@@ -43,6 +48,11 @@ const getTrainingHorizonWeek = (): Date => {
   return addWeeks(currentWeekStart, 4);
 };
 
+const getPlannedDateForWeekday = (weekStart: Date, dayOfWeek: number): Date => {
+  const daysOffset = (dayOfWeek + 6) % 7;
+  return addDays(weekStart, daysOffset);
+};
+
 /**
  * Main function to check and plan new weeks
  */
@@ -59,6 +69,8 @@ export const checkAndPlanNewWeeks = async (
 
   console.log(`[trainingPlanService] Última planificada: ${lastPlannedWeek || 'ninguna'}`);
   console.log(`[trainingPlanService] Horizonte actual: ${horizonISO}`);
+
+  await expireEndedEnduranceRecurrences(userId, format(new Date(), 'yyyy-MM-dd'));
 
   // Determine start week for checking
   let startCheckDate: Date;
@@ -95,9 +107,10 @@ export const checkAndPlanNewWeeks = async (
   // 2. Endurance Templates
   const { data: enduranceTemplates, error: cardioError } = await supabase
     .from('endurance_workout_templates')
-    .select('id, base_name, scheduled_day')
+    .select('id, base_name, scheduled_day, recurrence_start_date, recurrence_end_date')
     .eq('user_id', userId)
-    .not('scheduled_day', 'is', null);
+    .not('scheduled_day', 'is', null)
+    .returns<Array<RecurringEnduranceTemplate & { base_name: string }>>();
 
   if (cardioError) {
     console.error('[trainingPlanService] Error fetching endurance templates:', cardioError);
@@ -136,8 +149,10 @@ export const checkAndPlanNewWeeks = async (
     // Process Endurance Templates
     for (const tpl of allRecurringEndurance) {
       if (tpl.scheduled_day === null) continue;
-      await ensurePlanExists(userId, currentWeek, tpl.scheduled_day, 'endurance', tpl.id);
-      totalCreated++;
+      const targetDateStr = format(getPlannedDateForWeekday(currentWeek, tpl.scheduled_day), 'yyyy-MM-dd');
+      if (!isDateWithinEnduranceRecurrence(targetDateStr, tpl)) continue;
+      const created = await ensurePlanExists(userId, currentWeek, tpl.scheduled_day, 'endurance', tpl.id);
+      if (created) totalCreated++;
     }
 
     currentWeek = addWeeks(currentWeek, 1);
@@ -177,8 +192,7 @@ const ensurePlanExists = async (
   // If day=1 (Mon) -> (1+6)%7 = 7%7 = 0. Correct.
   // If day=0 (Sun) -> (0+6)%7 = 6. Correct.
   // If day=3 (Wed) -> (3+6)%7 = 9%7 = 2. Correct.
-  const daysOffset = (dayOfWeek + 6) % 7;
-  const targetDate = addDays(weekStart, daysOffset);
+  const targetDate = getPlannedDateForWeekday(weekStart, dayOfWeek);
   const targetDateStr = format(targetDate, 'yyyy-MM-dd');
 
   // Double Check Existence

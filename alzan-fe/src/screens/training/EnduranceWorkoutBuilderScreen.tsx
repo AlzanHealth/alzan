@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Pressable,
   useWindowDimensions,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
@@ -29,6 +30,7 @@ import {
   MoreVertical,
   ArrowLeft,
   ChevronRight,
+  Calendar,
 } from 'lucide-react-native';
 import { EnduranceStepEditorModal } from './components/EnduranceStepEditorModal';
 import { HyroxStepEditorModal } from './components/HyroxStepEditorModal';
@@ -42,11 +44,13 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { addDays, format } from 'date-fns';
 import { LiquidGlassFooter } from '../../components/common/LiquidGlassFooter';
+import { SimpleWheelPicker } from '../../components/SimpleWheelPicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SportIcon } from '../../components/icons/SportIcon';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
+import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { DurationType, PhaseType, SportType, TargetType } from '../../types/requests.types';
 import { Nullable } from '../../types/common.types';
@@ -54,9 +58,21 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
+import {
+  calculateProgressionWeeks,
+  EligibleProgressionStep,
+  ensureStepProgressionKeys,
+  getEligibleProgressionSteps,
+  getNextScheduledDateString,
+  normalizeStepProgressions,
+  ProgressionBuilderStep,
+  StepProgressionOverride,
+} from '../../modules/training/helpers/enduranceProgression.helper';
+import { fetchEnduranceStepProgressions } from '../../modules/training/services/enduranceProgressionService';
 
 interface Step {
   id: string; // temp id
+  progression_key?: string | null;
   phase_type: PhaseType;
   duration_type: DurationType;
   duration_s?: number;
@@ -90,6 +106,29 @@ const HYROX_FULL_FORMAT_STATIONS = [
   { key: 'wall_balls', reps: 100 },
 ] satisfies Array<{ key: string; distanceM?: number; reps?: number }>;
 
+type ProgressionPickerMode = 'main' | 'hyrox_station';
+
+type ProgressionPickerDraft = {
+  paceMin: string;
+  paceSec: string;
+  speed: string;
+  zone: string;
+  durationHour: string;
+  durationMin: string;
+  durationSec: string;
+  distanceMajor: string;
+  distanceMinor: string;
+  reps: string;
+  loadKg: string;
+};
+
+type ProgressionPickerState = {
+  step: EligibleProgressionStep;
+  weekIndex: number;
+  mode: ProgressionPickerMode;
+  draft: ProgressionPickerDraft;
+};
+
 export const EnduranceWorkoutBuilderScreen = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -97,6 +136,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const route = useRoute<RouteProp<TrainingStackParamList, 'EnduranceWorkoutBuilder'>>();
   const { saveWorkout } = useEnduranceWorkoutBuilder();
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
+  const { preferences } = useUserPreferences();
   const { options: sportCatalogOptions, getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const insets = useSafeAreaInsets();
@@ -141,6 +181,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceStartDate, setRecurrenceStartDate] = useState<string | null>(null);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<string>('');
+  const [showRecurrenceEndPicker, setShowRecurrenceEndPicker] = useState(false);
+  const [stepProgressions, setStepProgressions] = useState<StepProgressionOverride[]>([]);
+  const [progressionPicker, setProgressionPicker] = useState<ProgressionPickerState | null>(null);
+  const hydratedTemplateIdRef = useRef<string | null>(null);
   const [manualDuration, setManualDuration] = useState<string>('');
   const [elevationGain, setElevationGain] = useState<string>('');
   const [environmentType, setEnvironmentType] = useState<string | null>(null);
@@ -256,11 +302,26 @@ export const EnduranceWorkoutBuilderScreen = () => {
     enabled: !!templateId,
   });
 
-  const isHydratingEditTemplate = isEditMode && isExistingTemplateLoading && !sportType;
+  const { data: existingProgressions = [], isLoading: isExistingProgressionsLoading } = useQuery({
+    queryKey: ['enduranceTemplateProgressions', templateId],
+    queryFn: async () => {
+      if (!templateId) return [];
+      return fetchEnduranceStepProgressions(templateId);
+    },
+    enabled: !!templateId,
+  });
+
+  const isHydratingEditTemplate =
+    isEditMode && (isExistingTemplateLoading || isExistingProgressionsLoading) && !sportType;
+
+  useEffect(() => {
+    hydratedTemplateIdRef.current = null;
+  }, [templateId]);
 
   // Populate fields when template loads
   useEffect(() => {
-    if (existingTemplate) {
+    if (existingTemplate && !isExistingProgressionsLoading && hydratedTemplateIdRef.current !== existingTemplate.id) {
+      hydratedTemplateIdRef.current = existingTemplate.id;
       setName(existingTemplate.base_name || '');
       setDescription(existingTemplate.description || '');
 
@@ -318,6 +379,24 @@ export const EnduranceWorkoutBuilderScreen = () => {
         setOriginalScheduledDay(null);
       }
       setIsRecurring(!!existingTemplate.scheduled_day);
+      setRecurrenceStartDate(existingTemplate.recurrence_start_date || null);
+      setRecurrenceEndDate(existingTemplate.recurrence_end_date || '');
+      setStepProgressions(
+        normalizeStepProgressions(
+          existingProgressions.map(progression => ({
+            progression_key: progression.progression_key,
+            week_index: progression.week_index,
+            duration_s: progression.duration_s,
+            distance_m: progression.distance_m,
+            target_type: progression.target_type,
+            target_min: progression.target_min,
+            target_max: progression.target_max,
+            repetitions: progression.repetitions,
+            load_kg: progression.load_kg,
+            reps: progression.reps,
+          })),
+        ),
+      );
 
       // Convert DB steps to UI format
       if (existingTemplate.endurance_workout_steps) {
@@ -327,6 +406,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
           .sort((a, b) => a.order_index - b.order_index)
           .map(s => ({
             id: s.id,
+            progression_key: s.progression_key,
             phase_type: s.phase_type,
             duration_type: s.duration_type,
             duration_s: s.duration_s,
@@ -345,6 +425,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
               .sort((a, b) => a.order_index - b.order_index)
               .map(c => ({
                 id: c.id,
+                progression_key: c.progression_key,
                 phase_type: c.phase_type,
                 duration_type: c.duration_type,
                 duration_s: c.duration_s,
@@ -361,10 +442,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 reps: c.reps,
               })),
           })) as Step[];
-        setSteps(uiSteps);
+        setSteps(ensureStepProgressionKeys(uiSteps));
       }
     }
-  }, [existingTemplate]);
+  }, [existingProgressions, existingTemplate, isExistingProgressionsLoading]);
 
   const poolTypeOptions = sportType ? getOptions(sportType, 'pool_type') : [];
   const strokeOptions = sportType ? getOptions(sportType, 'stroke') : [];
@@ -572,10 +653,27 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return '';
   };
 
+  const getRecurrenceStartDateForSave = (scheduledDay: number | null): string | null => {
+    if (!isRecurring || scheduledDay === null) return null;
+    if (recurrenceStartDate && originalScheduledDay === scheduledDay) {
+      return recurrenceStartDate;
+    }
+    return getNextScheduledDateString(new Date(), scheduledDay);
+  };
+
+  const getValidatedRecurrenceEndDate = (): string | null => {
+    if (!isRecurring) return null;
+    const trimmedEndDate = recurrenceEndDate.trim();
+    return trimmedEndDate.length > 0 ? trimmedEndDate : null;
+  };
+
   const executeSave = async () => {
     try {
       const isOneOff = !isRecurring && scheduledDays.length > 0;
       const templateScheduledDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
+      const recurrenceStartDateForSave = getRecurrenceStartDateForSave(templateScheduledDay);
+      const recurrenceEndDateForSave = getValidatedRecurrenceEndDate();
+      const stepsWithProgressionKeys = ensureStepProgressionKeys(steps);
 
       const finalGoal = trainingGoal;
 
@@ -593,6 +691,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 : (parseInt(manualDuration) || 0) * 60,
           total_distance_m: Math.round(totalDistance),
           scheduled_day: templateScheduledDay,
+          recurrence_start_date: recurrenceStartDateForSave,
+          recurrence_end_date: recurrenceEndDateForSave,
           environment_type: environmentType,
           surface: surface,
           pool_type: poolType,
@@ -633,7 +733,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
           rival: sportType === 'football' ? rival : null,
           notes: sportType === 'football' ? notes : null,
         },
-        steps: steps as BuilderStep[],
+        steps: stepsWithProgressionKeys as BuilderStep[],
+        progressions: recurrenceEndDateForSave ? stepProgressions : [],
         templateId: templateId,
       });
 
@@ -717,6 +818,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (isRecurring && scheduledDays.length === 0) {
       Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
       return;
+    }
+
+    if (isRecurring && recurrenceEndDate.trim()) {
+      const recurrenceStart = getRecurrenceStartDateForSave(scheduledDays[0] ?? null);
+      const recurrenceWeeks = calculateProgressionWeeks(recurrenceStart, recurrenceEndDate.trim());
+      if (recurrenceWeeks < 1) {
+        Alert.alert(t('common.error'), t('training.recurrenceEndDateInvalid'));
+        return;
+      }
     }
 
     const effectiveNewDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
@@ -808,31 +918,32 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const handleSaveStep = (newStep: Step) => {
+    const nextStep = withProgressionKeys(newStep);
     if (editingStep) {
       if (activeGroupId) {
         setSteps(prev =>
           prev.map(s => {
             if (s.id === activeGroupId) {
-              return { ...s, children: s.children?.map(c => (c.id === newStep.id ? newStep : c)) };
+              return { ...s, children: s.children?.map(c => (c.id === nextStep.id ? nextStep : c)) };
             }
             return s;
           }),
         );
       } else {
-        setSteps(prev => updateStepInTree(prev, newStep));
+        setSteps(prev => updateStepInTree(prev, nextStep));
       }
     } else {
       if (activeGroupId) {
         setSteps(prev =>
           prev.map(s => {
             if (s.id === activeGroupId) {
-              return { ...s, children: [...(s.children || []), { ...newStep, parent_step_id: s.id }] };
+              return { ...s, children: [...(s.children || []), { ...nextStep, parent_step_id: s.id }] };
             }
             return s;
           }),
         );
       } else {
-        setSteps(prev => [...prev, newStep]);
+        setSteps(prev => [...prev, nextStep]);
       }
     }
     setModalVisible(false);
@@ -847,8 +958,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
     });
   };
 
+  const withProgressionKeys = (step: Step): Step => ensureStepProgressionKeys([step])[0];
+
   const handleAddGroup = () => {
-    const newGroup: Step = {
+    const newGroup: Step = withProgressionKeys({
       id: Math.random().toString(),
       phase_type: 'interval',
       duration_type: 'time',
@@ -856,40 +969,42 @@ export const EnduranceWorkoutBuilderScreen = () => {
       is_group: true,
       target_type: 'none',
       children: [],
-    };
+    });
     setSteps(prev => [...prev, newGroup]);
   };
 
   const handleAddHyroxFullFormat = () => {
-    const fullFormatSteps = HYROX_FULL_FORMAT_STATIONS.flatMap((station, index): Step[] => [
-      {
-        id: `hyrox-run-${Date.now()}-${index}`,
-        phase_type: 'interval',
-        duration_type: 'distance',
-        distance_m: 1000,
-        target_type: 'none',
-        repetitions: 1,
-        is_group: false,
-        hyrox_step_type: 'run',
-        hyrox_station_key: null,
-        load_kg: null,
-        reps: null,
-      },
-      {
-        id: `hyrox-station-${Date.now()}-${index}`,
-        phase_type: 'interval',
-        duration_type: station.distanceM ? 'distance' : 'time',
-        distance_m: station.distanceM,
-        duration_s: station.distanceM ? undefined : 0,
-        target_type: 'none',
-        repetitions: 1,
-        is_group: false,
-        hyrox_step_type: 'station',
-        hyrox_station_key: station.key,
-        load_kg: null,
-        reps: station.reps ?? null,
-      },
-    ]);
+    const fullFormatSteps = ensureStepProgressionKeys(
+      HYROX_FULL_FORMAT_STATIONS.flatMap((station, index): Step[] => [
+        {
+          id: `hyrox-run-${Date.now()}-${index}`,
+          phase_type: 'interval',
+          duration_type: 'distance',
+          distance_m: 1000,
+          target_type: 'none',
+          repetitions: 1,
+          is_group: false,
+          hyrox_step_type: 'run',
+          hyrox_station_key: null,
+          load_kg: null,
+          reps: null,
+        },
+        {
+          id: `hyrox-station-${Date.now()}-${index}`,
+          phase_type: 'interval',
+          duration_type: station.distanceM ? 'distance' : 'time',
+          distance_m: station.distanceM,
+          duration_s: station.distanceM ? undefined : 0,
+          target_type: 'none',
+          repetitions: 1,
+          is_group: false,
+          hyrox_step_type: 'station',
+          hyrox_station_key: station.key,
+          load_kg: null,
+          reps: station.reps ?? null,
+        },
+      ]),
+    );
 
     setSteps(fullFormatSteps);
   };
@@ -970,7 +1085,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     }
   };
 
-  const getHyroxStepTitle = (step: Step) => {
+  const getHyroxStepTitle = (step: ProgressionBuilderStep) => {
     if (step.hyrox_step_type === 'run') return t('training.hyroxRunBlock');
     if (step.hyrox_step_type === 'station') {
       return step.hyrox_station_key
@@ -1172,6 +1287,524 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   const summaryBlocks = getSummaryBlocks();
   const structuredSport = sportType ? ['running', 'cycling', 'swimming', 'hyrox'].includes(sportType) : false;
+  const recurrenceScheduledDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
+  const effectiveRecurrenceStartDate = getRecurrenceStartDateForSave(recurrenceScheduledDay);
+  const recurrenceWeekCount = calculateProgressionWeeks(effectiveRecurrenceStartDate, recurrenceEndDate.trim());
+  const eligibleProgressionSteps = getEligibleProgressionSteps(steps, sportType);
+  const isMetricDistance = preferences.distance_unit === 'km';
+  const progressionPaceUnitLabel =
+    sportType === 'swimming' ? (isMetricDistance ? '/100m' : '/100yd') : isMetricDistance ? '/km' : '/mi';
+  const progressionSpeedUnitLabel = isMetricDistance ? 'km/h' : 'mph';
+
+  const formatPaceInput = (seconds: number | null | undefined) => {
+    if (!seconds || seconds <= 0) return '';
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const toUiPaceSeconds = (dbSeconds: number) => {
+    if (sportType !== 'swimming' && !isMetricDistance) return dbSeconds * 1.60934;
+    if (sportType === 'swimming' && !isMetricDistance) return dbSeconds / 1.09361;
+    return dbSeconds;
+  };
+
+  const toDbPaceSeconds = (uiSeconds: number) => {
+    if (sportType !== 'swimming' && !isMetricDistance) return uiSeconds / 1.60934;
+    if (sportType === 'swimming' && !isMetricDistance) return uiSeconds * 1.09361;
+    return uiSeconds;
+  };
+
+  const toUiSpeed = (dbKmh: number) => (isMetricDistance ? dbKmh : dbKmh * 0.621371);
+  const toDbSpeed = (uiSpeed: number) => (isMetricDistance ? uiSpeed : uiSpeed * 1.60934);
+
+  const getProgressionOverride = (progressionKey: string, weekIndex: number) =>
+    stepProgressions.find(item => item.progression_key === progressionKey && item.week_index === weekIndex);
+
+  const getProgressionNumber = (
+    step: ProgressionBuilderStep,
+    weekIndex: number,
+    key: keyof Pick<
+      StepProgressionOverride,
+      'duration_s' | 'distance_m' | 'target_min' | 'target_max' | 'reps' | 'load_kg'
+    >,
+  ) => {
+    const override = step.progression_key ? getProgressionOverride(step.progression_key, weekIndex) : undefined;
+    const overrideValue = override?.[key];
+    if (typeof overrideValue === 'number' && Number.isFinite(overrideValue)) return overrideValue;
+
+    const stepValue = step[key as keyof ProgressionBuilderStep];
+    return typeof stepValue === 'number' && Number.isFinite(stepValue) ? stepValue : 0;
+  };
+
+  const formatProgressionDisplayValue = (step: ProgressionBuilderStep, weekIndex: number) => {
+    if (step.target_type === 'pace') {
+      const uiSeconds = toUiPaceSeconds(getProgressionNumber(step, weekIndex, 'target_min'));
+      const label = formatPaceInput(uiSeconds);
+      return label ? `${label} ${progressionPaceUnitLabel}` : '-';
+    }
+
+    if (step.target_type === 'speed') {
+      const uiSpeed = Math.round(toUiSpeed(getProgressionNumber(step, weekIndex, 'target_min')));
+      return uiSpeed > 0 ? `${uiSpeed} ${progressionSpeedUnitLabel}` : '-';
+    }
+
+    if (step.target_type === 'heart_rate') {
+      const zone = Math.round(getProgressionNumber(step, weekIndex, 'target_min'));
+      return zone > 0 ? `${t('training.hrZone')} ${zone}` : '-';
+    }
+
+    if (step.duration_type === 'time') {
+      const duration = Math.round(getProgressionNumber(step, weekIndex, 'duration_s'));
+      return duration > 0 ? formatTime(duration) : '-';
+    }
+
+    if (step.duration_type === 'distance') {
+      const distanceValue = getProgressionNumber(step, weekIndex, 'distance_m');
+      const distanceLabel = convertDistanceToUi(distanceValue, 2);
+      return distanceValue > 0 ? `${distanceLabel.value} ${distanceLabel.unit}` : '-';
+    }
+
+    return '-';
+  };
+
+  const updateProgressionOverride = (
+    progressionKey: string,
+    weekIndex: number,
+    patch: Partial<StepProgressionOverride>,
+  ) => {
+    setStepProgressions(prev => {
+      const existing = prev.find(item => item.progression_key === progressionKey && item.week_index === weekIndex);
+      const nextItem: StepProgressionOverride = {
+        ...(existing || { progression_key: progressionKey, week_index: weekIndex }),
+        ...patch,
+      };
+
+      return normalizeStepProgressions([
+        ...prev.filter(item => !(item.progression_key === progressionKey && item.week_index === weekIndex)),
+        nextItem,
+      ]);
+    });
+  };
+
+  const getHyroxStationProgressionValue = (step: ProgressionBuilderStep, weekIndex: number) => {
+    const repsValue = Math.round(getProgressionNumber(step, weekIndex, 'reps'));
+    const loadValue = getProgressionNumber(step, weekIndex, 'load_kg');
+    const parts = [
+      repsValue > 0 ? `${repsValue} ${t('training.unitRepsShort')}` : null,
+      loadValue > 0 ? `${loadValue} ${t('training.unitKgShort')}` : null,
+    ].filter(Boolean);
+
+    return parts.length > 0 ? parts.join(' · ') : '-';
+  };
+
+  const getStepProgressionLabel = (step: ProgressionBuilderStep) => {
+    if (sportType === HYROX_SPORT_TYPE && step.hyrox_step_type === 'station') return t('training.hyroxStationBlock');
+    if (sportType === HYROX_SPORT_TYPE && step.hyrox_step_type === 'run') return t('training.hyroxRunBlock');
+    if (step.target_type === 'pace') return t('training.pace');
+    if (step.target_type === 'speed') return t('training.speed');
+    if (step.target_type === 'heart_rate') return t('training.hrZone');
+    if (step.duration_type === 'time') return t('training.duration');
+    if (step.duration_type === 'distance') return t('training.distance');
+    return t('training.interval');
+  };
+
+  const createProgressionPickerDraft = (step: EligibleProgressionStep, weekIndex: number): ProgressionPickerDraft => {
+    const uiPaceSeconds = Math.max(0, Math.round(toUiPaceSeconds(getProgressionNumber(step, weekIndex, 'target_min'))));
+    const durationSeconds = Math.max(0, Math.round(getProgressionNumber(step, weekIndex, 'duration_s')));
+    const distanceMeters = Math.max(0, Math.round(getProgressionNumber(step, weekIndex, 'distance_m')));
+    const speedValue = Math.max(1, Math.round(toUiSpeed(getProgressionNumber(step, weekIndex, 'target_min')) || 1));
+    const zoneValue = Math.max(1, Math.min(5, Math.round(getProgressionNumber(step, weekIndex, 'target_min') || 2)));
+
+    let distanceMajor = '0';
+    let distanceMinor = '0';
+    if (isMetricDistance) {
+      let km = Math.floor(distanceMeters / 1000);
+      let meters = Math.round((distanceMeters % 1000) / 50) * 50;
+      if (meters >= 1000) {
+        km += 1;
+        meters = 0;
+      }
+      distanceMajor = Math.min(50, km).toString();
+      distanceMinor = meters.toString();
+    } else {
+      const miles = distanceMeters * 0.000621371;
+      let wholeMiles = Math.floor(miles);
+      let hundredths = Math.round((miles - wholeMiles) * 100);
+      if (hundredths >= 100) {
+        wholeMiles += 1;
+        hundredths = 0;
+      }
+      distanceMajor = Math.min(50, wholeMiles).toString();
+      distanceMinor = hundredths.toString().padStart(2, '0');
+    }
+
+    return {
+      paceMin: Math.min(30, Math.floor(uiPaceSeconds / 60)).toString(),
+      paceSec: Math.round(uiPaceSeconds % 60)
+        .toString()
+        .padStart(2, '0'),
+      speed: Math.min(90, speedValue).toString(),
+      zone: zoneValue.toString(),
+      durationHour: Math.min(23, Math.floor(durationSeconds / 3600)).toString(),
+      durationMin: Math.floor((durationSeconds % 3600) / 60)
+        .toString()
+        .padStart(2, '0'),
+      durationSec: Math.round(durationSeconds % 60)
+        .toString()
+        .padStart(2, '0'),
+      distanceMajor,
+      distanceMinor,
+      reps: Math.min(300, Math.round(getProgressionNumber(step, weekIndex, 'reps') || 0)).toString(),
+      loadKg: Math.min(300, Math.round(getProgressionNumber(step, weekIndex, 'load_kg') || 0)).toString(),
+    };
+  };
+
+  const openProgressionPicker = (step: EligibleProgressionStep, weekIndex: number, mode: ProgressionPickerMode) => {
+    setProgressionPicker({
+      step,
+      weekIndex,
+      mode,
+      draft: createProgressionPickerDraft(step, weekIndex),
+    });
+  };
+
+  const updateProgressionPickerDraft = (patch: Partial<ProgressionPickerDraft>) => {
+    setProgressionPicker(prev => (prev ? { ...prev, draft: { ...prev.draft, ...patch } } : prev));
+  };
+
+  const confirmProgressionPicker = () => {
+    if (!progressionPicker) return;
+
+    const { step, weekIndex, mode, draft } = progressionPicker;
+
+    if (mode === 'hyrox_station') {
+      updateProgressionOverride(step.progression_key, weekIndex, {
+        reps: Number.parseInt(draft.reps, 10) || null,
+        load_kg: Number.parseInt(draft.loadKg, 10) || null,
+      });
+      setProgressionPicker(null);
+      return;
+    }
+
+    if (step.target_type === 'pace') {
+      const totalUiSeconds = (Number.parseInt(draft.paceMin, 10) || 0) * 60 + (Number.parseInt(draft.paceSec, 10) || 0);
+      const dbSeconds = Math.max(1, Math.round(toDbPaceSeconds(totalUiSeconds)));
+      updateProgressionOverride(step.progression_key, weekIndex, {
+        target_type: 'pace',
+        target_min: dbSeconds,
+        target_max: dbSeconds,
+      });
+    } else if (step.target_type === 'speed') {
+      const dbSpeed = Math.max(1, Math.round(toDbSpeed(Number.parseInt(draft.speed, 10) || 0)));
+      updateProgressionOverride(step.progression_key, weekIndex, {
+        target_type: 'speed',
+        target_min: dbSpeed,
+        target_max: dbSpeed,
+      });
+    } else if (step.target_type === 'heart_rate') {
+      const zone = Math.max(1, Math.min(5, Number.parseInt(draft.zone, 10) || 1));
+      updateProgressionOverride(step.progression_key, weekIndex, {
+        target_type: 'heart_rate',
+        target_min: zone,
+        target_max: zone,
+      });
+    } else if (step.duration_type === 'time') {
+      const seconds =
+        (Number.parseInt(draft.durationHour, 10) || 0) * 3600 +
+        (Number.parseInt(draft.durationMin, 10) || 0) * 60 +
+        (Number.parseInt(draft.durationSec, 10) || 0);
+      updateProgressionOverride(step.progression_key, weekIndex, { duration_s: seconds });
+    } else if (step.duration_type === 'distance') {
+      const major = Number.parseInt(draft.distanceMajor, 10) || 0;
+      const minor = Number.parseInt(draft.distanceMinor, 10) || 0;
+      const distanceM = isMetricDistance ? major * 1000 + minor : Math.round((major + minor / 100) * 1609.34);
+      updateProgressionOverride(step.progression_key, weekIndex, { distance_m: distanceM });
+    }
+
+    setProgressionPicker(null);
+  };
+
+  const renderProgressionEditor = () => {
+    if (!isRecurring || !recurrenceEndDate.trim() || recurrenceWeekCount < 1 || eligibleProgressionSteps.length === 0) {
+      return null;
+    }
+
+    return (
+      <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
+        <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
+          {t('training.weeklyProgression').toUpperCase()}
+        </Text>
+        <Text style={[styles.helperDescription, { color: themeColors.textSecondary, marginBottom: spacing.m }]}>
+          {t('training.weeklyProgressionSubtitle')}
+        </Text>
+
+        {eligibleProgressionSteps.map(step => (
+          <View key={step.progression_key} style={[styles.progressionStepBlock, { borderColor: themeColors.border }]}>
+            <View style={styles.progressionStepHeader}>
+              <Text style={[styles.progressionStepTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
+                {step.path}. {getStepProgressionLabel(step)}
+              </Text>
+              <Text style={[styles.progressionStepMeta, { color: themeColors.textSecondary }]} numberOfLines={1}>
+                {sportType === HYROX_SPORT_TYPE ? getHyroxStepTitle(step) : t(getPhaseLabel(step.phase_type))}
+              </Text>
+            </View>
+
+            {Array.from({ length: recurrenceWeekCount }, (_, index) => index + 1).map(weekIndex => {
+              const isHyroxStation = sportType === HYROX_SPORT_TYPE && step.hyrox_step_type === 'station';
+              const valueLabel = isHyroxStation
+                ? getHyroxStationProgressionValue(step, weekIndex)
+                : formatProgressionDisplayValue(step, weekIndex);
+
+              return (
+                <View key={`${step.progression_key}-${weekIndex}`} style={styles.progressionWeekRow}>
+                  <Text style={[styles.progressionWeekLabel, { color: themeColors.textSecondary }]}>
+                    {t('training.weekNumber', { count: weekIndex })}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.progressionValueButton,
+                      { borderColor: themeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFF' },
+                    ]}
+                    onPress={() => openProgressionPicker(step, weekIndex, isHyroxStation ? 'hyrox_station' : 'main')}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.progressionValueText, { color: themeColors.textPrimary }]} numberOfLines={1}>
+                      {valueLabel}
+                    </Text>
+                    <ChevronRight size={16} color={themeColors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </GlassCard>
+    );
+  };
+
+  const renderProgressionPickerModal = () => {
+    if (!progressionPicker) return null;
+
+    const { step, weekIndex, mode, draft } = progressionPicker;
+    const title = `${t('training.weekNumber', { count: weekIndex })} · ${getStepProgressionLabel(step)}`;
+    const twoDigitItems = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+    const paceMinuteItems = Array.from({ length: 31 }, (_, i) => i.toString());
+    const speedItems = Array.from({ length: 90 }, (_, i) => (i + 1).toString());
+    const zoneItems = Array.from({ length: 5 }, (_, i) => (i + 1).toString());
+    const hourItems = Array.from({ length: 24 }, (_, i) => i.toString());
+    const distanceMajorItems = Array.from({ length: 51 }, (_, i) => i.toString());
+    const metricDistanceMinorItems = Array.from({ length: 20 }, (_, i) => (i * 50).toString());
+    const imperialDistanceMinorItems = Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'));
+    const repsItems = Array.from({ length: 301 }, (_, i) => i.toString());
+    const loadItems = Array.from({ length: 301 }, (_, i) => i.toString());
+
+    const renderWheelContent = () => {
+      if (mode === 'hyrox_station') {
+        return (
+          <>
+            <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
+              {t('training.hyroxStationBlock')}
+            </Text>
+            <View style={styles.progressionPickerWheelRow}>
+              <SimpleWheelPicker
+                items={repsItems}
+                selectedValue={draft.reps}
+                onValueChange={reps => updateProgressionPickerDraft({ reps })}
+                width={92}
+              />
+              <Text style={[styles.progressionPickerUnit, { color: themeColors.textSecondary }]}>
+                {t('training.unitRepsShort')}
+              </Text>
+              <SimpleWheelPicker
+                items={loadItems}
+                selectedValue={draft.loadKg}
+                onValueChange={loadKg => updateProgressionPickerDraft({ loadKg })}
+                width={92}
+              />
+              <Text style={[styles.progressionPickerUnit, { color: themeColors.textSecondary }]}>
+                {t('training.unitKgShort')}
+              </Text>
+            </View>
+          </>
+        );
+      }
+
+      if (step.target_type === 'pace') {
+        return (
+          <>
+            <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
+              {t('training.pace')} {progressionPaceUnitLabel}
+            </Text>
+            <View style={styles.progressionPickerWheelRow}>
+              <SimpleWheelPicker
+                items={paceMinuteItems}
+                selectedValue={draft.paceMin}
+                onValueChange={paceMin => updateProgressionPickerDraft({ paceMin })}
+                width={86}
+              />
+              <Text style={[styles.progressionPickerSeparator, { color: themeColors.textPrimary }]}>:</Text>
+              <SimpleWheelPicker
+                items={twoDigitItems}
+                selectedValue={draft.paceSec}
+                onValueChange={paceSec => updateProgressionPickerDraft({ paceSec })}
+                width={86}
+              />
+              <Text style={[styles.progressionPickerUnit, { color: themeColors.textSecondary }]}>
+                {progressionPaceUnitLabel}
+              </Text>
+            </View>
+          </>
+        );
+      }
+
+      if (step.target_type === 'speed') {
+        return (
+          <>
+            <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
+              {t('training.speed')} ({progressionSpeedUnitLabel})
+            </Text>
+            <View style={styles.progressionPickerWheelRow}>
+              <SimpleWheelPicker
+                items={speedItems}
+                selectedValue={draft.speed}
+                onValueChange={speed => updateProgressionPickerDraft({ speed })}
+                width={100}
+              />
+              <Text style={[styles.progressionPickerUnit, { color: themeColors.textSecondary }]}>
+                {progressionSpeedUnitLabel}
+              </Text>
+            </View>
+          </>
+        );
+      }
+
+      if (step.target_type === 'heart_rate') {
+        return (
+          <>
+            <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
+              {t('training.hrZone')}
+            </Text>
+            <View style={styles.progressionPickerWheelRow}>
+              <SimpleWheelPicker
+                items={zoneItems}
+                selectedValue={draft.zone}
+                onValueChange={zone => updateProgressionPickerDraft({ zone })}
+                width={100}
+              />
+            </View>
+          </>
+        );
+      }
+
+      if (step.duration_type === 'time') {
+        return (
+          <>
+            <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
+              {t('training.timeHmsFormat')}
+            </Text>
+            <View style={styles.progressionPickerWheelRow}>
+              <SimpleWheelPicker
+                items={hourItems}
+                selectedValue={draft.durationHour}
+                onValueChange={durationHour => updateProgressionPickerDraft({ durationHour })}
+                width={78}
+              />
+              <Text style={[styles.progressionPickerSeparator, { color: themeColors.textPrimary }]}>:</Text>
+              <SimpleWheelPicker
+                items={twoDigitItems}
+                selectedValue={draft.durationMin}
+                onValueChange={durationMin => updateProgressionPickerDraft({ durationMin })}
+                width={78}
+              />
+              <Text style={[styles.progressionPickerSeparator, { color: themeColors.textPrimary }]}>:</Text>
+              <SimpleWheelPicker
+                items={twoDigitItems}
+                selectedValue={draft.durationSec}
+                onValueChange={durationSec => updateProgressionPickerDraft({ durationSec })}
+                width={78}
+              />
+            </View>
+          </>
+        );
+      }
+
+      return (
+        <>
+          <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
+            {t('training.distance')} ({isMetricDistance ? 'km + m' : 'mi'})
+          </Text>
+          <View style={styles.progressionPickerWheelRow}>
+            <SimpleWheelPicker
+              items={distanceMajorItems}
+              selectedValue={draft.distanceMajor}
+              onValueChange={distanceMajor => updateProgressionPickerDraft({ distanceMajor })}
+              width={92}
+            />
+            <Text style={[styles.progressionPickerUnit, { color: themeColors.textSecondary }]}>
+              {isMetricDistance ? 'km' : 'mi'}
+            </Text>
+            <SimpleWheelPicker
+              items={isMetricDistance ? metricDistanceMinorItems : imperialDistanceMinorItems}
+              selectedValue={draft.distanceMinor}
+              onValueChange={distanceMinor => updateProgressionPickerDraft({ distanceMinor })}
+              width={92}
+            />
+            <Text style={[styles.progressionPickerUnit, { color: themeColors.textSecondary }]}>
+              {isMetricDistance ? 'm' : '/100'}
+            </Text>
+          </View>
+        </>
+      );
+    };
+
+    return (
+      <Modal
+        animationType={isWideLayout ? 'fade' : 'slide'}
+        transparent
+        visible={!!progressionPicker}
+        onRequestClose={() => setProgressionPicker(null)}
+      >
+        <Pressable
+          style={[styles.modalOverlay, isWideLayout && styles.modalOverlayWide]}
+          onPress={() => setProgressionPicker(null)}
+        >
+          <Pressable
+            style={[
+              styles.modalCard,
+              isWideLayout && styles.modalCardWide,
+              { backgroundColor: themeColors.cardBackground || themeColors.background },
+            ]}
+            onPress={event => event.stopPropagation()}
+          >
+            <View style={styles.modalHandle} />
+            <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>{title}</Text>
+            {renderWheelContent()}
+            <View style={[styles.modalActionRow, { marginTop: spacing.l }]}>
+              <TouchableOpacity
+                style={[styles.modalActionBtn, styles.cancelActionBtn, { borderColor: themeColors.border }]}
+                onPress={() => setProgressionPicker(null)}
+              >
+                <Text style={[styles.cancelActionBtnText, { color: themeColors.textSecondary }]}>
+                  {t('common.cancel')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalActionBtn,
+                  styles.confirmActionBtn,
+                  { backgroundColor: themeColors.primary, borderColor: themeColors.primary },
+                ]}
+                onPress={confirmProgressionPicker}
+              >
+                <Text style={styles.confirmActionBtnText}>{t('common.done')}</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    );
+  };
 
   const renderTemplateSummary = (selectedSport: SportType, showEditorAction = true, compact = false) => {
     const formattedDistance = convertDistanceToUi(totalDistance, 2);
@@ -2377,11 +3010,59 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     selectedDays={scheduledDays}
                     onDaysChange={setScheduledDays}
                     isRecurring={isRecurring}
-                    onToggleRecurring={() => setIsRecurring(!isRecurring)}
+                    onToggleRecurring={() => {
+                      const nextRecurring = !isRecurring;
+                      setIsRecurring(nextRecurring);
+                      if (!nextRecurring) {
+                        setRecurrenceEndDate('');
+                        setStepProgressions([]);
+                        setProgressionPicker(null);
+                      }
+                    }}
                     singleSelect={true}
                   />
+
+                  {isRecurring && (
+                    <View style={[styles.formRow, { borderBottomWidth: 0 }]}>
+                      <View style={styles.recurrenceEndLabel}>
+                        <Calendar size={16} color={themeColors.textSecondary} />
+                        <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                          {t('training.recurrenceEndDate')}
+                        </Text>
+                      </View>
+                      {Platform.OS === 'web' ? (
+                        <TextInput
+                          style={[styles.rowInput, { color: themeColors.textPrimary }]}
+                          value={recurrenceEndDate}
+                          onChangeText={setRecurrenceEndDate}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={themeColors.textSecondary}
+                          textAlign="right"
+                        />
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.rowRightValue}
+                          onPress={() => setShowRecurrenceEndPicker(true)}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('training.recurrenceEndDate')}
+                        >
+                          <Text
+                            style={[
+                              styles.rowValueText,
+                              { color: recurrenceEndDate ? themeColors.textPrimary : themeColors.textSecondary },
+                            ]}
+                          >
+                            {recurrenceEndDate || t('common.select')}
+                          </Text>
+                          <ChevronRight size={16} color={themeColors.textSecondary} style={{ marginLeft: 4 }} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
               </GlassCard>
+
+              {renderProgressionEditor()}
             </ScrollView>
 
             {isWideLayout && showSummary && (
@@ -2520,6 +3201,29 @@ export const EnduranceWorkoutBuilderScreen = () => {
               </View>
             )}
           </View>
+        )}
+
+        {renderProgressionPickerModal()}
+
+        {showRecurrenceEndPicker && Platform.OS !== 'web' && (
+          <DateTimePicker
+            value={
+              recurrenceEndDate
+                ? new Date(`${recurrenceEndDate}T00:00:00`)
+                : new Date(`${effectiveRecurrenceStartDate || format(new Date(), 'yyyy-MM-dd')}T00:00:00`)
+            }
+            mode="date"
+            display="default"
+            minimumDate={
+              effectiveRecurrenceStartDate ? new Date(`${effectiveRecurrenceStartDate}T00:00:00`) : new Date()
+            }
+            onChange={(_event, selectedDate) => {
+              setShowRecurrenceEndPicker(false);
+              if (selectedDate) {
+                setRecurrenceEndDate(format(selectedDate, 'yyyy-MM-dd'));
+              }
+            }}
+          />
         )}
 
         {/* Goal Selector Modal */}
@@ -3943,6 +4647,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  recurrenceEndLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   rowValueText: {
     fontSize: 15,
   },
@@ -3979,6 +4688,73 @@ const styles = StyleSheet.create({
   helperDescription: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  progressionStepBlock: {
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    padding: spacing.m,
+    marginBottom: spacing.m,
+  },
+  progressionStepHeader: {
+    marginBottom: spacing.s,
+  },
+  progressionStepTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  progressionStepMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  progressionWeekRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    marginTop: spacing.s,
+  },
+  progressionWeekLabel: {
+    width: 86,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  progressionValueButton: {
+    flex: 1,
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingHorizontal: spacing.m,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.s,
+  },
+  progressionValueText: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  progressionPickerLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing.m,
+  },
+  progressionPickerWheelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.m,
+    minHeight: 158,
+  },
+  progressionPickerSeparator: {
+    fontSize: 26,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  progressionPickerUnit: {
+    fontSize: 14,
+    fontWeight: '700',
+    minWidth: 28,
   },
   modalOverlay: {
     flex: 1,

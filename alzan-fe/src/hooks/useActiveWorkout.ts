@@ -14,6 +14,7 @@ import {
   getLocalizedExerciseDescription,
   getLocalizedExerciseName,
 } from '../services/localization';
+import { getDefaultGymExerciseTargets } from '../modules/training/helpers/gymExerciseDefaults.helper';
 
 export type FinishSession = {
   id: string;
@@ -260,26 +261,30 @@ export const useActiveWorkout = (sessionId?: string) => {
           if (adhocExercisesData) {
             // Build session exercise entries for adhoc exercises logged directly in this session.
             const sessionAdhocExercises: WorkoutTemplateExerciseWithExercise[] = adhocExercisesData.map(
-              (exerciseData, index) => ({
-                id: `adhoc-${exerciseData.id}`,
-                exercise_id: exerciseData.id,
-                workout_template_id: session.workout_template_id || '',
-                user_id: user?.id || null,
-                notes: null,
-                target_rpe: null,
-                order_index: (exercises.length || 0) + index,
-                target_sets: 3,
-                target_reps_min: 0,
-                target_reps_max: 0,
-                target_weight_kg: 0,
-                rest_seconds: 60,
-                superset_next_exercise_id: null,
-                is_warmup: false,
-                exercise: {
-                  ...exerciseData,
-                  exercise_type_code: exerciseData.exercise_type?.code || null,
-                },
-              }),
+              (exerciseData, index) => {
+                const defaultTargets = getDefaultGymExerciseTargets(exerciseData.exercise_type?.code);
+
+                return {
+                  id: `adhoc-${exerciseData.id}`,
+                  exercise_id: exerciseData.id,
+                  workout_template_id: session.workout_template_id || '',
+                  user_id: user?.id || null,
+                  notes: null,
+                  target_rpe: null,
+                  order_index: (exercises.length || 0) + index,
+                  target_sets: 3,
+                  target_reps_min: defaultTargets.target_reps_min,
+                  target_reps_max: defaultTargets.target_reps_max,
+                  target_weight_kg: 0,
+                  rest_seconds: 60,
+                  superset_next_exercise_id: null,
+                  is_warmup: false,
+                  exercise: {
+                    ...exerciseData,
+                    exercise_type_code: exerciseData.exercise_type?.code || null,
+                  },
+                };
+              },
             );
             exercises = [...exercises, ...sessionAdhocExercises];
           }

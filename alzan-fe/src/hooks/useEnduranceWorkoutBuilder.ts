@@ -4,9 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { propagateTrainingPlans } from '../modules/training/services/trainingCopyService';
 import { DurationType, PhaseType, SportType, TargetType } from '../types/requests.types';
 import { Database } from '../types/database.types';
+import { StepProgressionOverride } from '../modules/training/helpers/enduranceProgression.helper';
+import {
+  deleteFuturePlansOutsideEnduranceRecurrence,
+  replaceEnduranceStepProgressions,
+} from '../modules/training/services/enduranceProgressionService';
 
 export interface BuilderStep {
   id: string; // temp or real id
+  progression_key?: string | null;
   phase_type: PhaseType;
   duration_type: DurationType;
   duration_s?: number;
@@ -32,6 +38,8 @@ export interface BuilderTemplateData {
   total_duration_s?: number;
   total_distance_m?: number;
   scheduled_day?: number | null; // 0 = Sunday, 1 = Monday, etc.
+  recurrence_start_date?: string | null;
+  recurrence_end_date?: string | null;
   environment_type?: string | null;
   surface?: string | null;
   pool_type?: string | null;
@@ -66,10 +74,12 @@ export const useEnduranceWorkoutBuilder = () => {
     mutationFn: async ({
       data,
       steps,
+      progressions,
       templateId,
     }: {
       data: BuilderTemplateData;
       steps: BuilderStep[];
+      progressions?: StepProgressionOverride[];
       templateId?: string;
     }) => {
       const isEditMode = !!templateId;
@@ -94,6 +104,8 @@ export const useEnduranceWorkoutBuilder = () => {
             total_distance_m: data.total_distance_m,
             workout_goal: data.workout_goal,
             scheduled_day: data.scheduled_day,
+            recurrence_start_date: data.recurrence_start_date,
+            recurrence_end_date: data.recurrence_end_date,
             environment_type: data.environment_type,
             surface: data.surface,
             pool_type: data.pool_type,
@@ -142,6 +154,8 @@ export const useEnduranceWorkoutBuilder = () => {
             total_distance_m: data.total_distance_m,
             workout_goal: data.workout_goal,
             scheduled_day: data.scheduled_day,
+            recurrence_start_date: data.recurrence_start_date,
+            recurrence_end_date: data.recurrence_end_date,
             environment_type: data.environment_type,
             surface: data.surface,
             pool_type: data.pool_type,
@@ -188,6 +202,7 @@ export const useEnduranceWorkoutBuilder = () => {
               .insert({
                 template_id: finalTemplateId,
                 order_index: currentIndex,
+                progression_key: step.progression_key ?? undefined,
                 phase_type: step.phase_type,
                 duration_type: step.duration_type,
                 duration_s: step.duration_s,
@@ -220,6 +235,12 @@ export const useEnduranceWorkoutBuilder = () => {
         };
 
         await processSteps(steps);
+        await replaceEnduranceStepProgressions(finalTemplateId, data.recurrence_end_date ? progressions || [] : []);
+        await deleteFuturePlansOutsideEnduranceRecurrence({
+          userId: user.id,
+          templateId: finalTemplateId,
+          recurrenceEndDate: data.recurrence_end_date,
+        });
         console.log('[useEnduranceWorkoutBuilder.save] Éxito - todos los pasos insertados');
 
         return { id: finalTemplateId };
