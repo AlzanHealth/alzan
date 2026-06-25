@@ -23,6 +23,7 @@ import { SPORT_COLORS } from '../../theme/sportColors';
 import { SPORTS_CONFIG, getSportDefaultTitleKey } from '../../constants/sports';
 import { ActiveSessionBanner } from './components/ActiveSessionBanner';
 import { ImportReviewSurface } from './components/ImportReviewSurface';
+import { ScheduledWorkoutPreviewModal, ScheduledWorkoutPreviewPlan } from './components/ScheduledWorkoutPreviewModal';
 
 import { format, addDays, isSameDay, subDays, startOfDay } from 'date-fns';
 import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
@@ -33,6 +34,7 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { DaySwitcher } from '../../components/common/DaySwitcher';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { TrainingScreenNavigationProp, TabParamList } from '../../types/navigation.types';
+import { SportType } from '../../types/requests.types';
 import { DaySwitcherRef } from '../../components/common/DaySwitcher';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
@@ -94,6 +96,7 @@ export const TrainingHomeScreen = () => {
   const dotsStartDate = React.useMemo(() => subDays(startOfDay(new Date()), DOTS_RANGE_DAYS), []);
   const dotsEndDate = React.useMemo(() => addDays(startOfDay(new Date()), DOTS_RANGE_DAYS), []);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [previewPlan, setPreviewPlan] = useState<(ScheduledWorkoutPreviewPlan & { isActive?: boolean }) | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
   const daySwitcherRef = useRef<DaySwitcherRef>(null);
@@ -596,57 +599,109 @@ export const TrainingHomeScreen = () => {
                   (s: CompletedSession) => s.sport_type === template?.sport_type && s.name === template?.base_name,
                 );
               // If this is an extra session (from Registrar Actividad), it's already completed
-              const isCompleted = plan.isExtraSession || isGymCompleted || isEnduranceCompleted;
+              const isCompleted = Boolean(plan.isExtraSession || isGymCompleted || isEnduranceCompleted);
 
               const isRecurring = !!(isGym
                 ? plan.workout_templates && plan.workout_templates.suggested_day_of_week != null
                 : plan.endurance_workout_templates && plan.endurance_workout_templates.scheduled_day != null);
+              const templateId = isGym
+                ? plan.gym_template_id || template?.id || ''
+                : plan.endurance_template_id || template?.id || '';
+              const planDate = format(selectedDate, 'yyyy-MM-dd');
+              const startPlan = () => {
+                if (isCompleted) return;
+                if (isThisSessionActive) {
+                  navigation.navigate('ActiveWorkout', {
+                    sessionId: activeSession?.id || '',
+                  });
+                } else if (isGym) {
+                  navigation.navigate('StartWorkout', {
+                    templateId,
+                    date: planDate,
+                    planId: plan.id,
+                  });
+                } else {
+                  navigation.navigate('EnduranceSessionForm', {
+                    templateId,
+                    date: planDate,
+                  });
+                }
+              };
+
+              const openPreview = () => {
+                if (!templateId || isCompleted || plan.isExtraSession) return;
+                setPreviewPlan({
+                  id: plan.id,
+                  type: isGym ? 'gym' : 'endurance',
+                  templateId,
+                  plannedDate: plan.planned_date || planDate,
+                  title: template?.base_name || t('settings.workout'),
+                  subtitle: isGym
+                    ? t('constants.gym')
+                    : template?.sport_type
+                      ? t(SPORTS_CONFIG[template.sport_type].label)
+                      : t('settings.workout'),
+                  sportType: isGym
+                    ? 'strength'
+                    : ((template?.sport_type || plan.sport_type || null) as SportType | null),
+                  isCompleted,
+                  isActive: Boolean(isThisSessionActive),
+                });
+              };
 
               const cardContent = (
                 <GlassCard style={styles.planCard}>
                   <View style={styles.planHeader}>
-                    <View
-                      style={[
-                        styles.planIcon,
-                        {
-                          backgroundColor: isGym
-                            ? SPORT_COLORS.gym
-                            : template?.sport_type
-                              ? SPORT_COLORS[template.sport_type.toLowerCase() as keyof typeof SPORT_COLORS] ||
-                                colors.secondary
-                              : colors.secondary,
-                        },
-                      ]}
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      disabled={isCompleted || plan.isExtraSession || !templateId}
+                      onPress={openPreview}
+                      activeOpacity={0.82}
+                      style={styles.planInfoButton}
                     >
-                      {isGym ? (
-                        <Dumbbell size={20} color="#FFF" />
-                      ) : (
-                        <SportIcon sport={template?.sport_type || t('constants.other')} size={20} color="#FFF" />
-                      )}
-                    </View>
+                      <View
+                        style={[
+                          styles.planIcon,
+                          {
+                            backgroundColor: isGym
+                              ? SPORT_COLORS.gym
+                              : template?.sport_type
+                                ? SPORT_COLORS[template.sport_type.toLowerCase() as keyof typeof SPORT_COLORS] ||
+                                  colors.secondary
+                                : colors.secondary,
+                          },
+                        ]}
+                      >
+                        {isGym ? (
+                          <Dumbbell size={20} color="#FFF" />
+                        ) : (
+                          <SportIcon sport={template?.sport_type || t('constants.other')} size={20} color="#FFF" />
+                        )}
+                      </View>
 
-                    <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                      <Text style={[styles.planTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {plan.completedSession
-                          ? plan.completedSession.name ||
-                            (isGym
-                              ? t('training.strengthWorkout')
-                              : t(
-                                  getSportDefaultTitleKey(
-                                    plan.completedSession.sport_type,
-                                    plan.completedSession.sport_subtype,
-                                  ),
-                                ))
-                          : template?.base_name || t('settings.workout')}
-                      </Text>
-                      <Text style={[styles.planSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {isGym
-                          ? t('constants.gym')
-                          : template?.sport_type
-                            ? t(SPORTS_CONFIG[template.sport_type].label)
-                            : t('settings.workout')}
-                      </Text>
-                    </View>
+                      <View style={styles.planTextBlock}>
+                        <Text style={[styles.planTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                          {plan.completedSession
+                            ? plan.completedSession.name ||
+                              (isGym
+                                ? t('training.strengthWorkout')
+                                : t(
+                                    getSportDefaultTitleKey(
+                                      plan.completedSession.sport_type,
+                                      plan.completedSession.sport_subtype,
+                                    ),
+                                  ))
+                            : template?.base_name || t('settings.workout')}
+                        </Text>
+                        <Text style={[styles.planSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {isGym
+                            ? t('constants.gym')
+                            : template?.sport_type
+                              ? t(SPORTS_CONFIG[template.sport_type].label)
+                              : t('settings.workout')}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                       style={[
@@ -656,26 +711,7 @@ export const TrainingHomeScreen = () => {
                         isCompleted && { backgroundColor: colors.danger },
                       ]}
                       disabled={isCompleted}
-                      onPress={() => {
-                        if (isCompleted) return;
-                        if (isThisSessionActive) {
-                          navigation.navigate('ActiveWorkout', {
-                            sessionId: activeSession?.id || '',
-                          });
-                        } else {
-                          if (isGym)
-                            navigation.navigate('StartWorkout', {
-                              templateId: plan.gym_template_id || template?.id || '',
-                              date: format(selectedDate, 'yyyy-MM-dd'),
-                              planId: plan.id,
-                            });
-                          else
-                            navigation.navigate('EnduranceSessionForm', {
-                              templateId: plan.endurance_template_id || template?.id || '',
-                              date: format(selectedDate, 'yyyy-MM-dd'),
-                            });
-                        }
-                      }}
+                      onPress={startPlan}
                     >
                       {!isCompleted && <Play size={12} color="#FFF" style={{ marginRight: 4 }} />}
                       <Text style={styles.startPlanText}>
@@ -877,6 +913,41 @@ export const TrainingHomeScreen = () => {
           </TouchableOpacity>
         </Modal>
 
+        <ScheduledWorkoutPreviewModal
+          visible={!!previewPlan}
+          plan={previewPlan}
+          primaryActionLabel={
+            previewPlan?.isActive
+              ? t('training.resume')
+              : previewPlan?.type === 'gym'
+                ? t('training.start')
+                : t('training.register')
+          }
+          primaryActionDisabled={previewPlan?.isCompleted}
+          onClose={() => setPreviewPlan(null)}
+          onPrimaryAction={() => {
+            if (!previewPlan) return;
+            const currentPreviewPlan = previewPlan;
+            setPreviewPlan(null);
+            if (currentPreviewPlan.isActive) {
+              navigation.navigate('ActiveWorkout', {
+                sessionId: activeSession?.id || '',
+              });
+            } else if (currentPreviewPlan.type === 'gym') {
+              navigation.navigate('StartWorkout', {
+                templateId: currentPreviewPlan.templateId,
+                date: currentPreviewPlan.plannedDate,
+                planId: currentPreviewPlan.id,
+              });
+            } else {
+              navigation.navigate('EnduranceSessionForm', {
+                templateId: currentPreviewPlan.templateId,
+                date: currentPreviewPlan.plannedDate,
+              });
+            }
+          }}
+        />
+
         {/* Loading Overlay */}
         {isDeleting && (
           <View style={styles.loadingOverlay}>
@@ -933,6 +1004,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  planInfoButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  planTextBlock: {
+    flex: 1,
+    paddingHorizontal: 12,
   },
   planTitle: {
     fontSize: 16,
