@@ -16,7 +16,7 @@ import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../ty
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { X, Search, ScanBarcode, Plus, Trash2, ChevronLeft, Check, Info, Bookmark } from 'lucide-react-native';
+import { X, Search, ScanBarcode, Plus, Trash2, ChevronLeft, Check, Info, Bookmark, Eraser } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 
@@ -1375,7 +1375,7 @@ export const MealLogFormScreen = () => {
                       accessibilityLabel={t('nutrition.clear')}
                       hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
                     >
-                      <X size={18} color={themeColors.textSecondary} strokeWidth={2.3} />
+                      <Eraser size={18} color={themeColors.textSecondary} strokeWidth={2.3} />
                     </TouchableOpacity>
                   )}
                 </View>
