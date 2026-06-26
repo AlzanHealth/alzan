@@ -28,6 +28,9 @@ export interface ImportReviewDetailState {
   duplicateScore: number;
 }
 
+export const WATCH_METRICS_REVERT_WINDOW_HOURS = 72;
+export const WATCH_METRICS_SESSION_MAX_AGE_HOURS = 168;
+
 const hasPendingDuplicate = (session: ActivitySession): boolean =>
   session.duplicate_resolution === 'pending' && session.duplicate_of_session_id != null;
 
@@ -37,10 +40,41 @@ const hasStrongDuplicate = (session: ActivitySession): boolean =>
 const hasWeakDuplicate = (session: ActivitySession): boolean =>
   hasPendingDuplicate(session) && (session.duplicate_score ?? 0) < STRONG_DUPLICATE_THRESHOLD;
 
-export const getImportReviewConflictReason = (session: ActivitySession): ImportReviewConflictReason | null => {
+const toTime = (value: Date | number): number => (value instanceof Date ? value.getTime() : value);
+
+const parseIsoTime = (value: unknown): number | null => {
+  if (typeof value !== 'string') return null;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : null;
+};
+
+const getPendingWatchMetricsReceivedAt = (session: ActivitySession): number | null => {
+  const raw = session.pending_watch_metrics;
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  return parseIsoTime((raw as Record<string, unknown>).received_at);
+};
+
+const hoursBetween = (from: number, to: number): number => (to - from) / (3600 * 1000);
+
+export const hasActivePendingWatchMetrics = (session: ActivitySession, now: Date | number = Date.now()): boolean => {
+  if (session.pending_watch_metrics == null) return false;
+  const nowTime = toTime(now);
+  const receivedAt = getPendingWatchMetricsReceivedAt(session);
+  const sessionStart = parseIsoTime(session.start_time);
+  if (receivedAt == null || sessionStart == null) return false;
+  return (
+    hoursBetween(receivedAt, nowTime) < WATCH_METRICS_REVERT_WINDOW_HOURS &&
+    hoursBetween(sessionStart, nowTime) < WATCH_METRICS_SESSION_MAX_AGE_HOURS
+  );
+};
+
+export const getImportReviewConflictReason = (
+  session: ActivitySession,
+  now: Date | number = Date.now(),
+): ImportReviewConflictReason | null => {
   if (hasStrongDuplicate(session)) return 'duplicate';
   if (session.needs_strength_review) return 'strength_assignment';
-  if (session.pending_watch_metrics != null) return 'watch_metrics';
+  if (hasActivePendingWatchMetrics(session, now)) return 'watch_metrics';
   return null;
 };
 
@@ -59,12 +93,14 @@ export const getImportReviewDetailState = ({
   hasSuggestedTemplate,
   hasPlannedRoutine,
   associatedTemplateId,
+  now = Date.now(),
 }: {
   session: ActivitySession;
   reviewActionCompleted: boolean;
   hasSuggestedTemplate: boolean;
   hasPlannedRoutine: boolean;
   associatedTemplateId: string | null | undefined;
+  now?: Date | number;
 }): ImportReviewDetailState => {
   const duplicateScore = session.duplicate_score ?? 0;
   const hasWeakDuplicateNotice = !reviewActionCompleted && hasWeakDuplicate(session);
@@ -78,7 +114,7 @@ export const getImportReviewDetailState = ({
   if (session.needs_strength_review) {
     return { priority: 'blocking', mainStep: 'strength_assignment', hasWeakDuplicateNotice, duplicateScore };
   }
-  if (session.pending_watch_metrics != null) {
+  if (hasActivePendingWatchMetrics(session, now)) {
     return { priority: 'blocking', mainStep: 'watch_metrics', hasWeakDuplicateNotice, duplicateScore };
   }
   if (!associatedTemplateId && hasSuggestedTemplate) {

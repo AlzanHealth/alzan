@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import {
   getImportReviewConflictReason,
+  hasActivePendingWatchMetrics,
   sortImportReviewItems,
   type ImportReviewItem,
 } from '../screens/training/helpers/importReviewPipeline.helper';
@@ -28,7 +29,8 @@ export const useImportReviewQueue = () => {
     queryKey: ['importReviewQueue', user?.id],
     queryFn: async (): Promise<{ items: ImportReviewItem[]; latestNewImport: ImportReviewItem | null }> => {
       if (!user) return { items: [], latestNewImport: null };
-      const windowStart = new Date(Date.now() - NEW_IMPORT_WINDOW_HOURS * 3600 * 1000).toISOString();
+      const now = Date.now();
+      const windowStart = new Date(now - NEW_IMPORT_WINDOW_HOURS * 3600 * 1000).toISOString();
 
       // Hard reviews: any imported/owned session in a blocking state.
       const { data: hardRows, error: hardError } = await supabase
@@ -41,9 +43,21 @@ export const useImportReviewQueue = () => {
         );
       if (hardError) throw hardError;
 
+      const expiredWatchSessionIds = (hardRows ?? [])
+        .filter(session => session.pending_watch_metrics != null && !hasActivePendingWatchMetrics(session, now))
+        .map(session => session.id);
+      if (expiredWatchSessionIds.length > 0) {
+        const { error } = await supabase
+          .from('activity_sessions')
+          .update({ pending_watch_metrics: null })
+          .in('id', expiredWatchSessionIds)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      }
+
       const hardItems: ImportReviewItem[] = [];
       for (const session of hardRows ?? []) {
-        const reason = getImportReviewConflictReason(session);
+        const reason = getImportReviewConflictReason(session, now);
         if (reason) hardItems.push({ session, reason, hard: true });
       }
 
@@ -63,7 +77,7 @@ export const useImportReviewQueue = () => {
       if (recentImports && recentImports.length > 0) {
         // Find if there is any conflict in the recent imports
         const conflictImports = recentImports.filter(session => {
-          const reason = getImportReviewConflictReason(session);
+          const reason = getImportReviewConflictReason(session, now);
           return reason !== null;
         });
 
@@ -72,7 +86,7 @@ export const useImportReviewQueue = () => {
 
         // Only auto-open if it has not been marked seen yet
         if (targetSession.import_review_seen_at === null) {
-          const reason = getImportReviewConflictReason(targetSession) ?? 'new_import';
+          const reason = getImportReviewConflictReason(targetSession, now) ?? 'new_import';
           latestNewImport = {
             session: targetSession,
             reason,

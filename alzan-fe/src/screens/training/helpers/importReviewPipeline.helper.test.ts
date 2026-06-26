@@ -6,11 +6,13 @@ import {
 } from './importReviewPipeline.helper';
 import { ActivitySession } from '../../../types/requests.types';
 
+const NOW = new Date('2026-06-26T10:00:00.000Z');
+
 const session = (overrides: Partial<ActivitySession>): ActivitySession =>
   ({
     id: 'session-1',
     sport_type: 'cycling',
-    start_time: '2026-06-17T08:00:00.000Z',
+    start_time: '2026-06-25T08:00:00.000Z',
     status: 'completed',
     ...overrides,
   }) as ActivitySession;
@@ -32,8 +34,85 @@ assert.equal(
 assert.equal(getImportReviewConflictReason(session({ needs_strength_review: true })), 'strength_assignment');
 
 assert.equal(
-  getImportReviewConflictReason(session({ pending_watch_metrics: { previous: { duration_s: 1800 } } })),
+  getImportReviewConflictReason(
+    session({
+      pending_watch_metrics: {
+        previous: { duration_s: 1800 },
+        received_at: '2026-06-24T10:00:00.000Z',
+      },
+    }),
+    NOW,
+  ),
   'watch_metrics',
+);
+
+assert.equal(
+  getImportReviewConflictReason(
+    session({
+      pending_watch_metrics: {
+        previous: { duration_s: 1800 },
+        received_at: '2026-06-22T09:59:59.000Z',
+      },
+    }),
+    NOW,
+  ),
+  null,
+);
+
+assert.equal(
+  getImportReviewConflictReason(
+    session({
+      start_time: '2026-06-18T09:59:59.000Z',
+      pending_watch_metrics: {
+        previous: { duration_s: 1800 },
+        received_at: '2026-06-26T09:00:00.000Z',
+      },
+    }),
+    NOW,
+  ),
+  null,
+);
+
+assert.equal(
+  getImportReviewConflictReason(
+    session({
+      pending_watch_metrics: {
+        previous: { duration_s: 1800 },
+      },
+    }),
+    NOW,
+  ),
+  null,
+);
+
+assert.equal(
+  getImportReviewConflictReason(
+    session({
+      duplicate_resolution: 'pending',
+      duplicate_of_session_id: 'existing',
+      duplicate_score: 90,
+      start_time: '2026-06-01T08:00:00.000Z',
+      pending_watch_metrics: {
+        previous: { duration_s: 1800 },
+      },
+    }),
+    NOW,
+  ),
+  'duplicate',
+);
+
+assert.equal(
+  getImportReviewConflictReason(
+    session({
+      needs_strength_review: true,
+      start_time: '2026-06-01T08:00:00.000Z',
+      pending_watch_metrics: {
+        previous: { duration_s: 1800 },
+      },
+    }),
+    NOW,
+  ),
+  'strength_assignment',
 );
 
 assert.equal(

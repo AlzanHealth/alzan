@@ -274,6 +274,60 @@ async function assertReviewNoOpsAreIdempotentOnResolvedState(): Promise<void> {
   assert.deepEqual(reconciliation.templateMatches, []);
 }
 
+async function assertExpiredWatchMetricsCleanupKeepsCurrentWatchValues(): Promise<void> {
+  const client = createFakeSupabaseClient({
+    activity_sessions: [
+      baseSession({
+        id: 'expired-watch-session',
+        duration_s: 3600,
+        avg_heart_rate: 130,
+        pending_watch_metrics: {
+          previous: { duration_s: 3000, avg_heart_rate: 110 },
+          received_at: '2026-06-22T09:59:59.000Z',
+        },
+      }),
+    ],
+  });
+  const service = createService(client);
+
+  const sessionId = await service.clearExpiredWatchMetricsReview(
+    'user-1',
+    'expired-watch-session',
+    new Date('2026-06-26T10:00:00.000Z'),
+  );
+
+  const session = client.rows.activity_sessions[0];
+  assert.equal(sessionId, 'expired-watch-session');
+  assert.equal(session.duration_s, 3600);
+  assert.equal(session.avg_heart_rate, 130);
+  assert.equal(session.pending_watch_metrics, null);
+}
+
+async function assertExpiredWatchMetricsRevertKeepsWatchValues(): Promise<void> {
+  const client = createFakeSupabaseClient({
+    activity_sessions: [
+      baseSession({
+        id: 'old-watch-session',
+        duration_s: 3600,
+        avg_heart_rate: 130,
+        pending_watch_metrics: {
+          previous: { duration_s: 3000, avg_heart_rate: 110 },
+          received_at: '2020-01-01T00:00:00.000Z',
+        },
+      }),
+    ],
+  });
+  const service = createService(client);
+
+  const sessionId = await service.revertWatchMetrics('user-1', 'old-watch-session');
+
+  const session = client.rows.activity_sessions[0];
+  assert.equal(sessionId, 'old-watch-session');
+  assert.equal(session.duration_s, 3600);
+  assert.equal(session.avg_heart_rate, 130);
+  assert.equal(session.pending_watch_metrics, null);
+}
+
 async function run(): Promise<void> {
   await assertMergeIsIdempotentWhenSourceWasAlreadyDeleted();
   await assertMissingSourceWithoutTargetStillFails();
@@ -281,6 +335,8 @@ async function run(): Promise<void> {
   await assertAssociateTemplateUsesTargetForPendingDuplicate();
   await assertAssignStrengthIsIdempotentWhenSourceWasDeleted();
   await assertReviewNoOpsAreIdempotentOnResolvedState();
+  await assertExpiredWatchMetricsCleanupKeepsCurrentWatchValues();
+  await assertExpiredWatchMetricsRevertKeepsWatchValues();
 }
 
 void run();

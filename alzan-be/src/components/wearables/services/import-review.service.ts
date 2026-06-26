@@ -21,6 +21,8 @@ const PENDING_METRIC_COLUMNS = [
   'min_heart_rate',
   'recovery_time_s',
 ] as const;
+const WATCH_METRICS_REVERT_WINDOW_MS = 72 * 3600 * 1000;
+const WATCH_METRICS_SESSION_MAX_AGE_MS = 168 * 3600 * 1000;
 
 /**
  * User-driven actions over imported activities: template association,
@@ -248,6 +250,10 @@ export class ImportReviewService {
    */
   public async revertWatchMetrics(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
     const session = await this.getCanonicalActionSession(userId, sessionId, targetSessionId);
+    if (this.isWatchMetricsReviewExpired(session, new Date())) {
+      await this.updateSession(session.id, { pending_watch_metrics: null });
+      return session.id;
+    }
     const previous = this.readPreviousWatchMetrics(session);
     if (!previous) return session.id;
     const payload: ActivitySessionUpdate = { pending_watch_metrics: null };
@@ -263,6 +269,18 @@ export class ImportReviewService {
   public async keepWatchMetrics(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
     const session = await this.getCanonicalActionSession(userId, sessionId, targetSessionId);
     if (session.pending_watch_metrics == null) return session.id;
+    await this.updateSession(session.id, { pending_watch_metrics: null });
+    return session.id;
+  }
+
+  /** Clears an expired watch-metric revert notice while keeping the applied watch values. */
+  public async clearExpiredWatchMetricsReview(
+    userId: string,
+    sessionId: string,
+    now: Date = new Date(),
+  ): Promise<string> {
+    const session = await this.getOwnedSession(userId, sessionId);
+    if (!this.isWatchMetricsReviewExpired(session, now)) return session.id;
     await this.updateSession(session.id, { pending_watch_metrics: null });
     return session.id;
   }
@@ -455,6 +473,29 @@ export class ImportReviewService {
     const previous = (raw as Record<string, unknown>).previous;
     if (previous == null || typeof previous !== 'object' || Array.isArray(previous)) return null;
     return previous as Record<string, unknown>;
+  }
+
+  private isWatchMetricsReviewExpired(session: ActivitySessionRow, now: Date): boolean {
+    if (session.pending_watch_metrics == null) return false;
+    const receivedAt = this.readPendingWatchMetricsReceivedAt(session);
+    const startedAt = this.readTime(session.start_time);
+    if (receivedAt == null || startedAt == null) return true;
+    const nowTime = now.getTime();
+    return (
+      nowTime - receivedAt >= WATCH_METRICS_REVERT_WINDOW_MS || nowTime - startedAt >= WATCH_METRICS_SESSION_MAX_AGE_MS
+    );
+  }
+
+  private readPendingWatchMetricsReceivedAt(session: ActivitySessionRow): number | null {
+    const raw = session.pending_watch_metrics;
+    if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    return this.readTime((raw as Record<string, unknown>).received_at);
+  }
+
+  private readTime(value: unknown): number | null {
+    if (typeof value !== 'string') return null;
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) ? time : null;
   }
 
   private toStrengthLite(session: ActivitySessionRow): StrengthSessionLite {
