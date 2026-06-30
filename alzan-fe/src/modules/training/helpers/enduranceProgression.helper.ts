@@ -115,7 +115,9 @@ export const ensureStepProgressionKeys = <TStep extends ProgressionBuilderStep>(
   }) as TStep[];
 
 const isEligibleStep = (step: ProgressionBuilderStep, sportType: SportType): boolean => {
-  if (!step.progression_key || step.is_group) return false;
+  if (!step.progression_key) return false;
+
+  if (step.is_group) return (step.repetitions ?? 1) > 1;
 
   if (sportType === 'hyrox') {
     return step.hyrox_step_type === 'run' || step.hyrox_step_type === 'station';

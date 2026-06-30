@@ -105,6 +105,24 @@ assert.deepEqual(
   ['hyrox-run', 'hyrox-station'],
 );
 
+const repeatedBlockSteps: ProgressionBuilderStep[] = [
+  {
+    id: 'repeat-block',
+    progression_key: 'repeat-block-key',
+    phase_type: 'interval',
+    duration_type: 'lap_button',
+    target_type: 'none',
+    repetitions: 6,
+    is_group: true,
+    children: baseSteps,
+  },
+];
+
+assert.deepEqual(
+  getEligibleProgressionSteps(repeatedBlockSteps, 'running').map(step => step.progression_key),
+  ['repeat-block-key', 'work-key'],
+);
+
 const normalized = normalizeStepProgressions([
   {
     progression_key: 'work-key',
@@ -166,6 +184,72 @@ assert.equal(durationAndTargetProgressedSteps[1].distance_m, 1200);
 assert.equal(durationAndTargetProgressedSteps[1].target_type, 'heart_rate');
 assert.equal(durationAndTargetProgressedSteps[1].target_min, 3);
 assert.equal(durationAndTargetProgressedSteps[1].target_max, 3);
+
+const repeatedProgressedSteps = applyProgressionsToSteps(repeatedBlockSteps, 3, [
+  {
+    progression_key: 'repeat-block-key',
+    week_index: 3,
+    repetitions: 8,
+  },
+]);
+assert.equal(repeatedProgressedSteps[0].repetitions, 8);
+
+const twoDifferentIntervalSteps: ProgressionBuilderStep[] = [
+  {
+    id: 'short-fast-interval',
+    progression_key: 'short-fast-key',
+    phase_type: 'interval',
+    duration_type: 'distance',
+    distance_m: 400,
+    target_type: 'pace',
+    target_min: 255,
+    target_max: 255,
+    repetitions: 1,
+    is_group: false,
+  },
+  {
+    id: 'long-steady-interval',
+    progression_key: 'long-steady-key',
+    phase_type: 'interval',
+    duration_type: 'time',
+    duration_s: 600,
+    target_type: 'heart_rate',
+    target_min: 2,
+    target_max: 2,
+    repetitions: 1,
+    is_group: false,
+  },
+];
+
+assert.deepEqual(
+  getEligibleProgressionSteps(twoDifferentIntervalSteps, 'running').map(step => step.progression_key),
+  ['short-fast-key', 'long-steady-key'],
+);
+
+const twoDifferentProgressedIntervals = applyProgressionsToSteps(twoDifferentIntervalSteps, 4, [
+  {
+    progression_key: 'short-fast-key',
+    week_index: 4,
+    distance_m: 500,
+    target_type: 'pace',
+    target_min: 245,
+    target_max: 245,
+  },
+  {
+    progression_key: 'long-steady-key',
+    week_index: 4,
+    duration_s: 720,
+    target_type: 'heart_rate',
+    target_min: 3,
+    target_max: 3,
+  },
+]);
+assert.equal(twoDifferentProgressedIntervals[0].distance_m, 500);
+assert.equal(twoDifferentProgressedIntervals[0].target_min, 245);
+assert.equal(twoDifferentProgressedIntervals[1].duration_s, 720);
+assert.equal(twoDifferentProgressedIntervals[1].target_min, 3);
+assert.equal(twoDifferentProgressedIntervals[0].progression_key, 'short-fast-key');
+assert.equal(twoDifferentProgressedIntervals[1].progression_key, 'long-steady-key');
 
 const stableKey = createProgressionKey();
 assert.match(stableKey, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);

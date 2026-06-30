@@ -1346,6 +1346,7 @@ export default {
       'Ajusta duración o distancia y objetivo para cada semana. Calentamiento, recuperación y vuelta a la calma no cambian.',
     progressionDuration: 'Duración',
     progressionTarget: 'Objetivo',
+    progressionRepetitions: 'Repeticiones',
     weekNumber: 'Semana {{count}}',
     effortRpe: 'Esfuerzo (RPE 1-10)',
     avgHeartRate: 'FC Media (bpm)',

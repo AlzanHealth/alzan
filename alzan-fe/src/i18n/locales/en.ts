@@ -1333,6 +1333,7 @@ const en = {
       'Adjust duration or distance and target for each week. Warm-up, recovery and cooldown stay unchanged.',
     progressionDuration: 'Duration',
     progressionTarget: 'Target',
+    progressionRepetitions: 'Repetitions',
     weekNumber: 'Week {{count}}',
     effortRpe: 'Effort (RPE 1-10)',
     avgHeartRate: 'Avg HR (bpm)',
