@@ -106,7 +106,7 @@ const HYROX_FULL_FORMAT_STATIONS = [
   { key: 'wall_balls', reps: 100 },
 ] satisfies Array<{ key: string; distanceM?: number; reps?: number }>;
 
-type ProgressionPickerMode = 'main' | 'hyrox_station';
+type ProgressionPickerMode = 'duration' | 'target' | 'hyrox_station';
 
 type ProgressionPickerDraft = {
   paceMin: string;
@@ -1337,7 +1337,27 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return typeof stepValue === 'number' && Number.isFinite(stepValue) ? stepValue : 0;
   };
 
-  const formatProgressionDisplayValue = (step: ProgressionBuilderStep, weekIndex: number) => {
+  const hasProgressionDuration = (step: ProgressionBuilderStep) =>
+    step.duration_type === 'time' || step.duration_type === 'distance';
+
+  const hasProgressionTarget = (step: ProgressionBuilderStep) => step.target_type !== 'none';
+
+  const formatProgressionDurationValue = (step: ProgressionBuilderStep, weekIndex: number) => {
+    if (step.duration_type === 'time') {
+      const duration = Math.round(getProgressionNumber(step, weekIndex, 'duration_s'));
+      return duration > 0 ? formatTime(duration) : '-';
+    }
+
+    if (step.duration_type === 'distance') {
+      const distanceValue = getProgressionNumber(step, weekIndex, 'distance_m');
+      const distanceLabel = convertDistanceToUi(distanceValue, 2);
+      return distanceValue > 0 ? `${distanceLabel.value} ${distanceLabel.unit}` : '-';
+    }
+
+    return '-';
+  };
+
+  const formatProgressionTargetValue = (step: ProgressionBuilderStep, weekIndex: number) => {
     if (step.target_type === 'pace') {
       const uiSeconds = toUiPaceSeconds(getProgressionNumber(step, weekIndex, 'target_min'));
       const label = formatPaceInput(uiSeconds);
@@ -1352,17 +1372,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (step.target_type === 'heart_rate') {
       const zone = Math.round(getProgressionNumber(step, weekIndex, 'target_min'));
       return zone > 0 ? `${t('training.hrZone')} ${zone}` : '-';
-    }
-
-    if (step.duration_type === 'time') {
-      const duration = Math.round(getProgressionNumber(step, weekIndex, 'duration_s'));
-      return duration > 0 ? formatTime(duration) : '-';
-    }
-
-    if (step.duration_type === 'distance') {
-      const distanceValue = getProgressionNumber(step, weekIndex, 'distance_m');
-      const distanceLabel = convertDistanceToUi(distanceValue, 2);
-      return distanceValue > 0 ? `${distanceLabel.value} ${distanceLabel.unit}` : '-';
     }
 
     return '-';
@@ -1401,11 +1410,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const getStepProgressionLabel = (step: ProgressionBuilderStep) => {
     if (sportType === HYROX_SPORT_TYPE && step.hyrox_step_type === 'station') return t('training.hyroxStationBlock');
     if (sportType === HYROX_SPORT_TYPE && step.hyrox_step_type === 'run') return t('training.hyroxRunBlock');
-    if (step.target_type === 'pace') return t('training.pace');
-    if (step.target_type === 'speed') return t('training.speed');
-    if (step.target_type === 'heart_rate') return t('training.hrZone');
-    if (step.duration_type === 'time') return t('training.duration');
-    if (step.duration_type === 'distance') return t('training.distance');
+    if (step.phase_type === 'interval') return t(getPhaseLabel(step.phase_type));
+    if (hasProgressionDuration(step)) return t('training.progressionDuration');
+    if (hasProgressionTarget(step)) return t('training.progressionTarget');
     return t('training.interval');
   };
 
@@ -1487,7 +1494,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
 
-    if (step.target_type === 'pace') {
+    if (mode === 'target' && step.target_type === 'pace') {
       const totalUiSeconds = (Number.parseInt(draft.paceMin, 10) || 0) * 60 + (Number.parseInt(draft.paceSec, 10) || 0);
       const dbSeconds = Math.max(1, Math.round(toDbPaceSeconds(totalUiSeconds)));
       updateProgressionOverride(step.progression_key, weekIndex, {
@@ -1495,27 +1502,27 @@ export const EnduranceWorkoutBuilderScreen = () => {
         target_min: dbSeconds,
         target_max: dbSeconds,
       });
-    } else if (step.target_type === 'speed') {
+    } else if (mode === 'target' && step.target_type === 'speed') {
       const dbSpeed = Math.max(1, Math.round(toDbSpeed(Number.parseInt(draft.speed, 10) || 0)));
       updateProgressionOverride(step.progression_key, weekIndex, {
         target_type: 'speed',
         target_min: dbSpeed,
         target_max: dbSpeed,
       });
-    } else if (step.target_type === 'heart_rate') {
+    } else if (mode === 'target' && step.target_type === 'heart_rate') {
       const zone = Math.max(1, Math.min(5, Number.parseInt(draft.zone, 10) || 1));
       updateProgressionOverride(step.progression_key, weekIndex, {
         target_type: 'heart_rate',
         target_min: zone,
         target_max: zone,
       });
-    } else if (step.duration_type === 'time') {
+    } else if (mode === 'duration' && step.duration_type === 'time') {
       const seconds =
         (Number.parseInt(draft.durationHour, 10) || 0) * 3600 +
         (Number.parseInt(draft.durationMin, 10) || 0) * 60 +
         (Number.parseInt(draft.durationSec, 10) || 0);
       updateProgressionOverride(step.progression_key, weekIndex, { duration_s: seconds });
-    } else if (step.duration_type === 'distance') {
+    } else if (mode === 'duration' && step.duration_type === 'distance') {
       const major = Number.parseInt(draft.distanceMajor, 10) || 0;
       const minor = Number.parseInt(draft.distanceMinor, 10) || 0;
       const distanceM = isMetricDistance ? major * 1000 + minor : Math.round((major + minor / 100) * 1609.34);
@@ -1524,6 +1531,34 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
     setProgressionPicker(null);
   };
+
+  const renderProgressionValueButton = (
+    step: EligibleProgressionStep,
+    weekIndex: number,
+    mode: ProgressionPickerMode,
+    label: string,
+    value: string,
+  ) => (
+    <TouchableOpacity
+      style={[
+        styles.progressionValueButton,
+        { borderColor: themeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFF' },
+      ]}
+      onPress={() => openProgressionPicker(step, weekIndex, mode)}
+      accessibilityRole="button"
+      accessibilityLabel={`${t('training.weekNumber', { count: weekIndex })} ${label}`}
+    >
+      <View style={styles.progressionValueTextGroup}>
+        <Text style={[styles.progressionValueLabel, { color: themeColors.textSecondary }]} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text style={[styles.progressionValueText, { color: themeColors.textPrimary }]} numberOfLines={1}>
+          {value}
+        </Text>
+      </View>
+      <ChevronRight size={16} color={themeColors.textSecondary} />
+    </TouchableOpacity>
+  );
 
   const renderProgressionEditor = () => {
     if (!isRecurring || !recurrenceEndDate.trim() || recurrenceWeekCount < 1 || eligibleProgressionSteps.length === 0) {
@@ -1552,28 +1587,42 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
             {Array.from({ length: recurrenceWeekCount }, (_, index) => index + 1).map(weekIndex => {
               const isHyroxStation = sportType === HYROX_SPORT_TYPE && step.hyrox_step_type === 'station';
-              const valueLabel = isHyroxStation
-                ? getHyroxStationProgressionValue(step, weekIndex)
-                : formatProgressionDisplayValue(step, weekIndex);
+              const durationLabel =
+                step.duration_type === 'distance' ? t('training.distance') : t('training.progressionDuration');
 
               return (
                 <View key={`${step.progression_key}-${weekIndex}`} style={styles.progressionWeekRow}>
                   <Text style={[styles.progressionWeekLabel, { color: themeColors.textSecondary }]}>
                     {t('training.weekNumber', { count: weekIndex })}
                   </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.progressionValueButton,
-                      { borderColor: themeColors.border, backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFF' },
-                    ]}
-                    onPress={() => openProgressionPicker(step, weekIndex, isHyroxStation ? 'hyrox_station' : 'main')}
-                    accessibilityRole="button"
-                  >
-                    <Text style={[styles.progressionValueText, { color: themeColors.textPrimary }]} numberOfLines={1}>
-                      {valueLabel}
-                    </Text>
-                    <ChevronRight size={16} color={themeColors.textSecondary} />
-                  </TouchableOpacity>
+                  <View style={styles.progressionWeekControls}>
+                    {isHyroxStation
+                      ? renderProgressionValueButton(
+                          step,
+                          weekIndex,
+                          'hyrox_station',
+                          t('training.hyroxStationBlock'),
+                          getHyroxStationProgressionValue(step, weekIndex),
+                        )
+                      : hasProgressionDuration(step)
+                        ? renderProgressionValueButton(
+                            step,
+                            weekIndex,
+                            'duration',
+                            durationLabel,
+                            formatProgressionDurationValue(step, weekIndex),
+                          )
+                        : null}
+                    {!isHyroxStation && hasProgressionTarget(step)
+                      ? renderProgressionValueButton(
+                          step,
+                          weekIndex,
+                          'target',
+                          t('training.progressionTarget'),
+                          formatProgressionTargetValue(step, weekIndex),
+                        )
+                      : null}
+                  </View>
                 </View>
               );
             })}
@@ -1587,7 +1636,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (!progressionPicker) return null;
 
     const { step, weekIndex, mode, draft } = progressionPicker;
-    const title = `${t('training.weekNumber', { count: weekIndex })} · ${getStepProgressionLabel(step)}`;
+    const title =
+      mode === 'duration'
+        ? `${t('training.weekNumber', { count: weekIndex })} · ${t('training.progressionDuration')}`
+        : mode === 'target'
+          ? `${t('training.weekNumber', { count: weekIndex })} · ${t('training.progressionTarget')}`
+          : `${t('training.weekNumber', { count: weekIndex })} · ${getStepProgressionLabel(step)}`;
     const twoDigitItems = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
     const paceMinuteItems = Array.from({ length: 31 }, (_, i) => i.toString());
     const speedItems = Array.from({ length: 90 }, (_, i) => (i + 1).toString());
@@ -1630,7 +1684,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         );
       }
 
-      if (step.target_type === 'pace') {
+      if (mode === 'target' && step.target_type === 'pace') {
         return (
           <>
             <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
@@ -1658,7 +1712,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         );
       }
 
-      if (step.target_type === 'speed') {
+      if (mode === 'target' && step.target_type === 'speed') {
         return (
           <>
             <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
@@ -1679,7 +1733,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         );
       }
 
-      if (step.target_type === 'heart_rate') {
+      if (mode === 'target' && step.target_type === 'heart_rate') {
         return (
           <>
             <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
@@ -1697,7 +1751,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         );
       }
 
-      if (step.duration_type === 'time') {
+      if (mode === 'duration' && step.duration_type === 'time') {
         return (
           <>
             <Text style={[styles.progressionPickerLabel, { color: themeColors.textSecondary }]}>
@@ -4717,6 +4771,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  progressionWeekControls: {
+    flex: 1,
+    gap: spacing.xs,
+  },
   progressionValueButton: {
     flex: 1,
     minHeight: 44,
@@ -4727,6 +4785,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.s,
+  },
+  progressionValueTextGroup: {
+    flex: 1,
+    gap: 2,
+  },
+  progressionValueLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   progressionValueText: {
     fontSize: 14,

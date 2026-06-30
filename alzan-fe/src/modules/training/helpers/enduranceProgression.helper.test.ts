@@ -152,6 +152,21 @@ assert.equal(progressedSteps[1].target_min, 270);
 assert.equal(progressedSteps[1].target_max, 270);
 assert.equal(progressedSteps[0].duration_s, 600);
 
+const durationAndTargetProgressedSteps = applyProgressionsToSteps(baseSteps, 2, [
+  {
+    progression_key: 'work-key',
+    week_index: 2,
+    distance_m: 1200,
+    target_type: 'heart_rate',
+    target_min: 3,
+    target_max: 3,
+  },
+]);
+assert.equal(durationAndTargetProgressedSteps[1].distance_m, 1200);
+assert.equal(durationAndTargetProgressedSteps[1].target_type, 'heart_rate');
+assert.equal(durationAndTargetProgressedSteps[1].target_min, 3);
+assert.equal(durationAndTargetProgressedSteps[1].target_max, 3);
+
 const stableKey = createProgressionKey();
 assert.match(stableKey, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
 assert.notEqual(stableKey, createProgressionKey());

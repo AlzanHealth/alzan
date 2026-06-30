@@ -1343,7 +1343,9 @@ export default {
     recurrenceEndDateInvalid: 'Elige una fecha fin igual o posterior al primer entreno planificado.',
     weeklyProgression: 'Progresión semanal de intervalos',
     weeklyProgressionSubtitle:
-      'Ajusta solo los valores clave del intervalo para cada semana. Calentamiento, recuperación y vuelta a la calma no cambian.',
+      'Ajusta duración o distancia y objetivo para cada semana. Calentamiento, recuperación y vuelta a la calma no cambian.',
+    progressionDuration: 'Duración',
+    progressionTarget: 'Objetivo',
     weekNumber: 'Semana {{count}}',
     effortRpe: 'Esfuerzo (RPE 1-10)',
     avgHeartRate: 'FC Media (bpm)',
