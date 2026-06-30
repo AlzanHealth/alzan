@@ -210,6 +210,12 @@ export default {
     dailyMealsInfoModalTitle: 'Comidas del día',
     dailyMealsInfoModalBody:
       'Define qué comidas principales quieres usar en tu plan diario y en qué horario se te recuerdan.\n\nSe aplica en Nutrición Home, en el registro de comidas y en los recordatorios automáticos.',
+    nutritionDayTitle: 'DÍA NUTRICIONAL',
+    nutritionDayInfoModalTitle: 'Día nutricional',
+    nutritionDayInfoModalBody:
+      'Elige a qué hora debe pasar la app al siguiente día de nutrición.\n\nAntes de esa hora, los registros automáticos siguen usando el día anterior, útil para cenas o snacks después de medianoche.',
+    nutritionDayRolloverLabel: 'Cambiar día a las',
+    nutritionDayRolloverHint: 'Las comidas registradas antes de esta hora usan el día nutricional anterior.',
     recipePrivacyTitle: 'PRIVACIDAD DE RECETAS',
     recipePrivacyInfoModalTitle: 'Privacidad de recetas',
     recipePrivacyInfoModalBody:

@@ -22,6 +22,7 @@ import { MealType } from '../../types/requests.types';
 import { BottomTabNavigationProp, useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
+import { getNutritionDayDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 
 // Helper to group meals
 const groupMealsByType = (meals: DailyMealItem[]) => {
@@ -54,21 +55,32 @@ export const NutritionHomeScreen = () => {
   const { convertEnergyToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors } = useNutritionStyles();
   const tabBarHeight = useBottomTabBarHeight();
+  const { preferences, refetch: refetchPreferences, loading: prefsLoading } = usePreferences();
+  const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
+    preferences?.nutrition_prefs?.nutrition_day_rollover_time,
+  );
 
   // Date Logic
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => getNutritionDayDate(new Date(), nutritionDayRolloverTime));
   const daySwitcherRef = React.useRef<DaySwitcherRef>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
+  const isAutoSelectedDateRef = React.useRef(true);
 
   const resetToToday = React.useCallback(() => {
-    const today = new Date();
+    const today = getNutritionDayDate(new Date(), nutritionDayRolloverTime);
+    isAutoSelectedDateRef.current = true;
     setSelectedDate(today);
 
     requestAnimationFrame(() => {
-      daySwitcherRef.current?.scrollToCurrentWeek();
+      daySwitcherRef.current?.scrollToDate(today);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     });
-  }, []);
+  }, [nutritionDayRolloverTime]);
+
+  React.useEffect(() => {
+    if (prefsLoading || !isAutoSelectedDateRef.current) return;
+    setSelectedDate(getNutritionDayDate(new Date(), nutritionDayRolloverTime));
+  }, [nutritionDayRolloverTime, prefsLoading]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -77,6 +89,7 @@ export const NutritionHomeScreen = () => {
 
       const nextDate = parseISO(routeDate);
       if (isValid(nextDate)) {
+        isAutoSelectedDateRef.current = false;
         setSelectedDate(nextDate);
         requestAnimationFrame(() => {
           daySwitcherRef.current?.scrollToDate(nextDate);
@@ -122,9 +135,6 @@ export const NutritionHomeScreen = () => {
 
   // Data Hook (The brain)
   const { meals, totals, targets } = useDayNutrition(selectedDate);
-
-  // User Preferences for meal types
-  const { preferences, refetch: refetchPreferences, loading: prefsLoading } = usePreferences();
 
   // Refetch preferences when screen comes into focus
   useFocusEffect(
@@ -268,7 +278,14 @@ export const NutritionHomeScreen = () => {
         </View>
 
         {/* Day Switcher - Removed external wrapper styles to let component handle margin */}
-        <DaySwitcher ref={daySwitcherRef} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+        <DaySwitcher
+          ref={daySwitcherRef}
+          selectedDate={selectedDate}
+          onSelectDate={date => {
+            isAutoSelectedDateRef.current = false;
+            setSelectedDate(date);
+          }}
+        />
 
         <ScrollView
           ref={scrollViewRef}

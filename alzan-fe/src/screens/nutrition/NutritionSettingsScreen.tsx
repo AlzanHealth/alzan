@@ -39,6 +39,7 @@ import { LiquidGlassNativeCard } from '../../components/common/LiquidGlassNative
 import { MealType, NutritionSettingsJson, RecipeSearchScope } from '../../types/requests.types';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
+import { buildTimePickerDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 
 // Default meal types (fixed, not editable)
 const MEAL_TYPES: MealType[] = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'];
@@ -74,6 +75,7 @@ const getMinExportStartDate = (endDate: Date) => {
 type RecipeDefaultVisibility = 'private' | 'public';
 type NutritionSectionInfoKey =
   | 'dailyMeals'
+  | 'nutritionDay'
   | 'snacks'
   | 'visualization'
   | 'recipePrivacy'
@@ -191,6 +193,9 @@ export const NutritionSettingsScreen = () => {
   const enabledMeals = preferences?.nutrition_prefs?.enabled_meals || DEFAULT_ENABLED_MEALS;
   const snackOpts = preferences?.nutrition_prefs?.snack_behavior || DEFAULT_SNACK_OPTS;
   const macroDisplay = preferences?.nutrition_prefs?.macro_display || 'per_meal';
+  const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
+    preferences?.nutrition_prefs?.nutrition_day_rollover_time,
+  );
   const defaultRecipeVisibility: RecipeDefaultVisibility =
     preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
   const recipesArePublicByDefault = defaultRecipeVisibility === 'public';
@@ -203,6 +208,11 @@ export const NutritionSettingsScreen = () => {
   const [exportStartInput, setExportStartInput] = useState(() => format(getDefaultExportRange().start, 'yyyy-MM-dd'));
   const [exportEndInput, setExportEndInput] = useState(() => format(getDefaultExportRange().end, 'yyyy-MM-dd'));
   const [isExporting, setIsExporting] = useState(false);
+  const [showNutritionDayPicker, setShowNutritionDayPicker] = useState(false);
+  const [nutritionDayPickerDate, setNutritionDayPickerDate] = useState(() =>
+    buildTimePickerDate(nutritionDayRolloverTime),
+  );
+  const [nutritionDayRolloverInput, setNutritionDayRolloverInput] = useState(nutritionDayRolloverTime);
 
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -281,6 +291,10 @@ export const NutritionSettingsScreen = () => {
     setExportStartInput(format(exportStart, 'yyyy-MM-dd'));
     setExportEndInput(format(exportEnd, 'yyyy-MM-dd'));
   }, [showExportModal, exportStart, exportEnd]);
+
+  useEffect(() => {
+    setNutritionDayRolloverInput(nutritionDayRolloverTime);
+  }, [nutritionDayRolloverTime]);
 
   const exportMinStartDate = getMinExportStartDate(exportEnd);
   const exportRangeDays = differenceInCalendarDays(exportEnd, exportStart);
@@ -393,6 +407,44 @@ export const NutritionSettingsScreen = () => {
   const setRecipeSearchScope = (scope: RecipeSearchScope) => {
     if (scope === recipeSearchScope) return;
     updateNutritionPrefs({ recipe_search_scope: scope });
+  };
+
+  const openNutritionDayPicker = () => {
+    setNutritionDayPickerDate(buildTimePickerDate(nutritionDayRolloverTime));
+    setShowNutritionDayPicker(true);
+  };
+
+  const handleNutritionDayWebInputChange = (value: string) => {
+    setNutritionDayRolloverInput(value.replace(/[^\d:]/g, '').slice(0, 5));
+  };
+
+  const commitNutritionDayWebInput = () => {
+    const normalized = normalizeNutritionDayRolloverTime(nutritionDayRolloverInput);
+    if (normalized !== nutritionDayRolloverInput) {
+      setNutritionDayRolloverInput(nutritionDayRolloverTime);
+      return;
+    }
+
+    if (normalized !== nutritionDayRolloverTime) {
+      updateNutritionPrefs({ nutrition_day_rollover_time: normalized });
+    }
+  };
+
+  const handleNutritionDayRolloverChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowNutritionDayPicker(false);
+    }
+
+    if (!selectedDate) return;
+
+    setNutritionDayPickerDate(selectedDate);
+    const hours = selectedDate.getHours().toString().padStart(2, '0');
+    const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
+    updateNutritionPrefs({ nutrition_day_rollover_time: `${hours}:${minutes}` });
+  };
+
+  const closeNutritionDayPicker = () => {
+    setShowNutritionDayPicker(false);
   };
 
   // Export action
@@ -718,6 +770,10 @@ export const NutritionSettingsScreen = () => {
       titleKey: 'nutrition.dailyMealsInfoModalTitle',
       bodyKey: 'nutrition.dailyMealsInfoModalBody',
     },
+    nutritionDay: {
+      titleKey: 'nutrition.nutritionDayInfoModalTitle',
+      bodyKey: 'nutrition.nutritionDayInfoModalBody',
+    },
     snacks: {
       titleKey: 'nutrition.snacksInfoModalTitle',
       bodyKey: 'nutrition.snacksInfoModalBody',
@@ -783,7 +839,54 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 2. Snacks */}
+          {/* 2. Día nutricional */}
+          <View style={styles.section}>
+            {renderSectionTitle(t('nutrition.nutritionDayTitle'), 'nutritionDay')}
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <TouchableOpacity
+                style={styles.timeSettingRow}
+                onPress={Platform.OS === 'web' ? undefined : openNutritionDayPicker}
+                activeOpacity={0.75}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.toggleLabel, { color: themeColors.textPrimary }]}>
+                    {t('nutrition.nutritionDayRolloverLabel')}
+                  </Text>
+                  <Text style={[styles.toggleDesc, { color: themeColors.textSecondary }]}>
+                    {t('nutrition.nutritionDayRolloverHint')}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.timeSettingPill,
+                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' },
+                  ]}
+                >
+                  <Clock size={15} color={themeColors.primary} strokeWidth={2.4} />
+                  {Platform.OS === 'web' ? (
+                    <TextInput
+                      style={[styles.timeSettingInput, { color: themeColors.primary }]}
+                      value={nutritionDayRolloverInput}
+                      onChangeText={handleNutritionDayWebInputChange}
+                      onBlur={commitNutritionDayWebInput}
+                      onSubmitEditing={commitNutritionDayWebInput}
+                      placeholder="03:00"
+                      placeholderTextColor={themeColors.textSecondary}
+                      keyboardType="numbers-and-punctuation"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  ) : (
+                    <Text style={[styles.timeSettingText, { color: themeColors.primary }]}>
+                      {nutritionDayRolloverTime}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 3. Snacks */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.snacksAllCaps'), 'snacks')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
@@ -803,7 +906,7 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 3. Visualización nutricional */}
+          {/* 4. Visualización nutricional */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.visualizationTitle'), 'visualization')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
@@ -823,7 +926,7 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 4. Recipe privacy */}
+          {/* 5. Recipe privacy */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.recipePrivacyTitle'), 'recipePrivacy')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
@@ -837,7 +940,7 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 5. Recipe search scope */}
+          {/* 6. Recipe search scope */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.recipeSearchScopeTitle'), 'recipeSearch')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
@@ -878,7 +981,7 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 6. Auto-copy diet */}
+          {/* 7. Auto-copy diet */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.autoPlanningTitle'), 'autoPlanning')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
@@ -1012,7 +1115,7 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 5. Datos */}
+          {/* 8. Datos */}
           <View style={[styles.section, { marginBottom: spacing.xl * 2 }]}>
             {renderSectionTitle(t('nutrition.dataAllCaps'), 'data')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
@@ -1242,6 +1345,51 @@ export const NutritionSettingsScreen = () => {
               is24Hour={true}
               display="default"
               onChange={handleTimeChange}
+            />
+          )
+        )}
+
+        {/* Nutrition day rollover picker */}
+        {Platform.OS === 'ios' ? (
+          <Modal
+            visible={showNutritionDayPicker}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={closeNutritionDayPicker}
+          >
+            <View style={styles.modalOverlayBottom}>
+              <TouchableOpacity style={styles.modalBackdrop} onPress={closeNutritionDayPicker} />
+              <View
+                style={[
+                  styles.modalContentBottom,
+                  { backgroundColor: isDark ? themeColors.surfaceSolid || '#1C1C1E' : '#FFFFFF' },
+                ]}
+              >
+                <View style={styles.iosPickerToolbar}>
+                  <TouchableOpacity onPress={closeNutritionDayPicker} style={styles.iosPickerDone}>
+                    <Text style={[styles.iosPickerDoneText, { color: themeColors.primary }]}>{t('common.done')}</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={nutritionDayPickerDate}
+                  mode="time"
+                  is24Hour={true}
+                  display="spinner"
+                  onChange={handleNutritionDayRolloverChange}
+                  style={styles.iosPicker}
+                  textColor={themeColors.textPrimary}
+                />
+              </View>
+            </View>
+          </Modal>
+        ) : (
+          showNutritionDayPicker && (
+            <DateTimePicker
+              value={nutritionDayPickerDate}
+              mode="time"
+              is24Hour={true}
+              display="default"
+              onChange={handleNutritionDayRolloverChange}
             />
           )
         )}
@@ -1756,6 +1904,35 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  timeSettingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.m,
+    gap: spacing.m,
+  },
+  timeSettingPill: {
+    minWidth: 86,
+    minHeight: 36,
+    borderRadius: 18,
+    paddingHorizontal: spacing.s,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  timeSettingText: {
+    ...typography.caption,
+    fontWeight: '700',
+  },
+  timeSettingInput: {
+    ...typography.caption,
+    minWidth: 46,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    borderWidth: 0,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   radioRow: {
     flexDirection: 'row',

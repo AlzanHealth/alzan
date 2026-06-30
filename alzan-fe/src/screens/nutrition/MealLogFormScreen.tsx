@@ -35,7 +35,6 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 
 import { useSaveMealWithIngredients, useMealItems } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
-import { format } from 'date-fns';
 import { getCurrentAppLocale, getLocalizedIngredientNotes } from '../../services/localization';
 import { getRecipeIngredients } from '../../modules/nutrition/services/recipeService';
 import {
@@ -57,6 +56,10 @@ import { formatLocalizedDate, getLocaleTag } from '../../i18n/dateLocale';
 import { supabase } from '../../lib/supabaseClient';
 import { IngredientsCategory, MealItemsSource } from '../../types/requests.types';
 import { usePreferences } from '../../hooks/settings/usePreferences';
+import {
+  formatNutritionDayDate,
+  normalizeNutritionDayRolloverTime,
+} from '../../modules/nutrition/services/nutritionDay';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 
@@ -195,7 +198,10 @@ export const MealLogFormScreen = () => {
   const { convertEnergyToUi, parseEnergyToKcal, units } = useUnitConversion();
   const mealItem = params.mealItem;
   const isEdit = !!mealItem?.log;
-  const date = params.date || format(new Date(), 'yyyy-MM-dd');
+  const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
+    preferences?.nutrition_prefs?.nutrition_day_rollover_time,
+  );
+  const date = params.date || formatNutritionDayDate(new Date(), nutritionDayRolloverTime);
   const defaultRecipeVisibility =
     preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
   const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';

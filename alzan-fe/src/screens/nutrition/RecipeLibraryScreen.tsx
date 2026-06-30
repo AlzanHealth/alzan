@@ -6,7 +6,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ChevronLeft, Search, Star, Plus, Info, Flame } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
@@ -30,6 +29,10 @@ import {
   DiscoverSort,
   DiscoverCategory,
 } from '../../modules/nutrition/services/recipeLibraryService';
+import {
+  formatNutritionDayDate,
+  normalizeNutritionDayRolloverTime,
+} from '../../modules/nutrition/services/nutritionDay';
 
 type LibraryTab = 'discover' | 'mine' | 'favorites';
 
@@ -59,7 +62,10 @@ export const RecipeLibraryScreen = () => {
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
   const { preferences } = usePreferences();
   const tabBarHeight = useBottomTabBarHeight();
-  const targetDate = route.params?.date ?? format(new Date(), 'yyyy-MM-dd');
+  const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
+    preferences?.nutrition_prefs?.nutrition_day_rollover_time,
+  );
+  const targetDate = route.params?.date ?? formatNutritionDayDate(new Date(), nutritionDayRolloverTime);
   const targetMealType = route.params?.mealType;
 
   const [tab, setTab] = useState<LibraryTab>('discover');

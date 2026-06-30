@@ -16,6 +16,7 @@ import {
   NutritionSettingsJson,
   PrivacySettingsJson,
 } from '../types/requests.types';
+import { DEFAULT_NUTRITION_DAY_ROLLOVER_TIME } from '../modules/nutrition/services/nutritionDay';
 
 const PREFERENCES_STORAGE_KEY = 'user_preferences_cache';
 
@@ -78,6 +79,7 @@ const DEFAULT_NUTRITION_PREFS: NutritionSettingsJson = {
   copy_mode: 'none',
   default_recipe_visibility: 'private',
   recipe_search_scope: 'source',
+  nutrition_day_rollover_time: DEFAULT_NUTRITION_DAY_ROLLOVER_TIME,
 };
 
 const DEFAULT_PRIVACY_SETTINGS: PrivacySettingsJson = {
