@@ -155,6 +155,37 @@ Open Wearables was used as historical reference material only. It is not install
 
 Apple Health can only be tested through an iOS app build. Web cannot access HealthKit, and the iOS Simulator is useful mainly for compile and permission-flow checks; real Apple Watch/Fitness/Health data requires a physical iPhone with the HealthKit capability enabled for the signing team.
 
+## Steps Screen Data Contract
+
+The user-facing Steps screen is backed by `daily_steps`, not by `activity_sessions.total_steps`.
+
+Current path:
+
+1. `alzan-fe/src/modules/health/screens/StepsStatisticsScreen.tsx` renders `StepsChart`.
+2. `StepsChart` calls `useStepsRange`.
+3. `useStepsRange` calls `stepsApi.getRange`.
+4. `stepsApi.getRange` reads `daily_steps` from Supabase.
+5. `aggregateStepsByDate` collapses multiple rows on the same date: a manual row wins; otherwise the largest provider total wins. Provider rows are not summed.
+
+Current provider coverage for the Steps screen:
+
+| Provider/channel | Feeds `daily_steps` today | Feeds Steps screen today | Notes |
+| --- | --- | --- | --- |
+| Apple Health local SDK | Yes | Yes | Reads HealthKit `HKQuantityTypeIdentifier.stepCount`, uploads `daily_activity`, and writes `daily_steps`. |
+| Health Connect local SDK | Yes | Yes | Reads `StepsRecord.count` for the selected `DataOrigin`, uploads `daily_activity`, and writes `daily_steps`. |
+| Garmin cloud | No | No | OAuth and daily activity mapper exist, but there is no Garmin daily summary sync service or endpoint. |
+| Suunto cloud | No | No | Workout sync can write workout `total_steps` to `activity_sessions`; daily steps are not written to `daily_steps`. |
+| Fitbit/Oura/Polar/COROS/Ultrahuman cloud | No | No | Health mappers exist, but no productive cloud daily steps sync writes `daily_steps`. |
+| WHOOP cloud | No | No | Current mappers cover cycle/sleep/recovery, not daily steps. |
+
+Run the executable audit from the repo root:
+
+```sh
+pnpm verify:steps-providers
+```
+
+The audit source is `alzan-be/src/components/wearables/services/provider-steps-audit.ts`. It is intentionally conservative: a provider cannot be marked as feeding the Steps screen unless it writes `daily_steps`.
+
 ### Sync Polar activities
 
 `POST /wearables/cloud/polar/sync`

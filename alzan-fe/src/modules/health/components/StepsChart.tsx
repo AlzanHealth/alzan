@@ -16,7 +16,8 @@ import { GlassCard } from '../../../components/GlassCard';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { getDateFnsLocale, getLocaleTag } from '../../../i18n/dateLocale';
 import { useTranslation } from 'react-i18next';
-import { aggregateStepsByDate, useStepsRange } from '../hooks/useSteps';
+import { useStepsRange } from '../hooks/useSteps';
+import { aggregateStepsByDate } from '../services/stepsAggregation';
 
 type TimeRange = 'S' | 'M' | '6M' | 'A';
 

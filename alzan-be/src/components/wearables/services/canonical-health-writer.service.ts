@@ -46,7 +46,12 @@ export class CanonicalHealthWriterService {
     const payload = this.buildDailyStepsPayload(input);
     const dailyStepsId = existingId
       ? await this.updateDailySteps(existingId, payload)
-      : await this.insertDailySteps(payload as DailyStepsInsert);
+      : await this.insertOrUpdateDailyStepsAfterConflict(
+          input.userId,
+          input.dailyActivity,
+          input.provenance,
+          payload as DailyStepsInsert,
+        );
     await this.replaceStepIntervals(dailyStepsId, input.userId, input.dailyActivity, input.provenance);
     await this.rawPayloadService.linkPayload({
       rawPayloadId: input.provenance.rawPayloadId,
@@ -185,14 +190,35 @@ export class CanonicalHealthWriterService {
       .insert(payload)
       .select('id')
       .single();
-    if (error) throw new InternalServerErrorException('WEARABLE_DAILY_STEPS_INSERT_FAILED');
+    if (error) throw error;
     return data.id;
+  }
+
+  private async insertOrUpdateDailyStepsAfterConflict(
+    userId: string,
+    dailyActivity: ProviderDailyActivityCanonical,
+    provenance: CanonicalProvenance,
+    payload: DailyStepsInsert,
+  ): Promise<string> {
+    try {
+      return await this.insertDailySteps(payload);
+    } catch (error: unknown) {
+      if (!this.isUniqueViolation(error)) throw new InternalServerErrorException('WEARABLE_DAILY_STEPS_INSERT_FAILED');
+      const existingId = await this.findDailyStepsId(userId, dailyActivity, provenance);
+      if (!existingId) throw new InternalServerErrorException('WEARABLE_DAILY_STEPS_CONFLICT_LOOKUP_FAILED');
+      return this.updateDailySteps(existingId, payload);
+    }
   }
 
   private async updateDailySteps(id: string, payload: DailyStepsUpdate): Promise<string> {
     const { error } = await this.supabaseAdminService.client.from('daily_steps').update(payload).eq('id', id);
     if (error) throw new InternalServerErrorException('WEARABLE_DAILY_STEPS_UPDATE_FAILED');
     return id;
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) return false;
+    return (error as { code?: unknown }).code === '23505';
   }
 
   private async replaceStepIntervals(

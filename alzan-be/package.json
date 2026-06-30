@@ -15,6 +15,7 @@
     "start:prod": "node dist/main",
     "verify:activity-import": "ts-node -r tsconfig-paths/register src/components/activity-import/activity-import.verify.ts",
     "verify:import-review": "ts-node -r tsconfig-paths/register src/components/wearables/services/import-review.integration-check.ts",
+    "verify:steps-providers": "ts-node -r tsconfig-paths/register src/components/wearables/services/provider-steps-audit.ts",
     "seed:training": "ts-node -r tsconfig-paths/register src/components/wearables/services/seed-training-demo.ts",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

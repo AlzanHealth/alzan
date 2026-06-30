@@ -10,6 +10,7 @@ Este dashboard resume los cambios implementados para la integracion de wearables
 | Backend wearables | Hecho    | Existe modulo NestJS `/wearables` con endpoints y servicios de importacion local.                                                                                               |
 | Health Connect    | Hecho v1 | Existe modulo nativo Android `AlzanHealthConnect`, backend exige `source_package`, seleccion unica y lectura filtrada por `DataOrigin`.                                         |
 | Apple HealthKit   | Hecho v1 | Existe modulo nativo iOS `AlzanAppleHealth` con HealthKit read-only, permisos, workouts, sleep, biomarcadores, peso/body fat y rutas. Requiere iPhone fisico para datos reales. |
+| Pantalla Pasos    | Hecho v1 | La pantalla lee `daily_steps`; Apple Health y Health Connect la alimentan. Garmin/Suunto no deben mostrarse como pasos diarios cloud todavia.                                  |
 | Polar             | Hecho v1 | OAuth callback publico, registro AccessLink y sync manual de `/v3/exercises` hacia el writer canonico.                                                                          |
 | Cloud providers   | Parcial  | Polar ya tiene pull manual. El resto sigue preparado por OAuth/provenance, pero sin jobs/webhooks/backfills.                                                                    |
 | Frontend contrato | Mejorado | Settings permite conectar/sincronizar Apple Health, Health Connect y Polar; Apple usa modulo nativo propio y Polar usa endpoint cloud.                                          |
@@ -53,6 +54,40 @@ flowchart TD
 ```
 
 La idea importante: Apple Health y Health Connect no son OAuth cloud. Son canales locales. El proveedor real de Android se identifica con `metadata.dataOrigin.packageName`, guardado como `source_package`.
+
+## Pantalla Pasos
+
+La pantalla `Pasos` no lee pasos desde actividades deportivas. Su fuente visual de verdad es `daily_steps`.
+
+Flujo actual:
+
+```mermaid
+flowchart LR
+  AH["Apple Health\nstepCount"] --> LOCAL["POST /wearables/local-sync"]
+  HC["Health Connect\nStepsRecord.count"] --> LOCAL
+  LOCAL --> WRITER["CanonicalHealthWriterService\nupsertDailyActivity"]
+  WRITER --> DS["daily_steps"]
+  WRITER --> SI["step_intervals"]
+  DS --> API["stepsApi.getRange"]
+  API --> AGG["aggregateStepsByDate\nmanual gana; si no, maximo"]
+  AGG --> CHART["StepsChart"]
+```
+
+Reglas actuales:
+
+- `activity_sessions.total_steps` puede guardar pasos dentro de un entrenamiento, pero no alimenta la pantalla `Pasos`.
+- Si hay varias fuentes para una fecha, la app no las suma. La fila manual gana; si no existe manual, se muestra el mayor total de proveedor.
+- Apple Health y Health Connect son los unicos canales que alimentan `daily_steps` de forma productiva hoy.
+- Garmin tiene OAuth y mapper de daily activity, pero no tiene `GarminCloudSyncService` ni endpoint de daily summaries.
+- Suunto tiene sync de workouts/FIT; esos pasos son de entrenamientos y no equivalen a pasos diarios en `daily_steps`.
+
+Auditoria ejecutable:
+
+```sh
+pnpm verify:steps-providers
+```
+
+La matriz vive en `alzan-be/src/components/wearables/services/provider-steps-audit.ts` y falla si se marca un proveedor como listo para la pantalla sin escribir `daily_steps`.
 
 ## Base de Datos
 
@@ -165,6 +200,7 @@ Pendiente recomendado: cifrado fuerte de tokens con Vault/pgsodium o envelope en
 | `pnpm --prefix alzan-be run lint:check`                                                           | OK                                                                                 |
 | `pnpm --prefix alzan-be run format:check`                                                         | OK                                                                                 |
 | `pnpm run verify:activity-import`                                                                 | OK, 15/15 checks                                                                   |
+| `pnpm verify:steps-providers`                                                                     | Verifica la matriz ejecutable de cobertura de pasos por proveedor.                 |
 | `./gradlew :app:assembleDebug`                                                                    | OK                                                                                 |
 | `pnpm --prefix alzan-fe run typecheck`                                                            | Bloqueado por errores Supabase generales, sobre todo en training y servicios.      |
 | `pnpm --prefix alzan-fe run lint:check`                                                           | Bloqueado en frontend por 224 errores de tipado Supabase no limitados a wearables. |
