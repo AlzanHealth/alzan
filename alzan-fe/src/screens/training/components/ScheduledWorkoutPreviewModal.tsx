@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, Dumbbell, Play, Target, X } from 'lucide-react-native';
+import { CalendarDays, Clock, Dumbbell, Play, Target, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { GlassCard } from '../../../components/GlassCard';
 import { SportIcon } from '../../../components/icons/SportIcon';
@@ -52,6 +52,7 @@ type ScheduledWorkoutPreviewModalProps = {
   primaryActionLabel?: string;
   primaryActionDisabled?: boolean;
   onClose: () => void;
+  onMoveAction?: () => void;
   onPrimaryAction?: () => void;
 };
 
@@ -82,6 +83,7 @@ export const ScheduledWorkoutPreviewModal = ({
   primaryActionLabel,
   primaryActionDisabled,
   onClose,
+  onMoveAction,
   onPrimaryAction,
 }: ScheduledWorkoutPreviewModalProps) => {
   const { t, i18n } = useTranslation();
@@ -299,19 +301,35 @@ export const ScheduledWorkoutPreviewModal = ({
             {renderBody()}
           </ScrollView>
 
-          {onPrimaryAction && !plan.isCompleted ? (
-            <TouchableOpacity
-              accessibilityRole="button"
-              disabled={primaryActionDisabled}
-              style={[
-                styles.primaryButton,
-                { backgroundColor: primaryActionDisabled ? colors.textSecondary : colors.primary },
-              ]}
-              onPress={onPrimaryAction}
-            >
-              <Play size={14} color="#FFFFFF" />
-              <Text style={styles.primaryButtonText}>{primaryActionLabel || t('training.start')}</Text>
-            </TouchableOpacity>
+          {!plan.isCompleted ? (
+            <View style={styles.actionRow}>
+              {onMoveAction ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.secondaryButton, { borderColor: colors.primary }]}
+                  onPress={onMoveAction}
+                >
+                  <CalendarDays size={15} color={colors.primary} />
+                  <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
+                    {t('training.moveWorkout')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {onPrimaryAction ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  disabled={primaryActionDisabled}
+                  style={[
+                    styles.primaryButton,
+                    { backgroundColor: primaryActionDisabled ? colors.textSecondary : colors.primary },
+                  ]}
+                  onPress={onPrimaryAction}
+                >
+                  <Play size={14} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>{primaryActionLabel || t('training.start')}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           ) : null}
         </Pressable>
       </Pressable>
@@ -497,14 +515,34 @@ const styles = StyleSheet.create({
   retryText: {
     fontWeight: '700',
   },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.s,
+    marginTop: spacing.s,
+  },
+  secondaryButton: {
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.m,
+  },
+  secondaryButtonText: {
+    fontWeight: '800',
+    fontSize: 13,
+    textTransform: 'uppercase',
+  },
   primaryButton: {
+    flex: 1,
     height: 48,
     borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: spacing.s,
   },
   primaryButtonText: {
     color: '#FFFFFF',

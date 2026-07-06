@@ -17,7 +17,7 @@ import { GlassCard } from '../../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { spacing } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
-import { Dumbbell, Calendar, Play, List, Plus, Settings, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Dumbbell, Calendar, Play, List, Plus, Settings, Trash2 } from 'lucide-react-native';
 import { SportIcon } from '../../components/icons/SportIcon';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { SPORTS_CONFIG, getSportDefaultTitleKey } from '../../constants/sports';
@@ -25,8 +25,8 @@ import { ActiveSessionBanner } from './components/ActiveSessionBanner';
 import { ImportReviewSurface } from './components/ImportReviewSurface';
 import { ScheduledWorkoutPreviewModal, ScheduledWorkoutPreviewPlan } from './components/ScheduledWorkoutPreviewModal';
 
-import { format, addDays, isSameDay, subDays, startOfDay } from 'date-fns';
-import { useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
+import { format, addDays, addWeeks, isSameDay, startOfWeek, subDays, startOfDay, subWeeks } from 'date-fns';
+import { useMutation, useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { propagateTrainingPlans } from '../../modules/training/services/trainingCopyService';
@@ -39,6 +39,7 @@ import { DaySwitcherRef } from '../../components/common/DaySwitcher';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
 import { Alert } from '../../components/common/Alert';
+import { moveWorkoutPlan } from '../../modules/training/services/trainingRescheduleService';
 
 interface DailyEntry {
   id: string;
@@ -97,9 +98,37 @@ export const TrainingHomeScreen = () => {
   const dotsEndDate = React.useMemo(() => addDays(startOfDay(new Date()), DOTS_RANGE_DAYS), []);
   const [showAddModal, setShowAddModal] = useState(false);
   const [previewPlan, setPreviewPlan] = useState<(ScheduledWorkoutPreviewPlan & { isActive?: boolean }) | null>(null);
+  const [movePlan, setMovePlan] = useState<ScheduledWorkoutPreviewPlan | null>(null);
+  const [moveWeekStart, setMoveWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [moveSelectedDate, setMoveSelectedDate] = useState<Date | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
   const daySwitcherRef = useRef<DaySwitcherRef>(null);
+
+  const movePlanMutation = useMutation({
+    mutationFn: ({ plan, toDate }: { plan: ScheduledWorkoutPreviewPlan; toDate: string }) =>
+      moveWorkoutPlan({
+        planId: plan.id,
+        fromDate: plan.plannedDate,
+        toDate,
+        isCompleted: plan.isCompleted,
+      }),
+    onSuccess: (_data, variables) => {
+      const targetDate = new Date(`${variables.toDate}T00:00:00`);
+      setMovePlan(null);
+      setMoveSelectedDate(null);
+      setSelectedDate(targetDate);
+      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduledWorkoutPreview'] });
+    },
+    onError: error => {
+      console.error('Error moving planned workout:', error);
+      Alert.alert(t('common.error'), t('training.moveWorkoutError'));
+    },
+  });
 
   // Focus effect to reset date to current week when screen is focused
   useFocusEffect(
@@ -550,6 +579,153 @@ export const TrainingHomeScreen = () => {
     }
   }, [user]);
 
+  const moveWeekDays = React.useMemo(
+    () => Array.from({ length: 7 }).map((_, index) => addDays(moveWeekStart, index)),
+    [moveWeekStart],
+  );
+
+  const openMoveModal = (plan: ScheduledWorkoutPreviewPlan) => {
+    const originDate = new Date(`${plan.plannedDate}T00:00:00`);
+    setPreviewPlan(null);
+    setMovePlan(plan);
+    setMoveSelectedDate(originDate);
+    setMoveWeekStart(startOfWeek(originDate, { weekStartsOn: 1 }));
+  };
+
+  const closeMoveModal = () => {
+    if (movePlanMutation.isPending) return;
+    setMovePlan(null);
+    setMoveSelectedDate(null);
+  };
+
+  const saveMovedWorkout = () => {
+    if (!movePlan || !moveSelectedDate) return;
+    const toDate = format(moveSelectedDate, 'yyyy-MM-dd');
+    if (toDate === movePlan.plannedDate) return;
+    movePlanMutation.mutate({ plan: movePlan, toDate });
+  };
+
+  const renderMoveWorkoutModal = () => {
+    const selectedDateKey = moveSelectedDate ? format(moveSelectedDate, 'yyyy-MM-dd') : null;
+    const saveDisabled = !movePlan || !selectedDateKey || selectedDateKey === movePlan.plannedDate;
+
+    return (
+      <Modal animationType="fade" transparent={true} visible={!!movePlan} onRequestClose={closeMoveModal}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={closeMoveModal}>
+          <TouchableWithoutFeedback>
+            <View style={[styles.modalContent, styles.moveModalContent, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{t('training.moveWorkout')}</Text>
+              <Text style={[styles.modalSubtitle, styles.moveModalSubtitle, { color: colors.textSecondary }]}>
+                {t('training.moveWorkoutSubtitle')}
+              </Text>
+
+              {movePlan ? (
+                <View style={[styles.movePlanSummary, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.movePlanTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {movePlan.title}
+                  </Text>
+                  <Text style={[styles.movePlanDate, { color: colors.textSecondary }]}>
+                    {t('training.moveWorkoutFrom', {
+                      date: formatLocalizedDate(new Date(`${movePlan.plannedDate}T00:00:00`), {
+                        en: 'EEEE, MMMM d',
+                        es: "EEEE, d 'de' MMMM",
+                      }),
+                    })}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={styles.moveWeekHeader}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('training.previousWeek')}
+                  style={[styles.moveWeekNavButton, { backgroundColor: colors.surface }]}
+                  onPress={() => setMoveWeekStart(prev => subWeeks(prev, 1))}
+                >
+                  <ChevronLeft size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
+                <Text style={[styles.moveWeekLabel, { color: colors.textPrimary }]}>
+                  {formatLocalizedDate(moveWeekStart, { en: 'MMM d', es: 'd MMM' })} -{' '}
+                  {formatLocalizedDate(addDays(moveWeekStart, 6), { en: 'MMM d', es: 'd MMM' })}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('training.nextWeek')}
+                  style={[styles.moveWeekNavButton, { backgroundColor: colors.surface }]}
+                  onPress={() => setMoveWeekStart(prev => addWeeks(prev, 1))}
+                >
+                  <ChevronRight size={20} color={colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.moveWeekGrid}>
+                {moveWeekDays.map(day => {
+                  const dateKey = format(day, 'yyyy-MM-dd');
+                  const isOrigin = movePlan?.plannedDate === dateKey;
+                  const isSelected = selectedDateKey === dateKey;
+                  const hasPlannedWorkouts = markedDates?.has(dateKey);
+
+                  return (
+                    <TouchableOpacity
+                      key={dateKey}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      activeOpacity={0.78}
+                      style={[
+                        styles.moveDayCell,
+                        { borderColor: colors.border, backgroundColor: colors.surface },
+                        isSelected && { borderColor: colors.primary, backgroundColor: `${colors.primary}18` },
+                        isOrigin && !isSelected && { borderColor: colors.textSecondary },
+                      ]}
+                      onPress={() => setMoveSelectedDate(day)}
+                    >
+                      <Text style={[styles.moveDayName, { color: isSelected ? colors.primary : colors.textSecondary }]}>
+                        {format(day, 'EEE', { locale: getDateFnsLocale() }).toUpperCase()}
+                      </Text>
+                      <Text style={[styles.moveDayNumber, { color: isSelected ? colors.primary : colors.textPrimary }]}>
+                        {format(day, 'd')}
+                      </Text>
+                      <View style={styles.moveDayFooter}>
+                        {isOrigin ? (
+                          <View style={[styles.moveOriginBadge, { backgroundColor: colors.textSecondary }]}>
+                            <Text style={styles.moveOriginBadgeText}>{t('training.moveWorkoutOrigin')}</Text>
+                          </View>
+                        ) : hasPlannedWorkouts ? (
+                          <View style={[styles.moveDot, { backgroundColor: colors.primary }]} />
+                        ) : null}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={saveDisabled || movePlanMutation.isPending}
+                style={[
+                  styles.moveSaveButton,
+                  { backgroundColor: saveDisabled ? colors.textSecondary : colors.primary },
+                  movePlanMutation.isPending && { opacity: 0.7 },
+                ]}
+                onPress={saveMovedWorkout}
+              >
+                {movePlanMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.moveSaveButtonText}>{t('training.saveMove')}</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.modalCancel} onPress={closeMoveModal}>
+                <Text style={[styles.modalCancelText, { color: colors.textPrimary }]}>{t('common.cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+
   const renderDailyPlan = () => {
     if (isLoading)
       return <ActivityIndicator size={24} color={colors.primary} style={{ alignSelf: 'center', margin: 20 }} />;
@@ -925,6 +1101,7 @@ export const TrainingHomeScreen = () => {
           }
           primaryActionDisabled={previewPlan?.isCompleted}
           onClose={() => setPreviewPlan(null)}
+          onMoveAction={previewPlan && !previewPlan.isCompleted ? () => openMoveModal(previewPlan) : undefined}
           onPrimaryAction={() => {
             if (!previewPlan) return;
             const currentPreviewPlan = previewPlan;
@@ -947,6 +1124,8 @@ export const TrainingHomeScreen = () => {
             }
           }}
         />
+
+        {renderMoveWorkoutModal()}
 
         {/* Loading Overlay */}
         {isDeleting && (
@@ -1117,6 +1296,9 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 40,
   },
+  moveModalContent: {
+    paddingBottom: 28,
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
@@ -1127,6 +1309,96 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 24,
+  },
+  moveModalSubtitle: {
+    marginBottom: 16,
+  },
+  movePlanSummary: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  movePlanTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  movePlanDate: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  moveWeekHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  moveWeekNavButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moveWeekLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  moveWeekGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  moveDayCell: {
+    flex: 1,
+    minHeight: 92,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  moveDayName: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  moveDayNumber: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  moveDayFooter: {
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  moveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  moveOriginBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  moveOriginBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  moveSaveButton: {
+    minHeight: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moveSaveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   modalGrid: {
     flexDirection: 'row',
