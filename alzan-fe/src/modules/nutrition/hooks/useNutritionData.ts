@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useMemo } from 'react';
 import { nutritionService } from '../services/nutritionService';
+import { createVacationDateSet } from '../services/nutritionVacation';
 import { DietTemplateInsert, DietTemplateUpdate, MealLog, MealLogInsert } from '../../../types/requests.types';
 import { IngredientInput } from '../types/db';
 import { useAuth } from '../../../context/AuthContext';
@@ -10,6 +12,7 @@ const KEYS = {
   TEMPLATES: ['dietTemplates'],
   TEMPLATE_MEALS: (id: string) => ['dietTemplateMeals', id],
   MEAL_LOGS: (start: string, end: string) => ['mealLogs', start, end],
+  DAY_STATUSES: (start: string, end: string) => ['nutritionDayStatuses', start, end],
   ACTIVE_TEMPLATE_ID: 'active_diet_template_id',
 };
 
@@ -128,6 +131,43 @@ export function useMealLogs(startDate: string, endDate: string) {
     queryKey: KEYS.MEAL_LOGS(startDate, endDate),
     queryFn: () => nutritionService.getMealLogs(user!.id, startDate, endDate),
     enabled: !!user,
+  });
+}
+
+export function useNutritionDayStatuses(startDate: string, endDate: string) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: KEYS.DAY_STATUSES(startDate, endDate),
+    queryFn: () => nutritionService.getNutritionDayStatuses(user!.id, startDate, endDate),
+    enabled: !!user,
+  });
+}
+
+export function useVacationDateSet(startDate: string, endDate: string) {
+  const query = useNutritionDayStatuses(startDate, endDate);
+  const vacationDates = useMemo(() => createVacationDateSet(query.data), [query.data]);
+  return {
+    ...query,
+    data: vacationDates,
+  };
+}
+
+export function useSetNutritionVacationDates() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { addDates: string[]; removeDates: string[] }) => {
+      if (!user) throw new Error('No user');
+
+      await nutritionService.deleteNutritionVacationDays(user.id, variables.removeDates);
+      return nutritionService.upsertNutritionVacationDays(user.id, variables.addDates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nutritionDayStatuses'] });
+      queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+    },
   });
 }
 

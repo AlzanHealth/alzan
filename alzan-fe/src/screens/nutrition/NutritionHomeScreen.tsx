@@ -3,14 +3,19 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, Plus, BookOpen } from 'lucide-react-native';
-import { format, isValid, parseISO } from 'date-fns';
+import { Settings, Plus, BookOpen, CalendarCheck } from 'lucide-react-native';
+import { addDays, format, isValid, parseISO, subDays } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
 import { MealSection } from '../../modules/nutrition/components/MealSection';
 import { WaterTracker } from '../../modules/nutrition/components/WaterTracker';
 import { useDayNutrition } from '../../modules/nutrition/hooks/useDayNutritionLogic';
-import { useUpsertMealLog, useDeleteMealLog, useWaterIntake } from '../../modules/nutrition/hooks/useNutritionData';
+import {
+  useUpsertMealLog,
+  useDeleteMealLog,
+  useWaterIntake,
+  useVacationDateSet,
+} from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
 import { MEAL_TYPES, MEAL_TYPE_LABELS, getMealTypeByHour } from '../../modules/nutrition/constants';
 import { usePreferences } from '../../hooks/settings/usePreferences';
@@ -132,9 +137,12 @@ export const NutritionHomeScreen = () => {
   // Data Hooks
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
   const { data: waterMl, update: saveWater } = useWaterIntake(formattedDate);
+  const vacationRangeStart = format(subDays(selectedDate, 35), 'yyyy-MM-dd');
+  const vacationRangeEnd = format(addDays(selectedDate, 35), 'yyyy-MM-dd');
+  const { data: vacationDates } = useVacationDateSet(vacationRangeStart, vacationRangeEnd);
 
   // Data Hook (The brain)
-  const { meals, totals, targets } = useDayNutrition(selectedDate);
+  const { meals, totals, targets, isVacationDay } = useDayNutrition(selectedDate);
 
   // Refetch preferences when screen comes into focus
   useFocusEffect(
@@ -281,6 +289,7 @@ export const NutritionHomeScreen = () => {
         <DaySwitcher
           ref={daySwitcherRef}
           selectedDate={selectedDate}
+          markedDates={vacationDates}
           onSelectDate={date => {
             isAutoSelectedDateRef.current = false;
             setSelectedDate(date);
@@ -304,6 +313,22 @@ export const NutritionHomeScreen = () => {
               fats: { current: summary.totalFats, target: summary.targetFats || 60 },
             }}
           />
+
+          {isVacationDay ? (
+            <View style={[styles.vacationBanner, { backgroundColor: themeColors.primary + '12' }]}>
+              <View style={[styles.vacationIcon, { backgroundColor: themeColors.primary + '18' }]}>
+                <CalendarCheck color={themeColors.primary} size={22} />
+              </View>
+              <View style={styles.vacationCopy}>
+                <Text style={[styles.vacationTitle, { color: themeColors.textPrimary }]}>
+                  {t('nutrition.vacationDayTitle')}
+                </Text>
+                <Text style={[styles.vacationDescription, { color: themeColors.textSecondary }]}>
+                  {t('nutrition.vacationDayDescription')}
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           {/* Meal Sections - Iterate based on user preferences */}
           {displayMealTypes.map(type => {
@@ -383,6 +408,33 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 100,
+  },
+  vacationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  vacationIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vacationCopy: {
+    flex: 1,
+  },
+  vacationTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  vacationDescription: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   fab: {
     position: 'absolute',

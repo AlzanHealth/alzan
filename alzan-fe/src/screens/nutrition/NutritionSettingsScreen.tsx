@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,22 @@ import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
-import { Download, Trash2, Calendar, Info, AlertTriangle, Clock } from 'lucide-react-native';
+import { Download, Trash2, Calendar, Info, AlertTriangle, Clock, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { usePreferences } from '../../hooks/settings/usePreferences';
-import { differenceInCalendarDays, format, subDays } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  differenceInCalendarDays,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameMonth,
+  isToday,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+  subMonths,
+} from 'date-fns';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
@@ -40,6 +53,9 @@ import { MealType, NutritionSettingsJson, RecipeSearchScope } from '../../types/
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { buildTimePickerDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
+import { useSetNutritionVacationDates, useVacationDateSet } from '../../modules/nutrition/hooks/useNutritionData';
+import { getDateFnsLocale } from '../../i18n/dateLocale';
+import { diffVacationDateSelection } from '../../modules/nutrition/services/nutritionVacation';
 
 // Default meal types (fixed, not editable)
 const MEAL_TYPES: MealType[] = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'];
@@ -70,6 +86,20 @@ const getDefaultExportRange = () => {
 
 const getMinExportStartDate = (endDate: Date) => {
   return subDays(endDate, MAX_EXPORT_RANGE_DAYS);
+};
+
+const buildMonthGrid = (month: Date): Date[] => {
+  const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
+  const end = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
+  const days: Date[] = [];
+  let cursor = start;
+
+  while (cursor <= end) {
+    days.push(cursor);
+    cursor = addDays(cursor, 1);
+  }
+
+  return days;
 };
 
 type RecipeDefaultVisibility = 'private' | 'public';
@@ -213,6 +243,17 @@ export const NutritionSettingsScreen = () => {
     buildTimePickerDate(nutritionDayRolloverTime),
   );
   const [nutritionDayRolloverInput, setNutritionDayRolloverInput] = useState(nutritionDayRolloverTime);
+  const [showVacationModal, setShowVacationModal] = useState(false);
+  const [vacationCalendarMonth, setVacationCalendarMonth] = useState(() => startOfMonth(new Date()));
+  const [draftVacationDates, setDraftVacationDates] = useState<Set<string>>(() => new Set());
+  const vacationMonthStart = format(startOfMonth(vacationCalendarMonth), 'yyyy-MM-dd');
+  const vacationMonthEnd = format(endOfMonth(vacationCalendarMonth), 'yyyy-MM-dd');
+  const { data: vacationDates, isLoading: isLoadingVacationDates } = useVacationDateSet(
+    vacationMonthStart,
+    vacationMonthEnd,
+  );
+  const setVacationDates = useSetNutritionVacationDates();
+  const vacationMonthDays = useMemo(() => buildMonthGrid(vacationCalendarMonth), [vacationCalendarMonth]);
 
   // Delete modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -295,6 +336,11 @@ export const NutritionSettingsScreen = () => {
   useEffect(() => {
     setNutritionDayRolloverInput(nutritionDayRolloverTime);
   }, [nutritionDayRolloverTime]);
+
+  useEffect(() => {
+    if (!showVacationModal) return;
+    setDraftVacationDates(new Set(vacationDates));
+  }, [showVacationModal, vacationDates]);
 
   const exportMinStartDate = getMinExportStartDate(exportEnd);
   const exportRangeDays = differenceInCalendarDays(exportEnd, exportStart);
@@ -520,6 +566,40 @@ export const NutritionSettingsScreen = () => {
     setExportStartInput(format(defaultRange.start, 'yyyy-MM-dd'));
     setExportEndInput(format(defaultRange.end, 'yyyy-MM-dd'));
     setShowExportModal(true);
+  };
+
+  const openVacationModal = () => {
+    setVacationCalendarMonth(startOfMonth(new Date()));
+    setDraftVacationDates(new Set(vacationDates));
+    setShowVacationModal(true);
+  };
+
+  const toggleVacationDate = (dateKey: string) => {
+    setDraftVacationDates(prev => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) {
+        next.delete(dateKey);
+      } else {
+        next.add(dateKey);
+      }
+      return next;
+    });
+  };
+
+  const clearVacationSelection = () => {
+    setDraftVacationDates(new Set());
+  };
+
+  const saveVacationSelection = async () => {
+    const { addDates, removeDates } = diffVacationDateSelection(vacationDates, draftVacationDates);
+
+    try {
+      await setVacationDates.mutateAsync({ addDates, removeDates });
+      setShowVacationModal(false);
+    } catch (error) {
+      console.error('[NutritionSettings] Error saving vacation days:', error);
+      Alert.alert(t('common.error'), t('nutrition.vacationSaveError'));
+    }
   };
 
   // Check for conflicts before applying copy mode
@@ -886,6 +966,25 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>
+              {t('nutrition.vacationModalTitle').toUpperCase()}
+            </Text>
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <TouchableOpacity style={styles.actionRow} onPress={openVacationModal} activeOpacity={0.7}>
+                <Calendar size={20} color={themeColors.primary} />
+                <View style={styles.actionCopy}>
+                  <Text style={[styles.actionText, { color: themeColors.textPrimary }]}>
+                    {t('nutrition.manageVacationDays')}
+                  </Text>
+                  <Text style={[styles.actionDescription, { color: themeColors.textSecondary }]}>
+                    {t('nutrition.vacationModalSubtitle')}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* 3. Snacks */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.snacksAllCaps'), 'snacks')}
@@ -1135,6 +1234,16 @@ export const NutritionSettingsScreen = () => {
 
               <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
 
+              {/* Vacaciones */}
+              <TouchableOpacity style={styles.actionRow} onPress={openVacationModal} activeOpacity={0.7}>
+                <Calendar size={20} color={themeColors.primary} />
+                <Text style={[styles.actionText, { color: themeColors.primary }]}>
+                  {t('nutrition.manageVacationDays')}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={[styles.separator, { backgroundColor: themeColors.border }]} />
+
               {/* Exportar */}
               <TouchableOpacity style={styles.actionRow} onPress={openExportModal} activeOpacity={0.7}>
                 <Download size={20} color={themeColors.primary} />
@@ -1304,6 +1413,131 @@ export const NutritionSettingsScreen = () => {
                     <Text style={styles.modalBtnTextConfirm}>{t('nutrition.export')}</Text>
                   )}
                 </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Vacation Days Modal */}
+        <Modal visible={showVacationModal} animationType="fade" transparent>
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.modalContent,
+                dynamicStyles.glassCard,
+                styles.vacationModalContent,
+                isDark && { backgroundColor: themeColors.surfaceSolid },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                {t('nutrition.vacationModalTitle')}
+              </Text>
+              <Text style={[styles.modalSubtitle, { color: themeColors.textSecondary }]}>
+                {t('nutrition.vacationModalSubtitle')}
+              </Text>
+
+              <View style={styles.vacationCalendarHeader}>
+                <TouchableOpacity
+                  style={styles.vacationMonthButton}
+                  onPress={() => setVacationCalendarMonth(prev => subMonths(prev, 1))}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.previousMonth')}
+                >
+                  <ChevronLeft size={22} color={themeColors.textPrimary} />
+                </TouchableOpacity>
+                <Text style={[styles.vacationMonthTitle, { color: themeColors.textPrimary }]}>
+                  {format(vacationCalendarMonth, 'MMMM yyyy', { locale: getDateFnsLocale() })}
+                </Text>
+                <TouchableOpacity
+                  style={styles.vacationMonthButton}
+                  onPress={() => setVacationCalendarMonth(prev => addMonths(prev, 1))}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.nextMonth')}
+                >
+                  <ChevronRight size={22} color={themeColors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.vacationWeekHeader}>
+                {vacationMonthDays.slice(0, 7).map(day => (
+                  <Text
+                    key={`weekday-${day.toISOString()}`}
+                    style={[styles.vacationWeekday, { color: themeColors.textSecondary }]}
+                  >
+                    {format(day, 'EEEEE', { locale: getDateFnsLocale() })}
+                  </Text>
+                ))}
+              </View>
+
+              <View style={styles.vacationCalendarGrid}>
+                {vacationMonthDays.map(day => {
+                  const dateKey = format(day, 'yyyy-MM-dd');
+                  const isSelected = draftVacationDates.has(dateKey);
+                  const isCurrentMonth = isSameMonth(day, vacationCalendarMonth);
+                  const isCurrentDay = isToday(day);
+
+                  return (
+                    <TouchableOpacity
+                      key={dateKey}
+                      style={[
+                        styles.vacationDayCell,
+                        { borderColor: themeColors.border },
+                        isSelected && { backgroundColor: themeColors.primary, borderColor: themeColors.primary },
+                        isCurrentDay && !isSelected && { borderColor: themeColors.primary },
+                      ]}
+                      onPress={() => {
+                        if (isCurrentMonth) {
+                          toggleVacationDate(dateKey);
+                        }
+                      }}
+                      activeOpacity={isCurrentMonth ? 0.75 : 1}
+                      disabled={!isCurrentMonth}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected, disabled: !isCurrentMonth }}
+                    >
+                      <Text
+                        style={[
+                          styles.vacationDayText,
+                          { color: isCurrentMonth ? themeColors.textPrimary : themeColors.textSecondary },
+                          !isCurrentMonth && styles.vacationDayMuted,
+                          isSelected && styles.vacationDaySelectedText,
+                        ]}
+                      >
+                        {format(day, 'd')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {isLoadingVacationDates ? (
+                <ActivityIndicator size="small" color={themeColors.primary} style={styles.vacationLoader} />
+              ) : (
+                <Text style={[styles.vacationSelectedCount, { color: themeColors.textSecondary }]}>
+                  {t('nutrition.vacationSelectedCount', { count: draftVacationDates.size })}
+                </Text>
+              )}
+
+              <View style={styles.vacationModalActions}>
+                <TouchableOpacity onPress={clearVacationSelection} style={styles.modalBtnCancel}>
+                  <Text style={styles.modalBtnTextCancel}>{t('nutrition.clearSelection')}</Text>
+                </TouchableOpacity>
+                <View style={styles.vacationModalPrimaryActions}>
+                  <TouchableOpacity onPress={() => setShowVacationModal(false)} style={styles.modalBtnCancel}>
+                    <Text style={styles.modalBtnTextCancel}>{t('common.cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={saveVacationSelection}
+                    style={[styles.modalBtnConfirm, setVacationDates.isPending && { opacity: 0.45 }]}
+                    disabled={setVacationDates.isPending}
+                  >
+                    {setVacationDates.isPending ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.modalBtnTextConfirm}>{t('common.save')}</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
@@ -1978,6 +2212,14 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '500',
   },
+  actionCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  actionDescription: {
+    ...typography.caption,
+    lineHeight: 18,
+  },
   dangerCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.m,
@@ -2018,6 +2260,11 @@ const styles = StyleSheet.create({
   webModalContent: {
     width: '100%',
     maxWidth: 560,
+    alignSelf: 'center',
+  },
+  vacationModalContent: {
+    width: '100%',
+    maxWidth: 420,
     alignSelf: 'center',
   },
   glassModalCard: {
@@ -2124,6 +2371,79 @@ const styles = StyleSheet.create({
   modalBtnTextConfirm: {
     color: colors.white,
     fontWeight: '600',
+  },
+  vacationCalendarHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.s,
+    marginBottom: spacing.m,
+  },
+  vacationMonthButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vacationMonthTitle: {
+    ...typography.body,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  vacationWeekHeader: {
+    flexDirection: 'row',
+    marginBottom: spacing.xs,
+  },
+  vacationWeekday: {
+    width: `${100 / 7}%`,
+    textAlign: 'center',
+    ...typography.caption,
+    fontWeight: '700',
+  },
+  vacationCalendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: spacing.xs,
+  },
+  vacationDayCell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.s,
+  },
+  vacationDayText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  vacationDayMuted: {
+    opacity: 0.38,
+  },
+  vacationDaySelectedText: {
+    color: colors.white,
+  },
+  vacationLoader: {
+    marginTop: spacing.m,
+  },
+  vacationSelectedCount: {
+    ...typography.caption,
+    textAlign: 'center',
+    marginTop: spacing.m,
+    fontWeight: '600',
+  },
+  vacationModalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.l,
+    gap: spacing.m,
+  },
+  vacationModalPrimaryActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
   },
   deleteOption: {
     flexDirection: 'row',

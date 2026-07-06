@@ -2668,6 +2668,41 @@ export type Database = {
           },
         ];
       };
+      nutrition_day_statuses: {
+        Row: {
+          created_at: string;
+          date: string;
+          note: string | null;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          date: string;
+          note?: string | null;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          date?: string;
+          note?: string | null;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'nutrition_day_statuses_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       provider_connection_tokens: {
         Row: {
           access_token: string;

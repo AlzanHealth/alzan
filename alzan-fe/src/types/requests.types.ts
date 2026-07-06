@@ -1319,6 +1319,10 @@ export type UserNutritionSetting = Row<'user_nutrition_settings'>;
 export type UserNutritionSettingInsert = Insert<'user_nutrition_settings'>;
 export type UserNutritionSettingUpdate = Update<'user_nutrition_settings'>;
 
+export type NutritionDayStatus = Row<'nutrition_day_statuses'>;
+export type NutritionDayStatusInsert = Insert<'nutrition_day_statuses'>;
+export type NutritionDayStatusUpdate = Update<'nutrition_day_statuses'>;
+
 export type UserPreference = Row<'user_preferences'>;
 export type UserPreferenceInsert = Insert<'user_preferences'>;
 export type UserPreferenceUpdate = Update<'user_preferences'>;

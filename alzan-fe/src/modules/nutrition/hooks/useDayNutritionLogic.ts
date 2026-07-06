@@ -1,8 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { useActiveDietTemplateId, useDietTemplateMeals, useMealLogs } from './useNutritionData';
+import {
+  useActiveDietTemplateId,
+  useDietTemplateMeals,
+  useMealLogs,
+  useNutritionDayStatuses,
+} from './useNutritionData';
 import { DailyMealItem, AdherenceStatus, Macros } from '../types';
 import { format } from 'date-fns';
 import { DEFAULT_MACROS } from '../constants';
+import { shouldShowPendingPlannedMeals } from '../services/nutritionVacation';
 import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabaseClient';
 import { DietTemplateMeal, MealLog } from '../../../types/requests.types';
@@ -14,6 +20,7 @@ export function useDayNutrition(date: Date) {
 
   // 1. Get Logged Meals for this day
   const { data: logs, isLoading: loadingLogs } = useMealLogs(dateStr, dateStr);
+  const { data: dayStatuses, isLoading: loadingDayStatus } = useNutritionDayStatuses(dateStr, dateStr);
 
   // 2. Get Planned Meals (Active Template)
   const { data: templateMeals, isLoading: loadingTemplate } = useDietTemplateMeals(activeTemplateId || '');
@@ -54,9 +61,11 @@ export function useDayNutrition(date: Date) {
     };
   }
 
-  if (loadingLogs || (activeTemplateId && loadingTemplate)) {
+  if (loadingLogs || loadingDayStatus || (activeTemplateId && loadingTemplate)) {
     return { isLoading: true, meals: [], totals, targets };
   }
+
+  const isVacationDay = (dayStatuses || []).some(status => status.status === 'vacation');
 
   // A. Process Planned Meals for today
   const todaysPlannedMeals = templateMeals?.filter(m => m.day_of_week === mappedDay) || [];
@@ -103,7 +112,7 @@ export function useDayNutrition(date: Date) {
         totals.carbs_g += log.carbs_g || 0;
         totals.fats_g += log.fats_g || 0;
       }
-    } else {
+    } else if (shouldShowPendingPlannedMeals(isVacationDay)) {
       // It's pending
       dailyMeals.push({
         templateMeal: plan,
@@ -165,5 +174,6 @@ export function useDayNutrition(date: Date) {
     totals,
     targets,
     activeTemplateId,
+    isVacationDay,
   };
 }

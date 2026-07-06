@@ -7,10 +7,11 @@ import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import { addDays, format, parseISO } from 'date-fns';
 import { convertEnergyToUi } from '../../../utils/unitConversionUtils';
-import { DietTemplateMeal, EnergyUnit, MealItem, MealLog } from '../../../types/requests.types';
+import { DietTemplateMeal, EnergyUnit, MealItem, MealLog, NutritionDayStatus } from '../../../types/requests.types';
 import i18n from '../../../i18n';
 import { TranslationKey } from '../../../i18n/locales/en';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
+import { createVacationDateSet, getNutritionExportAverageDayCount } from './nutritionVacation';
 
 import iconSource from '../../../../assets/icon.png';
 
@@ -54,6 +55,7 @@ const loadAssetAsBase64 = async (module: number): Promise<string | null> => {
 
 interface DaySummary {
   date: string;
+  isVacation: boolean;
   logs: MealLogWithItems[];
   plannedMeals: PlannedMealWithLog[];
   totals: {
@@ -207,6 +209,17 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     if (logsError) throw new Error(getErrorMessage(logsError));
     const safeLogs = logs ?? [];
 
+    const { data: dayStatuses, error: dayStatusesError } = await supabase
+      .from('nutrition_day_statuses')
+      .select('user_id, date, status, note, created_at, updated_at')
+      .eq('user_id', userId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .returns<NutritionDayStatus[]>();
+
+    if (dayStatusesError) throw new Error(getErrorMessage(dayStatusesError));
+    const vacationDates = createVacationDateSet(dayStatuses);
+
     const logIds = safeLogs.map(l => l.id);
     const { data: items, error: itemsError } =
       logIds.length > 0
@@ -241,6 +254,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     buildDateRange(startDate, endDate).forEach(date => {
       daysMap.set(date, {
         date,
+        isVacation: vacationDates.has(date),
         logs: [],
         plannedMeals: [],
         totals: { kcal: 0, protein: 0, carbs: 0, fats: 0 },
@@ -252,6 +266,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       if (!daysMap.has(date)) {
         daysMap.set(date, {
           date,
+          isVacation: vacationDates.has(date),
           logs: [],
           plannedMeals: [],
           totals: { kcal: 0, protein: 0, carbs: 0, fats: 0 },
@@ -277,6 +292,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     });
 
     daysMap.forEach(day => {
+      if (day.isVacation) return;
       const plannedForDay = safeTemplateMeals.filter(plan => plan.day_of_week === getMappedDayOfWeek(day.date));
       day.plannedMeals = plannedForDay.map(plan => {
         const log =
@@ -287,6 +303,12 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     });
 
     const totalDays = daysMap.size;
+    const averageDays = getNutritionExportAverageDayCount(
+      Array.from(daysMap.values()).map(day => ({
+        isVacation: day.isVacation,
+        loggedMealCount: day.logs.length,
+      })),
+    );
     const grandTotal = { kcal: 0, protein: 0, carbs: 0, fats: 0 };
     daysMap.forEach(day => {
       grandTotal.kcal += day.totals.kcal;
@@ -296,10 +318,10 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     });
 
     const averages = {
-      kcal: Math.round(grandTotal.kcal / totalDays) || 0,
-      protein: Math.round(grandTotal.protein / totalDays) || 0,
-      carbs: Math.round(grandTotal.carbs / totalDays) || 0,
-      fats: Math.round(grandTotal.fats / totalDays) || 0,
+      kcal: Math.round(grandTotal.kcal / averageDays) || 0,
+      protein: Math.round(grandTotal.protein / averageDays) || 0,
+      carbs: Math.round(grandTotal.carbs / averageDays) || 0,
+      fats: Math.round(grandTotal.fats / averageDays) || 0,
     };
     const dateLocale = getDateFnsLocale();
     const datePattern = getPdfDatePattern();
@@ -491,6 +513,20 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     `;
 
     const renderDayMeals = (day: DaySummary): string => {
+      const vacationHtml = day.isVacation
+        ? `
+          <div class="meal-block meal-block-vacation avoid-break">
+            <div class="meal-header">
+              <div class="meal-name">
+                ${escapeHtml(t('nutrition.pdfVacationDay'))}
+                <span class="meal-status">${escapeHtml(t('nutrition.pdfVacationDay'))}</span>
+              </div>
+              <div class="meal-total">-</div>
+            </div>
+            <div class="macro-line">${escapeHtml(t('nutrition.pdfVacationDayDescription'))}</div>
+          </div>
+        `
+        : '';
       const plannedHtml = day.plannedMeals
         .map(({ plan, log }) => (log ? renderLoggedMeal(log, plan) : renderPendingPlannedMeal(plan)))
         .join('');
@@ -498,7 +534,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       const extraLogs = day.logs.filter(log => !plannedLogIds.has(log.id));
       const extraHtml = extraLogs.map(log => renderLoggedMeal(log)).join('');
 
-      if (plannedHtml || extraHtml) return `${plannedHtml}${extraHtml}`;
+      if (vacationHtml || plannedHtml || extraHtml) return `${vacationHtml}${plannedHtml}${extraHtml}`;
 
       return `
         <div class="meal-block avoid-break">
@@ -648,6 +684,13 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                 }
                 .meal-block-pending {
                     opacity: 0.72;
+                }
+                .meal-block-vacation {
+                    border-left-color: var(--primary);
+                    background: #F4F8FF;
+                    padding-top: 12px;
+                    padding-bottom: 12px;
+                    border-radius: 0 8px 8px 0;
                 }
                 .meal-header {
                     display: flex;

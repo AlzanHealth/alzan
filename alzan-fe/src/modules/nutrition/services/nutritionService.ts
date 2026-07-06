@@ -13,6 +13,8 @@ import {
   MealLogsDataQuality,
   MealItem,
   MealItemInsert,
+  NutritionDayStatus,
+  NutritionDayStatusInsert,
 } from '../../../types/requests.types';
 import { IngredientInput } from '../types/db';
 import { getLocalizedIngredientName } from '../../../services/localization';
@@ -114,6 +116,57 @@ export const nutritionService = {
 
     if (error) throw error;
     return data || [];
+  },
+
+  async getNutritionDayStatuses(userId: string, startDate: string, endDate: string): Promise<NutritionDayStatus[]> {
+    if (!userId) return [];
+
+    const { data, error } = await supabase
+      .from('nutrition_day_statuses')
+      .select('user_id, date, status, note, created_at, updated_at')
+      .eq('user_id', userId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: true })
+      .returns<NutritionDayStatus[]>();
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async upsertNutritionVacationDays(userId: string, dates: string[]): Promise<NutritionDayStatus[]> {
+    if (!userId) throw new Error('No user');
+    if (dates.length === 0) return [];
+
+    const uniqueDates = Array.from(new Set(dates)).sort();
+    const payload: NutritionDayStatusInsert[] = uniqueDates.map(date => ({
+      user_id: userId,
+      date,
+      status: 'vacation',
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { data, error } = await supabase
+      .from('nutrition_day_statuses')
+      .upsert(payload, { onConflict: 'user_id,date' })
+      .select('user_id, date, status, note, created_at, updated_at')
+      .returns<NutritionDayStatus[]>();
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async deleteNutritionVacationDays(userId: string, dates: string[]): Promise<void> {
+    if (!userId || dates.length === 0) return;
+
+    const uniqueDates = Array.from(new Set(dates));
+    const { error } = await supabase
+      .from('nutrition_day_statuses')
+      .delete()
+      .eq('user_id', userId)
+      .in('date', uniqueDates);
+
+    if (error) throw error;
   },
 
   /**

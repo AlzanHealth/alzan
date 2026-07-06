@@ -104,6 +104,7 @@ export interface NutritionSettingsJson {
   copy_mode: "none" | "sequential" | "alternating" | null;
   default_recipe_visibility?: "private" | "public";
   recipe_search_scope?: RecipeSearchScope;
+  nutrition_day_rollover_time?: string;
   show_diet_calories_only?: boolean;
   show_training_calories_only?: boolean;
   last_visible_week?: string;
@@ -1403,6 +1404,10 @@ export type UserGoalUpdate = Update<"user_goals">;
 export type UserNutritionSetting = Row<"user_nutrition_settings">;
 export type UserNutritionSettingInsert = Insert<"user_nutrition_settings">;
 export type UserNutritionSettingUpdate = Update<"user_nutrition_settings">;
+
+export type NutritionDayStatus = Row<"nutrition_day_statuses">;
+export type NutritionDayStatusInsert = Insert<"nutrition_day_statuses">;
+export type NutritionDayStatusUpdate = Update<"nutrition_day_statuses">;
 
 export type UserPreference = Row<"user_preferences">;
 export type UserPreferenceInsert = Insert<"user_preferences">;
