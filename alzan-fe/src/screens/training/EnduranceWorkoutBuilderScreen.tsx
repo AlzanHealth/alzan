@@ -58,6 +58,7 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
+import { formatPaceTime } from '../../utils/unitConversionUtils';
 import {
   calculateProgressionWeeks,
   EligibleProgressionStep,
@@ -1299,9 +1300,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   const formatPaceInput = (seconds: number | null | undefined) => {
     if (!seconds || seconds <= 0) return '';
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.round(seconds % 60);
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    return formatPaceTime(seconds);
   };
 
   const toUiPaceSeconds = (dbSeconds: number) => {
@@ -1456,20 +1455,19 @@ export const EnduranceWorkoutBuilderScreen = () => {
       distanceMinor = hundredths.toString().padStart(2, '0');
     }
 
+    const cappedPaceSeconds = Math.min(30 * 60 + 59, uiPaceSeconds);
+    const [paceMin, paceSec] = formatPaceTime(cappedPaceSeconds).split(':');
+
     return {
-      paceMin: Math.min(30, Math.floor(uiPaceSeconds / 60)).toString(),
-      paceSec: Math.round(uiPaceSeconds % 60)
-        .toString()
-        .padStart(2, '0'),
+      paceMin,
+      paceSec,
       speed: Math.min(90, speedValue).toString(),
       zone: zoneValue.toString(),
       durationHour: Math.min(23, Math.floor(durationSeconds / 3600)).toString(),
       durationMin: Math.floor((durationSeconds % 3600) / 60)
         .toString()
         .padStart(2, '0'),
-      durationSec: Math.round(durationSeconds % 60)
-        .toString()
-        .padStart(2, '0'),
+      durationSec: (durationSeconds % 60).toString().padStart(2, '0'),
       distanceMajor,
       distanceMinor,
       repetitionCount: Math.min(100, repetitionValue).toString(),

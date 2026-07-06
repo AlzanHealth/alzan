@@ -141,3 +141,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # ─── Workspace-internal ignore ───────────────────────────────────────────────
 alzan-temp/
 open-wearables/
+.worktrees/

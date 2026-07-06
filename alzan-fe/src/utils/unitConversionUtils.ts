@@ -8,6 +8,18 @@ const LBS_TO_KG = 0.453592;
 const KCAL_TO_KJ = 4.184;
 const KJ_TO_KCAL = 0.239006;
 
+export const formatPaceTime = (secondsPerUnit: number): string => {
+  const normalizedSeconds = Math.max(0, Math.round(secondsPerUnit));
+  const minutes = Math.floor(normalizedSeconds / 60);
+  const seconds = normalizedSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const formatPaceLabel = (secondsPerUnit: number, unit: string): string => {
+  const separator = unit.startsWith('/') ? '' : ' ';
+  return `${formatPaceTime(secondsPerUnit)}${separator}${unit}`;
+};
+
 export const convertDistanceToUi = (
   meters: number | null | undefined,
   distanceUnit: DistanceUnit = 'km',
@@ -81,21 +93,17 @@ export const convertSpeedToUi = (
     const secondsPer100m = 100 / speedMetersPerSecond;
 
     if (isMetric) {
-      const mins = Math.floor(secondsPer100m / 60);
-      const secs = Math.round(secondsPer100m % 60);
       return {
         value: secondsPer100m,
         unit: 'min/100m',
-        label: `${mins}:${secs.toString().padStart(2, '0')}/100m`,
+        label: formatPaceLabel(secondsPer100m, '/100m'),
       };
     } else {
       const secondsPer100yd = secondsPer100m / 1.09361;
-      const mins = Math.floor(secondsPer100yd / 60);
-      const secs = Math.round(secondsPer100yd % 60);
       return {
         value: secondsPer100yd,
         unit: 'min/100yd',
-        label: `${mins}:${secs.toString().padStart(2, '0')}/100yd`,
+        label: formatPaceLabel(secondsPer100yd, '/100yd'),
       };
     }
   } else {
@@ -114,9 +122,7 @@ export const convertSpeedToUi = (
       unit = 'min/mi';
     }
 
-    const minutes = Math.floor(paceMinPerUnit);
-    const seconds = Math.round((paceMinPerUnit - minutes) * 60);
-    const label = `${minutes}:${seconds.toString().padStart(2, '0')} ${unit}`;
+    const label = formatPaceLabel(paceMinPerUnit * 60, unit);
 
     return { value: paceMinPerUnit, unit, label };
   }

@@ -83,6 +83,22 @@ assert.equal(
 assert.equal(
   formatEnduranceStepTarget(
     {
+      duration_type: 'distance',
+      distance_m: 400,
+      target_type: 'pace',
+      target_min: 240,
+      target_max: 240,
+      repetitions: null,
+    },
+    'running',
+    labels,
+  ),
+  'Pace: 4:00 min/km',
+);
+
+assert.equal(
+  formatEnduranceStepTarget(
+    {
       duration_type: 'time',
       duration_s: 600,
       target_type: 'heart_rate',

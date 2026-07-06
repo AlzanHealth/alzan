@@ -20,6 +20,7 @@ import { useUserPreferences } from '../../../hooks/useUserPreferences';
 import { DurationType, PhaseType, TargetType } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from '../helpers/phase.helper';
+import { formatPaceTime } from '../../../utils/unitConversionUtils';
 
 interface Step {
   id: string;
@@ -154,7 +155,7 @@ export const EnduranceStepEditorModal = ({
         }
 
         // Parse duration to hr:min:sec
-        const totalSecs = initialStep.duration_s || 0;
+        const totalSecs = Math.max(0, Math.round(initialStep.duration_s || 0));
         setDurationHour(Math.floor(totalSecs / 3600).toString());
         setDurationMin(
           Math.floor((totalSecs % 3600) / 60)
@@ -190,10 +191,9 @@ export const EnduranceStepEditorModal = ({
             uiPaceSeconds = dbPaceSeconds / 1.09361;
           }
 
-          const mins = Math.floor(uiPaceSeconds / 60);
-          const secs = Math.round(uiPaceSeconds % 60);
-          setPaceMin(mins.toString());
-          setPaceSec(secs.toString().padStart(2, '0'));
+          const [minutes, seconds] = formatPaceTime(uiPaceSeconds).split(':');
+          setPaceMin(minutes);
+          setPaceSec(seconds);
         } else if (initialStep.target_type === 'speed' && initialStep.target_min) {
           // DB: m/s (Standardized) or km/h (Legacy)?
           // Existing app seems to save km/h raw.

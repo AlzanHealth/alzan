@@ -18,6 +18,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { colors, spacing, borderRadius } from '../../../theme';
 import { BuilderStep } from '../../../hooks/useEnduranceWorkoutBuilder';
 import { SportCatalogOption } from '../../../hooks/useSportCatalog';
+import { formatPaceTime } from '../../../utils/unitConversionUtils';
 
 type HyroxStepType = 'run' | 'station' | 'rest';
 
@@ -77,10 +78,9 @@ export const HyroxStepEditorModal = ({
     );
 
     if (initialStep?.target_type === 'pace' && initialStep.target_min) {
-      const minutes = Math.floor(initialStep.target_min / 60);
-      const seconds = Math.round(initialStep.target_min % 60);
-      setPaceMin(String(minutes));
-      setPaceSec(String(seconds).padStart(2, '0'));
+      const [minutes, seconds] = formatPaceTime(initialStep.target_min).split(':');
+      setPaceMin(minutes);
+      setPaceSec(seconds);
     } else {
       setPaceMin('');
       setPaceSec('');
