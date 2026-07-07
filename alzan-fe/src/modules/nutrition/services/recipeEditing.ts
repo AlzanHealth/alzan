@@ -19,6 +19,18 @@ export type RecipeSoftDeletePayload = {
   updated_at: string;
 };
 
+export type PresetRecipeDraftMode =
+  | {
+      mode: 'edit-existing';
+      editingRecipeId: string;
+      originalSignature: string;
+    }
+  | {
+      mode: 'copy';
+      editingRecipeId: null;
+      originalSignature: null;
+    };
+
 const normalizeRecipeName = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, ' ');
 
 const normalizeQuantity = (quantity: number): number => Math.round(quantity * 10) / 10;
@@ -52,6 +64,36 @@ export const canSubmitRecipeDraft = ({
 }): boolean => {
   return name.trim().length > 0 && ingredientsLength > 0 && originalSignature !== currentSignature;
 };
+
+export const getPresetRecipeDraftMode = ({
+  editableRecipeId,
+  originalSignature,
+}: {
+  editableRecipeId: string | null;
+  originalSignature: string | null;
+}): PresetRecipeDraftMode => {
+  if (!editableRecipeId || !originalSignature) {
+    return {
+      mode: 'copy',
+      editingRecipeId: null,
+      originalSignature: null,
+    };
+  }
+
+  return {
+    mode: 'edit-existing',
+    editingRecipeId: editableRecipeId,
+    originalSignature,
+  };
+};
+
+export const getMealSourceRecipeIdForSave = ({
+  selectedRecipeId,
+  existingSourceRecipeId,
+}: {
+  selectedRecipeId: string | null;
+  existingSourceRecipeId: string | null;
+}): string | null => selectedRecipeId ?? existingSourceRecipeId;
 
 export const buildRecipeSoftDeletePayload = (deletedAt: string): RecipeSoftDeletePayload => ({
   deleted_at: deletedAt,

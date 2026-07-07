@@ -41,6 +41,8 @@ import { getEditableUserRecipe, getRecipeIngredients } from '../../modules/nutri
 import {
   buildEditableRecipeSignature,
   canSubmitRecipeDraft,
+  getMealSourceRecipeIdForSave,
+  getPresetRecipeDraftMode,
   isOwnUserRecipe,
 } from '../../modules/nutrition/services/recipeEditing';
 import {
@@ -68,12 +70,17 @@ import {
 } from '../../modules/nutrition/services/nutritionDay';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
+type EditableUserRecipeForBuilder = NonNullable<Awaited<ReturnType<typeof getEditableUserRecipe>>>;
 
 type InputMode = 'search' | 'scan' | 'manual' | 'photo';
 type MealSearchFilter = 'all' | 'recipe' | 'precooked';
 const MEAL_RECIPE_PAGE_SIZE = 5;
 const INGREDIENT_AMOUNT_DECIMALS = 1;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const getMealLogSourceRecipeId = (log: DailyMealItem['log'] | undefined): string | null => {
+  return typeof log?.source_recipe_id === 'string' ? log.source_recipe_id : null;
+};
 
 const roundIngredientAmount = (amount: number): number => {
   if (amount <= 0) return 0;
@@ -199,6 +206,7 @@ export const MealLogFormScreen = () => {
   const mealItem = params.mealItem;
   const isEdit = !!mealItem?.log;
   const isRecipeEditorOnly = params.recipeEditorOnly === true;
+  const existingMealSourceRecipeId = getMealLogSourceRecipeId(mealItem?.log);
   const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
     preferences?.nutrition_prefs?.nutrition_day_rollover_time,
   );
@@ -245,6 +253,12 @@ export const MealLogFormScreen = () => {
   const [editingSavedRecipeId, setEditingSavedRecipeId] = useState<string | null>(null);
   const [editingSavedRecipeUpdatedAt, setEditingSavedRecipeUpdatedAt] = useState<string | null>(null);
   const [editingRecipeSignature, setEditingRecipeSignature] = useState<string | null>(null);
+  const [mealSourceRecipeId, setMealSourceRecipeId] = useState<string | null>(
+    getMealSourceRecipeIdForSave({
+      selectedRecipeId: params.presetRecipeId ?? null,
+      existingSourceRecipeId: existingMealSourceRecipeId,
+    }),
+  );
   const lastRecipeAggregateRefreshAtRef = useRef<number>(0);
   const mealSearchRequestIdRef = useRef(0);
 
@@ -480,6 +494,64 @@ export const MealLogFormScreen = () => {
     setSelectedFood(null);
   };
 
+  const applyEditableRecipeToBuilder = (
+    editableRecipe: EditableUserRecipeForBuilder,
+    showReadyMessage: boolean,
+  ): boolean => {
+    const transformedIngredients = mapRecipeIngredientsToMealComponents(editableRecipe.ingredients);
+    const signature = buildRecipeSignature(editableRecipe.name, transformedIngredients);
+    const draftMode = getPresetRecipeDraftMode({
+      editableRecipeId: editableRecipe.id,
+      originalSignature: signature,
+    });
+
+    if (draftMode.mode !== 'edit-existing') {
+      return false;
+    }
+
+    setName(editableRecipe.name);
+    setIngredients(transformedIngredients);
+    setEditingSavedRecipeId(draftMode.editingRecipeId);
+    setEditingSavedRecipeUpdatedAt(editableRecipe.updated_at);
+    setEditingRecipeSignature(draftMode.originalSignature);
+    setMealSourceRecipeId(editableRecipe.id);
+    resetMealSearchState();
+    setInputMode('search');
+
+    if (showReadyMessage) {
+      setSearchMessage({ type: 'info', text: t('nutrition.recipeReadyToEdit') });
+    }
+
+    return true;
+  };
+
+  const applyEditableRecipeReferenceToCurrentMeal = (
+    editableRecipe: EditableUserRecipeForBuilder,
+    showReadyMessage: boolean,
+  ): boolean => {
+    const transformedIngredients = mapRecipeIngredientsToMealComponents(editableRecipe.ingredients);
+    const signature = buildRecipeSignature(editableRecipe.name, transformedIngredients);
+    const draftMode = getPresetRecipeDraftMode({
+      editableRecipeId: editableRecipe.id,
+      originalSignature: signature,
+    });
+
+    if (draftMode.mode !== 'edit-existing') {
+      return false;
+    }
+
+    setEditingSavedRecipeId(draftMode.editingRecipeId);
+    setEditingSavedRecipeUpdatedAt(editableRecipe.updated_at);
+    setEditingRecipeSignature(draftMode.originalSignature);
+    setMealSourceRecipeId(editableRecipe.id);
+
+    if (showReadyMessage) {
+      setSearchMessage({ type: 'info', text: t('nutrition.recipeReadyToEdit') });
+    }
+
+    return true;
+  };
+
   const loadEditableRecipeIntoBuilder = useCallback(
     async (recipeId: string, showReadyMessage: boolean) => {
       const currentUserId = await getCurrentUserId();
@@ -494,21 +566,7 @@ export const MealLogFormScreen = () => {
         return false;
       }
 
-      const transformedIngredients = mapRecipeIngredientsToMealComponents(editableRecipe.ingredients);
-      const signature = buildRecipeSignature(editableRecipe.name, transformedIngredients);
-      setName(editableRecipe.name);
-      setIngredients(transformedIngredients);
-      setEditingSavedRecipeId(editableRecipe.id);
-      setEditingSavedRecipeUpdatedAt(editableRecipe.updated_at);
-      setEditingRecipeSignature(signature);
-      resetMealSearchState();
-      setInputMode('search');
-
-      if (showReadyMessage) {
-        setSearchMessage({ type: 'info', text: t('nutrition.recipeReadyToEdit') });
-      }
-
-      return true;
+      return applyEditableRecipeToBuilder(editableRecipe, showReadyMessage);
     },
     [languageCode, t],
   );
@@ -655,6 +713,7 @@ export const MealLogFormScreen = () => {
 
   // Handle selection from meal search results
   const handleSelectMealResult = async (item: MealComponent) => {
+    const selectedRecipeId = item.itemType === 'recipe' && item.external_id ? item.external_id : null;
     if (item.itemType === 'recipe' && item.external_id) {
       const currentUserId = await getCurrentUserId();
       if (isOwnUserRecipe(item, currentUserId)) {
@@ -669,6 +728,7 @@ export const MealLogFormScreen = () => {
     setEditingSavedRecipeId(null);
     setEditingSavedRecipeUpdatedAt(null);
     setEditingRecipeSignature(null);
+    setMealSourceRecipeId(selectedRecipeId);
     setMealSearchResults([]);
     setSearchMessage(null);
 
@@ -730,6 +790,29 @@ export const MealLogFormScreen = () => {
     }
   };
 
+  const loadPresetRecipeIntoMealLog = async (recipeId: string, fallbackName: string): Promise<void> => {
+    const currentUserId = await getCurrentUserId();
+    if (currentUserId) {
+      try {
+        const editableRecipe = await getEditableUserRecipe(recipeId, currentUserId, languageCode);
+        if (editableRecipe && applyEditableRecipeToBuilder(editableRecipe, true)) {
+          trackRecipeUsage(recipeId, 'saved');
+          return;
+        }
+      } catch (error) {
+        console.error('[MealLogForm] Error loading preset recipe ownership:', error);
+      }
+    }
+
+    await handleSelectMealResult({
+      id: `preset_${recipeId}`,
+      external_id: recipeId,
+      name: fallbackName,
+      source: 'database',
+      itemType: 'recipe',
+    });
+  };
+
   // Preload a recipe chosen from the Recipe Library ("Usar"). Runs once on mount.
   const presetRecipeLoadedRef = useRef(false);
   useEffect(() => {
@@ -737,13 +820,7 @@ export const MealLogFormScreen = () => {
     const presetId = params.presetRecipeId;
     if (!presetId) return;
     presetRecipeLoadedRef.current = true;
-    void handleSelectMealResult({
-      id: `preset_${presetId}`,
-      external_id: presetId,
-      name: params.presetRecipeName || '',
-      source: 'database',
-      itemType: 'recipe',
-    });
+    void loadPresetRecipeIntoMealLog(presetId, params.presetRecipeName || '');
   }, [params.presetRecipeId, params.presetRecipeName]);
 
   const editableRecipeLoadedRef = useRef<string | null>(null);
@@ -755,6 +832,28 @@ export const MealLogFormScreen = () => {
     editableRecipeLoadedRef.current = params.editRecipeId;
     void loadEditableRecipeIntoBuilder(params.editRecipeId, false);
   }, [isRecipeEditorOnly, loadEditableRecipeIntoBuilder, params.editRecipeId]);
+
+  const sourceRecipeLoadedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isEdit || isRecipeEditorOnly || !mealSourceRecipeId || sourceRecipeLoadedRef.current === mealSourceRecipeId) {
+      return;
+    }
+
+    sourceRecipeLoadedRef.current = mealSourceRecipeId;
+    void (async () => {
+      const currentUserId = await getCurrentUserId();
+      if (!currentUserId) return;
+
+      try {
+        const editableRecipe = await getEditableUserRecipe(mealSourceRecipeId, currentUserId, languageCode);
+        if (editableRecipe) {
+          applyEditableRecipeReferenceToCurrentMeal(editableRecipe, false);
+        }
+      } catch (error) {
+        console.error('[MealLogForm] Error loading source recipe for meal edit:', error);
+      }
+    })();
+  }, [isEdit, isRecipeEditorOnly, languageCode, mealSourceRecipeId]);
 
   const normalizeName = (value: string): string =>
     value
@@ -1275,6 +1374,7 @@ export const MealLogFormScreen = () => {
     setEditingSavedRecipeId(null);
     setEditingSavedRecipeUpdatedAt(null);
     setEditingRecipeSignature(null);
+    setMealSourceRecipeId(null);
     setManualMacros({
       kcal: 0,
       protein_g: 0,
@@ -1319,6 +1419,7 @@ export const MealLogFormScreen = () => {
         carbs_g: finalMacros.carbs_g,
         fats_g: finalMacros.fats_g,
         source: 'manual',
+        source_recipe_id: mealSourceRecipeId,
       };
 
       const ingredientsPayload = ingredients.map(ing => ({

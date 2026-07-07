@@ -4,6 +4,8 @@ import {
   buildEditableRecipeSignature,
   buildRecipeSoftDeletePayload,
   canSubmitRecipeDraft,
+  getMealSourceRecipeIdForSave,
+  getPresetRecipeDraftMode,
   isOwnUserRecipe,
 } from './recipeEditing';
 
@@ -14,6 +16,52 @@ function run() {
   assert.equal(isOwnUserRecipe({ recipe_source: 'system', recipe_owner_user_id: null }, currentUserId), false);
   assert.equal(isOwnUserRecipe({ recipe_source: 'user', recipe_owner_user_id: 'user-2' }, currentUserId), false);
   assert.equal(isOwnUserRecipe({ recipe_source: 'user', recipe_owner_user_id: currentUserId }, null), false);
+
+  assert.equal(
+    getMealSourceRecipeIdForSave({
+      selectedRecipeId: 'recipe-from-library',
+      existingSourceRecipeId: null,
+    }),
+    'recipe-from-library',
+  );
+  assert.equal(
+    getMealSourceRecipeIdForSave({
+      selectedRecipeId: null,
+      existingSourceRecipeId: 'existing-recipe',
+    }),
+    'existing-recipe',
+  );
+  assert.equal(
+    getMealSourceRecipeIdForSave({
+      selectedRecipeId: null,
+      existingSourceRecipeId: null,
+    }),
+    null,
+  );
+
+  assert.deepEqual(
+    getPresetRecipeDraftMode({
+      editableRecipeId: 'recipe-1',
+      originalSignature: 'signature-1',
+    }),
+    {
+      mode: 'edit-existing',
+      editingRecipeId: 'recipe-1',
+      originalSignature: 'signature-1',
+    },
+  );
+
+  assert.deepEqual(
+    getPresetRecipeDraftMode({
+      editableRecipeId: null,
+      originalSignature: null,
+    }),
+    {
+      mode: 'copy',
+      editingRecipeId: null,
+      originalSignature: null,
+    },
+  );
 
   const originalSignature = buildEditableRecipeSignature({
     name: 'Tortilla',

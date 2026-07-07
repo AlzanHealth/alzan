@@ -2572,6 +2572,7 @@ export type Database = {
           origin_confidence: number | null
           protein_g: number | null
           source: string
+          source_recipe_id: string | null
           user_id: string
         }
         Insert: {
@@ -2592,6 +2593,7 @@ export type Database = {
           origin_confidence?: number | null
           protein_g?: number | null
           source?: string
+          source_recipe_id?: string | null
           user_id: string
         }
         Update: {
@@ -2612,6 +2614,7 @@ export type Database = {
           origin_confidence?: number | null
           protein_g?: number | null
           source?: string
+          source_recipe_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -2620,6 +2623,13 @@ export type Database = {
             columns: ["diet_template_meal_id"]
             isOneToOne: false
             referencedRelation: "diet_template_meals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_logs_source_recipe_id_fkey"
+            columns: ["source_recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
             referencedColumns: ["id"]
           },
           {
