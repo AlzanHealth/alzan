@@ -35,6 +35,7 @@ interface RecipeSearchRow {
   source: 'system' | 'user';
   owner_user_id: string | null;
   visibility: 'private' | 'public';
+  updated_at: string;
   kcal_100: number;
   protein_g_100: number;
   carbs_g_100: number;
@@ -87,6 +88,7 @@ const RECIPES_SELECT_FIELDS = `
   source,
   owner_user_id,
   visibility,
+  updated_at,
   kcal_100,
   protein_g_100,
   carbs_g_100,
@@ -123,6 +125,7 @@ function mapRecipeToMealComponent(recipe: RecipeSearchRow): MealComponent {
     recipe_source: recipe.source,
     recipe_owner_user_id: recipe.owner_user_id,
     recipe_visibility: recipe.visibility,
+    recipe_updated_at: recipe.updated_at,
     recipe_public_slug: recipe.public_slug,
     recipe_origin_id: recipe.origin_recipe_id,
     recipe_popularity_score: recipe.popularity_score,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator } from 'react-native';
-import { X, Plus } from 'lucide-react-native';
+import { X, Plus, Pencil, Trash2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
 import { borderRadius } from '../../../theme';
@@ -15,9 +15,20 @@ interface RecipeDetailModalProps {
   visible: boolean;
   onClose: () => void;
   onUse: (recipe: MealComponent) => void;
+  onEdit?: (recipe: MealComponent) => void;
+  onDelete?: (recipe: MealComponent) => void;
+  isDeleting?: boolean;
 }
 
-export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, visible, onClose, onUse }) => {
+export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
+  recipe,
+  visible,
+  onClose,
+  onUse,
+  onEdit,
+  onDelete,
+  isDeleting = false,
+}) => {
   const { t } = useTranslation();
   const { colors: themeColors, isDark } = useNutritionStyles();
   const [ingredients, setIngredients] = useState<RecipeIngredientItem[]>([]);
@@ -125,6 +136,47 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({ recipe, vi
             </ScrollView>
           )}
 
+          {(onEdit || onDelete) && (
+            <View style={styles.manageActionsRow}>
+              {onEdit && (
+                <TouchableOpacity
+                  style={[styles.manageButton, { borderColor: themeColors.primary + '55' }]}
+                  onPress={() => {
+                    onEdit(recipe);
+                    onClose();
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Pencil size={16} color={themeColors.primary} strokeWidth={2.4} />
+                  <Text style={[styles.manageButtonText, { color: themeColors.primary }]}>
+                    {t('nutrition.editRecipeAction')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {onDelete && (
+                <TouchableOpacity
+                  style={[
+                    styles.manageButton,
+                    { borderColor: themeColors.danger + '55' },
+                    isDeleting && { opacity: 0.5 },
+                  ]}
+                  onPress={() => onDelete(recipe)}
+                  disabled={isDeleting}
+                  activeOpacity={0.85}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color={themeColors.danger} />
+                  ) : (
+                    <Trash2 size={16} color={themeColors.danger} strokeWidth={2.4} />
+                  )}
+                  <Text style={[styles.manageButtonText, { color: themeColors.danger }]}>
+                    {t('nutrition.deleteRecipeAction')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           <TouchableOpacity
             style={[styles.useButton, { backgroundColor: themeColors.primary }]}
             onPress={() => {
@@ -173,6 +225,18 @@ const styles = StyleSheet.create({
   ingredientName: { flex: 1, fontSize: 15 },
   ingredientMeta: { fontSize: 13 },
   emptyText: { fontSize: 14, paddingVertical: 16 },
+  manageActionsRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  manageButton: {
+    flex: 1,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+  },
+  manageButtonText: { fontSize: 14, fontWeight: '700' },
   useButton: {
     flexDirection: 'row',
     alignItems: 'center',

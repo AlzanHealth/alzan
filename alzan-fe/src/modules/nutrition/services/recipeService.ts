@@ -58,6 +58,15 @@ interface RecipeRow {
   quality_score?: number;
 }
 
+interface EditableUserRecipeRow {
+  id: string;
+  name_es: string;
+  name_en: string | null;
+  source: 'system' | 'user';
+  owner_user_id: string | null;
+  updated_at: string;
+}
+
 interface RecipeAliasLookupRow {
   recipe_id: string;
   recipes: RecipeRow | RecipeRow[] | null;
@@ -258,6 +267,43 @@ export async function getRecipeIngredients(recipeId: string, locale?: Locale) {
 }
 
 export type RecipeVisibility = 'private' | 'public';
+
+export interface EditableUserRecipe {
+  id: string;
+  name: string;
+  updated_at: string;
+  ingredients: RecipeIngredient[];
+}
+
+export async function getEditableUserRecipe(
+  recipeId: string,
+  currentUserId: string,
+  locale?: Locale,
+): Promise<EditableUserRecipe | null> {
+  const languageCode = locale ?? getCurrentAppLocale();
+  const { data: recipe, error } = await supabase
+    .from('recipes')
+    .select('id, name_es, name_en, source, owner_user_id, updated_at')
+    .eq('id', recipeId)
+    .is('deleted_at', null)
+    .maybeSingle<EditableUserRecipeRow>();
+
+  if (error) {
+    console.error('[recipeService] Error loading editable recipe:', error);
+    throw error;
+  }
+
+  if (!recipe || recipe.source !== 'user' || recipe.owner_user_id !== currentUserId) {
+    return null;
+  }
+
+  return {
+    id: recipe.id,
+    name: getLocalizedRecipeName(recipe, languageCode),
+    updated_at: recipe.updated_at,
+    ingredients: await getRecipeIngredients(recipe.id, languageCode),
+  };
+}
 
 /**
  * Set the visibility of all of a user's own (source = 'user', not deleted) recipes.

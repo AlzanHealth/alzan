@@ -150,6 +150,8 @@ export type NutritionStackParamList = {
     isExtra?: boolean;
     presetRecipeId?: string;
     presetRecipeName?: string;
+    editRecipeId?: string;
+    recipeEditorOnly?: boolean;
   };
 };
 

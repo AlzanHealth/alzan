@@ -9,6 +9,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { getLocalizedRecipeDescription, getLocalizedRecipeName } from '../../../services/localization';
 import { normalizeInput } from '../../../services/ingredientsService';
 import { MealComponent } from '../types/ingredients';
+import { buildRecipeSoftDeletePayload } from './recipeEditing';
 
 // Discovery sorting lens (all backed by aggregate columns already on `recipes`).
 export type DiscoverSort = 'recommended' | 'week' | 'month' | 'saved';
@@ -28,6 +29,7 @@ interface RecipeRow {
   source: 'system' | 'user';
   owner_user_id: string | null;
   visibility: 'private' | 'public';
+  updated_at: string;
   kcal_100: number | null;
   protein_g_100: number | null;
   carbs_g_100: number | null;
@@ -51,7 +53,7 @@ interface UserNameRow {
 }
 
 const RECIPE_CARD_FIELDS =
-  'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total';
+  'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, updated_at, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total';
 
 const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10;
 
@@ -70,6 +72,7 @@ const mapRecipeRow = (row: RecipeRow): MealComponent => ({
   recipe_source: row.source,
   recipe_owner_user_id: row.owner_user_id,
   recipe_visibility: row.visibility,
+  recipe_updated_at: row.updated_at,
   recipe_popularity_score: row.popularity_score ?? 0,
   recipe_favorites_total: row.favorites_total ?? 0,
   recipe_saves_total: row.saves_total ?? 0,
@@ -281,4 +284,31 @@ export async function toggleFavoriteRecipe(recipeId: string, isCurrentlyFavorite
     return false;
   }
   return true;
+}
+
+export async function softDeleteOwnRecipe(
+  recipeId: string,
+  userId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('recipes')
+    .update(buildRecipeSoftDeletePayload(now))
+    .eq('id', recipeId)
+    .eq('owner_user_id', userId)
+    .eq('source', 'user')
+    .is('deleted_at', null)
+    .select('id')
+    .maybeSingle<{ id: string }>();
+
+  if (error) {
+    console.error('[recipeLibraryService] soft delete recipe error:', error);
+    return { success: false, error: error.message };
+  }
+
+  if (!data) {
+    return { success: false, error: 'recipe_not_found_or_not_owned' };
+  }
+
+  return { success: true };
 }
