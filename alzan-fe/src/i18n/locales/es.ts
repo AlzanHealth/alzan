@@ -106,6 +106,12 @@ export default {
     adjust: 'Ajustar',
     ml: 'ml',
     hydration: 'Hidratación',
+    defaultHydrationTitle: 'HIDRATACIÓN',
+    defaultHydrationLabel: 'Agua diaria por defecto',
+    defaultHydrationHint:
+      'Se usa como valor inicial en días sin registro de agua guardado. Luego puedes editar cada día.',
+    defaultHydrationPlaceholder: 'Sin defecto',
+    defaultHydrationSaveError: 'No se pudo guardar el valor de hidratación por defecto.',
     checkOfficialSiteForIngredients: 'Para conocer los ingredientes, consulta la web oficial del proveedor.',
     onlyMacrosWarning: '⚠️ Solo macros disponibles.',
     noIngredientsFound: 'No se encontraron ingredientes',
@@ -230,6 +236,9 @@ export default {
       'Elige a qué hora debe pasar la app al siguiente día de nutrición.\n\nAntes de esa hora, los registros automáticos siguen usando el día anterior, útil para cenas o snacks después de medianoche.',
     nutritionDayRolloverLabel: 'Cambiar día a las',
     nutritionDayRolloverHint: 'Las comidas registradas antes de esta hora usan el día nutricional anterior.',
+    defaultHydrationInfoModalTitle: 'Hidratación por defecto',
+    defaultHydrationInfoModalBody:
+      'Define un valor diario de agua que aparece por defecto en Nutrición.\n\nNo crea registros de hidratación por adelantado. Si editas el agua de un día concreto, ese valor guardado tiene prioridad.',
     recipePrivacyTitle: 'PRIVACIDAD DE RECETAS',
     recipePrivacyInfoModalTitle: 'Privacidad de recetas',
     recipePrivacyInfoModalBody:

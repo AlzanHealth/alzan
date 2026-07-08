@@ -83,6 +83,8 @@ const DEFAULT_SNACK_OPTS = {
 
 const MAX_EXPORT_RANGE_DAYS = 92;
 const VACATION_CALENDAR_RANGE_MONTHS = 12;
+const HYDRATION_PRESETS_ML = [1500, 2000, 2500, 3000];
+const MAX_DEFAULT_HYDRATION_ML = 10000;
 
 const createEmptyVacationDraftSelection = (): VacationDraftSelectionState => ({
   persistedDates: new Set(),
@@ -121,6 +123,7 @@ type RecipeDefaultVisibility = 'private' | 'public';
 type NutritionSectionInfoKey =
   | 'dailyMeals'
   | 'nutritionDay'
+  | 'hydration'
   | 'snacks'
   | 'visualization'
   | 'recipePrivacy'
@@ -245,6 +248,11 @@ export const NutritionSettingsScreen = () => {
     preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
   const recipesArePublicByDefault = defaultRecipeVisibility === 'public';
   const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
+  const storedDefaultHydrationMl = preferences?.nutrition_prefs?.default_hydration_ml;
+  const defaultHydrationMl =
+    typeof storedDefaultHydrationMl === 'number' && Number.isFinite(storedDefaultHydrationMl)
+      ? Math.max(0, Math.round(storedDefaultHydrationMl))
+      : 0;
 
   // Export modal state
   const [showExportModal, setShowExportModal] = useState(false);
@@ -258,6 +266,10 @@ export const NutritionSettingsScreen = () => {
     buildTimePickerDate(nutritionDayRolloverTime),
   );
   const [nutritionDayRolloverInput, setNutritionDayRolloverInput] = useState(nutritionDayRolloverTime);
+  const [defaultHydrationInput, setDefaultHydrationInput] = useState(() =>
+    defaultHydrationMl > 0 ? String(defaultHydrationMl) : '',
+  );
+  const [isDefaultHydrationSaving, setIsDefaultHydrationSaving] = useState(false);
   const [showVacationModal, setShowVacationModal] = useState(false);
   const [vacationCalendarMonth, setVacationCalendarMonth] = useState(() => startOfMonth(new Date()));
   const [vacationCalendarRangeAnchor, setVacationCalendarRangeAnchor] = useState(() => startOfMonth(new Date()));
@@ -360,6 +372,10 @@ export const NutritionSettingsScreen = () => {
   useEffect(() => {
     setNutritionDayRolloverInput(nutritionDayRolloverTime);
   }, [nutritionDayRolloverTime]);
+
+  useEffect(() => {
+    setDefaultHydrationInput(defaultHydrationMl > 0 ? String(defaultHydrationMl) : '');
+  }, [defaultHydrationMl]);
 
   useEffect(() => {
     if (!showVacationModal || isLoadingVacationDates) return;
@@ -500,6 +516,32 @@ export const NutritionSettingsScreen = () => {
 
     if (normalized !== nutritionDayRolloverTime) {
       updateNutritionPrefs({ nutrition_day_rollover_time: normalized });
+    }
+  };
+
+  const handleDefaultHydrationInputChange = (value: string) => {
+    setDefaultHydrationInput(value.replace(/[^\d]/g, '').slice(0, 5));
+  };
+
+  const getHydrationDraftMl = () => {
+    const parsed = Number(defaultHydrationInput);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.min(MAX_DEFAULT_HYDRATION_ML, Math.max(0, Math.round(parsed)));
+  };
+
+  const saveDefaultHydration = async () => {
+    const nextDefaultHydrationMl = getHydrationDraftMl();
+    if (nextDefaultHydrationMl === defaultHydrationMl || isDefaultHydrationSaving) return;
+
+    setIsDefaultHydrationSaving(true);
+    try {
+      await updateNutritionPrefs({ default_hydration_ml: nextDefaultHydrationMl });
+      setDefaultHydrationInput(nextDefaultHydrationMl > 0 ? String(nextDefaultHydrationMl) : '');
+    } catch (error) {
+      console.error('[NutritionSettings] Error saving default hydration:', error);
+      Alert.alert(t('common.error'), t('nutrition.defaultHydrationSaveError'));
+    } finally {
+      setIsDefaultHydrationSaving(false);
     }
   };
 
@@ -891,6 +933,10 @@ export const NutritionSettingsScreen = () => {
       titleKey: 'nutrition.nutritionDayInfoModalTitle',
       bodyKey: 'nutrition.nutritionDayInfoModalBody',
     },
+    hydration: {
+      titleKey: 'nutrition.defaultHydrationInfoModalTitle',
+      bodyKey: 'nutrition.defaultHydrationInfoModalBody',
+    },
     snacks: {
       titleKey: 'nutrition.snacksInfoModalTitle',
       bodyKey: 'nutrition.snacksInfoModalBody',
@@ -922,6 +968,9 @@ export const NutritionSettingsScreen = () => {
       <Text style={[styles.sectionTitle, { color: themeColors.textSecondary }]}>{label}</Text>
     </TouchableOpacity>
   );
+
+  const hydrationDraftMl = getHydrationDraftMl();
+  const isDefaultHydrationSaveDisabled = isDefaultHydrationSaving || hydrationDraftMl === defaultHydrationMl;
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
@@ -1000,6 +1049,104 @@ export const NutritionSettingsScreen = () => {
                   )}
                 </View>
               </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 3. Hidratación */}
+          <View style={styles.section}>
+            {renderSectionTitle(t('nutrition.defaultHydrationTitle'), 'hydration')}
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <View style={styles.hydrationSettingContent}>
+                <View style={styles.hydrationSettingHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.toggleLabel, { color: themeColors.textPrimary }]}>
+                      {t('nutrition.defaultHydrationLabel')}
+                    </Text>
+                    <Text style={[styles.toggleDesc, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.defaultHydrationHint')}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.hydrationInputRow}>
+                  <View
+                    style={[
+                      styles.hydrationInputShell,
+                      {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                        borderColor: themeColors.border,
+                      },
+                    ]}
+                  >
+                    <TextInput
+                      style={[styles.hydrationInput, { color: themeColors.textPrimary }]}
+                      value={defaultHydrationInput}
+                      onChangeText={handleDefaultHydrationInputChange}
+                      placeholder={t('nutrition.defaultHydrationPlaceholder')}
+                      placeholderTextColor={themeColors.textSecondary}
+                      keyboardType="number-pad"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={5}
+                    />
+                    <Text style={[styles.hydrationInputUnit, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.ml')}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.hydrationSaveButton,
+                      {
+                        backgroundColor: isDefaultHydrationSaveDisabled ? themeColors.border : themeColors.primary,
+                      },
+                    ]}
+                    onPress={saveDefaultHydration}
+                    disabled={isDefaultHydrationSaveDisabled}
+                    activeOpacity={0.8}
+                  >
+                    {isDefaultHydrationSaving ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.hydrationSaveButtonText}>{t('common.save')}</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.hydrationPresetRow}>
+                  {HYDRATION_PRESETS_ML.map(presetMl => {
+                    const selected = hydrationDraftMl === presetMl;
+                    return (
+                      <TouchableOpacity
+                        key={presetMl}
+                        style={[
+                          styles.hydrationPresetChip,
+                          {
+                            borderColor: selected ? themeColors.primary : themeColors.border,
+                            backgroundColor: selected
+                              ? isDark
+                                ? 'rgba(59, 130, 246, 0.18)'
+                                : 'rgba(0, 122, 255, 0.1)'
+                              : 'transparent',
+                          },
+                        ]}
+                        onPress={() => setDefaultHydrationInput(String(presetMl))}
+                        activeOpacity={0.75}
+                      >
+                        <Text
+                          style={[
+                            styles.hydrationPresetText,
+                            { color: selected ? themeColors.primary : themeColors.textSecondary },
+                          ]}
+                        >
+                          {presetMl}
+                          {t('nutrition.ml')}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
             </View>
           </View>
 
@@ -2207,6 +2354,67 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  hydrationSettingContent: {
+    padding: spacing.m,
+    gap: spacing.m,
+  },
+  hydrationSettingHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.m,
+  },
+  hydrationInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+  },
+  hydrationInputShell: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.m,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hydrationInput: {
+    flex: 1,
+    ...typography.body,
+    fontWeight: '700',
+    paddingVertical: 0,
+  },
+  hydrationInputUnit: {
+    ...typography.caption,
+    fontWeight: '700',
+  },
+  hydrationSaveButton: {
+    minWidth: 92,
+    minHeight: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.m,
+  },
+  hydrationSaveButtonText: {
+    ...typography.body,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  hydrationPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.s,
+  },
+  hydrationPresetChip: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xs,
+  },
+  hydrationPresetText: {
+    ...typography.caption,
+    fontWeight: '700',
   },
   radioRow: {
     flexDirection: 'row',

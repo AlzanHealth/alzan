@@ -327,8 +327,8 @@ export const nutritionService = {
 
   // --- Water (daily_hydration) ---
 
-  async getWaterIntake(userId: string, date: string) {
-    if (!userId) return 0;
+  async getWaterIntake(userId: string, date: string, fallbackMl = 0) {
+    if (!userId) return fallbackMl;
 
     const { data, error } = await supabase
       .from('daily_hydration')
@@ -340,7 +340,7 @@ export const nutritionService = {
     if (error) {
       throw error;
     }
-    return data?.total_ml || 0;
+    return data?.total_ml ?? fallbackMl;
   },
 
   async upsertWaterIntake(userId: string, date: string, total_ml: number) {

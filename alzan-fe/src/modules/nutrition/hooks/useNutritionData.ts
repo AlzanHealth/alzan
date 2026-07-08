@@ -7,13 +7,14 @@ import { DietTemplateInsert, DietTemplateUpdate, MealLog, MealLogInsert } from '
 import { IngredientInput } from '../types/db';
 import { useAuth } from '../../../context/AuthContext';
 import { getCurrentAppLocale } from '../../../services/localization';
+import { usePreferences } from '../../../hooks/settings/usePreferences';
 
 const KEYS = {
   TEMPLATES: (userId: string) => ['dietTemplates', userId],
   TEMPLATE_MEALS: (id: string) => ['dietTemplateMeals', id],
   MEAL_LOGS: (userId: string, start: string, end: string) => ['mealLogs', userId, start, end],
   DAY_STATUSES: (userId: string, start: string, end: string) => ['nutritionDayStatuses', userId, start, end],
-  WATER: (userId: string, date: string) => ['water', userId, date],
+  WATER: (userId: string, date: string, fallbackMl = 0) => ['water', userId, date, fallbackMl],
   ACTIVE_TEMPLATE_ID: 'active_diet_template_id',
 };
 
@@ -226,10 +227,16 @@ export function useWaterIntake(date: string) {
   const queryClient = useQueryClient();
 
   const { user } = useAuth();
+  const { preferences } = usePreferences();
+  const storedDefaultHydrationMl = preferences?.nutrition_prefs?.default_hydration_ml;
+  const defaultHydrationMl =
+    typeof storedDefaultHydrationMl === 'number' && Number.isFinite(storedDefaultHydrationMl)
+      ? Math.max(0, Math.round(storedDefaultHydrationMl))
+      : 0;
 
   const query = useQuery({
-    queryKey: user ? KEYS.WATER(user.id, date) : ['water', 'anonymous', date],
-    queryFn: () => nutritionService.getWaterIntake(user!.id, date),
+    queryKey: user ? KEYS.WATER(user.id, date, defaultHydrationMl) : ['water', 'anonymous', date, defaultHydrationMl],
+    queryFn: () => nutritionService.getWaterIntake(user!.id, date, defaultHydrationMl),
     enabled: !!user,
   });
 
@@ -237,13 +244,13 @@ export function useWaterIntake(date: string) {
     mutationFn: (ml: number) => nutritionService.upsertWaterIntake(user!.id, date, ml),
     onSuccess: ml => {
       if (user) {
-        queryClient.setQueryData(KEYS.WATER(user.id, date), ml);
+        queryClient.setQueryData(KEYS.WATER(user.id, date, defaultHydrationMl), ml);
       }
     },
   });
 
   return {
-    data: query.data || 0,
+    data: query.data ?? defaultHydrationMl,
     isLoading: query.isLoading,
     update: mutation.mutateAsync,
   };

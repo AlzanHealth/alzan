@@ -104,6 +104,12 @@ const en = {
     adjust: 'Adjust',
     ml: 'ml',
     hydration: 'Hydration',
+    defaultHydrationTitle: 'HYDRATION',
+    defaultHydrationLabel: 'Default daily water',
+    defaultHydrationHint:
+      'Used as the starting value for days without a saved water record. You can edit each day later.',
+    defaultHydrationPlaceholder: 'No default',
+    defaultHydrationSaveError: 'Could not save the default hydration value.',
     checkOfficialSiteForIngredients: 'For ingredients, check the supplier’s official website.',
     onlyMacrosWarning: '⚠️ Only macros available.',
     noIngredientsFound: 'No ingredients found',
@@ -227,6 +233,9 @@ const en = {
       'Choose when the app should switch to the next nutrition day.\n\nBefore this time, automatic meal logging still uses the previous day, which helps with late dinners or snacks after midnight.',
     nutritionDayRolloverLabel: 'Switch day at',
     nutritionDayRolloverHint: 'Meals logged before this time use the previous nutrition day.',
+    defaultHydrationInfoModalTitle: 'Default hydration',
+    defaultHydrationInfoModalBody:
+      'Set a daily water value that appears by default in Nutrition.\n\nIt does not create hydration records in advance. If you edit water on a specific day, that saved day value takes priority.',
     recipePrivacyTitle: 'RECIPE PRIVACY',
     recipePrivacyInfoModalTitle: 'Recipe privacy',
     recipePrivacyInfoModalBody:
