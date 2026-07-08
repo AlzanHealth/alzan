@@ -75,13 +75,19 @@ import {
 } from '../constants/bodyCompositionRanges';
 import { Alert } from '../../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
+import {
+  getBodyFatPrecisionTip,
+  getLocalizedCompositionFormula,
+  getMusclePrecisionTip,
+  getRemainderInfoCopy,
+} from '../algorithms/bodyCompositionInfoCopy';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 /** Type for info modal state - which metric is being explained */
-type InfoType = 'bmi' | 'bodyFat' | 'muscle' | null;
+type InfoType = 'bmi' | 'bodyFat' | 'muscle' | 'remainder' | null;
 
 // ============================================================================
 // MAIN COMPONENT
@@ -277,6 +283,14 @@ export const BodyCompositionDetail = () => {
   const formatInputsUsed = (inputs: CompositionInputKey[] | undefined): string =>
     inputs && inputs.length > 0 ? inputs.map(getInputLabel).join(', ') : t('health.noData');
 
+  const translateInfoCopy = (key: string, values?: Record<string, string | number>): string => {
+    const translate = t as unknown as (
+      translationKey: string,
+      interpolation?: Record<string, string | number>,
+    ) => string;
+    return translate(key, values);
+  };
+
   // --- INFO MODAL ---
   const InfoModal = () => {
     if (!infoModal) return null;
@@ -293,6 +307,7 @@ export const BodyCompositionDetail = () => {
     // Body fat method info
     const muscleMethod = bodyComposition.muscle?.method || 'lee_et_al';
     const isAdvancedMuscle = muscleMethod === 'al_gindan';
+    const formulaSex = profile?.sex === 'female' ? 'female' : 'male';
 
     if (infoModal === 'bmi') {
       title = t('health.imc');
@@ -307,16 +322,14 @@ export const BodyCompositionDetail = () => {
       calculationDetails = (
         <View style={styles.calculationContainer}>
           <Text style={styles.calcExplanation}>
-            <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')}</Text>
-            {t('health.bmiFormula')}
+            <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')}</Text> {t('health.bmiFormula')}
           </Text>
           <View style={styles.calcDivider} />
           <View style={styles.calculationRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.calcLabel}>{t('health.yourWeight')}</Text>
               <Text style={[styles.calcValue, { color: themeColor }]}>
-                {convertWeightToUi(weightKg).value}
-                {convertWeightToUi(weightKg).unit}
+                {convertWeightToUi(weightKg).value} {convertWeightToUi(weightKg).unit}
               </Text>
             </View>
             <View style={{ flex: 1 }}>
@@ -338,7 +351,7 @@ export const BodyCompositionDetail = () => {
             <TrendingUp size={16} color={themeColor} />
           </View>
           <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
-            <Text style={{ fontWeight: '700' }}>{t('health.improvePrecision')}</Text>
+            <Text style={{ fontWeight: '700' }}>{t('health.improvePrecision')}</Text>{' '}
             {t('health.unlockAdvancedMetricsPrompt')}
           </Text>
         </View>,
@@ -361,8 +374,14 @@ export const BodyCompositionDetail = () => {
       formulaTitle = t('health.methodOfCalculation');
 
       const method = bodyComposition.bodyFat?.method || 'deurenberg';
-      const formula = bodyComposition.bodyFat?.formulaUsed || '';
+      const formula = getLocalizedCompositionFormula({
+        metric: 'bodyFat',
+        method,
+        sex: formulaSex,
+        t: translateInfoCopy,
+      });
       const inputsUsed = bodyComposition.bodyFat?.inputsUsed;
+      const precisionTip = getBodyFatPrecisionTip(method, translateInfoCopy);
       const getBodyFatMethodLabel = () => {
         switch (method) {
           case 'stored':
@@ -407,12 +426,12 @@ export const BodyCompositionDetail = () => {
 
           {shouldShowFormula && (
             <Text style={styles.calcExplanation}>
-              <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')}</Text>
+              <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')} </Text>
               {formula}
             </Text>
           )}
           <Text style={styles.calcExplanation}>
-            <Text style={{ fontWeight: '700' }}>{t('health.dataUsedLabel')}</Text>
+            <Text style={{ fontWeight: '700' }}>{t('health.dataUsedLabel')} </Text>
             {formatInputsUsed(inputsUsed)}
           </Text>
           <View style={styles.calcDivider} />
@@ -420,38 +439,32 @@ export const BodyCompositionDetail = () => {
 
           <View style={styles.calcDivider} />
           <Text style={[styles.calcExplanation, { fontWeight: '700', color: themeColor, fontSize: 16 }]}>
-            {t('health.resultLabel')}
-            {bodyComposition.bodyFat?.percentage || '--'}
+            {t('health.resultLabel')} {bodyComposition.bodyFat?.percentage || '--'}
             {t('health.bodyFatPercentage')}
           </Text>
         </View>
       );
 
-      // Dynamic tips based on what's missing
-      // Dynamic tips based on what's missing
-      // If we are using Deurenberg or CUN-BAE (basic methods), suggest Abdomen for RFM
-      if (method === 'deurenberg' || method === 'cun_bae' || method === 'bai') {
+      tips.push(
+        <View key="tip1" style={styles.tipBox}>
+          <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
+            {method === 'rfm' ? <Target size={16} color={themeColor} /> : <TrendingUp size={16} color={themeColor} />}
+          </View>
+          <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
+            <Text style={{ fontWeight: '700' }}>{precisionTip.title} </Text>
+            {precisionTip.body}
+          </Text>
+        </View>,
+      );
+
+      if (method === 'rfm') {
         tips.push(
-          <View key="tip1" style={styles.tipBox}>
+          <View key="tip-tracking" style={styles.tipBox}>
             <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
-              <TrendingUp size={16} color={themeColor} />
+              <Lightbulb size={16} color={themeColor} />
             </View>
             <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
-              <Text style={{ fontWeight: '700' }}>{t('health.improvePrecision')}</Text>
-              {t('health.addMeasurementOf')} <Text style={{ fontWeight: '700' }}>{t('health.abdomen')}</Text>
-              {t('health.activateRfmAlgHint')}
-            </Text>
-          </View>,
-        );
-      } else if (method === 'rfm') {
-        tips.push(
-          <View key="tip1" style={styles.tipBox}>
-            <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
-              <Target size={16} color={themeColor} />
-            </View>
-            <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
-              <Text style={{ fontWeight: '700' }}>{t('health.optimalPrecision')}</Text>
-              {t('health.keepAbdomenUpdated')}
+              {t('health.trackingMeasurementsNote')}
             </Text>
           </View>,
         );
@@ -472,6 +485,13 @@ export const BodyCompositionDetail = () => {
       IconComponent = Dumbbell;
       description = t('health.muscleDescription');
       formulaTitle = t('health.methodOfCalculation');
+      const muscleFormula = getLocalizedCompositionFormula({
+        metric: 'muscle',
+        method: muscleMethod,
+        sex: formulaSex,
+        t: translateInfoCopy,
+      });
+      const precisionTip = getMusclePrecisionTip(muscleMethod, translateInfoCopy);
 
       const getMuscleMethodLabel = () => {
         switch (muscleMethod) {
@@ -499,7 +519,6 @@ export const BodyCompositionDetail = () => {
             return t('health.estimatedCalcNote');
         }
       };
-      const muscleFormula = bodyComposition.muscle?.formulaUsed || '';
       const shouldShowMuscleFormula = muscleMethod !== 'stored' && muscleFormula.length > 0;
 
       calculationDetails = (
@@ -514,12 +533,12 @@ export const BodyCompositionDetail = () => {
 
           {shouldShowMuscleFormula && (
             <Text style={styles.calcExplanation}>
-              <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')}</Text>
+              <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')} </Text>
               {muscleFormula}
             </Text>
           )}
           <Text style={styles.calcExplanation}>
-            <Text style={{ fontWeight: '700' }}>{t('health.dataUsedLabel')}</Text>
+            <Text style={{ fontWeight: '700' }}>{t('health.dataUsedLabel')} </Text>
             {formatInputsUsed(bodyComposition.muscle?.inputsUsed)}
           </Text>
           <View style={styles.calcDivider} />
@@ -530,7 +549,7 @@ export const BodyCompositionDetail = () => {
             <View style={{ flex: 1 }}>
               <Text style={styles.calcLabel}>{t('health.muscleMass')}</Text>
               <Text style={[styles.calcValue, { color: themeColor }]}>
-                {bodyComposition.muscle?.massKg ? convertWeightToUi(bodyComposition.muscle.massKg).value : '--'}
+                {bodyComposition.muscle?.massKg ? convertWeightToUi(bodyComposition.muscle.massKg).value : '--'}{' '}
                 {bodyComposition.muscle?.massKg ? convertWeightToUi(bodyComposition.muscle.massKg).unit : ''}
               </Text>
             </View>
@@ -544,38 +563,64 @@ export const BodyCompositionDetail = () => {
         </View>
       );
 
-      if (!isAdvancedMuscle) {
-        tips.push(
-          <View key="tip1" style={styles.tipBox}>
-            <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
-              <TrendingUp size={16} color={themeColor} />
-            </View>
-            <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
-              <Text style={{ fontWeight: '700' }}>{t('health.improvePrecision')}</Text>
-              {t('health.addMeasurementOf')} <Text style={{ fontWeight: '700' }}>{t('health.abdomenAndHip')}</Text>
-              {t('health.activateMriAlgHint')}
-            </Text>
-          </View>,
-        );
-      } else {
-        tips.push(
-          <View key="tip1" style={styles.tipBox}>
-            <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
-              <Target size={16} color={themeColor} />
-            </View>
-            <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
-              <Text style={{ fontWeight: '700' }}>{t('health.optimalPrecision')}</Text>
-              {t('health.measurementsUpdateAdvice')}
-            </Text>
-          </View>,
-        );
-      }
       tips.push(
-        <View key="tip2" style={styles.tipBox}>
+        <View key="tip1" style={styles.tipBox}>
+          <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
+            {isAdvancedMuscle ? <Target size={16} color={themeColor} /> : <TrendingUp size={16} color={themeColor} />}
+          </View>
+          <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
+            <Text style={{ fontWeight: '700' }}>{precisionTip.title} </Text>
+            {precisionTip.body}
+          </Text>
+        </View>,
+      );
+      tips.push(
+        <View key="tip-tracking" style={styles.tipBox}>
           <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
             <Lightbulb size={16} color={themeColor} />
           </View>
+          <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
+            {t('health.trackingMeasurementsNote')}
+          </Text>
+        </View>,
+      );
+      tips.push(
+        <View key="tip2" style={styles.tipBox}>
+          <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
+            <Dumbbell size={16} color={themeColor} />
+          </View>
           <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>{t('health.proteinAdvice')}</Text>
+        </View>,
+      );
+    } else if (infoModal === 'remainder') {
+      title = t('health.remainder');
+      themeColor = themeColors.textPrimary;
+      IconComponent = Info;
+      const remainderCopy = getRemainderInfoCopy(translateInfoCopy);
+      description = remainderCopy.description;
+      formulaTitle = t('health.methodOfCalculation');
+
+      calculationDetails = (
+        <View style={styles.calculationContainer}>
+          <Text style={styles.calcExplanation}>
+            <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')} </Text>
+            {remainderCopy.formula}
+          </Text>
+          <View style={styles.calcDivider} />
+          <Text style={styles.calcExplanation}>{remainderCopy.components}</Text>
+          <View style={styles.calcDivider} />
+          <Text style={[styles.calcExplanation, { fontWeight: '700', color: themeColor, fontSize: 16 }]}>
+            {t('health.resultLabel')} {bodyComposition.residualMassKg || '--'} {t('health.unitKg')}
+          </Text>
+        </View>
+      );
+
+      tips.push(
+        <View key="tip1" style={styles.tipBox}>
+          <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
+            <Lightbulb size={16} color={themeColor} />
+          </View>
+          <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>{remainderCopy.note}</Text>
         </View>,
       );
     }
@@ -626,14 +671,16 @@ export const BodyCompositionDetail = () => {
                 <Text style={[styles.sheetSectionTitle, { color: themeColors.textPrimary }]}>
                   {t('health.tipsAndRecs')}
                 </Text>
-                <View
-                  style={[
-                    styles.tipsContainer,
-                    { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background },
-                  ]}
-                >
-                  {tips}
-                </View>
+                {tips.length > 0 && (
+                  <View
+                    style={[
+                      styles.tipsContainer,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background },
+                    ]}
+                  >
+                    {tips}
+                  </View>
+                )}
               </View>
             </ScrollView>
           </View>
@@ -825,9 +872,7 @@ export const BodyCompositionDetail = () => {
                       <TrendingUp size={14} color="#10B981" />
                     </View>
                     <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
-                      {t('health.add')}
-                      <Text style={{ fontWeight: '700', color: themeColors.textSecondary }}>{t('health.abdomen')}</Text>
-                      {t('health.forBetterPrecision')}
+                      {t('health.bodyFatImprovePrecisionBody')}
                     </Text>
                   </View>
                 )}
@@ -880,11 +925,7 @@ export const BodyCompositionDetail = () => {
                       <TrendingUp size={14} color="#047857" />
                     </View>
                     <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
-                      {t('health.activateMriAlgHint')}{' '}
-                      <Text style={{ fontWeight: '700', color: themeColors.textSecondary }}>
-                        {t('health.abdomenAndHip')}
-                      </Text>
-                      {t('health.activateMriAlgHint')}
+                      {t('health.muscleImprovePrecisionBody')}
                     </Text>
                   </View>
                 )}
@@ -942,13 +983,13 @@ export const BodyCompositionDetail = () => {
                 <View style={styles.massDivider} />
 
                 {/* Lean (Residual: Bone/Water/Organs) */}
-                <View style={styles.massItem}>
+                <TouchableOpacity style={styles.massItem} onPress={() => setInfoModal('remainder')}>
                   <Text style={[styles.massLabel, { color: themeColors.textSecondary }]}>{t('health.remainder')}</Text>
                   <Text style={[styles.massValue, { color: themeColors.textPrimary }]}>
                     {bodyComposition.residualMassKg || '--'}{' '}
                     <Text style={[styles.massUnit, { color: themeColors.textSecondary }]}>{t('health.unitKg')}</Text>
                   </Text>
-                </View>
+                </TouchableOpacity>
               </View>
             </GlassCard>
           )}

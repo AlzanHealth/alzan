@@ -657,6 +657,17 @@ export default {
     bmiFormula: 'IMC = Peso (kg) / Altura² (m²)',
     formulaLabel: 'Fórmula:',
     dataUsedLabel: 'Datos usados:',
+    formulaCunBaeLocalized:
+      'CUN-BAE = -44.988 + 0.503 * edad + 10.689 * factor mujer + 3.172 * IMC - 0.026 * IMC^2 + 0.181 * IMC * factor mujer - 0.02 * IMC * edad - 0.005 * IMC^2 * factor mujer + 0.00021 * IMC^2 * edad (factor mujer = {{femaleFactor}})',
+    formulaRfmMaleLocalized: 'RFM = 64 - 20 * (altura / abdomen)',
+    formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (altura / abdomen)',
+    formulaBaiLocalized: 'BAI = (cadera / alturaM^1.5) - 18',
+    formulaDeurenbergLocalized:
+      'Deurenberg = 1.20 * IMC + 0.23 * edad - 10.8 * factor hombre - 5.4 (factor hombre = {{maleFactor}})',
+    formulaLeeLocalized:
+      'SMM = 0.244 * peso + 7.8 * alturaM - 0.098 * edad + 6.6 * factor hombre - 3.3 (factor hombre = {{maleFactor}})',
+    formulaAlGindanMaleLocalized: 'SMM = 39.5 + 0.665 * peso - 0.185 * abdomen - 0.418 * cadera - 0.08 * edad',
+    formulaAlGindanFemaleLocalized: 'SMM = 2.89 + 0.255 * peso - 0.175 * cadera - 0.038 * edad + 0.118 * altura',
     calcInputWeight: 'peso',
     calcInputHeight: 'altura',
     calcInputAge: 'edad',
@@ -676,6 +687,25 @@ export default {
       'Estimación muscular antropométrica avanzada. Necesita abdomen y cadera recientes y sigue siendo una estimación, no una prueba clínica.',
     basicMusclePrecisionNote:
       'Estimación muscular básica con peso, altura, edad y sexo porque faltan abdomen y cadera recientes.',
+    bodyFatOptimalPrecisionTitle: 'Precisión óptima para grasa corporal:',
+    bodyFatOptimalPrecisionBody:
+      'Mantén tu abdomen actualizado; no necesitas cadera para mejorar este cálculo de grasa corporal.',
+    bodyFatImprovePrecisionBody:
+      'Añade abdomen para activar RFM, el método más preciso disponible en Alzan para grasa corporal.',
+    muscleOptimalPrecisionTitle: 'Precisión óptima para músculo estimado:',
+    muscleOptimalPrecisionBody:
+      'Mantén abdomen y cadera actualizados para conservar la mejor estimación muscular disponible en Alzan.',
+    muscleImprovePrecisionBody:
+      'Añade abdomen y cadera para activar Al-Gindan, la estimación muscular más precisa disponible en Alzan.',
+    trackingMeasurementsNote:
+      'Pecho, brazo y muslo sirven para ver cambios de perímetros y progreso visual, pero no se usan en esta estimación.',
+    remainderDescription:
+      'Resto es la parte de tu peso que no se estima como masa grasa ni como masa muscular esquelética.',
+    remainderFormula: 'Resto = peso total - masa grasa - masa muscular estimada',
+    remainderComponents:
+      'Incluye principalmente agua corporal, huesos/minerales, órganos, piel, tejido conectivo, sangre, glucógeno y el margen de error de las estimaciones.',
+    remainderClinicalNote:
+      'No es una métrica clínica aislada. Puede variar por hidratación, glucógeno, comida reciente y la precisión de las estimaciones de grasa y músculo.',
     autoCompCalcDisclaimer:
       'Los datos de composición corporal se calculan automáticamente al registrar el peso. Se recomienda añadir primero las medidas corporales para un cálculo más exacto.',
     addFirstSleepRecord: 'Toca + para añadir tu primera noche',
@@ -1171,7 +1201,7 @@ export default {
     healthConsent: 'Consentimiento de Salud',
     termsConditions: 'Términos y Condiciones',
     preferNotToSay: 'Prefiero no decir',
-    male: 'male',
+    male: 'Hombre',
     yourName: 'Tu nombre',
     athleteDesc: 'Competitivo, dobles sesiones (+7 sesiones/semana).',
     proAthlete: 'Atleta / Alto Rendimiento',
@@ -1302,7 +1332,7 @@ export default {
     irreversibleActionWarning: 'No hay vuelta atrás. ¿Realmente quieres borrar todo?',
     lastWarning: 'Última advertencia',
     accountDeletionImmediateEffect: 'Tu cuenta dejará de existir inmediatamente después de confirmar.',
-    genderFemale: 'female',
+    genderFemale: 'Mujer',
     genderMale: 'Hombre',
     genderFemaleAlt: 'Mujer',
     genderPrivate: 'Prefiero no decirlo',

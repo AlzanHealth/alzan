@@ -9,8 +9,6 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { config, parse } = require("dotenv");
-const { expand } = require("dotenv-expand");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -22,6 +20,85 @@ const cloudEnvPath = path.join(ROOT, ".env.cloud");
 // (ports, backend URLs, OAuth, ...) keeps the local values from .env.
 const useCloud = process.argv.includes("--cloud");
 
+function unquoteEnvValue(value) {
+  const trimmed = value.trim();
+  if (trimmed.length < 2) return trimmed;
+
+  const quote = trimmed[0];
+  if ((quote !== `"` && quote !== `'`) || trimmed[trimmed.length - 1] !== quote) {
+    return trimmed;
+  }
+
+  const inner = trimmed.slice(1, -1);
+  if (quote === `'`) return inner;
+
+  return inner
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\r")
+    .replace(/\\t/g, "\t")
+    .replace(/\\"/g, `"`)
+    .replace(/\\\\/g, "\\");
+}
+
+function stripInlineComment(value) {
+  let quote = null;
+  for (let index = 0; index < value.length; index++) {
+    const char = value[index];
+    const previous = value[index - 1];
+
+    if ((char === `"` || char === `'`) && previous !== "\\") {
+      quote = quote === char ? null : quote ?? char;
+      continue;
+    }
+
+    if (char === "#" && quote === null && (index === 0 || /\s/.test(previous))) {
+      return value.slice(0, index);
+    }
+  }
+
+  return value;
+}
+
+function parseEnvFile(filePath) {
+  const parsed = {};
+  const raw = fs.readFileSync(filePath, "utf8");
+
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (!match) continue;
+
+    parsed[match[1]] = unquoteEnvValue(stripInlineComment(match[2]));
+  }
+
+  return parsed;
+}
+
+function expandEnvValues(values) {
+  const expanded = {};
+  const resolving = new Set();
+  const pattern = /\${([A-Za-z_][A-Za-z0-9_]*)}/g;
+
+  const resolveValue = (key) => {
+    if (expanded[key] !== undefined) return expanded[key];
+    if (resolving.has(key)) return values[key] ?? "";
+
+    resolving.add(key);
+    const rawValue = values[key] ?? "";
+    expanded[key] = rawValue.replace(pattern, (_match, refKey) => resolveValue(refKey));
+    resolving.delete(key);
+    return expanded[key];
+  };
+
+  for (const key of Object.keys(values)) {
+    resolveValue(key);
+  }
+
+  return expanded;
+}
+
 if (!fs.existsSync(rootEnvPath)) {
   console.error(
     `❌  Root .env not found. Copy .env.example to .env and fill in your values.`,
@@ -29,7 +106,7 @@ if (!fs.existsSync(rootEnvPath)) {
   process.exit(1);
 }
 
-let merged = parse(fs.readFileSync(rootEnvPath));
+let merged = parseEnvFile(rootEnvPath);
 
 if (useCloud) {
   if (!fs.existsSync(cloudEnvPath)) {
@@ -39,13 +116,13 @@ if (useCloud) {
     );
     process.exit(1);
   }
-  merged = { ...merged, ...parse(fs.readFileSync(cloudEnvPath)) };
+  merged = { ...merged, ...parseEnvFile(cloudEnvPath) };
   console.log(`☁️   Cloud mode: overlaying .env.cloud on top of .env`);
 }
 
 // Expand ${VAR} interpolations using only the merged file values (deterministic,
 // independent of the shell environment).
-const { parsed: root } = expand({ parsed: merged, processEnv: {} });
+const root = expandEnvValues(merged);
 
 // ─── Mapping definitions ──────────────────────────────────────────────────────
 // Format: { TARGET_KEY: "SOURCE_KEY_FROM_ROOT_ENV" }
@@ -116,7 +193,7 @@ const FE_MAPPING = {
 // ─── Writer ───────────────────────────────────────────────────────────────────
 function readExistingEnv(targetPath) {
   if (!fs.existsSync(targetPath)) return {};
-  return config({ path: targetPath, processEnv: {} }).parsed ?? {};
+  return parseEnvFile(targetPath);
 }
 
 function writeEnv(targetPath, root, mapping, label) {

@@ -649,6 +649,17 @@ const en = {
     bmiFormula: 'BMI = Weight (kg) / Height² (m²)',
     formulaLabel: 'Formula:',
     dataUsedLabel: 'Data used:',
+    formulaCunBaeLocalized:
+      'CUN-BAE = -44.988 + 0.503 * age + 10.689 * female factor + 3.172 * BMI - 0.026 * BMI^2 + 0.181 * BMI * female factor - 0.02 * BMI * age - 0.005 * BMI^2 * female factor + 0.00021 * BMI^2 * age (female factor = {{femaleFactor}})',
+    formulaRfmMaleLocalized: 'RFM = 64 - 20 * (height / abdomen)',
+    formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (height / abdomen)',
+    formulaBaiLocalized: 'BAI = (hip / heightM^1.5) - 18',
+    formulaDeurenbergLocalized:
+      'Deurenberg = 1.20 * BMI + 0.23 * age - 10.8 * male factor - 5.4 (male factor = {{maleFactor}})',
+    formulaLeeLocalized:
+      'SMM = 0.244 * weight + 7.8 * heightM - 0.098 * age + 6.6 * male factor - 3.3 (male factor = {{maleFactor}})',
+    formulaAlGindanMaleLocalized: 'SMM = 39.5 + 0.665 * weight - 0.185 * abdomen - 0.418 * hip - 0.08 * age',
+    formulaAlGindanFemaleLocalized: 'SMM = 2.89 + 0.255 * weight - 0.175 * hip - 0.038 * age + 0.118 * height',
     calcInputWeight: 'weight',
     calcInputHeight: 'height',
     calcInputAge: 'age',
@@ -668,6 +679,24 @@ const en = {
       'Advanced anthropometric muscle estimate. It needs recent abdomen and hip measurements and remains an estimate, not a clinical test.',
     basicMusclePrecisionNote:
       'Basic muscle estimate using weight, height, age, and sex because recent abdomen and hip measurements are missing.',
+    bodyFatOptimalPrecisionTitle: 'Optimal precision for body fat:',
+    bodyFatOptimalPrecisionBody:
+      'Keep your abdomen measurement updated; hip is not needed to improve this body fat calculation.',
+    bodyFatImprovePrecisionBody:
+      'Add abdomen to activate RFM, the most accurate body fat method currently available in Alzan.',
+    muscleOptimalPrecisionTitle: 'Optimal precision for estimated muscle:',
+    muscleOptimalPrecisionBody: 'Keep abdomen and hip updated to maintain the best muscle estimate available in Alzan.',
+    muscleImprovePrecisionBody:
+      'Add abdomen and hip to activate Al-Gindan, the most precise muscle estimate currently available in Alzan.',
+    trackingMeasurementsNote:
+      'Chest, arm, and thigh are useful to follow perimeter changes and visual progress, but they are not used by this estimate.',
+    remainderDescription:
+      'Remainder is the part of your weight that is not estimated as fat mass or skeletal muscle mass.',
+    remainderFormula: 'Remainder = total weight - fat mass - estimated muscle mass',
+    remainderComponents:
+      'It mainly includes body water, bones/minerals, organs, skin, connective tissue, blood, glycogen, and the error margin of the estimates.',
+    remainderClinicalNote:
+      'It is not a standalone clinical metric. It can change with hydration, glycogen, recent food intake, and the precision of fat and muscle estimates.',
     autoCompCalcDisclaimer:
       'Body composition data is calculated automatically when recording weight. It is recommended to add body measurements first for a more accurate calculation.',
     addFirstSleepRecord: 'Tap + to add your first night',
