@@ -28,11 +28,12 @@ interface RemainderInfoCopy {
 export const getLocalizedCompositionFormula = ({ metric, method, sex, t }: LocalizedFormulaInput): string => {
   const femaleFactor = sex === 'female' ? 1 : 0;
   const maleFactor = sex === 'male' ? 1 : 0;
+  const sexLabel = (sex === 'female' ? t('settings.genderFemale') : t('settings.male')).toLocaleLowerCase();
 
   if (metric === 'bodyFat') {
     switch (method) {
       case 'cun_bae':
-        return t('health.formulaCunBaeLocalized', { femaleFactor });
+        return t('health.formulaCunBaeLocalized', { femaleFactor, sexLabel });
       case 'rfm':
         return sex === 'female' ? t('health.formulaRfmFemaleLocalized') : t('health.formulaRfmMaleLocalized');
       case 'bai':

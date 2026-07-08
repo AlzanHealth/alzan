@@ -43,6 +43,11 @@ import {
   getBodyFatCategory,
   getMuscleCategory,
 } from '../algorithms/bodyComposition';
+import {
+  calculateAbdominalHealth,
+  calculateRecompositionTrend,
+  RecompositionSnapshot,
+} from '../algorithms/abdominalHealth';
 import { BodyCompositionLog } from '../services/bodyCompositionService';
 
 /** Debug flag - logs will appear in development mode */
@@ -277,6 +282,19 @@ export const useHealthInsights = () => {
     thigh: getLatest('thigh'),
   };
 
+  const getPreviousLatest = (type: string): number | undefined => {
+    if (!measurements || measurements.length === 0) return undefined;
+
+    const matching = measurements
+      .filter(m => m.measurement_type === type && m.measured_at)
+      .sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime());
+
+    if (matching.length < 2) return undefined;
+
+    const latestDate = new Date(matching[0].measured_at).toDateString();
+    return matching.find(m => new Date(m.measured_at).toDateString() !== latestDate)?.value_cm;
+  };
+
   log('Anthropometric measurements', anthroMeasurements);
 
   // =========================================================================
@@ -341,6 +359,30 @@ export const useHealthInsights = () => {
   const effectiveWeight = latestCompositionLog?.weight_kg_used ?? latestWeight?.weight_kg;
   const effectiveBodyFat = latestCompositionLog?.bodyfat_percent ?? latestWeight?.bodyfat_percent;
   const canCalculateBmi = hasEnoughDataForBmi(effectiveWeight, height_cm);
+  const abdominalHealth = calculateAbdominalHealth({
+    weightKg: effectiveWeight,
+    heightCm: height_cm,
+    sex: effectiveSex,
+    measurements: anthroMeasurements,
+  });
+  const currentRecompositionSnapshot: RecompositionSnapshot = {
+    weightKg: effectiveWeight,
+    abdomen: anthroMeasurements.abdomen,
+    chest: anthroMeasurements.chest,
+    arm: anthroMeasurements.arm,
+    thigh: anthroMeasurements.thigh,
+  };
+  const previousRecompositionSnapshot: RecompositionSnapshot = {
+    weightKg: previousWeight?.weight_kg,
+    abdomen: getPreviousLatest('abdomen'),
+    chest: getPreviousLatest('chest'),
+    arm: getPreviousLatest('arm'),
+    thigh: getPreviousLatest('thigh'),
+  };
+  const recompositionTrend = calculateRecompositionTrend({
+    current: currentRecompositionSnapshot,
+    previous: previousRecompositionSnapshot,
+  });
 
   const canCalculateBodyFat = hasEnoughDataForBodyFat(
     effectiveWeight,
@@ -393,6 +435,8 @@ export const useHealthInsights = () => {
       fatMassKg: bodyCompResult?.fatMassKg || null,
       muscleMassKg: bodyCompResult?.muscleMassKg || null,
       residualMassKg: bodyCompResult?.residualMassKg || null,
+      abdominalHealth,
+      recompositionTrend,
       // Data availability info
       availableData: bodyCompResult?.availableData || {
         hasBasicData: false,

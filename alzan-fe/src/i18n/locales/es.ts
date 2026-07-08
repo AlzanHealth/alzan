@@ -658,7 +658,7 @@ export default {
     formulaLabel: 'Fórmula:',
     dataUsedLabel: 'Datos usados:',
     formulaCunBaeLocalized:
-      'CUN-BAE = -44.988 + 0.503 * edad + 10.689 * factor mujer + 3.172 * IMC - 0.026 * IMC^2 + 0.181 * IMC * factor mujer - 0.02 * IMC * edad - 0.005 * IMC^2 * factor mujer + 0.00021 * IMC^2 * edad (factor mujer = {{femaleFactor}})',
+      'CUN-BAE = -44.988 + 0.503 * edad + 10.689 * factor mujer + 3.172 * IMC - 0.026 * IMC^2 + 0.181 * IMC * factor mujer - 0.02 * IMC * edad - 0.005 * IMC^2 * factor mujer + 0.00021 * IMC^2 * edad (factor mujer = {{femaleFactor}} porque tu perfil está configurado como {{sexLabel}})',
     formulaRfmMaleLocalized: 'RFM = 64 - 20 * (altura / abdomen)',
     formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (altura / abdomen)',
     formulaBaiLocalized: 'BAI = (cadera / alturaM^1.5) - 18',
@@ -706,6 +706,55 @@ export default {
       'Incluye principalmente agua corporal, huesos/minerales, órganos, piel, tejido conectivo, sangre, glucógeno y el margen de error de las estimaciones.',
     remainderClinicalNote:
       'No es una métrica clínica aislada. Puede variar por hidratación, glucógeno, comida reciente y la precisión de las estimaciones de grasa y músculo.',
+    abdominalHealth: 'Salud abdominal',
+    waistToHeight: 'Abdomen/altura',
+    waistToHip: 'Abdomen/cadera',
+    recomposition: 'Recomposición',
+    advancedMarkers: 'Marcadores avanzados',
+    bri: 'BRI',
+    absi: 'ABSI',
+    abdominalCategoryVeryLow: 'Muy bajo',
+    abdominalCategoryHealthy: 'Zona saludable',
+    abdominalCategoryIncreased: 'Riesgo aumentado',
+    abdominalCategoryModerate: 'Riesgo moderado',
+    abdominalCategoryHigh: 'Riesgo alto',
+    waistToHeightDescription:
+      'El ratio abdomen/altura es un indicador sencillo de riesgo abdominal. Es útil porque compara tu abdomen con tu tamaño corporal.',
+    waistToHeightFormula: 'Abdomen/altura = abdomen en cm / altura en cm',
+    waistToHeightRule:
+      'Una referencia práctica es mantener el abdomen por debajo de la mitad de tu altura. Es un indicador, no un diagnóstico médico.',
+    waistToHipDescription:
+      'El ratio abdomen/cadera ayuda a leer la distribución de grasa y si el peso se concentra más en la zona abdominal.',
+    waistToHipFormula: 'Abdomen/cadera = abdomen en cm / cadera en cm',
+    waistToHipRule:
+      'La lectura usa rangos por sexo y conviene interpretarla junto con abdomen/altura y la tendencia de grasa corporal.',
+    abdominalAdvancedDescription:
+      'BRI y ABSI son índices avanzados de forma corporal. Son menos intuitivos, por eso Alzan los muestra solo como contexto complementario.',
+    missingAbdomenForAbdominal: 'Añade abdomen para calcular los marcadores de salud abdominal.',
+    missingHipForWaistHip: 'Añade cadera para calcular abdomen/cadera.',
+    recompositionDescription:
+      'La recomposición compara la tendencia reciente de abdomen, peso, pecho, brazo y muslo. Es una señal de progreso, no una fórmula médica.',
+    recompositionFormula: 'Tendencia = cambio de abdomen + cambio de peso + conservación de pecho/brazo/muslo',
+    recompositionNoMedicalFormula:
+      'Pecho, brazo y muslo ayudan a seguir cambios de perímetros y conservación muscular relativa, pero no recalculan grasa ni músculo.',
+    recompositionPositive: 'Recomposición positiva',
+    recompositionPositiveAdvice: 'El abdomen baja mientras los perímetros clave se mantienen. Mantén el ritmo actual.',
+    recompositionCorrect: 'Progreso correcto',
+    recompositionCorrectAdvice: 'Peso y abdomen bajan. Vigila fuerza y perímetros para evitar un déficit excesivo.',
+    recompositionMuscleLossRisk: 'Posible pérdida muscular',
+    recompositionMuscleLossRiskAdvice:
+      'El peso bajó mientras pecho, brazo o muslo cayeron bastante. Revisa déficit, proteína y rendimiento de fuerza.',
+    recompositionAbdomenIncreased: 'Abdomen en aumento',
+    recompositionAbdomenIncreasedAdvice:
+      'El abdomen sube. Revisa ingesta reciente, estrés, sueño y consistencia al medir.',
+    recompositionNeutral: 'Tendencia estable',
+    recompositionNeutralAdvice:
+      'Los cambios son pequeños. Sigue midiendo en condiciones parecidas para aclarar la tendencia.',
+    recompositionInsufficient: 'Necesita mediciones previas',
+    recompositionNeedPrevious:
+      'Registra otro día con abdomen e idealmente pecho, brazo y muslo para calcular recomposición.',
+    currentTrend: 'Tendencia actual',
+    dataCompared: 'Datos comparados:',
     autoCompCalcDisclaimer:
       'Los datos de composición corporal se calculan automáticamente al registrar el peso. Se recomienda añadir primero las medidas corporales para un cálculo más exacto.',
     addFirstSleepRecord: 'Toca + para añadir tu primera noche',

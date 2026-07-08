@@ -650,7 +650,7 @@ const en = {
     formulaLabel: 'Formula:',
     dataUsedLabel: 'Data used:',
     formulaCunBaeLocalized:
-      'CUN-BAE = -44.988 + 0.503 * age + 10.689 * female factor + 3.172 * BMI - 0.026 * BMI^2 + 0.181 * BMI * female factor - 0.02 * BMI * age - 0.005 * BMI^2 * female factor + 0.00021 * BMI^2 * age (female factor = {{femaleFactor}})',
+      'CUN-BAE = -44.988 + 0.503 * age + 10.689 * female factor + 3.172 * BMI - 0.026 * BMI^2 + 0.181 * BMI * female factor - 0.02 * BMI * age - 0.005 * BMI^2 * female factor + 0.00021 * BMI^2 * age (female factor = {{femaleFactor}} because your profile is set to {{sexLabel}})',
     formulaRfmMaleLocalized: 'RFM = 64 - 20 * (height / abdomen)',
     formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (height / abdomen)',
     formulaBaiLocalized: 'BAI = (hip / heightM^1.5) - 18',
@@ -697,6 +697,55 @@ const en = {
       'It mainly includes body water, bones/minerals, organs, skin, connective tissue, blood, glycogen, and the error margin of the estimates.',
     remainderClinicalNote:
       'It is not a standalone clinical metric. It can change with hydration, glycogen, recent food intake, and the precision of fat and muscle estimates.',
+    abdominalHealth: 'Abdominal Health',
+    waistToHeight: 'Abdomen/height',
+    waistToHip: 'Abdomen/hip',
+    recomposition: 'Recomposition',
+    advancedMarkers: 'Advanced markers',
+    bri: 'BRI',
+    absi: 'ABSI',
+    abdominalCategoryVeryLow: 'Very low',
+    abdominalCategoryHealthy: 'Healthy zone',
+    abdominalCategoryIncreased: 'Increased risk',
+    abdominalCategoryModerate: 'Moderate risk',
+    abdominalCategoryHigh: 'High risk',
+    waistToHeightDescription:
+      'Abdomen-to-height ratio is a simple indicator of abdominal risk. It is useful because it compares your abdomen with your body size.',
+    waistToHeightFormula: 'Abdomen/height = abdomen cm / height cm',
+    waistToHeightRule:
+      'A practical reference is to keep abdomen below half of height. It is an indicator, not a medical diagnosis.',
+    waistToHipDescription:
+      'Abdomen-to-hip ratio helps read fat distribution and whether more weight is concentrated around the abdominal area.',
+    waistToHipFormula: 'Abdomen/hip = abdomen cm / hip cm',
+    waistToHipRule:
+      'Interpretation uses sex-specific ranges and should be read together with abdomen/height and body fat trend.',
+    abdominalAdvancedDescription:
+      'BRI and ABSI are advanced body-shape indexes. They are less intuitive, so Alzan shows them as complementary context only.',
+    missingAbdomenForAbdominal: 'Add abdomen to calculate abdominal health markers.',
+    missingHipForWaistHip: 'Add hip to calculate abdomen/hip.',
+    recompositionDescription:
+      'Recomposition compares your recent trend in abdomen, weight, chest, arm, and thigh. It is a progress signal, not a medical formula.',
+    recompositionFormula: 'Trend = abdomen change + weight change + chest/arm/thigh preservation',
+    recompositionNoMedicalFormula:
+      'Chest, arm, and thigh help track perimeter changes and relative muscle preservation, but they do not recalculate body fat or muscle mass.',
+    recompositionPositive: 'Positive recomposition',
+    recompositionPositiveAdvice: 'Abdomen is down while key perimeters are maintained. Keep the current pace.',
+    recompositionCorrect: 'Correct progress',
+    recompositionCorrectAdvice:
+      'Weight and abdomen are down. Watch strength and perimeters to avoid excessive deficit.',
+    recompositionMuscleLossRisk: 'Possible muscle loss',
+    recompositionMuscleLossRiskAdvice:
+      'Weight dropped while chest, arm, or thigh fell noticeably. Review deficit, protein, and strength performance.',
+    recompositionAbdomenIncreased: 'Abdomen increased',
+    recompositionAbdomenIncreasedAdvice:
+      'Abdomen is trending up. Check recent intake, stress, sleep, and measurement consistency.',
+    recompositionNeutral: 'Stable trend',
+    recompositionNeutralAdvice: 'Changes are small. Keep measuring under similar conditions to make the trend clearer.',
+    recompositionInsufficient: 'Needs previous measurements',
+    recompositionNeedPrevious:
+      'Record another day with abdomen and, ideally, chest, arm, and thigh to calculate recomposition.',
+    currentTrend: 'Current trend',
+    dataCompared: 'Data compared:',
     autoCompCalcDisclaimer:
       'Body composition data is calculated automatically when recording weight. It is recommended to add body measurements first for a more accurate calculation.',
     addFirstSleepRecord: 'Tap + to add your first night',

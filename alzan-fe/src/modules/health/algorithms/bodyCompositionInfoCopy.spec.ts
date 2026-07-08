@@ -65,13 +65,13 @@ test('Spanish formulas do not leak English technical tokens', () => {
   ];
 
   formulas.forEach(formula => assert.doesNotMatch(formula, englishTechnicalTokens));
-  assert.match(formulas[0], /factor mujer = 0/);
+  assert.match(formulas[0], /factor mujer = 0 porque tu perfil está configurado como hombre/);
 });
 
 test('English formulas keep readable factor notes', () => {
   const formula = getLocalizedCompositionFormula({ metric: 'bodyFat', method: 'cun_bae', sex: 'female', t: tEn });
 
-  assert.match(formula, /female factor = 1/);
+  assert.match(formula, /female factor = 1 because your profile is set to female/);
   assert.doesNotMatch(formula, /\bfemale\s*\+/i);
 });
 

@@ -87,7 +87,7 @@ import {
 // ============================================================================
 
 /** Type for info modal state - which metric is being explained */
-type InfoType = 'bmi' | 'bodyFat' | 'muscle' | 'remainder' | null;
+type InfoType = 'bmi' | 'bodyFat' | 'muscle' | 'remainder' | 'waistToHeight' | 'waistToHip' | 'recomposition' | null;
 
 // ============================================================================
 // MAIN COMPONENT
@@ -250,6 +250,8 @@ export const BodyCompositionDetail = () => {
     if (!bodyComposition.bmi?.value) return null;
     return findCategory(bodyComposition.bmi.value, BMI_RANGES);
   }, [bodyComposition.bmi?.value]);
+  const abdominalHealth = bodyComposition.abdominalHealth;
+  const recompositionTrend = bodyComposition.recompositionTrend;
 
   const getInputLabel = (input: CompositionInputKey): string => {
     switch (input) {
@@ -290,6 +292,7 @@ export const BodyCompositionDetail = () => {
     ) => string;
     return translate(key, values);
   };
+  const translateDynamicKey = (key: string): string => translateInfoCopy(key);
 
   // --- INFO MODAL ---
   const InfoModal = () => {
@@ -623,6 +626,129 @@ export const BodyCompositionDetail = () => {
           <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>{remainderCopy.note}</Text>
         </View>,
       );
+    } else if (infoModal === 'waistToHeight') {
+      title = t('health.waistToHeight');
+      themeColor = '#0EA5E9';
+      IconComponent = Target;
+      description = t('health.waistToHeightDescription');
+      formulaTitle = t('health.methodOfCalculation');
+      const marker = abdominalHealth.waistToHeight;
+
+      calculationDetails = (
+        <View style={styles.calculationContainer}>
+          <Text style={styles.calcExplanation}>
+            <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')} </Text>
+            {t('health.waistToHeightFormula')}
+          </Text>
+          <View style={styles.calcDivider} />
+          <Text style={styles.calcExplanation}>{t('health.waistToHeightRule')}</Text>
+          <View style={styles.calcDivider} />
+          <Text style={[styles.calcExplanation, { fontWeight: '700', color: themeColor, fontSize: 16 }]}>
+            {t('health.resultLabel')} {marker ? marker.value.toFixed(2) : '--'}
+          </Text>
+          {(abdominalHealth.bri || abdominalHealth.absi) && (
+            <>
+              <View style={styles.calcDivider} />
+              <Text style={[styles.sectionSubtitle, { color: themeColors.textPrimary }]}>
+                {t('health.advancedMarkers')}
+              </Text>
+              <Text style={styles.calcExplanation}>{t('health.abdominalAdvancedDescription')}</Text>
+              <View style={styles.advancedMarkerRow}>
+                <Text style={styles.calcLabel}>{t('health.bri')}</Text>
+                <Text style={[styles.advancedMarkerValue, { color: themeColor }]}>
+                  {abdominalHealth.bri?.value ?? '--'}
+                </Text>
+              </View>
+              <View style={styles.advancedMarkerRow}>
+                <Text style={styles.calcLabel}>{t('health.absi')}</Text>
+                <Text style={[styles.advancedMarkerValue, { color: themeColor }]}>
+                  {abdominalHealth.absi?.value ?? '--'}
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
+      );
+
+      tips.push(
+        <View key="tip1" style={styles.tipBox}>
+          <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
+            <Lightbulb size={16} color={themeColor} />
+          </View>
+          <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
+            {marker ? t('health.waistToHeightRule') : t('health.missingAbdomenForAbdominal')}
+          </Text>
+        </View>,
+      );
+    } else if (infoModal === 'waistToHip') {
+      title = t('health.waistToHip');
+      themeColor = '#F59E0B';
+      IconComponent = Target;
+      description = t('health.waistToHipDescription');
+      formulaTitle = t('health.methodOfCalculation');
+      const marker = abdominalHealth.waistToHip;
+
+      calculationDetails = (
+        <View style={styles.calculationContainer}>
+          <Text style={styles.calcExplanation}>
+            <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')} </Text>
+            {t('health.waistToHipFormula')}
+          </Text>
+          <View style={styles.calcDivider} />
+          <Text style={styles.calcExplanation}>{t('health.waistToHipRule')}</Text>
+          <View style={styles.calcDivider} />
+          <Text style={[styles.calcExplanation, { fontWeight: '700', color: themeColor, fontSize: 16 }]}>
+            {t('health.resultLabel')} {marker ? marker.value.toFixed(2) : '--'}
+          </Text>
+        </View>
+      );
+
+      tips.push(
+        <View key="tip1" style={styles.tipBox}>
+          <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
+            <Lightbulb size={16} color={themeColor} />
+          </View>
+          <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
+            {marker ? t('health.waistToHipRule') : t('health.missingHipForWaistHip')}
+          </Text>
+        </View>,
+      );
+    } else if (infoModal === 'recomposition') {
+      title = t('health.recomposition');
+      themeColor = '#8B5CF6';
+      IconComponent = TrendingUp;
+      description = t('health.recompositionDescription');
+      formulaTitle = t('health.methodOfCalculation');
+
+      calculationDetails = (
+        <View style={styles.calculationContainer}>
+          <Text style={styles.calcExplanation}>
+            <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')} </Text>
+            {t('health.recompositionFormula')}
+          </Text>
+          <View style={styles.calcDivider} />
+          <Text style={styles.calcExplanation}>{t('health.recompositionNoMedicalFormula')}</Text>
+          <View style={styles.calcDivider} />
+          <Text style={[styles.calcExplanation, { fontWeight: '700', color: themeColor, fontSize: 16 }]}>
+            {t('health.currentTrend')} {translateDynamicKey(recompositionTrend.labelKey)}
+          </Text>
+          <Text style={styles.calcExplanation}>
+            <Text style={{ fontWeight: '700' }}>{t('health.dataCompared')} </Text>
+            {formatInputsUsed(recompositionTrend.usedMeasurements)}
+          </Text>
+        </View>
+      );
+
+      tips.push(
+        <View key="tip1" style={styles.tipBox}>
+          <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
+            <Lightbulb size={16} color={themeColor} />
+          </View>
+          <Text style={[styles.tipText, { color: themeColors.textPrimary }]}>
+            {translateDynamicKey(recompositionTrend.recommendationKey)}
+          </Text>
+        </View>,
+      );
     }
 
     return (
@@ -732,7 +858,15 @@ export const BodyCompositionDetail = () => {
 
       <View style={styles.metricBody}>
         <View style={styles.valueContainer}>
-          <Text style={[styles.bigValue, { color: themeColors.textPrimary }]}>{value}</Text>
+          <Text
+            style={[
+              styles.bigValue,
+              typeof value === 'string' && value.length > 8 && styles.mediumValue,
+              { color: themeColors.textPrimary },
+            ]}
+          >
+            {value}
+          </Text>
           {unit && <Text style={[styles.unitText, { color: themeColors.textSecondary }]}>{unit}</Text>}
           {delta !== undefined && delta !== 0 && (
             <View style={styles.deltaContainer}>
@@ -934,6 +1068,80 @@ export const BodyCompositionDetail = () => {
           </MetricCard>
 
           {/* Global Recalculate Button */}
+          {/* 4. ABDOMINAL HEALTH */}
+          <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>{t('health.abdominalHealth')}</Text>
+          <MetricCard
+            icon={Target}
+            iconColor="#0EA5E9"
+            title={t('health.waistToHeight')}
+            value={abdominalHealth.waistToHeight?.value.toFixed(2) || '--'}
+            badge={
+              abdominalHealth.waistToHeight ? translateDynamicKey(abdominalHealth.waistToHeight.labelKey) : undefined
+            }
+            badgeColor={abdominalHealth.waistToHeight?.color}
+            onInfoPress={() => setInfoModal('waistToHeight')}
+          >
+            <View
+              style={[styles.inlineTipBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background }]}
+            >
+              <View style={[styles.inlineTipIcon, { backgroundColor: '#0EA5E920' }]}>
+                <Lightbulb size={14} color="#0EA5E9" />
+              </View>
+              <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
+                {abdominalHealth.waistToHeight ? t('health.waistToHeightRule') : t('health.missingAbdomenForAbdominal')}
+              </Text>
+            </View>
+          </MetricCard>
+
+          <MetricCard
+            icon={Target}
+            iconColor="#F59E0B"
+            title={t('health.waistToHip')}
+            value={abdominalHealth.waistToHip?.value.toFixed(2) || '--'}
+            badge={abdominalHealth.waistToHip ? translateDynamicKey(abdominalHealth.waistToHip.labelKey) : undefined}
+            badgeColor={abdominalHealth.waistToHip?.color}
+            onInfoPress={() => setInfoModal('waistToHip')}
+          >
+            <View
+              style={[styles.inlineTipBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background }]}
+            >
+              <View style={[styles.inlineTipIcon, { backgroundColor: '#F59E0B20' }]}>
+                <Lightbulb size={14} color="#F59E0B" />
+              </View>
+              <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
+                {abdominalHealth.waistToHip ? t('health.waistToHipRule') : t('health.missingHipForWaistHip')}
+              </Text>
+            </View>
+          </MetricCard>
+
+          {/* 5. RECOMPOSITION */}
+          <Text style={[styles.sectionTitle, { color: themeColors.textPrimary }]}>{t('health.recomposition')}</Text>
+          <MetricCard
+            icon={TrendingUp}
+            iconColor="#8B5CF6"
+            title={t('health.recomposition')}
+            value={translateDynamicKey(recompositionTrend.labelKey)}
+            badge={
+              recompositionTrend.usedMeasurements.length > 0
+                ? `${recompositionTrend.usedMeasurements.length}`
+                : undefined
+            }
+            badgeColor="#8B5CF6"
+            onInfoPress={() => setInfoModal('recomposition')}
+          >
+            <View
+              style={[styles.inlineTipBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background }]}
+            >
+              <View style={[styles.inlineTipIcon, { backgroundColor: '#8B5CF620' }]}>
+                <Lightbulb size={14} color="#8B5CF6" />
+              </View>
+              <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
+                {translateDynamicKey(recompositionTrend.recommendationKey)}
+              </Text>
+            </View>
+          </MetricCard>
+
+          {/* Global Recalculate Button */}
           <View style={styles.recalculateContainer}>
             <View style={[styles.recalculateSeparator, { backgroundColor: themeColors.border }]} />
             <TouchableOpacity
@@ -1070,6 +1278,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.textPrimary,
     letterSpacing: -1,
+  },
+  mediumValue: {
+    flexShrink: 1,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: 0,
   },
   unitText: {
     fontSize: 20,
@@ -1398,6 +1612,16 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 8,
     marginTop: 12,
+  },
+  advancedMarkerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  advancedMarkerValue: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 
   tipsContainer: {
