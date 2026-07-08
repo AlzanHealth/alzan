@@ -192,9 +192,9 @@ export const useHealthInsights = () => {
 
   let bodyCompResult: BodyCompositionResult | null = null;
 
-  const effectiveSex = profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : 'male';
+  const effectiveSex = profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : undefined;
 
-  if (latestWeight?.weight_kg && profile?.height_cm && age) {
+  if (latestWeight?.weight_kg && profile?.height_cm) {
     // Calculate body composition using the algorithm WITH measurements
     // This ensures the UI shows the ACTUAL method used (RFM, Al-Gindan, etc.)
     bodyCompResult = calculateBodyComposition({

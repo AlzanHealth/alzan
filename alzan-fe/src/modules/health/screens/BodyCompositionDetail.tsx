@@ -62,6 +62,7 @@ import { BlurView } from 'expo-blur';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { LinearGradient } from 'expo-linear-gradient';
+import type { CompositionInputKey } from '../algorithms/bodyComposition';
 import {
   BMI_RANGES,
   BMI_BAR_CONFIG,
@@ -244,6 +245,38 @@ export const BodyCompositionDetail = () => {
     return findCategory(bodyComposition.bmi.value, BMI_RANGES);
   }, [bodyComposition.bmi?.value]);
 
+  const getInputLabel = (input: CompositionInputKey): string => {
+    switch (input) {
+      case 'weight':
+        return t('health.calcInputWeight');
+      case 'height':
+        return t('health.calcInputHeight');
+      case 'age':
+        return t('health.calcInputAge');
+      case 'sex':
+        return t('health.calcInputSex');
+      case 'abdomen':
+        return t('health.abdomen');
+      case 'hips':
+        return t('health.hips');
+      case 'chest':
+        return t('health.chest');
+      case 'arm':
+        return t('health.arm');
+      case 'thigh':
+        return t('health.thigh');
+      case 'storedBodyFat':
+        return t('health.calcInputStoredBodyFat');
+      case 'storedMuscleMass':
+        return t('health.calcInputStoredMuscleMass');
+      default:
+        return t('health.unknown');
+    }
+  };
+
+  const formatInputsUsed = (inputs: CompositionInputKey[] | undefined): string =>
+    inputs && inputs.length > 0 ? inputs.map(getInputLabel).join(', ') : t('health.noData');
+
   // --- INFO MODAL ---
   const InfoModal = () => {
     if (!infoModal) return null;
@@ -258,8 +291,8 @@ export const BodyCompositionDetail = () => {
     const tips: React.ReactNode[] = [];
 
     // Body fat method info
-    const muscleMethod = bodyComposition.muscle?.method || 'al_gindan';
-    const isAdvancedMuscle = ['al_gindan', 'cmc_advanced'].includes(muscleMethod);
+    const muscleMethod = bodyComposition.muscle?.method || 'lee_et_al';
+    const isAdvancedMuscle = muscleMethod === 'al_gindan';
 
     if (infoModal === 'bmi') {
       title = t('health.imc');
@@ -329,6 +362,7 @@ export const BodyCompositionDetail = () => {
 
       const method = bodyComposition.bodyFat?.method || 'deurenberg';
       const formula = bodyComposition.bodyFat?.formulaUsed || '';
+      const inputsUsed = bodyComposition.bodyFat?.inputsUsed;
       const getBodyFatMethodLabel = () => {
         switch (method) {
           case 'stored':
@@ -347,6 +381,23 @@ export const BodyCompositionDetail = () => {
             return t('health.estimation');
         }
       };
+      const getBodyFatMethodNote = () => {
+        switch (method) {
+          case 'stored':
+            return t('health.storedCalculationUnknown');
+          case 'measured':
+            return t('health.measuredCalculationNote');
+          case 'rfm':
+            return t('health.rfmPrecisionNote');
+          case 'bai':
+            return t('health.baiPrecisionNote');
+          case 'cun_bae':
+            return t('health.basicBodyFatPrecisionNote');
+          default:
+            return t('health.estimatedCalcNote');
+        }
+      };
+      const shouldShowFormula = method !== 'stored' && method !== 'measured' && formula.length > 0;
 
       calculationDetails = (
         <View style={styles.calculationContainer}>
@@ -354,132 +405,18 @@ export const BodyCompositionDetail = () => {
             <Text style={[styles.methodTagText, { color: themeColor }]}>{getBodyFatMethodLabel()}</Text>
           </View>
 
-          {method === 'cun_bae' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.formulaCunBae')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.basedOnBmiAgeSex')}</Text>
-              <View style={styles.calcDivider} />
-              <Text style={styles.calcExplanation}>{t('health.mostAccurateFallbackNote')}</Text>
-            </>
+          {shouldShowFormula && (
+            <Text style={styles.calcExplanation}>
+              <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')}</Text>
+              {formula}
+            </Text>
           )}
-
-          {method === 'deurenberg' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.formulaDeurenberg')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.basicEstimationFallback')}</Text>
-              <View style={styles.calcDivider} />
-              <Text style={styles.calcExplanation}>{t('health.fallbackMethodNote')}</Text>
-            </>
-          )}
-
-          {method === 'rfm' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.rfmTitle')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>
-                {t('health.fat')}
-                {isFemale ? '76' : '64'}
-                {t('health.fatFormulaSuffix')}
-              </Text>
-              <View style={styles.calcDivider} />
-              <Text style={styles.calcExplanation}>
-                {t('health.formulaBasedOnMeasurements')}
-                <Text style={{ fontWeight: '700' }}>{t('health.exclusivelyMeasurements')}</Text>
-                {t('health.abdomenHeightMethodNote')}
-              </Text>
-            </>
-          )}
-
-          {method === 'bai' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.baiIndexTitle')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.fatFormulaHip')}</Text>
-              <View style={styles.calcDivider} />
-              <Text style={styles.calcExplanation}>{t('health.calcFatFromHip')}</Text>
-            </>
-          )}
-
-          {method === 'whtr' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.icaIndexTitle')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.whtrFormula')}</Text>
-              <View style={styles.calcDivider} />
-              <Text style={styles.calcExplanation}>{t('health.fatConversionNote')}</Text>
-            </>
-          )}
-
-          {method === 'bai_whtr_combined' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.combinedAlgorithm')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.baiMethodStep')}</Text>
-              <Text style={styles.calcExplanation}>{t('health.whtrMethodStep')}</Text>
-              <Text style={styles.calcExplanation}>3. BF% = (BAI × 0.6) + (WHtR × 0.4)</Text>
-            </>
-          )}
-
-          {method === 'anthropometry_full' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.fullAnthropometryMethod')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.measurementsUsedList')}</Text>
-              <Text style={styles.calcExplanation}>{formula}</Text>
-              <View style={styles.calcDivider} />
-              <Text style={styles.calcExplanation}>{t('health.adjustedByBmiNote')}</Text>
-            </>
-          )}
-
-          {method === 'measured' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.directMeasurement')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.smartScaleSource')}</Text>
-            </>
-          )}
-
-          {method === 'stored' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.savedValue')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.compositionCalculationLegacyNote')}</Text>
-            </>
-          )}
-
-          {/* Fallback: always show something if no specific method matched */}
-          {![
-            'cun_bae',
-            'deurenberg',
-            'rfm',
-            'bai',
-            'whtr',
-            'bai_whtr_combined',
-            'anthropometry_full',
-            'measured',
-            'stored',
-          ].includes(method) && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>
-                  {t('health.methodLabel')}
-                  {method || t('health.unknown')}
-                </Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.estimatedCalcNote')}</Text>
-            </>
-          )}
+          <Text style={styles.calcExplanation}>
+            <Text style={{ fontWeight: '700' }}>{t('health.dataUsedLabel')}</Text>
+            {formatInputsUsed(inputsUsed)}
+          </Text>
+          <View style={styles.calcDivider} />
+          <Text style={styles.calcExplanation}>{getBodyFatMethodNote()}</Text>
 
           <View style={styles.calcDivider} />
           <Text style={[styles.calcExplanation, { fontWeight: '700', color: themeColor, fontSize: 16 }]}>
@@ -493,7 +430,7 @@ export const BodyCompositionDetail = () => {
       // Dynamic tips based on what's missing
       // Dynamic tips based on what's missing
       // If we are using Deurenberg or CUN-BAE (basic methods), suggest Abdomen for RFM
-      if (method === 'deurenberg' || method === 'cun_bae') {
+      if (method === 'deurenberg' || method === 'cun_bae' || method === 'bai') {
         tips.push(
           <View key="tip1" style={styles.tipBox}>
             <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
@@ -506,7 +443,7 @@ export const BodyCompositionDetail = () => {
             </Text>
           </View>,
         );
-      } else if (method === 'rfm' || method === 'bai') {
+      } else if (method === 'rfm') {
         tips.push(
           <View key="tip1" style={styles.tipBox}>
             <View style={[styles.tipIconBox, { backgroundColor: themeColor + '20' }]}>
@@ -550,6 +487,20 @@ export const BodyCompositionDetail = () => {
             return t('health.estimation');
         }
       };
+      const getMuscleMethodNote = () => {
+        switch (muscleMethod) {
+          case 'stored':
+            return t('health.storedCalculationUnknown');
+          case 'al_gindan':
+            return t('health.alGindanPrecisionNote');
+          case 'lee_et_al':
+            return t('health.basicMusclePrecisionNote');
+          default:
+            return t('health.estimatedCalcNote');
+        }
+      };
+      const muscleFormula = bodyComposition.muscle?.formulaUsed || '';
+      const shouldShowMuscleFormula = muscleMethod !== 'stored' && muscleFormula.length > 0;
 
       calculationDetails = (
         <View style={styles.calculationContainer}>
@@ -561,41 +512,18 @@ export const BodyCompositionDetail = () => {
             {isAdvancedMuscle ? t('health.advancedMethodAlGindan') : t('health.estimationMethodLee')}
           </Text>
 
-          {muscleMethod === 'lee_et_al' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.formulaLee2000')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>
-                {t('health.formulaMuscleMass')}
-                {isFemale ? '3.3' : '6.6'}
-              </Text>
-              <View style={styles.calcDivider} />
-              <Text style={styles.calcExplanation}>{t('health.methodBasicDescription')}</Text>
-            </>
+          {shouldShowMuscleFormula && (
+            <Text style={styles.calcExplanation}>
+              <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')}</Text>
+              {muscleFormula}
+            </Text>
           )}
-
-          {(muscleMethod === 'al_gindan' || muscleMethod === 'anthropometric') && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.formulaAlGindanMri')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>
-                {isFemale ? t('health.formulaBodyComposition') : t('health.bodyFormula')}
-              </Text>
-              <View style={styles.calcDivider} />
-              <Text style={styles.calcExplanation}>{t('health.methodMriDescription')}</Text>
-            </>
-          )}
-
-          {muscleMethod === 'stored' && (
-            <>
-              <Text style={styles.calcExplanation}>
-                <Text style={{ fontWeight: '700' }}>{t('health.savedValue')}</Text>
-              </Text>
-              <Text style={styles.calcExplanation}>{t('health.compositionCalculationLegacyNote')}</Text>
-            </>
-          )}
+          <Text style={styles.calcExplanation}>
+            <Text style={{ fontWeight: '700' }}>{t('health.dataUsedLabel')}</Text>
+            {formatInputsUsed(bodyComposition.muscle?.inputsUsed)}
+          </Text>
+          <View style={styles.calcDivider} />
+          <Text style={styles.calcExplanation}>{getMuscleMethodNote()}</Text>
 
           <View style={styles.calcDivider} />
           <View style={styles.calculationRow}>

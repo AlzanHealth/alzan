@@ -647,6 +647,26 @@ export default {
     yourWeight: 'Tu peso',
     bmiFormula: 'IMC = Peso (kg) / Altura² (m²)',
     formulaLabel: 'Fórmula:',
+    dataUsedLabel: 'Datos usados:',
+    calcInputWeight: 'peso',
+    calcInputHeight: 'altura',
+    calcInputAge: 'edad',
+    calcInputSex: 'sexo',
+    calcInputStoredBodyFat: 'valor guardado de grasa corporal',
+    calcInputStoredMuscleMass: 'valor guardado de masa muscular',
+    storedCalculationUnknown:
+      'Valor guardado. El método original no se guarda, así que Alzan no intenta adivinar la fórmula.',
+    measuredCalculationNote:
+      'Valor importado o introducido directamente. Trátalo como una estimación de la fuente, no como una fórmula de Alzan.',
+    rfmPrecisionNote:
+      'Estimación antropométrica avanzada con abdomen y altura. Su precisión depende de que la medida de abdomen sea reciente y esté bien tomada.',
+    baiPrecisionNote:
+      'Estimación de confianza media con cadera y altura. Es útil si falta abdomen, pero menos fiable que RFM.',
+    basicBodyFatPrecisionNote: 'Estimación básica con IMC, edad y sexo porque faltan medidas corporales recientes.',
+    alGindanPrecisionNote:
+      'Estimación muscular antropométrica avanzada. Necesita abdomen y cadera recientes y sigue siendo una estimación, no una prueba clínica.',
+    basicMusclePrecisionNote:
+      'Estimación muscular básica con peso, altura, edad y sexo porque faltan abdomen y cadera recientes.',
     autoCompCalcDisclaimer:
       'Los datos de composición corporal se calculan automáticamente al registrar el peso. Se recomienda añadir primero las medidas corporales para un cálculo más exacto.',
     addFirstSleepRecord: 'Toca + para añadir tu primera noche',

@@ -61,6 +61,19 @@ export type BodyFatCategory = 'athletic' | 'fitness' | 'normal' | 'overweight' |
 /** Muscle category */
 export type MuscleCategory = 'low' | 'normal' | 'fitness' | 'high' | 'very_high';
 
+export type CompositionInputKey =
+  | 'weight'
+  | 'height'
+  | 'age'
+  | 'sex'
+  | 'abdomen'
+  | 'hips'
+  | 'chest'
+  | 'arm'
+  | 'thigh'
+  | 'storedBodyFat'
+  | 'storedMuscleMass';
+
 /** BMI Result */
 export interface BmiResult {
   value: number;
@@ -75,8 +88,9 @@ export interface BodyFatResult {
   categoryLabel: string;
   method: BodyFatMethod;
   methodLabel: string;
-  precisionLevel: 1 | 2;
+  precisionLevel: 1 | 2 | 3;
   formulaUsed: string;
+  inputsUsed: CompositionInputKey[];
 }
 
 /** Muscle Result */
@@ -87,8 +101,9 @@ export interface MuscleResult {
   categoryLabel: string;
   method: MuscleMethod;
   methodLabel: string;
-  precisionLevel: 1 | 2;
+  precisionLevel: 1 | 2 | 3;
   formulaUsed: string;
+  inputsUsed: CompositionInputKey[];
 }
 
 /** Available measurements */
@@ -104,8 +119,8 @@ export interface AnthroMeasurements {
 export interface BodyCompositionInput {
   weightKg: number;
   heightCm: number;
-  age: number;
-  sex: MaleOrFemale;
+  age?: number | null;
+  sex?: MaleOrFemale | null;
   measurements?: AnthroMeasurements;
   loggedBodyFat?: number; // Medición directa
   loggedMuscleMass?: number; // Valor guardado
@@ -153,6 +168,16 @@ const clamp = (val: number, min: number, max: number): number => Math.max(min, M
 
 const round1 = (val: number): number => parseFloat(val.toFixed(1));
 
+const CUN_BAE_FORMULA =
+  'CUN-BAE = -44.988 + 0.503 * age + 10.689 * female + 3.172 * BMI - 0.026 * BMI^2 + 0.181 * BMI * female - 0.02 * BMI * age - 0.005 * BMI^2 * female + 0.00021 * BMI^2 * age';
+const RFM_MALE_FORMULA = 'RFM = 64 - 20 * (heightCm / abdomenCm)';
+const RFM_FEMALE_FORMULA = 'RFM = 76 - 20 * (heightCm / abdomenCm)';
+const BAI_FORMULA = 'BAI = (hipsCm / heightM^1.5) - 18';
+const LEE_FORMULA = 'SMM = 0.244 * weightKg + 7.8 * heightM - 0.098 * age + 6.6 * male - 3.3';
+const AL_GINDAN_MALE_FORMULA = 'SMM = 39.5 + 0.665 * weightKg - 0.185 * abdomenCm - 0.418 * hipsCm - 0.08 * age';
+const AL_GINDAN_FEMALE_FORMULA = 'SMM = 2.89 + 0.255 * weightKg - 0.175 * hipsCm - 0.038 * age + 0.118 * heightCm';
+const STORED_FORMULA = 'Stored value; original calculation method is not persisted.';
+
 // ============================================================================
 // VALIDATION RANGES
 // ============================================================================
@@ -180,14 +205,11 @@ const validateMeasurement = (value: number | undefined, range: { min: number; ma
 /**
  * Calculate BMI with sex-specific category interpretation
  */
-export const calculateBMI = (weightKg: number, heightCm: number, sex: MaleOrFemale): BmiResult | null => {
+export const calculateBMI = (weightKg: number, heightCm: number): BmiResult | null => {
   if (!weightKg || !heightCm || heightCm <= 0) return null;
 
   const heightM = heightCm / 100;
   const bmi = round1(weightKg / (heightM * heightM));
-
-  // Sex-specific thresholds (women have slightly different "normal" upper limit)
-  const normalUpperLimit = sex === 'female' ? 24.4 : 24.9;
 
   let category: BmiCategory;
   let categoryLabel: string;
@@ -195,7 +217,7 @@ export const calculateBMI = (weightKg: number, heightCm: number, sex: MaleOrFema
   if (bmi < 18.5) {
     category = 'underweight';
     categoryLabel = 'Bajo peso';
-  } else if (bmi <= normalUpperLimit) {
+  } else if (bmi < 25) {
     category = 'normal';
     categoryLabel = 'Normal';
   } else if (bmi < 30) {
@@ -212,7 +234,7 @@ export const calculateBMI = (weightKg: number, heightCm: number, sex: MaleOrFema
     categoryLabel = 'Obesidad III';
   }
 
-  log('calculateBMI', 'Result', { bmi, category, sex });
+  log('calculateBMI', 'Result', { bmi, category });
   return { value: bmi, category, categoryLabel };
 };
 
@@ -385,8 +407,11 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
   // Scenario B Requirement: Abdomen AND Hips are the key for advanced algorithms (RFM + Al-Gindan)
   const hasAdvancedProfile = !!(abdomen && hips);
 
+  const hasBmiData = !!(weightKg && weightKg > 0 && heightCm && heightCm > 0);
+  const hasCompositionData = !!(hasBmiData && age && age > 0 && (sex === 'male' || sex === 'female'));
+
   const availableData = {
-    hasBasicData: !!(weightKg && heightCm && age && sex),
+    hasBasicData: hasBmiData,
     hasAbdomen: !!abdomen,
     hasHips: !!hips,
     hasChest: !!chest,
@@ -397,8 +422,8 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
 
   log('Main', 'Available data', availableData);
 
-  // Return null result if missing basic data
-  if (!availableData.hasBasicData) {
+  // Return null result if missing BMI-level data
+  if (!hasBmiData) {
     return {
       bmi: null,
       bodyFat: null,
@@ -414,7 +439,20 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
   // =========================================================================
   // 1. CALCULATE BMI (A1 / B1)
   // =========================================================================
-  const bmi = calculateBMI(weightKg, heightCm, sex);
+  const bmi = calculateBMI(weightKg, heightCm);
+
+  if (!hasCompositionData || !bmi || !sex || !age) {
+    return {
+      bmi,
+      bodyFat: null,
+      muscle: null,
+      fatMassKg: null,
+      leanMassKg: null,
+      muscleMassKg: null,
+      residualMassKg: null,
+      availableData,
+    };
+  }
 
   // =========================================================================
   // 2. CALCULATE BODY FAT
@@ -426,36 +464,17 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
   if (input.loggedBodyFat && input.loggedBodyFat > 0) {
     // PRIORITY 0: Use logged/measured body fat if available
     const { category, label } = getBodyFatCategory(input.loggedBodyFat, sex);
-
-    // Default to CUN-BAE (basic) if no other layout fits,
-    // but try to upgrade to RFM/BAI if measurements exist.
-    let method: BodyFatMethod = 'cun_bae';
-    let methodLabel = 'CUN-BAE (Valor Guardado)';
-    let formula = 'Basado en IMC, edad y sexo';
-    let precision: 1 | 2 = 1;
-
-    // We infer what method was likely used based on available measurements
-    // This allows showing "RFM" or "CUN-BAE" labels even for stored values
-    if (availableData.hasAbdomen) {
-      method = 'rfm';
-      methodLabel = 'RFM (Valor Guardado)';
-      formula = sex === 'male' ? '64 - 20 × (Altura / Abdomen)' : '76 - 20 × (Altura / Abdomen)';
-      precision = 2;
-    } else if (availableData.hasHips) {
-      method = 'bai';
-      methodLabel = 'BAI (Valor Guardado)';
-      formula = '(Cadera / Altura ^ 1.5) - 18';
-      precision = 2;
-    }
+    const isImported = !!input.loggedSource && input.loggedSource !== 'manual';
 
     bodyFat = {
       percentage: round1(input.loggedBodyFat),
       category,
       categoryLabel: label,
-      method,
-      methodLabel,
-      precisionLevel: precision,
-      formulaUsed: formula,
+      method: isImported ? 'measured' : 'stored',
+      methodLabel: isImported ? 'Medición importada/externa' : 'Valor guardado',
+      precisionLevel: isImported ? 3 : 1,
+      formulaUsed: STORED_FORMULA,
+      inputsUsed: ['storedBodyFat'],
     };
   } else if (bmi) {
     // Attempt calculation strategies
@@ -463,31 +482,36 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
     let method: BodyFatMethod = 'cun_bae';
     let methodLabel = '';
     let formula = '';
-    let precision: 1 | 2 = 1;
+    let precision: 1 | 2 | 3 = 2;
+    let inputsUsed: CompositionInputKey[] = ['weight', 'height', 'age', 'sex'];
 
     // Strategy 1: Scenario B - RFM (If abdomen available)
     if (availableData.hasAbdomen) {
       calculatedBF = calculateBodyFatRFM(heightCm, abdomen!, sex);
       method = 'rfm';
       methodLabel = 'RFM (Woolcott & Bergman 2018)';
-      formula = sex === 'male' ? '64 - 20 × (Altura / Abdomen)' : '76 - 20 × (Altura / Abdomen)';
-      precision = 2;
+      formula = sex === 'male' ? RFM_MALE_FORMULA : RFM_FEMALE_FORMULA;
+      precision = 3;
+      inputsUsed = ['height', 'sex', 'abdomen'];
     }
-    // Strategy 2: Fallback B - BAI (If hips available but no abdomen)
+    // Strategy 2: Fallback B - BAI (If hips available but no abdomen).
+    // Evidence is mixed, so this remains a medium-confidence fallback, not optimal precision.
     else if (availableData.hasHips) {
       calculatedBF = calculateBodyFatBAI(heightCm, hips!);
       method = 'bai';
-      methodLabel = 'BAI (Índice de Adiposidad Corporal)';
-      formula = '(Cadera / Altura ^ 1.5) - 18';
+      methodLabel = 'BAI (Fallback con cadera)';
+      formula = BAI_FORMULA;
       precision = 2;
+      inputsUsed = ['height', 'hips'];
     }
     // Strategy 3: Scenario A - CUN-BAE (BMI + Age + Sex)
     else {
       calculatedBF = calculateBodyFatCUNBAE(bmi.value, age, sex);
       method = 'cun_bae';
       methodLabel = 'CUN-BAE (Gómez-Ambrosi et al. 2012)';
-      formula = 'Basado en IMC, edad y sexo';
-      precision = 1;
+      formula = CUN_BAE_FORMULA;
+      precision = 2;
+      inputsUsed = ['weight', 'height', 'age', 'sex'];
     }
 
     // SANITY CHECK: Detect impossible results
@@ -508,8 +532,9 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
           calculatedBF = baiValue;
           method = 'bai';
           methodLabel = 'BAI (Fallback por abdomen incorrecto)';
-          formula = '(Cadera / Altura ^ 1.5) - 18';
+          formula = BAI_FORMULA;
           precision = 2;
+          inputsUsed = ['height', 'hips'];
           triedFallback = true;
         }
       }
@@ -520,8 +545,9 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
         calculatedBF = calculateBodyFatCUNBAE(bmi.value, age, sex);
         method = 'cun_bae';
         methodLabel = 'CUN-BAE (Fallback)';
-        formula = 'Basado en IMC, edad y sexo';
-        precision = 1;
+        formula = CUN_BAE_FORMULA;
+        precision = 2;
+        inputsUsed = ['weight', 'height', 'age', 'sex'];
       }
     }
 
@@ -535,6 +561,7 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
         methodLabel,
         precisionLevel: precision,
         formulaUsed: formula,
+        inputsUsed,
       };
     }
   }
@@ -558,27 +585,13 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
   let muscle: MuscleResult | null = null;
   let muscleMassKg: number | null = null;
 
-  // For Al-Gindan: Men need Abdomen+Hips, Women need Hips(+Height).
-  // We enable Al-Gindan if the specific requirements for the sex are met.
-  const canUseAlGindan = sex === 'female' ? !!hips : !!(abdomen && hips);
+  // Use Al-Gindan only when both app-supported key measurements are available.
+  const canUseAlGindan = !!(abdomen && hips);
 
   if (input.loggedMuscleMass && input.loggedMuscleMass > 0) {
     // PRIORITY 0: Use logged/stored muscle mass if available
     const musclePercent = round1((input.loggedMuscleMass / weightKg) * 100);
     const { category, label } = getMuscleCategory(musclePercent, sex);
-
-    let method: MuscleMethod = 'lee_et_al';
-    let methodLabel = 'Lee et al. (Valor Guardado)';
-    let formula = 'Basado en peso, altura y edad';
-    let precision: 1 | 2 = 1;
-
-    // Use Al-Gindan if requirements are met (same as comparison logic)
-    if (canUseAlGindan) {
-      method = 'al_gindan';
-      methodLabel = 'Al-Gindan (Valor Guardado)';
-      formula = 'Basado en peso, abdomen y cadera';
-      precision = 2;
-    }
 
     muscleMassKg = round1(input.loggedMuscleMass);
     muscle = {
@@ -586,10 +599,11 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
       massKg: muscleMassKg,
       category,
       categoryLabel: label,
-      method,
-      methodLabel,
-      precisionLevel: precision,
-      formulaUsed: formula,
+      method: 'stored',
+      methodLabel: 'Valor guardado',
+      precisionLevel: 1,
+      formulaUsed: STORED_FORMULA,
+      inputsUsed: ['storedMuscleMass'],
     };
   } else if (canUseAlGindan) {
     // Scenario B3: Al-Gindan et al.
@@ -607,8 +621,10 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
       categoryLabel: label,
       method: 'al_gindan',
       methodLabel: 'Al-Gindan et al. (2014)',
-      precisionLevel: 2,
-      formulaUsed: 'Basado en peso, abdomen y cadera',
+      precisionLevel: 3,
+      formulaUsed: sex === 'male' ? AL_GINDAN_MALE_FORMULA : AL_GINDAN_FEMALE_FORMULA,
+      inputsUsed:
+        sex === 'male' ? ['weight', 'age', 'sex', 'abdomen', 'hips'] : ['weight', 'height', 'age', 'sex', 'hips'],
     };
   } else {
     // Scenario A3: Lee et al. (Basic Fallback)
@@ -623,8 +639,9 @@ export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompo
       categoryLabel: label,
       method: 'lee_et_al',
       methodLabel: 'Lee et al. (2000)',
-      precisionLevel: 1,
-      formulaUsed: 'Basado en peso, altura y edad',
+      precisionLevel: 2,
+      formulaUsed: LEE_FORMULA,
+      inputsUsed: ['weight', 'height', 'age', 'sex'],
     };
   }
 

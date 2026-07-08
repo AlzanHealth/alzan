@@ -639,6 +639,26 @@ const en = {
     yourWeight: 'Your weight',
     bmiFormula: 'BMI = Weight (kg) / Height² (m²)',
     formulaLabel: 'Formula:',
+    dataUsedLabel: 'Data used:',
+    calcInputWeight: 'weight',
+    calcInputHeight: 'height',
+    calcInputAge: 'age',
+    calcInputSex: 'sex',
+    calcInputStoredBodyFat: 'saved body fat value',
+    calcInputStoredMuscleMass: 'saved muscle mass value',
+    storedCalculationUnknown:
+      'Saved value. The original calculation method is not stored, so Alzan will not guess the formula.',
+    measuredCalculationNote:
+      'Imported or directly entered value. Treat it as a measurement estimate from the source, not an Alzan formula.',
+    rfmPrecisionNote:
+      'Advanced anthropometric estimate using abdomen and height. Accuracy depends on a recent, correctly taken abdomen measurement.',
+    baiPrecisionNote:
+      'Medium-confidence estimate using hip and height. It is useful when abdomen is missing, but less reliable than RFM.',
+    basicBodyFatPrecisionNote: 'Basic estimate using BMI, age, and sex because recent body measurements are missing.',
+    alGindanPrecisionNote:
+      'Advanced anthropometric muscle estimate. It needs recent abdomen and hip measurements and remains an estimate, not a clinical test.',
+    basicMusclePrecisionNote:
+      'Basic muscle estimate using weight, height, age, and sex because recent abdomen and hip measurements are missing.',
     autoCompCalcDisclaimer:
       'Body composition data is calculated automatically when recording weight. It is recommended to add body measurements first for a more accurate calculation.',
     addFirstSleepRecord: 'Tap + to add your first night',
@@ -730,7 +750,7 @@ const en = {
     wakeUp: 'I woke up',
     fellAsleep: 'I fell asleep',
     last12Weeks: 'Last 12 weeks',
-    formulaBodyComposition: 'SM = 28.9 + 0.255×weight - 0.175×hip - 0.038×age + 0.118×height',
+    formulaBodyComposition: 'SM = 2.89 + 0.255×weight - 0.175×hip - 0.038×age + 0.118×height',
     imc: 'BMI',
 
     // Sleep sessions (new schema)
