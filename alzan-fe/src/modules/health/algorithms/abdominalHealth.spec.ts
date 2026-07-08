@@ -8,7 +8,9 @@ import assert from 'node:assert/strict';
 import {
   calculateAbdominalHealth,
   calculateRecompositionTrend,
+  getWaistToHeightRangeConfig,
   getWaistToHeightCategory,
+  getWaistToHipRangeConfig,
   getWaistToHipCategory,
 } from './abdominalHealth';
 
@@ -40,6 +42,19 @@ test('waist-to-height calculates and categorizes correctly', () => {
   assert.equal(getWaistToHeightCategory(0.61).category, 'high_risk');
 });
 
+test('waist-to-height range keeps lower values healthier until risk cutoffs', () => {
+  const range = getWaistToHeightRangeConfig();
+
+  assert.equal(range.min, 0.35);
+  assert.equal(range.max, 0.7);
+  assert.deepEqual(
+    range.segments.map(segment => segment.to),
+    [0.45, 0.5, 0.6, 0.7],
+  );
+  assert.equal(range.segments[1].labelKey, 'health.abdominalCategoryHealthy');
+  assert.equal(range.segments[3].labelKey, 'health.abdominalCategoryHigh');
+});
+
 test('waist-to-hip calculates and uses sex-specific categories', () => {
   const male = getWaistToHipCategory(0.91, 'male');
   const female = getWaistToHipCategory(0.91, 'female');
@@ -53,6 +68,20 @@ test('waist-to-hip calculates and uses sex-specific categories', () => {
   assert.equal(result.waistToHip?.ratio, 0.9);
   assert.equal(male.category, 'moderate_risk');
   assert.equal(female.category, 'high_risk');
+});
+
+test('waist-to-hip range uses sex-specific health thresholds', () => {
+  const maleRange = getWaistToHipRangeConfig('male');
+  const femaleRange = getWaistToHipRangeConfig('female');
+
+  assert.deepEqual(
+    maleRange.segments.map(segment => segment.to),
+    [0.85, 0.9, 1, 1.1],
+  );
+  assert.deepEqual(
+    femaleRange.segments.map(segment => segment.to),
+    [0.75, 0.8, 0.85, 0.95],
+  );
 });
 
 test('BRI and ABSI calculate only when enough data exists', () => {

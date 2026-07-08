@@ -63,6 +63,7 @@ import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { CompositionInputKey } from '../algorithms/bodyComposition';
+import { getWaistToHeightRangeConfig, getWaistToHipRangeConfig } from '../algorithms/abdominalHealth';
 import {
   BMI_RANGES,
   BMI_BAR_CONFIG,
@@ -232,6 +233,9 @@ export const BodyCompositionDetail = () => {
   /** Muscle mass bar segments based on user's age and sex */
   const muscleRanges = useMemo(() => getMuscleRanges(userAge, isFemale), [userAge, isFemale]);
   const muscleSegments = useMemo(() => toBarSegments(muscleRanges, isSpanish), [muscleRanges, isSpanish]);
+  const abdominalSex = isFemale ? 'female' : 'male';
+  const waistToHeightRange = useMemo(() => getWaistToHeightRangeConfig(), []);
+  const waistToHipRange = useMemo(() => getWaistToHipRangeConfig(abdominalSex), [abdominalSex]);
 
   /** Current body fat category based on official ranges */
   const currentBodyFatCategory = useMemo(() => {
@@ -293,6 +297,24 @@ export const BodyCompositionDetail = () => {
     return translate(key, values);
   };
   const translateDynamicKey = (key: string): string => translateInfoCopy(key);
+  const waistToHeightSegments = useMemo(
+    () =>
+      waistToHeightRange.segments.map(segment => ({
+        to: segment.to,
+        color: segment.color,
+        label: translateDynamicKey(segment.labelKey),
+      })),
+    [translateDynamicKey, waistToHeightRange],
+  );
+  const waistToHipSegments = useMemo(
+    () =>
+      waistToHipRange.segments.map(segment => ({
+        to: segment.to,
+        color: segment.color,
+        label: translateDynamicKey(segment.labelKey),
+      })),
+    [translateDynamicKey, waistToHipRange],
+  );
 
   // --- INFO MODAL ---
   const InfoModal = () => {
@@ -654,13 +676,21 @@ export const BodyCompositionDetail = () => {
               </Text>
               <Text style={styles.calcExplanation}>{t('health.abdominalAdvancedDescription')}</Text>
               <View style={styles.advancedMarkerRow}>
-                <Text style={styles.calcLabel}>{t('health.bri')}</Text>
+                <View style={styles.advancedMarkerCopy}>
+                  <Text style={styles.calcLabel}>{t('health.bri')}</Text>
+                  <Text style={styles.calcExplanation}>{t('health.briExplanation')}</Text>
+                  <Text style={styles.calcExplanation}>{t('health.briDirection')}</Text>
+                </View>
                 <Text style={[styles.advancedMarkerValue, { color: themeColor }]}>
                   {abdominalHealth.bri?.value ?? '--'}
                 </Text>
               </View>
               <View style={styles.advancedMarkerRow}>
-                <Text style={styles.calcLabel}>{t('health.absi')}</Text>
+                <View style={styles.advancedMarkerCopy}>
+                  <Text style={styles.calcLabel}>{t('health.absi')}</Text>
+                  <Text style={styles.calcExplanation}>{t('health.absiExplanation')}</Text>
+                  <Text style={styles.calcExplanation}>{t('health.absiDirection')}</Text>
+                </View>
                 <Text style={[styles.advancedMarkerValue, { color: themeColor }]}>
                   {abdominalHealth.absi?.value ?? '--'}
                 </Text>
@@ -1081,6 +1111,37 @@ export const BodyCompositionDetail = () => {
             badgeColor={abdominalHealth.waistToHeight?.color}
             onInfoPress={() => setInfoModal('waistToHeight')}
           >
+            {abdominalHealth.waistToHeight && (
+              <View style={styles.rangeWrapper}>
+                <RangeBar
+                  hideLegend={true}
+                  showCutoffs={true}
+                  formatCutoff={cutoff => cutoff.toFixed(2)}
+                  label=""
+                  value={abdominalHealth.waistToHeight.value}
+                  min={waistToHeightRange.min}
+                  max={waistToHeightRange.max}
+                  segments={waistToHeightSegments}
+                />
+              </View>
+            )}
+            {(abdominalHealth.bri || abdominalHealth.absi) && (
+              <View
+                style={[styles.advancedInlineBox, { backgroundColor: isDark ? 'rgba(14,165,233,0.12)' : '#E0F2FE' }]}
+              >
+                <Text style={[styles.advancedInlineTitle, { color: themeColors.textPrimary }]}>
+                  {t('health.advancedMarkers')}
+                </Text>
+                <Text style={[styles.advancedInlineText, { color: themeColors.textSecondary }]}>
+                  {[
+                    abdominalHealth.bri ? `${t('health.bri')} ${abdominalHealth.bri.value}` : null,
+                    abdominalHealth.absi ? `${t('health.absi')} ${abdominalHealth.absi.value}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              </View>
+            )}
             <View
               style={[styles.inlineTipBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background }]}
             >
@@ -1102,6 +1163,20 @@ export const BodyCompositionDetail = () => {
             badgeColor={abdominalHealth.waistToHip?.color}
             onInfoPress={() => setInfoModal('waistToHip')}
           >
+            {abdominalHealth.waistToHip && (
+              <View style={styles.rangeWrapper}>
+                <RangeBar
+                  hideLegend={true}
+                  showCutoffs={true}
+                  formatCutoff={cutoff => cutoff.toFixed(2)}
+                  label=""
+                  value={abdominalHealth.waistToHip.value}
+                  min={waistToHipRange.min}
+                  max={waistToHipRange.max}
+                  segments={waistToHipSegments}
+                />
+              </View>
+            )}
             <View
               style={[styles.inlineTipBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background }]}
             >
@@ -1617,11 +1692,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
     paddingVertical: 6,
+  },
+  advancedMarkerCopy: {
+    flex: 1,
   },
   advancedMarkerValue: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  advancedInlineBox: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  advancedInlineTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  advancedInlineText: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
 
   tipsContainer: {

@@ -16,6 +16,18 @@ interface CategoryResult<TCategory extends string> {
   color: string;
 }
 
+export interface AbdominalRangeSegment {
+  to: number;
+  color: string;
+  labelKey: string;
+}
+
+export interface AbdominalRangeConfig {
+  min: number;
+  max: number;
+  segments: AbdominalRangeSegment[];
+}
+
 export interface AbdominalMarkerResult<TCategory extends string = AbdominalRiskCategory> {
   value: number;
   ratio?: number;
@@ -94,6 +106,17 @@ export const getWaistToHeightCategory = (ratio: number): CategoryResult<Abdomina
   return { category: 'high_risk', labelKey: 'health.abdominalCategoryHigh', color: '#EF4444' };
 };
 
+export const getWaistToHeightRangeConfig = (): AbdominalRangeConfig => ({
+  min: 0.35,
+  max: 0.7,
+  segments: [
+    { to: 0.45, color: '#38BDF8', labelKey: 'health.abdominalCategoryVeryLow' },
+    { to: 0.5, color: '#10B981', labelKey: 'health.abdominalCategoryHealthy' },
+    { to: 0.6, color: '#F59E0B', labelKey: 'health.abdominalCategoryIncreased' },
+    { to: 0.7, color: '#EF4444', labelKey: 'health.abdominalCategoryHigh' },
+  ],
+});
+
 export const getWaistToHipCategory = (ratio: number, sex: MaleOrFemale): CategoryResult<AbdominalRiskCategory> => {
   if (sex === 'female') {
     if (ratio < 0.75) return { category: 'very_low', labelKey: 'health.abdominalCategoryVeryLow', color: '#38BDF8' };
@@ -110,6 +133,32 @@ export const getWaistToHipCategory = (ratio: number, sex: MaleOrFemale): Categor
     return { category: 'moderate_risk', labelKey: 'health.abdominalCategoryModerate', color: '#F59E0B' };
   }
   return { category: 'high_risk', labelKey: 'health.abdominalCategoryHigh', color: '#EF4444' };
+};
+
+export const getWaistToHipRangeConfig = (sex: MaleOrFemale): AbdominalRangeConfig => {
+  if (sex === 'female') {
+    return {
+      min: 0.65,
+      max: 0.95,
+      segments: [
+        { to: 0.75, color: '#38BDF8', labelKey: 'health.abdominalCategoryVeryLow' },
+        { to: 0.8, color: '#10B981', labelKey: 'health.abdominalCategoryHealthy' },
+        { to: 0.85, color: '#F59E0B', labelKey: 'health.abdominalCategoryModerate' },
+        { to: 0.95, color: '#EF4444', labelKey: 'health.abdominalCategoryHigh' },
+      ],
+    };
+  }
+
+  return {
+    min: 0.75,
+    max: 1.1,
+    segments: [
+      { to: 0.85, color: '#38BDF8', labelKey: 'health.abdominalCategoryVeryLow' },
+      { to: 0.9, color: '#10B981', labelKey: 'health.abdominalCategoryHealthy' },
+      { to: 1, color: '#F59E0B', labelKey: 'health.abdominalCategoryModerate' },
+      { to: 1.1, color: '#EF4444', labelKey: 'health.abdominalCategoryHigh' },
+    ],
+  };
 };
 
 export const calculateBri = (heightCm: number, abdomenCm: number): number | null => {

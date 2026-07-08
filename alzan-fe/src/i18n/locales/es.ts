@@ -730,6 +730,14 @@ export default {
       'La lectura usa rangos por sexo y conviene interpretarla junto con abdomen/altura y la tendencia de grasa corporal.',
     abdominalAdvancedDescription:
       'BRI y ABSI son índices avanzados de forma corporal. Son menos intuitivos, por eso Alzan los muestra solo como contexto complementario.',
+    briExplanation:
+      'BRI estima lo redondeada que es la forma corporal usando abdomen y altura. Ayuda a contextualizar el volumen abdominal más allá del peso.',
+    briDirection:
+      'Más bajo suele ser mejor cuando viene de un perímetro abdominal menor; valores más altos suelen indicar más concentración abdominal.',
+    absiExplanation:
+      'ABSI compara abdomen con IMC y altura. Sirve para ver si la cintura es mayor de lo esperado para tu tamaño corporal.',
+    absiDirection:
+      'Más bajo suele ser mejor cuando refleja una cintura menor para el mismo tamaño corporal; valores más altos sugieren más contexto de riesgo abdominal.',
     missingAbdomenForAbdominal: 'Añade abdomen para calcular los marcadores de salud abdominal.',
     missingHipForWaistHip: 'Añade cadera para calcular abdomen/cadera.',
     recompositionDescription:

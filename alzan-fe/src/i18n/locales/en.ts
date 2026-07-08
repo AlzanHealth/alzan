@@ -721,6 +721,14 @@ const en = {
       'Interpretation uses sex-specific ranges and should be read together with abdomen/height and body fat trend.',
     abdominalAdvancedDescription:
       'BRI and ABSI are advanced body-shape indexes. They are less intuitive, so Alzan shows them as complementary context only.',
+    briExplanation:
+      'BRI estimates how round the body shape is from abdomen and height. It helps contextualize abdominal volume beyond weight alone.',
+    briDirection:
+      'Lower is usually better when it comes from less abdominal perimeter; higher values usually mean more abdominal concentration.',
+    absiExplanation:
+      'ABSI compares abdomen with BMI and height. It is useful to see whether the waist is larger than expected for your size.',
+    absiDirection:
+      'Lower is usually better when it reflects a smaller waist for the same body size; higher values suggest more abdominal risk context.',
     missingAbdomenForAbdominal: 'Add abdomen to calculate abdominal health markers.',
     missingHipForWaistHip: 'Add hip to calculate abdomen/hip.',
     recompositionDescription:
