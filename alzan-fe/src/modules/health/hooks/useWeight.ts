@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
 import { weightApi } from '../services/weightApi';
 import { bodyCompositionService } from '../services/bodyCompositionService';
-import { calculateBodyComposition } from '../algorithms/bodyComposition';
 
 export const useWeightLogs = (limit = 100) => {
   const { user } = useAuth();
@@ -57,57 +56,23 @@ export const useAddWeightLog = () => {
       const existingLog = existingLogs?.[0];
 
       if (existingLog) {
-        // Overwrite the existing weight log for this day if any values change
+        // Overwrite the existing real weight log for this day if the weight changed.
         const updatedWeight = log.weight_kg;
-        const profile = await bodyCompositionService.getUserProfile(userId);
-        let calculatedBF: number | undefined = log.bodyfat_percent;
-        let calculatedMuscle: number | undefined = log.muscle_mass_kg;
-
-        if (profile && profile.height_cm) {
-          const measurements = await bodyCompositionService.getAllLatestMeasurements(userId);
-          const age = bodyCompositionService.calculateAge(profile.date_of_birth);
-          const sex = (profile.sex as 'male' | 'female') || 'male';
-
-          const compResult = calculateBodyComposition({
-            weightKg: updatedWeight,
-            heightCm: profile.height_cm,
-            age,
-            sex,
-            measurements: {
-              abdomen: measurements.abdomen,
-              hips: measurements.hips,
-              chest: measurements.chest,
-              arm: measurements.arm,
-              thigh: measurements.thigh,
-            },
-          });
-
-          if (compResult.bodyFat) {
-            calculatedBF = compResult.bodyFat.percentage;
-            calculatedMuscle = compResult.muscle?.massKg;
-          }
-        }
-
         const currentWeight = existingLog.weight_kg;
-        const currentBF = existingLog.bodyfat_percent || 0;
-        const newBF = calculatedBF || 0;
-        const currentMuscle = existingLog.muscle_mass_kg || 0;
-        const newMuscle = calculatedMuscle || 0;
-
         const weightDiff = Math.abs(updatedWeight - currentWeight);
-        const bfDiff = Math.abs(newBF - currentBF);
-        const muscleDiff = Math.abs(newMuscle - currentMuscle);
 
-        if (weightDiff >= 0.05 || bfDiff >= 0.1 || muscleDiff >= 0.1) {
+        if (weightDiff >= 0.05 || log.bodyfat_percent !== undefined || log.muscle_mass_kg !== undefined) {
           console.log('[useAddWeightLog] Overwriting same-day weight record:', existingLog.id);
           const result = await weightApi.updateLog(existingLog.id, {
             weight_kg: updatedWeight,
-            bodyfat_percent: calculatedBF ?? null,
-            muscle_mass_kg: calculatedMuscle ?? null,
+            bodyfat_percent: log.bodyfat_percent ?? existingLog.bodyfat_percent,
+            muscle_mass_kg: log.muscle_mass_kg ?? existingLog.muscle_mass_kg,
           });
+          await bodyCompositionService.recalculateBestCompositionForDate(userId, targetDate);
           return result;
         }
 
+        await bodyCompositionService.recalculateBestCompositionForDate(userId, targetDate);
         return existingLog;
       }
 
@@ -119,15 +84,16 @@ export const useAddWeightLog = () => {
         ...log,
       });
 
-      // Auto-calculate body fat if not provided manually
-      if (!log.bodyfat_percent && result.id) {
-        await bodyCompositionService.recalculateForWeight(userId, result.id, log.weight_kg);
+      // Auto-calculate daily composition without duplicating weight history.
+      if (result.id) {
+        await bodyCompositionService.recalculateForWeight(userId, result.id, log.weight_kg, result.measured_at);
       }
 
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['bodyCompositionLogs'] });
       queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
     },
   });
@@ -139,6 +105,7 @@ export const useDeleteWeightLog = () => {
     mutationFn: weightApi.deleteLog,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['bodyCompositionLogs'] });
       queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
     },
   });

@@ -301,7 +301,7 @@ export const calculateBodyFatCUNBAE = (bmi: number, age: number, sex: MaleOrFema
 // BODY FAT CATEGORY DETERMINATION
 // ============================================================================
 
-const getBodyFatCategory = (bf: number, sex: MaleOrFemale): { category: BodyFatCategory; label: string } => {
+export const getBodyFatCategory = (bf: number, sex: MaleOrFemale): { category: BodyFatCategory; label: string } => {
   if (sex === 'male') {
     if (bf < 13) return { category: 'athletic', label: 'Atlético' };
     if (bf < 17) return { category: 'fitness', label: 'Fitness' };
@@ -367,7 +367,10 @@ export const calculateMuscleMassAlGindan = (
 // MUSCLE CATEGORY DETERMINATION
 // ============================================================================
 
-const getMuscleCategory = (musclePercent: number, sex: MaleOrFemale): { category: MuscleCategory; label: string } => {
+export const getMuscleCategory = (
+  musclePercent: number,
+  sex: MaleOrFemale,
+): { category: MuscleCategory; label: string } => {
   if (sex === 'male') {
     if (musclePercent < 38) return { category: 'low', label: 'Bajo' };
     if (musclePercent < 42) return { category: 'normal', label: 'Normal' };

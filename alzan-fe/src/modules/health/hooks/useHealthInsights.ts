@@ -30,13 +30,20 @@ import { useMeasurements } from './useMeasurements';
 import { useSleepSessions } from './useSleep';
 import { useRestingHRLogs } from './useRestingHR';
 import { useUserProfile } from './useUserProfile';
+import { useBodyCompositionLogs } from './useBodyCompositionLogs';
 import {
   calculateBodyComposition,
   hasEnoughDataForBmi,
   hasEnoughDataForBodyFat,
   AnthroMeasurements,
   BodyCompositionResult,
+  BodyFatMethod,
+  CompositionInputKey,
+  MuscleMethod,
+  getBodyFatCategory,
+  getMuscleCategory,
 } from '../algorithms/bodyComposition';
+import { BodyCompositionLog } from '../services/bodyCompositionService';
 
 /** Debug flag - logs will appear in development mode */
 const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
@@ -48,6 +55,112 @@ const log = (message: string, data?: unknown) => {
   if (DEBUG) {
     console.log(`[useHealthInsights] ${message}`, data || '');
   }
+};
+
+const round1 = (value: number): number => parseFloat(value.toFixed(1));
+
+const COMPOSITION_INPUT_KEYS: CompositionInputKey[] = [
+  'weight',
+  'height',
+  'age',
+  'sex',
+  'abdomen',
+  'hips',
+  'chest',
+  'arm',
+  'thigh',
+  'storedBodyFat',
+  'storedMuscleMass',
+];
+
+type CompositionInputsJson = BodyCompositionLog['bodyfat_inputs'];
+
+const isCompositionInputKey = (value: unknown): value is CompositionInputKey =>
+  typeof value === 'string' && COMPOSITION_INPUT_KEYS.includes(value as CompositionInputKey);
+
+const parseInputs = (value: CompositionInputsJson): CompositionInputKey[] =>
+  Array.isArray(value) ? value.filter(isCompositionInputKey) : [];
+
+const bodyFatMethodLabels: Record<BodyFatMethod, string> = {
+  measured: 'Medición importada/externa',
+  rfm: 'RFM (Woolcott & Bergman 2018)',
+  bai: 'BAI (Fallback con cadera)',
+  cun_bae: 'CUN-BAE (Gómez-Ambrosi et al. 2012)',
+  deurenberg: 'Deurenberg (1991)',
+  stored: 'Valor guardado',
+  whtr: 'WHtR',
+  anthropometry_full: 'Antropometría avanzada',
+  bai_whtr_combined: 'BAI + WHtR',
+};
+
+const muscleMethodLabels: Record<MuscleMethod, string> = {
+  lee_et_al: 'Lee et al. (2000)',
+  al_gindan: 'Al-Gindan et al. (2014)',
+  stored: 'Valor guardado',
+  anthropometric: 'Antropometría',
+};
+
+const isBodyFatMethod = (method: string | null): method is BodyFatMethod => !!method && method in bodyFatMethodLabels;
+
+const isMuscleMethod = (method: string | null): method is MuscleMethod => !!method && method in muscleMethodLabels;
+
+const compositionFromLog = (
+  compositionLog: BodyCompositionLog,
+  fallbackResult: BodyCompositionResult,
+  sex: 'male' | 'female',
+): BodyCompositionResult => {
+  const bodyFatMethod = isBodyFatMethod(compositionLog.bodyfat_method) ? compositionLog.bodyfat_method : 'stored';
+  const muscleMethod = isMuscleMethod(compositionLog.muscle_method) ? compositionLog.muscle_method : 'stored';
+  const bodyFatValue = compositionLog.bodyfat_percent;
+  const muscleMassKg = compositionLog.muscle_mass_kg;
+  const musclePercent = compositionLog.muscle_percent;
+  const bodyFatCategory = bodyFatValue !== null ? getBodyFatCategory(bodyFatValue, sex) : null;
+  const muscleCategory = musclePercent !== null ? getMuscleCategory(musclePercent, sex) : null;
+
+  const bodyFat =
+    bodyFatValue !== null && bodyFatCategory
+      ? {
+          percentage: bodyFatValue,
+          category: bodyFatCategory.category,
+          categoryLabel: bodyFatCategory.label,
+          method: bodyFatMethod,
+          methodLabel: bodyFatMethodLabels[bodyFatMethod],
+          precisionLevel: (compositionLog.bodyfat_precision_level ?? 1) as 1 | 2 | 3,
+          formulaUsed: compositionLog.bodyfat_formula ?? 'Stored value; original calculation method is not persisted.',
+          inputsUsed: parseInputs(compositionLog.bodyfat_inputs),
+        }
+      : null;
+
+  const muscle =
+    muscleMassKg !== null && musclePercent !== null && muscleCategory
+      ? {
+          percentage: musclePercent,
+          massKg: muscleMassKg,
+          category: muscleCategory.category,
+          categoryLabel: muscleCategory.label,
+          method: muscleMethod,
+          methodLabel: muscleMethodLabels[muscleMethod],
+          precisionLevel: (compositionLog.muscle_precision_level ?? 1) as 1 | 2 | 3,
+          formulaUsed: compositionLog.muscle_formula ?? 'Stored value; original calculation method is not persisted.',
+          inputsUsed: parseInputs(compositionLog.muscle_inputs),
+        }
+      : null;
+
+  const fatMassKg = bodyFat ? round1(compositionLog.weight_kg_used * (bodyFat.percentage / 100)) : null;
+  const leanMassKg = fatMassKg !== null ? round1(compositionLog.weight_kg_used - fatMassKg) : null;
+  const residualMassKg =
+    leanMassKg !== null && muscleMassKg !== null ? round1(Math.max(0, leanMassKg - muscleMassKg)) : null;
+
+  return {
+    ...fallbackResult,
+    bmi: fallbackResult.bmi,
+    bodyFat,
+    muscle,
+    fatMassKg,
+    leanMassKg,
+    muscleMassKg,
+    residualMassKg,
+  };
 };
 
 /**
@@ -66,12 +179,14 @@ export const useHealthInsights = () => {
   const { data: sleepSessions } = useSleepSessions();
   const { data: hrLogs } = useRestingHRLogs();
   const { data: profile } = useUserProfile();
+  const { data: bodyCompositionLogs } = useBodyCompositionLogs();
 
   log('Data loaded', {
     weightLogsCount: weightLogs?.length || 0,
     measurementsCount: measurements?.length || 0,
     sleepLogsCount: sleepSessions?.length || 0,
     hrLogsCount: hrLogs?.length || 0,
+    bodyCompositionLogsCount: bodyCompositionLogs?.length || 0,
     hasProfile: !!profile,
   });
 
@@ -93,6 +208,7 @@ export const useHealthInsights = () => {
   })();
 
   const latestSleep = sleepSessions?.[0];
+  const latestCompositionLog = bodyCompositionLogs?.[0];
 
   /** Most recent heart rate log */
   const latestHR = hrLogs?.[0];
@@ -181,32 +297,34 @@ export const useHealthInsights = () => {
   }
 
   // =========================================================================
-  // BODY COMPOSITION - USE STORED VALUES
+  // BODY COMPOSITION - USE PERSISTED DAILY RESULT WHEN AVAILABLE
   // =========================================================================
   //
-  // IMPORTANT: Body composition values (body fat %, muscle mass) are calculated
-  // ONLY when a new weight is registered. Adding new measurements does NOT
-  // update these values until the next weight registration.
-  //
-  // This ensures data consistency and prevents confusing value changes.
+  // Daily composition logs preserve the algorithm, formula, inputs and precision
+  // used for that day. Legacy weight-log values remain a fallback for older data.
 
   let bodyCompResult: BodyCompositionResult | null = null;
 
   const effectiveSex = profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : undefined;
 
-  if (latestWeight?.weight_kg && profile?.height_cm) {
+  if ((latestCompositionLog?.weight_kg_used || latestWeight?.weight_kg) && profile?.height_cm) {
+    const calculationWeight = latestCompositionLog?.weight_kg_used ?? latestWeight!.weight_kg;
+    const calculationSex = effectiveSex ?? 'male';
     // Calculate body composition using the algorithm WITH measurements
-    // This ensures the UI shows the ACTUAL method used (RFM, Al-Gindan, etc.)
-    bodyCompResult = calculateBodyComposition({
-      weightKg: latestWeight.weight_kg,
+    // This is the fallback for old rows; persisted composition logs override method/formula/inputs.
+    const fallbackResult = calculateBodyComposition({
+      weightKg: calculationWeight,
       heightCm: profile.height_cm,
       age,
-      sex: effectiveSex,
+      sex: calculationSex,
       measurements: anthroMeasurements, // Pass actual measurements!
-      loggedBodyFat: latestWeight.bodyfat_percent ?? undefined, // Use stored value if available
-      loggedMuscleMass: latestWeight.muscle_mass_kg ?? undefined, // Use stored value if available
-      loggedSource: latestWeight.source,
+      loggedBodyFat: latestCompositionLog ? undefined : (latestWeight?.bodyfat_percent ?? undefined),
+      loggedMuscleMass: latestCompositionLog ? undefined : (latestWeight?.muscle_mass_kg ?? undefined),
+      loggedSource: latestWeight?.source,
     });
+    bodyCompResult = latestCompositionLog
+      ? compositionFromLog(latestCompositionLog, fallbackResult, calculationSex)
+      : fallbackResult;
 
     log('Body composition calculated', {
       bmi: bodyCompResult.bmi?.value,
@@ -220,15 +338,17 @@ export const useHealthInsights = () => {
   // =========================================================================
 
   const height_cm = profile?.height_cm ?? undefined;
-  const canCalculateBmi = hasEnoughDataForBmi(latestWeight?.weight_kg, height_cm);
+  const effectiveWeight = latestCompositionLog?.weight_kg_used ?? latestWeight?.weight_kg;
+  const effectiveBodyFat = latestCompositionLog?.bodyfat_percent ?? latestWeight?.bodyfat_percent;
+  const canCalculateBmi = hasEnoughDataForBmi(effectiveWeight, height_cm);
 
   const canCalculateBodyFat = hasEnoughDataForBodyFat(
-    latestWeight?.weight_kg,
+    effectiveWeight,
     height_cm,
     age,
     profile?.sex,
     anthroMeasurements.hips,
-    latestWeight?.bodyfat_percent,
+    effectiveBodyFat,
   );
 
   log('Data sufficiency', { canCalculateBmi, canCalculateBodyFat });
@@ -308,7 +428,7 @@ export const useHealthInsights = () => {
     },
 
     // Loading state
-    isLoading: !weightLogs,
+    isLoading: !weightLogs || !bodyCompositionLogs,
   };
 
   log('Returning result', {

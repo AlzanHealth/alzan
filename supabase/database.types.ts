@@ -881,6 +881,90 @@ export type Database = {
           },
         ]
       }
+      body_composition_logs: {
+        Row: {
+          bmi: number | null
+          bodyfat_formula: string | null
+          bodyfat_inputs: Json
+          bodyfat_method: string | null
+          bodyfat_percent: number | null
+          bodyfat_precision_level: number | null
+          calculated_for_date: string
+          composition_calculated_at: string
+          created_at: string
+          id: string
+          muscle_formula: string | null
+          muscle_inputs: Json
+          muscle_mass_kg: number | null
+          muscle_method: string | null
+          muscle_percent: number | null
+          muscle_precision_level: number | null
+          source_weight_log_id: string | null
+          updated_at: string
+          user_id: string
+          weight_kg_used: number
+        }
+        Insert: {
+          bmi?: number | null
+          bodyfat_formula?: string | null
+          bodyfat_inputs?: Json
+          bodyfat_method?: string | null
+          bodyfat_percent?: number | null
+          bodyfat_precision_level?: number | null
+          calculated_for_date: string
+          composition_calculated_at?: string
+          created_at?: string
+          id?: string
+          muscle_formula?: string | null
+          muscle_inputs?: Json
+          muscle_mass_kg?: number | null
+          muscle_method?: string | null
+          muscle_percent?: number | null
+          muscle_precision_level?: number | null
+          source_weight_log_id?: string | null
+          updated_at?: string
+          user_id: string
+          weight_kg_used: number
+        }
+        Update: {
+          bmi?: number | null
+          bodyfat_formula?: string | null
+          bodyfat_inputs?: Json
+          bodyfat_method?: string | null
+          bodyfat_percent?: number | null
+          bodyfat_precision_level?: number | null
+          calculated_for_date?: string
+          composition_calculated_at?: string
+          created_at?: string
+          id?: string
+          muscle_formula?: string | null
+          muscle_inputs?: Json
+          muscle_mass_kg?: number | null
+          muscle_method?: string | null
+          muscle_percent?: number | null
+          muscle_precision_level?: number | null
+          source_weight_log_id?: string | null
+          updated_at?: string
+          user_id?: string
+          weight_kg_used?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "body_composition_logs_source_weight_log_id_fkey"
+            columns: ["source_weight_log_id"]
+            isOneToOne: false
+            referencedRelation: "weight_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "body_composition_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       body_measurements: {
         Row: {
           id: string

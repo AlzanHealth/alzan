@@ -96,6 +96,7 @@ export interface NutritionSettingsJson {
   default_recipe_visibility?: 'private' | 'public';
   recipe_search_scope?: RecipeSearchScope;
   nutrition_day_rollover_time?: string;
+  default_hydration_ml?: number;
   show_diet_calories_only?: boolean;
   show_training_calories_only?: boolean;
   last_visible_week?: string;

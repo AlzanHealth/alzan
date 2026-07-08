@@ -43,7 +43,7 @@ export const useAddMeasurement = () => {
         ...data,
       });
 
-      // Trigger automatic recalculation if all 5 metrics exist on this day
+      // Trigger automatic recalculation for this day using the best available recent weight and measurements.
       try {
         const dateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
         await bodyCompositionService.checkAndTriggerRecalculateForMeasurements(user.id, dateStr);
@@ -57,6 +57,7 @@ export const useAddMeasurement = () => {
       // Invalidate measurements and weight logs for this user
       queryClient.invalidateQueries({ queryKey: ['measurements', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['bodyCompositionLogs'] });
       queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
     },
   });
