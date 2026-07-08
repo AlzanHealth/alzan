@@ -15,6 +15,7 @@ import { buildRecipeSoftDeletePayload } from './recipeEditing';
 export type DiscoverSort = 'recommended' | 'week' | 'month' | 'saved';
 // Macro-based category filter (derived from the per-100g columns on `recipes`).
 export type DiscoverCategory = 'all' | 'high_protein' | 'low_cal' | 'high_carb';
+export type PersonalRecipeSort = 'recently_used' | 'most_used' | 'alphabetical';
 
 const HIGH_PROTEIN_MIN_G = 15;
 const LOW_CAL_MAX_KCAL = 120;
@@ -52,6 +53,17 @@ interface UserNameRow {
   display_name: string | null;
 }
 
+interface RecipeUsageEventRow {
+  recipe_id: string;
+  used_at: string;
+}
+
+export interface RecipePersonalUsageSummary {
+  recipeId: string;
+  lastUsedAt: string | null;
+  useCount: number;
+}
+
 const RECIPE_CARD_FIELDS =
   'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, updated_at, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total';
 
@@ -59,6 +71,13 @@ const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10
 
 const stripCopySuffix = (rawName: string): string =>
   rawName.replace(/\s*\((?:copia|copy)(?:\s+\d+)?\)\s*$/i, '').trim();
+
+export const recipeMatchesCategory = (recipe: MealComponent, category: DiscoverCategory): boolean => {
+  if (category === 'all') return true;
+  if (category === 'high_protein') return (recipe.protein_g_100 ?? 0) >= HIGH_PROTEIN_MIN_G;
+  if (category === 'low_cal') return (recipe.kcal_100 ?? 0) <= LOW_CAL_MAX_KCAL;
+  return (recipe.carbs_g_100 ?? 0) >= HIGH_CARB_MIN_G;
+};
 
 const mapRecipeRow = (row: RecipeRow): MealComponent => ({
   id: `recipe_${row.id}`,
@@ -262,6 +281,46 @@ export async function getFavoriteRecipes(favoriteIds: string[]): Promise<MealCom
     .filter((row): row is RecipeRow => Boolean(row))
     .map(mapRecipeRow);
   return attachAuthorNames(ordered);
+}
+
+/** Per-user usage summary for local sorting in Mine/Favorites. */
+export async function getRecipePersonalUsageSummaries(recipeIds: string[]): Promise<RecipePersonalUsageSummary[]> {
+  const userId = await getCurrentUserId();
+  const uniqueRecipeIds = Array.from(new Set(recipeIds.filter(Boolean)));
+  if (!userId || uniqueRecipeIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('recipe_usage_events')
+    .select('recipe_id, used_at')
+    .eq('user_id', userId)
+    .in('recipe_id', uniqueRecipeIds)
+    .order('used_at', { ascending: false })
+    .returns<RecipeUsageEventRow[]>();
+
+  if (error || !data) {
+    if (error) console.error('[recipeLibraryService] getRecipePersonalUsageSummaries error:', error);
+    return [];
+  }
+
+  const summaries = new Map<string, RecipePersonalUsageSummary>();
+
+  for (const event of data) {
+    const current = summaries.get(event.recipe_id);
+    if (current) {
+      current.useCount += 1;
+      if (!current.lastUsedAt || Date.parse(event.used_at) > Date.parse(current.lastUsedAt)) {
+        current.lastUsedAt = event.used_at;
+      }
+    } else {
+      summaries.set(event.recipe_id, {
+        recipeId: event.recipe_id,
+        lastUsedAt: event.used_at,
+        useCount: 1,
+      });
+    }
+  }
+
+  return Array.from(summaries.values());
 }
 
 /** Toggle a favorite; returns the new favorite state (true = now favorited). */

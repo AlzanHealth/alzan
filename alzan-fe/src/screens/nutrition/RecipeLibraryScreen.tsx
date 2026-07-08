@@ -15,6 +15,7 @@ import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../ty
 import { TranslationKey } from '../../i18n/locales/en';
 import { MealType } from '../../types/requests.types';
 import { MealComponent } from '../../modules/nutrition/types/ingredients';
+import { normalizeInput } from '../../services/ingredientsService';
 import { RecipeDetailModal } from '../../modules/nutrition/components/RecipeDetailModal';
 import { FilterDropdown } from '../../modules/nutrition/components/FilterDropdown';
 import { MEAL_TYPE_LABELS } from '../../modules/nutrition/constants';
@@ -25,11 +26,14 @@ import {
   getFavoriteRecipeIds,
   getFavoriteRecipes,
   getMySavedRecipes,
+  getRecipePersonalUsageSummaries,
   isRecipeRising,
+  recipeMatchesCategory,
   softDeleteOwnRecipe,
   toggleFavoriteRecipe,
   DiscoverSort,
   DiscoverCategory,
+  PersonalRecipeSort,
 } from '../../modules/nutrition/services/recipeLibraryService';
 import {
   formatNutritionDayDate,
@@ -55,6 +59,18 @@ const DISCOVER_CATEGORIES: { key: DiscoverCategory; labelKey: TranslationKey }[]
   { key: 'high_carb', labelKey: 'nutrition.discoverCategoryCarbs' },
 ];
 
+const PERSONAL_SORTS: { key: PersonalRecipeSort; labelKey: TranslationKey }[] = [
+  { key: 'recently_used', labelKey: 'nutrition.recipeSortRecentlyUsed' },
+  { key: 'most_used', labelKey: 'nutrition.recipeSortMostUsed' },
+  { key: 'alphabetical', labelKey: 'nutrition.recipeSortAlphabetical' },
+];
+
+const getTimeValue = (value: string | null | undefined): number => {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
 export const RecipeLibraryScreen = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -79,7 +95,8 @@ export const RecipeLibraryScreen = () => {
   const [discoverTotal, setDiscoverTotal] = useState(0);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverSort, setDiscoverSort] = useState<DiscoverSort>('recommended');
-  const [discoverCategory, setDiscoverCategory] = useState<DiscoverCategory>('all');
+  const [personalSort, setPersonalSort] = useState<PersonalRecipeSort>('recently_used');
+  const [recipeCategory, setRecipeCategory] = useState<DiscoverCategory>('all');
 
   const [detailRecipe, setDetailRecipe] = useState<MealComponent | null>(null);
   const [pendingMealRecipe, setPendingMealRecipe] = useState<MealComponent | null>(null);
@@ -125,7 +142,7 @@ export const RecipeLibraryScreen = () => {
           page,
           pageSize: DISCOVER_PAGE_SIZE,
           sort: discoverSort,
-          category: discoverCategory,
+          category: recipeCategory,
         });
         setDiscoverTotal(total);
         setDiscover(prev => (replace ? recipes : [...prev, ...recipes]));
@@ -136,7 +153,7 @@ export const RecipeLibraryScreen = () => {
         setDiscoverLoading(false);
       }
     },
-    [debouncedQuery, discoverSort, discoverCategory],
+    [debouncedQuery, discoverSort, recipeCategory],
   );
 
   useEffect(() => {
@@ -242,8 +259,57 @@ export const RecipeLibraryScreen = () => {
     ]);
   };
 
-  const listData =
-    tab === 'discover' ? discover : tab === 'mine' ? (mineQuery.data ?? []) : (favoritesQuery.data ?? []);
+  const personalRecipes =
+    tab === 'mine' ? (mineQuery.data ?? []) : tab === 'favorites' ? (favoritesQuery.data ?? []) : [];
+
+  const personalRecipeIds = useMemo(
+    () => personalRecipes.map(recipe => recipe.external_id).filter((id): id is string => Boolean(id)),
+    [personalRecipes],
+  );
+
+  const personalUsageQuery = useQuery({
+    queryKey: ['recipePersonalUsageSummaries', user?.id, personalRecipeIds],
+    queryFn: () => getRecipePersonalUsageSummaries(personalRecipeIds),
+    enabled: !!user && tab !== 'discover' && personalRecipeIds.length > 0,
+  });
+
+  const personalUsageById = useMemo(() => {
+    return new Map((personalUsageQuery.data ?? []).map(summary => [summary.recipeId, summary]));
+  }, [personalUsageQuery.data]);
+
+  const filteredPersonalRecipes = useMemo(() => {
+    if (tab === 'discover') return [];
+
+    const normalizedQuery = normalizeInput(debouncedQuery);
+    const searchedRecipes =
+      normalizedQuery.length > 0
+        ? personalRecipes.filter(recipe => normalizeInput(recipe.name).includes(normalizedQuery))
+        : personalRecipes;
+    const categorizedRecipes = searchedRecipes.filter(recipe => recipeMatchesCategory(recipe, recipeCategory));
+
+    return [...categorizedRecipes].sort((a, b) => {
+      const aUsage = a.external_id ? personalUsageById.get(a.external_id) : undefined;
+      const bUsage = b.external_id ? personalUsageById.get(b.external_id) : undefined;
+
+      if (personalSort === 'alphabetical') {
+        return a.name.localeCompare(b.name);
+      }
+
+      if (personalSort === 'most_used') {
+        const aUses = (aUsage?.useCount ?? 0) || (a.recipe_uses_total ?? 0);
+        const bUses = (bUsage?.useCount ?? 0) || (b.recipe_uses_total ?? 0);
+        if (bUses !== aUses) return bUses - aUses;
+      } else {
+        const aRecent = getTimeValue(aUsage?.lastUsedAt) || getTimeValue(a.recipe_updated_at);
+        const bRecent = getTimeValue(bUsage?.lastUsedAt) || getTimeValue(b.recipe_updated_at);
+        if (bRecent !== aRecent) return bRecent - aRecent;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [debouncedQuery, personalRecipes, personalSort, personalUsageById, recipeCategory, tab]);
+
+  const listData = tab === 'discover' ? discover : filteredPersonalRecipes;
   const isListLoading =
     tab === 'discover'
       ? discoverLoading && discover.length === 0
@@ -398,33 +464,37 @@ export const RecipeLibraryScreen = () => {
           })}
         </View>
 
-        {tab === 'discover' && (
-          <View style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#FFF' }]}>
-            <Search size={18} color={themeColors.textSecondary} />
-            <TextInput
-              style={[styles.searchInput, { color: themeColors.textPrimary }]}
-              placeholder={t('nutrition.recipeLibrarySearchPlaceholder')}
-              placeholderTextColor={themeColors.textSecondary}
-              value={query}
-              onChangeText={setQuery}
-            />
-          </View>
-        )}
+        <View style={[styles.searchBar, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#FFF' }]}>
+          <Search size={18} color={themeColors.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: themeColors.textPrimary }]}
+            placeholder={t('nutrition.recipeLibrarySearchPlaceholder')}
+            placeholderTextColor={themeColors.textSecondary}
+            value={query}
+            onChangeText={setQuery}
+          />
+        </View>
 
-        {tab === 'discover' && (
-          <View style={styles.filtersRow}>
+        <View style={styles.filtersRow}>
+          {tab === 'discover' ? (
             <FilterDropdown
               value={discoverSort}
               options={DISCOVER_SORTS.map(option => ({ key: option.key, label: t(option.labelKey) }))}
               onChange={setDiscoverSort}
             />
+          ) : (
             <FilterDropdown
-              value={discoverCategory}
-              options={DISCOVER_CATEGORIES.map(option => ({ key: option.key, label: t(option.labelKey) }))}
-              onChange={setDiscoverCategory}
+              value={personalSort}
+              options={PERSONAL_SORTS.map(option => ({ key: option.key, label: t(option.labelKey) }))}
+              onChange={setPersonalSort}
             />
-          </View>
-        )}
+          )}
+          <FilterDropdown
+            value={recipeCategory}
+            options={DISCOVER_CATEGORIES.map(option => ({ key: option.key, label: t(option.labelKey) }))}
+            onChange={setRecipeCategory}
+          />
+        </View>
 
         {isListLoading ? (
           <View style={styles.centerState}>
