@@ -2377,6 +2377,8 @@ export default {
     saveSessionError: 'No se pudo guardar la sesión.',
     loadRoutineError: 'No se pudo cargar la rutina.',
     startSessionError: 'No se pudo iniciar la sesión',
+    activeGymSessionTitle: 'Entreno ya iniciado',
+    activeGymSessionMessage: 'Ya tienes un entreno de gym en curso. Finalízalo antes de empezar otro.',
     updateDateError: 'No se pudo actualizar la fecha',
     newWorkout: 'Nuevo Entrenamiento',
     saving: 'Guardando...',

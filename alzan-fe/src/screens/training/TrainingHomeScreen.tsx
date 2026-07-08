@@ -354,6 +354,13 @@ export const TrainingHomeScreen = () => {
     enabled: !!user,
     refetchInterval: 3000,
   });
+  const activeGymSessionId =
+    activeSession &&
+    (activeSession.sport_type === 'strength' ||
+      activeSession.sport_type === 'gym' ||
+      activeSession.source === 'gym_session')
+      ? activeSession.id
+      : null;
 
   // Fetch dates with plans or sessions for the DaySwitcher dots
   const { data: markedDates } = useQuery({
@@ -764,6 +771,7 @@ export const TrainingHomeScreen = () => {
                 isSameDay(new Date(activeSession.start_time), new Date(plan.planned_date || ''));
 
               const isThisSessionActive = isGym && !activeSession?.end_time && (hasExplicitLink || isLegacyMatch);
+              const isAnyGymSessionActive = isGym && !!activeGymSessionId;
 
               // Check if workout is already completed for this date
               const isGymCompleted =
@@ -789,9 +797,12 @@ export const TrainingHomeScreen = () => {
               const planDate = format(selectedDate, 'yyyy-MM-dd');
               const startPlan = () => {
                 if (isCompleted) return;
-                if (isThisSessionActive) {
+                if (isAnyGymSessionActive) {
+                  if (!isThisSessionActive) {
+                    Alert.alert(t('training.activeGymSessionTitle'), t('training.activeGymSessionMessage'));
+                  }
                   navigation.navigate('ActiveWorkout', {
-                    sessionId: activeSession?.id || '',
+                    sessionId: activeGymSessionId,
                   });
                 } else if (isGym) {
                   navigation.navigate('StartWorkout', {
@@ -824,7 +835,7 @@ export const TrainingHomeScreen = () => {
                     ? 'strength'
                     : ((template?.sport_type || plan.sport_type || null) as SportType | null),
                   isCompleted,
-                  isActive: Boolean(isThisSessionActive),
+                  isActive: Boolean(isThisSessionActive || isAnyGymSessionActive),
                 });
               };
 
@@ -1109,7 +1120,11 @@ export const TrainingHomeScreen = () => {
             if (!previewPlan) return;
             const currentPreviewPlan = previewPlan;
             setPreviewPlan(null);
-            if (currentPreviewPlan.isActive) {
+            if (currentPreviewPlan.isActive && currentPreviewPlan.type === 'gym' && activeGymSessionId) {
+              navigation.navigate('ActiveWorkout', {
+                sessionId: activeGymSessionId,
+              });
+            } else if (currentPreviewPlan.isActive) {
               navigation.navigate('ActiveWorkout', {
                 sessionId: activeSession?.id || '',
               });

@@ -2209,6 +2209,8 @@ const en = {
     saveSessionError: 'Could not save the session.',
     loadRoutineError: 'Could not load the routine.',
     startSessionError: 'Could not start the session.',
+    activeGymSessionTitle: 'Workout already started',
+    activeGymSessionMessage: 'You already have a gym workout in progress. Finish it before starting another one.',
     updateDateError: 'Could not update the date.',
     newWorkout: 'New Workout',
     saving: 'Saving...',

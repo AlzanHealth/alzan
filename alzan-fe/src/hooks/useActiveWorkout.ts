@@ -76,6 +76,16 @@ type ActiveWorkoutSupplementalData = {
 
 export type ActiveWorkoutData = ActiveWorkoutCoreData & ActiveWorkoutSupplementalData;
 
+export class ActiveGymSessionAlreadyStartedError extends Error {
+  sessionId: string;
+
+  constructor(sessionId: string) {
+    super('A gym session is already active');
+    this.name = 'ActiveGymSessionAlreadyStartedError';
+    this.sessionId = sessionId;
+  }
+}
+
 export const useActiveWorkout = (sessionId?: string) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -102,6 +112,25 @@ export const useActiveWorkout = (sessionId?: string) => {
       );
       try {
         if (!user) throw new Error('No user');
+
+        const { data: activeGymSession, error: activeGymSessionError } = await supabase
+          .from('activity_sessions')
+          .select('id')
+          .eq('user_id', user.id)
+          .or('sport_type.eq.strength,sport_type.eq.gym,source.eq.gym_session')
+          .is('end_time', null)
+          .order('start_time', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (activeGymSessionError) {
+          console.error('[useActiveWorkout.startSession] Error checking active gym session:', activeGymSessionError);
+          throw activeGymSessionError;
+        }
+
+        if (activeGymSession?.id) {
+          throw new ActiveGymSessionAlreadyStartedError(activeGymSession.id);
+        }
 
         // Fetch template details to get name
         const { data: template } = await supabase.from('workout_templates').select('*').eq('id', templateId).single();

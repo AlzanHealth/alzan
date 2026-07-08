@@ -7,7 +7,7 @@ import { GlassCard } from '../../components/GlassCard';
 import { LiquidGlassFooter } from '../../components/common/LiquidGlassFooter';
 import { spacing, typography } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
-import { useActiveWorkout } from '../../hooks/useActiveWorkout';
+import { ActiveGymSessionAlreadyStartedError, useActiveWorkout } from '../../hooks/useActiveWorkout';
 import { Play, Calendar, Infinity as InfinityIcon } from 'lucide-react-native';
 import { supabase } from '../../lib/supabaseClient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -138,6 +138,17 @@ export const StartWorkoutScreen = () => {
       });
       navigation.replace('ActiveWorkout', { sessionId: session.id });
     } catch (e) {
+      if (e instanceof ActiveGymSessionAlreadyStartedError) {
+        Alert.alert(t('training.activeGymSessionTitle'), t('training.activeGymSessionMessage'), [
+          {
+            text: t('training.resume'),
+            onPress: () => navigation.replace('ActiveWorkout', { sessionId: e.sessionId }),
+          },
+        ]);
+        setIsLoading(false);
+        return;
+      }
+
       console.error(e);
       Alert.alert(t('common.error'), t('training.startSessionError'));
       setIsLoading(false);
