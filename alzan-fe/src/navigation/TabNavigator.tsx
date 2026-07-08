@@ -38,6 +38,7 @@ export type CustomTabBarProps = {
 };
 
 const Tab = createBottomTabNavigator();
+const SOCIAL_MODE_ENABLED = false;
 
 const AlzanIcon = ({ color, size }: { color: string; size: number }) => (
   <Image
@@ -130,6 +131,8 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
 
   const handleTabPress = (tabConfig: TabConfig, _routeKey?: string) => {
     if (tabConfig.isAlzanSwitch) {
+      if (!SOCIAL_MODE_ENABLED && !isAlzanMode) return;
+
       // Toggle Mode
       const newMode = !isAlzanMode;
       setIsAlzanMode(newMode);
@@ -197,12 +200,15 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
           {/* Tabs */}
           {tabsConfig.map((tabConfig, index) => {
             const isFocused = activeIndex === index;
+            const isAlzanSwitchDisabled = tabConfig.isAlzanSwitch && !SOCIAL_MODE_ENABLED && !isAlzanMode;
 
-            const iconColor = tabConfig.isAlzanSwitch
-              ? colors.primary
-              : isFocused
+            const iconColor = isAlzanSwitchDisabled
+              ? colors.textSecondary
+              : tabConfig.isAlzanSwitch
                 ? colors.primary
-                : colors.textSecondary;
+                : isFocused
+                  ? colors.primary
+                  : colors.textSecondary;
 
             const Icon = tabConfig.icon;
             const iconSize = tabConfig.isAlzanSwitch ? 32 : isFocused ? 26 : 24;
@@ -215,10 +221,11 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
               <TouchableOpacity
                 key={tabConfig.name}
                 accessibilityRole="button"
-                accessibilityState={isFocused ? { selected: true } : {}}
+                accessibilityState={isAlzanSwitchDisabled ? { disabled: true } : isFocused ? { selected: true } : {}}
                 onPress={() => handleTabPress(tabConfig)}
                 style={styles.tabButton}
-                activeOpacity={0.7}
+                disabled={isAlzanSwitchDisabled}
+                activeOpacity={isAlzanSwitchDisabled ? 1 : 0.7}
               >
                 <View style={wrapperStyle}>
                   <Icon color={iconColor} size={iconSize} />
