@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { startOfDay, endOfDay, format } from 'date-fns';
 import { ActivitySession } from '../types/requests.types';
 
+type DashboardActiveWorkout = Pick<ActivitySession, 'id' | 'sport_type' | 'sport_subtype' | 'name' | 'start_time'>;
+
 export type UseDashboardDataScheduledWorkout = ReturnType<typeof useDashboardData>['scheduledWorkouts'][number];
-export type UseDashboardDataActiveTodayWorkout = ActivitySession | null;
+export type UseDashboardDataActiveTodayWorkout = DashboardActiveWorkout | null;
 
 export const useDashboardData = () => {
   const { user } = useAuth();
@@ -15,13 +17,13 @@ export const useDashboardData = () => {
   const todayStr = format(today, 'yyyy-MM-dd');
 
   const { data: workouts, isLoading: workoutsLoading } = useQuery({
-    queryKey: ['dashboard', 'workouts', user?.id],
+    queryKey: ['dashboard', 'workouts', user?.id, todayStr],
     queryFn: async () => {
       try {
         if (!user) return [];
         const { data, error } = await supabase
           .from('activity_sessions')
-          .select('*')
+          .select('id')
           .eq('user_id', user.id)
           .gte('start_time', start)
           .lte('start_time', end);
@@ -67,7 +69,7 @@ export const useDashboardData = () => {
 
         const { data, error } = await supabase
           .from('activity_sessions')
-          .select('*')
+          .select('id, sport_type, sport_subtype, name, start_time')
           .eq('user_id', user.id)
           .is('end_time', null)
           .gte('start_time', start)
@@ -77,7 +79,7 @@ export const useDashboardData = () => {
           .maybeSingle();
 
         if (error) throw error;
-        return data;
+        return data as DashboardActiveWorkout | null;
       } catch (err) {
         console.error('[useDashboardData.activeTodayWorkout] Exception:', err);
         throw err;

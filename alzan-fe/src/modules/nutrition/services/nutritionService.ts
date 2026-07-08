@@ -327,11 +327,17 @@ export const nutritionService = {
 
   // --- Water (daily_hydration) ---
 
-  async getWaterIntake(date: string) {
-    const { data, error } = await supabase.from('daily_hydration').select('total_ml').eq('date', date).single();
+  async getWaterIntake(userId: string, date: string) {
+    if (!userId) return 0;
+
+    const { data, error } = await supabase
+      .from('daily_hydration')
+      .select('total_ml')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .maybeSingle();
 
     if (error) {
-      if (error.code === 'PGRST116') return 0; // No rows found
       throw error;
     }
     return data?.total_ml || 0;
@@ -361,7 +367,33 @@ export const nutritionService = {
   },
 
   async getMealItems(logId: string, locale?: Locale): Promise<LocalizedMealItem[]> {
-    const { data, error } = await supabase.from('meal_items').select('*').eq('meal_log_id', logId);
+    const { data, error } = await supabase
+      .from('meal_items')
+      .select(
+        [
+          'id',
+          'meal_log_id',
+          'user_id',
+          'name',
+          'source',
+          'source_ref',
+          'quantity_g',
+          'per_100g_kcal',
+          'per_100g_protein_g',
+          'per_100g_carbs_g',
+          'per_100g_fats_g',
+          'kcal',
+          'protein_g',
+          'carbs_g',
+          'fats_g',
+          'data_quality',
+          'created_at',
+          'origin',
+          'confidence',
+        ].join(','),
+      )
+      .eq('meal_log_id', logId)
+      .returns<LocalizedMealItem[]>();
 
     if (error) throw error;
     const mealItems = data || [];

@@ -23,7 +23,11 @@ import { format } from 'date-fns';
 import { spacing, borderRadius, typography } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { GlassCard } from '../../components/GlassCard';
-import { useDashboardData, UseDashboardDataScheduledWorkout } from '../../hooks/useDashboardData';
+import {
+  useDashboardData,
+  UseDashboardDataActiveTodayWorkout,
+  UseDashboardDataScheduledWorkout,
+} from '../../hooks/useDashboardData';
 import { useDayNutrition } from '../../modules/nutrition/hooks/useDayNutritionLogic';
 import { MEAL_TYPES, MEAL_TYPE_LABELS } from '../../modules/nutrition/constants';
 import { WeightLogModal } from '../../components/WeightLogModal';
@@ -43,7 +47,6 @@ import { getLocaleTag } from '../../i18n/dateLocale';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedDate } from '../../i18n/dateLocale';
-import { ActivitySession } from '../../types/requests.types';
 
 const getNextMealType = (settings: NotificationSettings) => {
   if (!settings?.meals) return MEAL_TYPES.BREAKFAST;
@@ -342,7 +345,7 @@ export const HomeScreen = () => {
     };
   };
 
-  const getActiveWorkoutVisuals = (session: ActivitySession) => {
+  const getActiveWorkoutVisuals = (session: NonNullable<UseDashboardDataActiveTodayWorkout>) => {
     if (session.sport_type === 'strength') {
       return {
         icon: <Dumbbell color={colors.textPrimary} size={24} />,

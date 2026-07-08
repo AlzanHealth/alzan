@@ -9,10 +9,11 @@ import { useAuth } from '../../../context/AuthContext';
 import { getCurrentAppLocale } from '../../../services/localization';
 
 const KEYS = {
-  TEMPLATES: ['dietTemplates'],
+  TEMPLATES: (userId: string) => ['dietTemplates', userId],
   TEMPLATE_MEALS: (id: string) => ['dietTemplateMeals', id],
-  MEAL_LOGS: (start: string, end: string) => ['mealLogs', start, end],
-  DAY_STATUSES: (start: string, end: string) => ['nutritionDayStatuses', start, end],
+  MEAL_LOGS: (userId: string, start: string, end: string) => ['mealLogs', userId, start, end],
+  DAY_STATUSES: (userId: string, start: string, end: string) => ['nutritionDayStatuses', userId, start, end],
+  WATER: (userId: string, date: string) => ['water', userId, date],
   ACTIVE_TEMPLATE_ID: 'active_diet_template_id',
 };
 
@@ -21,7 +22,7 @@ const KEYS = {
 export function useDietTemplates() {
   const { user } = useAuth();
   return useQuery({
-    queryKey: KEYS.TEMPLATES,
+    queryKey: user ? KEYS.TEMPLATES(user.id) : ['dietTemplates', 'anonymous'],
     queryFn: () => nutritionService.getDietTemplates(user!.id),
     enabled: !!user,
   });
@@ -64,7 +65,7 @@ export function useCreateDietTemplate() {
   return useMutation({
     mutationFn: (template: DietTemplateInsert) => nutritionService.createDietTemplate(user!.id, template),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: KEYS.TEMPLATES });
+      queryClient.invalidateQueries({ queryKey: ['dietTemplates'] });
     },
   });
 }
@@ -74,7 +75,7 @@ export function useDeleteDietTemplate() {
   return useMutation({
     mutationFn: nutritionService.deleteDietTemplate,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: KEYS.TEMPLATES });
+      queryClient.invalidateQueries({ queryKey: ['dietTemplates'] });
     },
   });
 }
@@ -85,7 +86,7 @@ export function useUpdateDietTemplate() {
     mutationFn: (variables: { id: string; updates: DietTemplateUpdate }) =>
       nutritionService.updateDietTemplate(variables.id, variables.updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: KEYS.TEMPLATES });
+      queryClient.invalidateQueries({ queryKey: ['dietTemplates'] });
     },
   });
 }
@@ -128,7 +129,7 @@ export function useDeleteTemplateMeal() {
 export function useMealLogs(startDate: string, endDate: string) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: KEYS.MEAL_LOGS(startDate, endDate),
+    queryKey: user ? KEYS.MEAL_LOGS(user.id, startDate, endDate) : ['mealLogs', 'anonymous', startDate, endDate],
     queryFn: () => nutritionService.getMealLogs(user!.id, startDate, endDate),
     enabled: !!user,
   });
@@ -137,7 +138,9 @@ export function useMealLogs(startDate: string, endDate: string) {
 export function useNutritionDayStatuses(startDate: string, endDate: string) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: KEYS.DAY_STATUSES(startDate, endDate),
+    queryKey: user
+      ? KEYS.DAY_STATUSES(user.id, startDate, endDate)
+      : ['nutritionDayStatuses', 'anonymous', startDate, endDate],
     queryFn: () => nutritionService.getNutritionDayStatuses(user!.id, startDate, endDate),
     enabled: !!user,
   });
@@ -225,14 +228,17 @@ export function useWaterIntake(date: string) {
   const { user } = useAuth();
 
   const query = useQuery({
-    queryKey: ['water', date],
-    queryFn: () => nutritionService.getWaterIntake(date),
+    queryKey: user ? KEYS.WATER(user.id, date) : ['water', 'anonymous', date],
+    queryFn: () => nutritionService.getWaterIntake(user!.id, date),
+    enabled: !!user,
   });
 
   const mutation = useMutation({
     mutationFn: (ml: number) => nutritionService.upsertWaterIntake(user!.id, date, ml),
     onSuccess: ml => {
-      queryClient.setQueryData(['water', date], ml);
+      if (user) {
+        queryClient.setQueryData(KEYS.WATER(user.id, date), ml);
+      }
     },
   });
 
