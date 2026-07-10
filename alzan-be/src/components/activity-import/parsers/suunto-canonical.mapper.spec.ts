@@ -19,6 +19,15 @@ type FitFieldDefinition = {
   value: number | number[];
 };
 
+type TestFitLap = {
+  startOffsetSeconds: number;
+  durationSeconds: number;
+  distanceM: number;
+  avgHeartRate?: number;
+  maxHeartRate?: number;
+  lapTrigger?: number;
+};
+
 function fitTimestamp(iso: string): number {
   return Math.round(new Date(iso).getTime() / 1000 - FIT_EPOCH_OFFSET_SECONDS);
 }
@@ -78,10 +87,13 @@ function buildTestFit(params: {
   sport: number;
   subSport: number;
   distanceM?: number;
+  durationSeconds?: number;
   includeGps?: boolean;
   lapTrigger?: number;
+  laps?: TestFitLap[];
 }): Uint8Array {
   const startedAt = fitTimestamp('2026-05-01T08:00:00Z');
+  const durationSeconds = params.durationSeconds ?? 3600;
   const data: number[] = [];
 
   const sessionFields = [
@@ -104,8 +116,8 @@ function buildTestFit(params: {
     { ...sessionFields[0], value: startedAt },
     { ...sessionFields[1], value: params.sport },
     { ...sessionFields[2], value: params.subSport },
-    { ...sessionFields[3], value: 3600000 },
-    { ...sessionFields[4], value: 3600000 },
+    { ...sessionFields[3], value: Math.round(durationSeconds * 1000) },
+    { ...sessionFields[4], value: Math.round(durationSeconds * 1000) },
     { ...sessionFields[5], value: Math.round((params.distanceM ?? 0) * 100) },
     { ...sessionFields[6], value: 500 },
     { ...sessionFields[7], value: 120 },
@@ -113,7 +125,7 @@ function buildTestFit(params: {
     { ...sessionFields[9], value: 80 },
     { ...sessionFields[10], value: 70 },
     { ...sessionFields[11], value: [300000, 600000, 900000, 1200000, 600000] },
-    { ...sessionFields[12], value: startedAt + 3600 },
+    { ...sessionFields[12], value: startedAt + durationSeconds },
   ]);
 
   const lapFields = [
@@ -125,14 +137,26 @@ function buildTestFit(params: {
     { fieldNumber: 26, size: 1, baseType: 0x02 },
   ];
   appendFitDefinition(data, 1, 19, lapFields);
-  appendFitData(data, 1, [
-    { ...lapFields[0], value: startedAt },
-    { ...lapFields[1], value: 3600000 },
-    { ...lapFields[2], value: Math.round((params.distanceM ?? 0) * 100) },
-    { ...lapFields[3], value: 120 },
-    { ...lapFields[4], value: 150 },
-    { ...lapFields[5], value: params.lapTrigger ?? 2 },
-  ]);
+  const laps: TestFitLap[] = params.laps ?? [
+    {
+      startOffsetSeconds: 0,
+      durationSeconds,
+      distanceM: params.distanceM ?? 0,
+      avgHeartRate: 120,
+      maxHeartRate: 150,
+      lapTrigger: params.lapTrigger ?? 2,
+    },
+  ];
+  for (const lap of laps) {
+    appendFitData(data, 1, [
+      { ...lapFields[0], value: startedAt + lap.startOffsetSeconds },
+      { ...lapFields[1], value: Math.round(lap.durationSeconds * 1000) },
+      { ...lapFields[2], value: Math.round(lap.distanceM * 100) },
+      { ...lapFields[3], value: lap.avgHeartRate ?? 120 },
+      { ...lapFields[4], value: lap.maxHeartRate ?? 150 },
+      { ...lapFields[5], value: lap.lapTrigger ?? params.lapTrigger ?? 2 },
+    ]);
+  }
 
   if (params.includeGps) {
     const recordFields = [
@@ -312,6 +336,59 @@ function assertSuuntoFitCanonicalParsesGpsAndLaps(): void {
   ]);
 }
 
+function assertSuuntoFitRemovesMixedOneKilometerAutolaps(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 4144,
+    durationSeconds: 2110,
+    laps: [
+      { startOffsetSeconds: 0, durationSeconds: 342, distanceM: 1000, avgHeartRate: 141, lapTrigger: 0 },
+      { startOffsetSeconds: 0, durationSeconds: 600, distanceM: 1600, avgHeartRate: 146, lapTrigger: 0 },
+      { startOffsetSeconds: 600, durationSeconds: 364, distanceM: 1000, avgHeartRate: 152, lapTrigger: 0 },
+      { startOffsetSeconds: 600, durationSeconds: 105, distanceM: 400, avgHeartRate: 153, lapTrigger: 0 },
+      { startOffsetSeconds: 705, durationSeconds: 90, distanceM: 123, avgHeartRate: 150, lapTrigger: 0 },
+      { startOffsetSeconds: 795, durationSeconds: 109, distanceM: 400, avgHeartRate: 153, lapTrigger: 0 },
+      { startOffsetSeconds: 904, durationSeconds: 90, distanceM: 121, avgHeartRate: 157, lapTrigger: 0 },
+      { startOffsetSeconds: 994, durationSeconds: 103, distanceM: 400, avgHeartRate: 160, lapTrigger: 0 },
+    ],
+  });
+
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-running-intervals.fit');
+
+  assert.deepEqual(
+    canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
+    [1600, 400, 123, 400, 121, 400],
+  );
+  assert.deepEqual(
+    canonical.laps.map(lap => lap.lapIndex),
+    [1, 2, 3, 4, 5, 6],
+  );
+}
+
+function assertSuuntoFitKeepsRealOneKilometerIntervals(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 3400,
+    durationSeconds: 1143,
+    laps: [
+      { startOffsetSeconds: 0, durationSeconds: 240, distanceM: 1000, avgHeartRate: 160, lapTrigger: 2 },
+      { startOffsetSeconds: 240, durationSeconds: 90, distanceM: 200, avgHeartRate: 145, lapTrigger: 0 },
+      { startOffsetSeconds: 330, durationSeconds: 242, distanceM: 1000, avgHeartRate: 164, lapTrigger: 2 },
+      { startOffsetSeconds: 572, durationSeconds: 90, distanceM: 200, avgHeartRate: 146, lapTrigger: 0 },
+      { startOffsetSeconds: 662, durationSeconds: 241, distanceM: 1000, avgHeartRate: 166, lapTrigger: 2 },
+    ],
+  });
+
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-one-km-intervals.fit');
+
+  assert.deepEqual(
+    canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
+    [1000, 200, 1000, 200, 1000],
+  );
+}
+
 function assertSuuntoFitCanonicalParsesWithoutGps(): void {
   const fit = buildTestFit({ sport: 10, subSport: 20, distanceM: 0, includeGps: false });
   const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-gym.fit', { estimatedMaxHeartRate: 190 });
@@ -479,6 +556,8 @@ function assertSuuntoHealthCanonicalParsesWithoutPersistence(): void {
 
 assertSuuntoSportMapping();
 assertSuuntoFitCanonicalParsesGpsAndLaps();
+assertSuuntoFitRemovesMixedOneKilometerAutolaps();
+assertSuuntoFitKeepsRealOneKilometerIntervals();
 assertSuuntoFitCanonicalParsesWithoutGps();
 assertSuuntoFitWithoutGpsStillParsesAsRouteImport();
 assertSuuntoJsonCanonicalParsesSummary();

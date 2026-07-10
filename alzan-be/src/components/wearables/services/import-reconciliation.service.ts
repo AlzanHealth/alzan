@@ -476,6 +476,7 @@ export class ImportReconciliationService {
       .from('activity_laps')
       .select('*')
       .eq('session_id', sessionId)
+      .in('split_group', ['legacy', 'custom'])
       .order('lap_index', { ascending: true });
     if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_LAPS_READ_FAILED');
     return data ?? [];

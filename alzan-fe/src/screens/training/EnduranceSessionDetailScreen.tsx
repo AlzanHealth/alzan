@@ -62,6 +62,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { SPORT_COLORS } from '../../theme/sportColors';
+import { getHeartRateZoneFillPercentage } from './helpers/heartRateZoneDisplay.helper';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
@@ -315,6 +316,10 @@ export const EnduranceSessionDetailScreen = () => {
     .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
   const fastestPace = activeSplitPaceValues.length > 0 ? Math.min(...activeSplitPaceValues) : null;
   const slowestPace = activeSplitPaceValues.length > 0 ? Math.max(...activeSplitPaceValues) : null;
+  const maxHeartRateZoneDuration = useMemo(
+    () => heartRateZones?.reduce((max, zone) => Math.max(max, zone.duration_s), 0) ?? 0,
+    [heartRateZones],
+  );
 
   const resolvePaceCellBackground = useCallback(
     (lap: SessionLap) => {
@@ -370,6 +375,7 @@ export const EnduranceSessionDetailScreen = () => {
   const formatSplitDistance = useCallback(
     (distanceM: number | null) => {
       if (distanceM == null || distanceM <= 0) return '-';
+      if (distanceM < 1000) return `${Math.round(distanceM)} m`;
       const convertedDistance = convertDistanceToUi(distanceM, 2);
       const numericValue = Number(convertedDistance.value);
       const decimals = numericValue >= 10 ? 1 : 2;
@@ -1811,7 +1817,7 @@ export const EnduranceSessionDetailScreen = () => {
                         style={[
                           styles.zoneFill,
                           {
-                            width: `${Math.max(0, Math.min(100, zone.percentage))}%`,
+                            width: `${getHeartRateZoneFillPercentage(zone.duration_s, maxHeartRateZoneDuration)}%`,
                             backgroundColor: resolveZoneColor(zone.zone),
                           },
                         ]}

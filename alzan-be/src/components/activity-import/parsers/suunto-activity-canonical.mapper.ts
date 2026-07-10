@@ -182,6 +182,10 @@ function roundNullable(value: number | null | undefined): number | null {
   return Math.round(value);
 }
 
+function valuesAreClose(value: number, target: number, tolerance: number): boolean {
+  return Math.abs(value - target) <= tolerance;
+}
+
 function normaliseHeartRate(value: number): number {
   return value > 0 && value < 4 ? value * 60 : value;
 }
@@ -764,6 +768,137 @@ function appendFitLap(state: FitParseState, lap: FitLapAccumulator): void {
   });
 }
 
+const STANDARD_DISTANCE_AUTOLAP_M = 1000;
+const STANDARD_DISTANCE_AUTOLAP_TOLERANCE_M = 15;
+const SUMMARY_LAP_DISTANCE_TOLERANCE_M = 25;
+const SUMMARY_LAP_DURATION_TOLERANCE_S = 5;
+const MIN_INTERVAL_SIGNAL_LAPS = 4;
+const MIN_INTERVAL_PACE_SPREAD = 0.25;
+
+function lapPaceSecondsPerKm(lap: CanonicalActivityLap): number | null {
+  if (lap.avgPaceSecondsPerKm != null && lap.avgPaceSecondsPerKm > 0) return lap.avgPaceSecondsPerKm;
+  if (lap.durationSeconds != null && lap.durationSeconds > 0 && lap.distanceM != null && lap.distanceM > 0) {
+    return (lap.durationSeconds / lap.distanceM) * 1000;
+  }
+  return null;
+}
+
+function isValidSuuntoLap(lap: CanonicalActivityLap): boolean {
+  return (lap.distanceM != null && lap.distanceM > 0) || (lap.durationSeconds != null && lap.durationSeconds > 0);
+}
+
+function isTotalLikeSuuntoLap(lap: CanonicalActivityLap, summary: Partial<CanonicalActivity['summary']>): boolean {
+  const summaryDistanceM = summary.distanceM ?? null;
+  const summaryDurationSeconds = summary.durationSeconds ?? null;
+  const hasSummaryDistance = summaryDistanceM != null && summaryDistanceM > 0;
+  const hasSummaryDuration = summaryDurationSeconds != null && summaryDurationSeconds > 0;
+  if (!hasSummaryDistance && !hasSummaryDuration) return false;
+
+  const distanceMatches =
+    hasSummaryDistance &&
+    lap.distanceM != null &&
+    lap.distanceM > 0 &&
+    valuesAreClose(lap.distanceM, summaryDistanceM, SUMMARY_LAP_DISTANCE_TOLERANCE_M);
+  const durationMatches =
+    hasSummaryDuration &&
+    lap.durationSeconds != null &&
+    lap.durationSeconds > 0 &&
+    valuesAreClose(lap.durationSeconds, summaryDurationSeconds, SUMMARY_LAP_DURATION_TOLERANCE_S);
+
+  if (hasSummaryDistance && hasSummaryDuration) return distanceMatches || durationMatches;
+  if (hasSummaryDistance) return distanceMatches;
+  if (hasSummaryDuration) return durationMatches;
+  return false;
+}
+
+function isStandardDistanceMarker(lap: CanonicalActivityLap): boolean {
+  return (
+    lap.distanceM != null &&
+    valuesAreClose(lap.distanceM, STANDARD_DISTANCE_AUTOLAP_M, STANDARD_DISTANCE_AUTOLAP_TOLERANCE_M)
+  );
+}
+
+function lapHasTiming(lap: CanonicalActivityLap): boolean {
+  return (
+    lap.startOffsetSeconds != null && lap.endOffsetSeconds != null && lap.endOffsetSeconds > lap.startOffsetSeconds
+  );
+}
+
+function lapsOverlap(left: CanonicalActivityLap, right: CanonicalActivityLap): boolean {
+  if (!lapHasTiming(left) || !lapHasTiming(right)) return false;
+  return (
+    Math.max(left.startOffsetSeconds as number, right.startOffsetSeconds as number) <
+    Math.min(left.endOffsetSeconds as number, right.endOffsetSeconds as number)
+  );
+}
+
+function hasNonStandardIntervalSignal(laps: CanonicalActivityLap[]): boolean {
+  const paceValues = laps
+    .map(lapPaceSecondsPerKm)
+    .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
+  if (paceValues.length < MIN_INTERVAL_SIGNAL_LAPS) return false;
+
+  const minPace = Math.min(...paceValues);
+  const maxPace = Math.max(...paceValues);
+  const medianPace = [...paceValues].sort((left, right) => left - right)[Math.floor(paceValues.length / 2)];
+  if (medianPace == null || medianPace <= 0) return false;
+
+  return (maxPace - minPace) / medianPace >= MIN_INTERVAL_PACE_SPREAD;
+}
+
+function buildLapIdentity(lap: CanonicalActivityLap): string {
+  const distanceKey = lap.distanceM == null ? 'null' : Math.round(lap.distanceM);
+  const durationKey = lap.durationSeconds == null ? 'null' : Math.round(lap.durationSeconds);
+  const startKey = lap.startOffsetSeconds == null ? 'null' : Math.round(lap.startOffsetSeconds);
+  const endKey = lap.endOffsetSeconds == null ? 'null' : Math.round(lap.endOffsetSeconds);
+  return `${lap.lapType}|${distanceKey}|${durationKey}|${startKey}|${endKey}`;
+}
+
+function normaliseSuuntoFitLaps(
+  laps: CanonicalActivityLap[],
+  summary: Partial<CanonicalActivity['summary']>,
+): CanonicalActivityLap[] {
+  const validLaps = laps.filter(isValidSuuntoLap);
+  if (validLaps.length === 0) return [];
+
+  let workingLaps = [...validLaps];
+  const totalLikeMask = workingLaps.map(lap => isTotalLikeSuuntoLap(lap, summary));
+  if (totalLikeMask.some(Boolean) && totalLikeMask.some(isTotalLike => !isTotalLike)) {
+    workingLaps = workingLaps.filter((_, index) => !totalLikeMask[index]);
+  }
+
+  const standardDistanceMarkerMask = workingLaps.map(isStandardDistanceMarker);
+  const nonStandardLaps = workingLaps.filter((_, index) => !standardDistanceMarkerMask[index]);
+  const overlappedStandardMarkerMask = workingLaps.map(
+    (lap, index) =>
+      standardDistanceMarkerMask[index] && nonStandardLaps.some(nonStandardLap => lapsOverlap(lap, nonStandardLap)),
+  );
+
+  if (overlappedStandardMarkerMask.some(Boolean)) {
+    workingLaps = workingLaps.filter((_, index) => !overlappedStandardMarkerMask[index]);
+  } else if (
+    standardDistanceMarkerMask.some(Boolean) &&
+    workingLaps.some((lap, index) => standardDistanceMarkerMask[index] && !lapHasTiming(lap)) &&
+    hasNonStandardIntervalSignal(nonStandardLaps)
+  ) {
+    workingLaps = nonStandardLaps;
+  }
+
+  const seen = new Set<string>();
+  const deduped: CanonicalActivityLap[] = [];
+  for (const lap of workingLaps) {
+    const identity = buildLapIdentity(lap);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    deduped.push(lap);
+  }
+
+  return deduped.map((lap, index) => ({
+    ...lap,
+    lapIndex: index + 1,
+  }));
+}
+
 function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions): CanonicalActivity {
   if (binary.byteLength < 12) throw new Error('Invalid Suunto FIT file.');
   const dataView = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
@@ -838,7 +973,7 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
       power: state.power,
       temperature: state.temperature,
     },
-    laps: state.laps,
+    laps: normaliseSuuntoFitLaps(state.laps, state.summary),
     device: state.device,
     vendorFields: { suuntoFitSport: state.sport, suuntoFitSubSport: state.subSport },
     heartRateZones: state.nativeHeartRateZones,
