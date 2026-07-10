@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { HealthScreenNavigationProp, TabParamList } from '../../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Scale, Ruler, Moon, Plus, BarChart2, ChevronRight, Activity } from 'lucide-react-native';
+import { Scale, Ruler, Moon, Plus, BarChart2, ChevronRight, Activity, Settings } from 'lucide-react-native';
 import { colors, typography } from '../../../theme';
 
 import { useHealthInsights } from '../hooks/useHealthInsights';
@@ -73,9 +73,14 @@ export const HealthHome = () => {
         {/* Top Bar - EXACT COPY FROM NUTRITION */}
         <View style={styles.topBar}>
           <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>{t('health.summary')}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('HealthStatistics')} style={styles.topActions}>
-            <BarChart2 size={24} color={themeColors.textPrimary} />
-          </TouchableOpacity>
+          <View style={styles.topActions}>
+            <TouchableOpacity onPress={() => navigation.navigate('HealthStatistics')}>
+              <BarChart2 size={24} color={themeColors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+              <Settings size={24} color={themeColors.textPrimary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -326,11 +331,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     top: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 16,
   },
   scrollContent: {
     paddingHorizontal: 16,
