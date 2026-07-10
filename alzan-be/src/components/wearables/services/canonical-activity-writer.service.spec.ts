@@ -282,7 +282,19 @@ function buildCanonicalRun(): CanonicalActivity {
       power: [],
       temperature: [],
     },
-    laps: [],
+    laps: [
+      {
+        lapIndex: 1,
+        lapType: 'manual',
+        distanceM: 400,
+        durationSeconds: 105.3,
+        avgPaceSecondsPerKm: 263.25,
+        avgHeartRate: 153,
+        maxHeartRate: 160,
+        startOffsetSeconds: 600,
+        endOffsetSeconds: 705.3,
+      },
+    ],
     heartRateZones: [],
     device: null,
     vendorFields: {},
@@ -439,6 +451,13 @@ async function assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate(): P
       insert =>
         insert.table === 'activity_route_points' &&
         insert.rows?.every(row => row.session_id === 'survivor-session') === true,
+    ),
+  );
+  assert.ok(
+    client.inserts.some(
+      insert =>
+        insert.table === 'activity_laps' &&
+        insert.rows?.some(row => row.session_id === 'survivor-session' && row.duration_s === 105.3) === true,
     ),
   );
   assert.equal(completedPlans[0], 'survivor-session');

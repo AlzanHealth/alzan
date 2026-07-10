@@ -14,6 +14,7 @@ interface ActivityImportServicePrivate {
     summary: ImportedStrengthActivitySummary,
   ): Promise<void>;
   replaceStrengthStream(ctx: FakeUserCtx, sessionId: string, summary: ImportedStrengthActivitySummary): Promise<void>;
+  buildRouteLapRows(ctx: FakeUserCtx, sessionId: string, details: RouteImportDetails): Array<Record<string, unknown>>;
   resolveRouteTabs(details: RouteImportDetails): Array<{
     splitGroup: 'custom' | 'distance';
     splitDistanceM: number | null;
@@ -241,9 +242,37 @@ function assertProviderSplitsAreNotHiddenByComputedDistanceBuckets(): void {
   assert.equal(tabs[1].laps[2].durationSeconds, 346.9);
 }
 
+function assertRouteLapRowsKeepDecimalDurations(): void {
+  const service = getPrivateService();
+  const ctx: FakeUserCtx = { user: { id: 'user-1' }, supabase: createFakeSupabaseClient() };
+  const rows = service.buildRouteLapRows(ctx, 'session-1', {
+    customSplits: [
+      {
+        lapIndex: 1,
+        lapType: 'manual',
+        distanceM: 400,
+        durationSeconds: 105.3,
+        avgPaceSecondsPerKm: 263.25,
+        avgHeartRate: 153,
+        maxHeartRate: 160,
+        startOffsetSeconds: 600,
+        endOffsetSeconds: 705.3,
+      },
+    ],
+    distanceSplits: [],
+    splits1k: [],
+    splits5k: [],
+    splits10k: [],
+    heartRateZones: [],
+  });
+
+  assert.equal(rows[0]?.duration_s, 105.3);
+}
+
 async function run(): Promise<void> {
   assertBuildStrengthSessionUpdateUsesImportedMasterValues();
   assertProviderSplitsAreNotHiddenByComputedDistanceBuckets();
+  assertRouteLapRowsKeepDecimalDurations();
   await assertReplaceStrengthHeartRateZonesReplacesRows();
   await assertReplaceStrengthStreamPersistsImportedMetrics();
 }

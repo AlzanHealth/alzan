@@ -384,7 +384,7 @@ export class ActivityImportService {
         split_group_order: tabIndex,
         split_distance_m: tab.splitDistanceM != null ? Math.round(tab.splitDistanceM) : null,
         distance_m: lap.distanceM,
-        duration_s: lap.durationSeconds != null ? Math.round(lap.durationSeconds) : null,
+        duration_s: lap.durationSeconds,
         avg_heart_rate: lap.avgHeartRate != null ? Math.round(lap.avgHeartRate) : null,
         max_heart_rate: lap.maxHeartRate != null ? Math.round(lap.maxHeartRate) : null,
         avg_pace_s_per_km: lap.avgPaceSecondsPerKm != null ? Math.round(lap.avgPaceSecondsPerKm) : null,

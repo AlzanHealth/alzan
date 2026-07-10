@@ -436,7 +436,7 @@ export class CanonicalActivityWriterService {
       split_group_order: 0,
       split_distance_m: null,
       distance_m: lap.distanceM,
-      duration_s: lap.durationSeconds == null ? null : Math.round(lap.durationSeconds),
+      duration_s: lap.durationSeconds,
       avg_heart_rate: lap.avgHeartRate == null ? null : Math.round(lap.avgHeartRate),
       max_heart_rate: lap.maxHeartRate == null ? null : Math.round(lap.maxHeartRate),
       avg_pace_s_per_km: lap.avgPaceSecondsPerKm == null ? null : Math.round(lap.avgPaceSecondsPerKm),
