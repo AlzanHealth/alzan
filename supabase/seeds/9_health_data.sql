@@ -207,3 +207,234 @@ INSERT INTO public.daily_recovery (id, user_id, date, timezone, source, sleep_se
  'dd000000-0000-0000-0001-000000000012',79,76,81,57,42,15.1,97.2,'Good','complete','garmin-rec-006'),
 ('00800000-0000-0000-0001-000000000007','4424c5d6-5751-4038-aa39-bd85895ddb78',CURRENT_DATE,'Europe/Madrid','garmin',
  'dd000000-0000-0000-0001-000000000013',86,84,84,55,44,14.9,97.4,'Excellent','complete','garmin-rec-007');
+
+-- ---------------------------------------------------------------------------
+-- weight_logs (14 days of weight logs for Roberto/Alice)
+-- ---------------------------------------------------------------------------
+INSERT INTO public.weight_logs (id, user_id, measured_at, weight_kg, bodyfat_percent, muscle_mass_kg, source) VALUES
+('cc000000-0000-0000-0001-000000000001', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 13) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 75.2, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000002', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 12) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 75.0, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000003', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 11) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 74.8, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000004', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 10) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 74.9, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000005', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 9) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 74.6, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000006', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 8) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 74.5, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000007', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 7) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 76.5, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000008', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 6) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 74.2, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000009', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 5) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 74.3, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000010', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 4) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 74.1, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000011', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 3) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 73.9, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000012', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 2) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 79.0, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000013', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 1) + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 73.7, NULL, NULL, 'manual'),
+('cc000000-0000-0000-0001-000000000014', '4424c5d6-5751-4038-aa39-bd85895ddb78', CURRENT_DATE + TIME '08:00' AT TIME ZONE 'Europe/Madrid', 73.6, NULL, NULL, 'manual')
+ON CONFLICT (id) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- body_measurements (14 days of measurements: chest, arm, thigh, hips, abdomen)
+-- ---------------------------------------------------------------------------
+INSERT INTO public.body_measurements (id, user_id, measured_at, measurement_type, value_cm, notes) VALUES
+-- Day 1 (CURRENT_DATE - 13)
+('bb000000-0000-0000-0001-000000000001', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 13) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 85.0, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000002', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 13) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 95.0, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000003', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 13) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 98.0, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000004', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 13) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 34.0, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000005', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 13) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 56.0, 'Seed thigh'),
+
+-- Day 2 (CURRENT_DATE - 12)
+('bb000000-0000-0000-0001-000000000006', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 12) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 84.8, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000007', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 12) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 94.8, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000008', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 12) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 97.8, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000009', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 12) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 34.0, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000010', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 12) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 55.8, 'Seed thigh'),
+
+-- Day 3 (CURRENT_DATE - 11)
+('bb000000-0000-0000-0001-000000000011', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 11) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 84.6, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000012', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 11) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 94.6, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000013', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 11) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 97.6, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000014', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 11) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.9, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000015', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 11) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 55.6, 'Seed thigh'),
+
+-- Day 4 (CURRENT_DATE - 10)
+('bb000000-0000-0000-0001-000000000016', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 10) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 84.5, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000017', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 10) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 94.5, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000018', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 10) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 97.5, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000019', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 10) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.8, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000020', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 10) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 55.5, 'Seed thigh'),
+
+-- Day 5 (CURRENT_DATE - 9)
+('bb000000-0000-0000-0001-000000000021', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 9) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 84.3, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000022', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 9) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 94.3, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000023', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 9) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 97.3, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000024', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 9) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.8, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000025', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 9) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 55.3, 'Seed thigh'),
+
+-- Day 6 (CURRENT_DATE - 8)
+('bb000000-0000-0000-0001-000000000026', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 8) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 84.0, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000027', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 8) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 94.0, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000028', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 8) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 97.0, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000029', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 8) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.7, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000030', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 8) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 55.0, 'Seed thigh'),
+
+-- Day 7 (CURRENT_DATE - 7) -- Increased risk day (abdomen = 92 -> ratio 0.53)
+('bb000000-0000-0000-0001-000000000031', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 7) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 92.0, 'Increased risk waist'),
+('bb000000-0000-0000-0001-000000000032', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 7) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 96.0, 'Increased risk hips'),
+('bb000000-0000-0000-0001-000000000033', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 7) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 100.0, 'Increased risk chest'),
+('bb000000-0000-0000-0001-000000000034', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 7) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 35.0, 'Increased risk arm'),
+('bb000000-0000-0000-0001-000000000035', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 7) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 57.0, 'Increased risk thigh'),
+
+-- Day 8 (CURRENT_DATE - 6)
+('bb000000-0000-0000-0001-000000000036', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 6) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 83.8, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000037', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 6) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 93.8, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000038', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 6) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 96.8, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000039', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 6) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.6, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000040', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 6) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 54.8, 'Seed thigh'),
+
+-- Day 9 (CURRENT_DATE - 5)
+('bb000000-0000-0000-0001-000000000041', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 5) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 83.6, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000042', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 5) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 93.6, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000043', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 5) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 96.6, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000044', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 5) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.5, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000045', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 5) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 54.6, 'Seed thigh'),
+
+-- Day 10 (CURRENT_DATE - 4)
+('bb000000-0000-0000-0001-000000000046', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 4) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 83.5, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000047', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 4) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 93.5, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000048', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 4) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 96.5, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000049', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 4) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.4, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000050', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 4) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 54.5, 'Seed thigh'),
+
+-- Day 11 (CURRENT_DATE - 3)
+('bb000000-0000-0000-0001-000000000051', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 3) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 83.3, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000052', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 3) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 93.3, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000053', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 3) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 96.3, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000054', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 3) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.3, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000055', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 3) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 54.3, 'Seed thigh'),
+
+-- Day 12 (CURRENT_DATE - 2) -- High risk day (abdomen = 106 -> ratio 0.61)
+('bb000000-0000-0000-0001-000000000056', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 2) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 106.0, 'High risk waist'),
+('bb000000-0000-0000-0001-000000000057', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 2) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 98.0, 'High risk hips'),
+('bb000000-0000-0000-0001-000000000058', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 2) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 102.0, 'High risk chest'),
+('bb000000-0000-0000-0001-000000000059', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 2) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 36.0, 'High risk arm'),
+('bb000000-0000-0000-0001-000000000060', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 2) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 58.0, 'High risk thigh'),
+
+-- Day 13 (CURRENT_DATE - 1)
+('bb000000-0000-0000-0001-000000000061', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 1) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 83.0, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000062', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 1) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 93.0, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000063', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 1) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 96.0, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000064', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 1) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.2, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000065', '4424c5d6-5751-4038-aa39-bd85895ddb78', (CURRENT_DATE - 1) + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 54.0, 'Seed thigh'),
+
+-- Day 14 (CURRENT_DATE)
+('bb000000-0000-0000-0001-000000000066', '4424c5d6-5751-4038-aa39-bd85895ddb78', CURRENT_DATE + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'abdomen', 82.8, 'Seed normal waist'),
+('bb000000-0000-0000-0001-000000000067', '4424c5d6-5751-4038-aa39-bd85895ddb78', CURRENT_DATE + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'hips', 92.8, 'Seed normal hips'),
+('bb000000-0000-0000-0001-000000000068', '4424c5d6-5751-4038-aa39-bd85895ddb78', CURRENT_DATE + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'chest', 95.8, 'Seed chest'),
+('bb000000-0000-0000-0001-000000000069', '4424c5d6-5751-4038-aa39-bd85895ddb78', CURRENT_DATE + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'arm', 33.0, 'Seed arm'),
+('bb000000-0000-0000-0001-000000000070', '4424c5d6-5751-4038-aa39-bd85895ddb78', CURRENT_DATE + TIME '08:05' AT TIME ZONE 'Europe/Madrid', 'thigh', 53.8, 'Seed thigh')
+ON CONFLICT (id) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- Recalculate body composition logs for abdominal health
+-- ---------------------------------------------------------------------------
+WITH latest_abdomen AS (
+  SELECT DISTINCT ON (m.user_id, m.measured_at::date)
+    m.user_id,
+    m.measured_at,
+    m.measured_at::date AS calculated_for_date,
+    m.value_cm AS abdomen_cm,
+    u.height_cm,
+    u.sex
+  FROM public.body_measurements m
+  JOIN public.users u ON u.id = m.user_id
+  WHERE m.measurement_type = 'abdomen'
+    AND m.value_cm BETWEEN 40 AND 200
+    AND u.height_cm > 0
+  ORDER BY m.user_id, m.measured_at::date, m.measured_at DESC
+),
+computed AS (
+  SELECT
+    abdomen.user_id,
+    abdomen.calculated_for_date,
+    recent_weight.id AS source_weight_log_id,
+    recent_weight.weight_kg AS weight_kg_used,
+    round((abdomen.abdomen_cm / abdomen.height_cm)::numeric, 2) AS waist_to_height_ratio,
+    CASE
+      WHEN abdomen.abdomen_cm / abdomen.height_cm < 0.40 THEN 'low'
+      WHEN abdomen.abdomen_cm / abdomen.height_cm < 0.50 THEN 'healthy'
+      WHEN abdomen.abdomen_cm / abdomen.height_cm < 0.60 THEN 'increased_risk'
+      ELSE 'high_risk'
+    END AS waist_to_height_category,
+    CASE
+      WHEN hips.value_cm IS NULL OR abdomen.sex NOT IN ('male', 'female') THEN NULL
+      ELSE round((abdomen.abdomen_cm / hips.value_cm)::numeric, 2)
+    END AS waist_to_hip_ratio,
+    CASE
+      WHEN hips.value_cm IS NULL OR abdomen.sex NOT IN ('male', 'female') THEN NULL
+      WHEN abdomen.sex = 'female' AND abdomen.abdomen_cm / hips.value_cm < 0.80 THEN 'healthy'
+      WHEN abdomen.sex = 'female' AND abdomen.abdomen_cm / hips.value_cm < 0.85 THEN 'increased_risk'
+      WHEN abdomen.sex = 'female' THEN 'high_risk'
+      WHEN abdomen.abdomen_cm / hips.value_cm < 0.90 THEN 'healthy'
+      WHEN abdomen.abdomen_cm / hips.value_cm < 1.00 THEN 'increased_risk'
+      ELSE 'high_risk'
+    END AS waist_to_hip_category
+  FROM latest_abdomen abdomen
+  LEFT JOIN LATERAL (
+    SELECT h.value_cm
+    FROM public.body_measurements h
+    WHERE h.user_id = abdomen.user_id
+      AND h.measurement_type = 'hips'
+      AND h.value_cm BETWEEN 50 AND 200
+      AND h.measured_at <= abdomen.measured_at
+      AND h.measured_at >= abdomen.measured_at - interval '13 days'
+    ORDER BY h.measured_at DESC
+    LIMIT 1
+  ) hips ON true
+  LEFT JOIN LATERAL (
+    SELECT w.id, w.weight_kg
+    FROM public.weight_logs w
+    WHERE w.user_id = abdomen.user_id
+      AND w.weight_kg > 0
+      AND w.measured_at <= abdomen.measured_at
+      AND w.measured_at >= abdomen.measured_at - interval '13 days'
+    ORDER BY w.measured_at DESC
+    LIMIT 1
+  ) recent_weight ON true
+)
+INSERT INTO public.body_composition_logs (
+  user_id,
+  calculated_for_date,
+  source_weight_log_id,
+  weight_kg_used,
+  waist_to_height_ratio,
+  waist_to_height_category,
+  waist_to_height_formula,
+  waist_to_height_inputs,
+  waist_to_hip_ratio,
+  waist_to_hip_category,
+  waist_to_hip_formula,
+  waist_to_hip_inputs
+)
+SELECT
+  user_id,
+  calculated_for_date,
+  source_weight_log_id,
+  weight_kg_used,
+  waist_to_height_ratio,
+  waist_to_height_category,
+  'waistToHeight = abdomen / height',
+  jsonb_build_array('height', 'abdomen'),
+  waist_to_hip_ratio,
+  waist_to_hip_category,
+  CASE WHEN waist_to_hip_ratio IS NULL THEN NULL ELSE 'waistToHip = abdomen / hips' END,
+  CASE WHEN waist_to_hip_ratio IS NULL THEN '[]'::jsonb ELSE jsonb_build_array('abdomen', 'hips', 'sex') END
+FROM computed
+ON CONFLICT (user_id, calculated_for_date) DO UPDATE SET
+  source_weight_log_id = COALESCE(public.body_composition_logs.source_weight_log_id, EXCLUDED.source_weight_log_id),
+  weight_kg_used = COALESCE(public.body_composition_logs.weight_kg_used, EXCLUDED.weight_kg_used),
+  waist_to_height_ratio = EXCLUDED.waist_to_height_ratio,
+  waist_to_height_category = EXCLUDED.waist_to_height_category,
+  waist_to_height_formula = EXCLUDED.waist_to_height_formula,
+  waist_to_height_inputs = EXCLUDED.waist_to_height_inputs,
+  waist_to_hip_ratio = EXCLUDED.waist_to_hip_ratio,
+  waist_to_hip_category = EXCLUDED.waist_to_hip_category,
+  waist_to_hip_formula = EXCLUDED.waist_to_hip_formula,
+  waist_to_hip_inputs = EXCLUDED.waist_to_hip_inputs,
+  updated_at = now();
