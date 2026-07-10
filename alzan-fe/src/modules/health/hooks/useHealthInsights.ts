@@ -151,8 +151,9 @@ const compositionFromLog = (
         }
       : null;
 
-  const fatMassKg = bodyFat ? round1(compositionLog.weight_kg_used * (bodyFat.percentage / 100)) : null;
-  const leanMassKg = fatMassKg !== null ? round1(compositionLog.weight_kg_used - fatMassKg) : null;
+  const weightKgUsed = compositionLog.weight_kg_used;
+  const fatMassKg = bodyFat && weightKgUsed !== null ? round1(weightKgUsed * (bodyFat.percentage / 100)) : null;
+  const leanMassKg = fatMassKg !== null && weightKgUsed !== null ? round1(weightKgUsed - fatMassKg) : null;
   const residualMassKg =
     leanMassKg !== null && muscleMassKg !== null ? round1(Math.max(0, leanMassKg - muscleMassKg)) : null;
 

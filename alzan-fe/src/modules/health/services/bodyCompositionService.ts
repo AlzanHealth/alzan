@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { Database, MaleOrFemale, MeasurementType, WeightLogUpdate } from '../../../types/requests.types';
 import { Nullable } from '../../../types/common.types';
 import { BodyCompositionResult, calculateBodyComposition } from '../algorithms/bodyComposition';
+import { PersistedAbdominalHealthResult, calculatePersistedAbdominalHealth } from '../algorithms/abdominalHealth';
 import {
   DailyCompositionMeasurementInput,
   DailyCompositionWeightLogInput,
@@ -57,25 +58,42 @@ const addDays = (date: Date, days: number): Date =>
 
 const hasKeys = (value: Record<string, unknown>): boolean => Object.keys(value).length > 0;
 
+const shouldReplaceRatio = (nextValue: number | null | undefined, currentValue: number | null | undefined): boolean => {
+  if (nextValue == null) return false;
+  if (currentValue == null) return true;
+  return Math.abs(nextValue - currentValue) >= 0.005;
+};
+
+const shouldReplaceAbdominalHealth = (
+  next: PersistedAbdominalHealthResult,
+  existing: BodyCompositionLog | null,
+): boolean =>
+  shouldReplaceRatio(next.waistToHeight?.value, existing?.waist_to_height_ratio) ||
+  shouldReplaceRatio(next.waistToHip?.value, existing?.waist_to_hip_ratio);
+
 const buildCompositionPayload = (
   userId: string,
   calculatedForDate: string,
-  sourceWeightLogId: string,
-  weightKgUsed: number,
-  result: BodyCompositionResult,
+  sourceWeightLogId: string | null,
+  weightKgUsed: number | null,
+  result: BodyCompositionResult | null,
+  abdominalHealth: PersistedAbdominalHealthResult,
   existing: BodyCompositionLog | null,
   bodyfatShouldReplace: boolean,
   muscleShouldReplace: boolean,
+  abdominalShouldReplace: boolean,
 ): BodyCompositionLogInsert => {
-  const nextBodyFat = bodyfatShouldReplace || !existing ? result.bodyFat : null;
-  const nextMuscle = muscleShouldReplace || !existing ? result.muscle : null;
+  const nextBodyFat = result && (bodyfatShouldReplace || !existing) ? result.bodyFat : null;
+  const nextMuscle = result && (muscleShouldReplace || !existing) ? result.muscle : null;
+  const nextWaistToHeight = abdominalShouldReplace || !existing ? abdominalHealth.waistToHeight : null;
+  const nextWaistToHip = abdominalShouldReplace || !existing ? abdominalHealth.waistToHip : null;
 
   return {
     user_id: userId,
     calculated_for_date: calculatedForDate,
-    source_weight_log_id: sourceWeightLogId,
-    weight_kg_used: weightKgUsed,
-    bmi: result.bmi?.value ?? existing?.bmi ?? null,
+    source_weight_log_id: sourceWeightLogId ?? existing?.source_weight_log_id ?? null,
+    weight_kg_used: weightKgUsed ?? existing?.weight_kg_used ?? null,
+    bmi: result?.bmi?.value ?? existing?.bmi ?? null,
     bodyfat_percent: nextBodyFat?.percentage ?? existing?.bodyfat_percent ?? null,
     bodyfat_method: nextBodyFat?.method ?? existing?.bodyfat_method ?? null,
     bodyfat_precision_level: nextBodyFat?.precisionLevel ?? existing?.bodyfat_precision_level ?? null,
@@ -91,6 +109,18 @@ const buildCompositionPayload = (
     muscle_inputs: (nextMuscle?.inputsUsed ??
       existing?.muscle_inputs ??
       []) as BodyCompositionLogInsert['muscle_inputs'],
+    waist_to_height_ratio: nextWaistToHeight?.value ?? existing?.waist_to_height_ratio ?? null,
+    waist_to_height_category: nextWaistToHeight?.category ?? existing?.waist_to_height_category ?? null,
+    waist_to_height_formula: nextWaistToHeight?.formula ?? existing?.waist_to_height_formula ?? null,
+    waist_to_height_inputs: (nextWaistToHeight?.inputsUsed ??
+      existing?.waist_to_height_inputs ??
+      []) as BodyCompositionLogInsert['waist_to_height_inputs'],
+    waist_to_hip_ratio: nextWaistToHip?.value ?? existing?.waist_to_hip_ratio ?? null,
+    waist_to_hip_category: nextWaistToHip?.category ?? existing?.waist_to_hip_category ?? null,
+    waist_to_hip_formula: nextWaistToHip?.formula ?? existing?.waist_to_hip_formula ?? null,
+    waist_to_hip_inputs: (nextWaistToHip?.inputsUsed ??
+      existing?.waist_to_hip_inputs ??
+      []) as BodyCompositionLogInsert['waist_to_hip_inputs'],
     composition_calculated_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -181,19 +211,31 @@ export const bodyCompositionService = {
           : null,
       });
 
-      if (!plan.shouldUpsert || !plan.result || !plan.sourceWeightLogId || !plan.weightKgUsed) {
+      const abdominalHealth = calculatePersistedAbdominalHealth({
+        heightCm: profile.height_cm,
+        weightKg: plan.weightKgUsed,
+        sex: profile.sex,
+        measurements: plan.measurements,
+      });
+      const typedExistingComposition = existingComposition as BodyCompositionLog | null;
+      const abdominalShouldReplace = shouldReplaceAbdominalHealth(abdominalHealth, typedExistingComposition);
+      const shouldUpsert = plan.shouldUpsert || abdominalShouldReplace;
+
+      if (!shouldUpsert) {
         return { success: plan.reason !== 'missing_weight', unchanged: true, reason: plan.reason };
       }
 
       const payload = buildCompositionPayload(
         userId,
         calculatedForDate,
-        plan.sourceWeightLogId,
-        plan.weightKgUsed,
-        plan.result,
-        existingComposition,
+        plan.sourceWeightLogId ?? null,
+        plan.weightKgUsed ?? null,
+        plan.result ?? null,
+        abdominalHealth,
+        typedExistingComposition,
         plan.bodyfatShouldReplace,
         plan.muscleShouldReplace,
+        abdominalShouldReplace,
       );
 
       const { data: upsertedLog, error: upsertError } = await supabase
@@ -204,13 +246,13 @@ export const bodyCompositionService = {
 
       if (upsertError) throw upsertError;
 
-      if (plan.shouldUpdateWeightLog) {
+      if (plan.shouldUpdateWeightLog && plan.sourceWeightLogId) {
         const weightUpdate: WeightLogUpdate = {};
-        if (plan.bodyfatShouldReplace && plan.result.bodyFat) {
+        if (plan.bodyfatShouldReplace && plan.result?.bodyFat) {
           weightUpdate.bodyfat_percent = plan.result.bodyFat.percentage;
         }
         if (plan.muscleShouldReplace) {
-          weightUpdate.muscle_mass_kg = plan.result.muscle?.massKg ?? null;
+          weightUpdate.muscle_mass_kg = plan.result?.muscle?.massKg ?? null;
         }
 
         if (hasKeys(weightUpdate)) {
@@ -223,7 +265,7 @@ export const bodyCompositionService = {
         }
       }
 
-      return { success: true, log: upsertedLog };
+      return { success: true, log: upsertedLog as BodyCompositionLog };
     } catch (error) {
       console.error('[BodyComp] Error in recalculateBestCompositionForDate:', error);
       return { success: false, reason: 'unexpected_error' };
@@ -293,7 +335,7 @@ export const bodyCompositionService = {
       .maybeSingle();
 
     if (error) throw error;
-    return data;
+    return data as BodyCompositionLog | null;
   },
 
   /**

@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import {
   calculateAbdominalHealth,
+  calculatePersistedAbdominalHealth,
   calculateRecompositionTrend,
   getWaistToHeightRangeConfig,
   getWaistToHeightCategory,
@@ -49,7 +50,7 @@ test('waist-to-height range keeps lower values healthier until risk cutoffs', ()
   assert.equal(range.max, 0.7);
   assert.deepEqual(
     range.segments.map(segment => segment.to),
-    [0.45, 0.5, 0.6, 0.7],
+    [0.4, 0.5, 0.6, 0.7],
   );
   assert.equal(range.segments[1].labelKey, 'health.abdominalCategoryHealthy');
   assert.equal(range.segments[3].labelKey, 'health.abdominalCategoryHigh');
@@ -66,7 +67,7 @@ test('waist-to-hip calculates and uses sex-specific categories', () => {
   });
 
   assert.equal(result.waistToHip?.ratio, 0.9);
-  assert.equal(male.category, 'moderate_risk');
+  assert.equal(male.category, 'increased_risk');
   assert.equal(female.category, 'high_risk');
 });
 
@@ -76,12 +77,26 @@ test('waist-to-hip range uses sex-specific health thresholds', () => {
 
   assert.deepEqual(
     maleRange.segments.map(segment => segment.to),
-    [0.85, 0.9, 1, 1.1],
+    [0.9, 1, 1.1],
   );
   assert.deepEqual(
     femaleRange.segments.map(segment => segment.to),
-    [0.75, 0.8, 0.85, 0.95],
+    [0.8, 0.85, 0.95],
   );
+});
+
+test('persisted abdominal health stores only primary ratios, not BRI or ABSI', () => {
+  const persisted = calculatePersistedAbdominalHealth({
+    heightCm: 180,
+    weightKg: 80,
+    sex: 'male',
+    measurements: { abdomen: 90, hips: 100 },
+  });
+
+  assert.equal(persisted.waistToHeight?.ratio, 0.5);
+  assert.equal(persisted.waistToHip?.ratio, 0.9);
+  assert.equal('bri' in persisted, false);
+  assert.equal('absi' in persisted, false);
 });
 
 test('BRI and ABSI calculate only when enough data exists', () => {
@@ -154,6 +169,16 @@ test('recomposition warns when weight drops while muscle-related perimeters fall
   });
 
   assert.equal(trend.status, 'muscle_loss_risk');
+});
+
+test('recomposition exposes weight as a translatable input key', () => {
+  const trend = calculateRecompositionTrend({
+    current: { weightKg: 79, abdomen: 89 },
+    previous: { weightKg: 80, abdomen: 90 },
+  });
+
+  assert.equal(trend.usedMeasurements.includes('weight'), true);
+  assert.equal(trend.usedMeasurements.includes('weightKg' as never), false);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

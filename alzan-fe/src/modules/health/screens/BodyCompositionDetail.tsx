@@ -1122,24 +1122,8 @@ export const BodyCompositionDetail = () => {
                   min={waistToHeightRange.min}
                   max={waistToHeightRange.max}
                   segments={waistToHeightSegments}
+                  equalWidths={false}
                 />
-              </View>
-            )}
-            {(abdominalHealth.bri || abdominalHealth.absi) && (
-              <View
-                style={[styles.advancedInlineBox, { backgroundColor: isDark ? 'rgba(14,165,233,0.12)' : '#E0F2FE' }]}
-              >
-                <Text style={[styles.advancedInlineTitle, { color: themeColors.textPrimary }]}>
-                  {t('health.advancedMarkers')}
-                </Text>
-                <Text style={[styles.advancedInlineText, { color: themeColors.textSecondary }]}>
-                  {[
-                    abdominalHealth.bri ? `${t('health.bri')} ${abdominalHealth.bri.value}` : null,
-                    abdominalHealth.absi ? `${t('health.absi')} ${abdominalHealth.absi.value}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
               </View>
             )}
             <View
@@ -1149,7 +1133,9 @@ export const BodyCompositionDetail = () => {
                 <Lightbulb size={14} color="#0EA5E9" />
               </View>
               <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
-                {abdominalHealth.waistToHeight ? t('health.waistToHeightRule') : t('health.missingAbdomenForAbdominal')}
+                {abdominalHealth.waistToHeight
+                  ? t('health.waistToHeightSummary')
+                  : t('health.missingAbdomenForAbdominal')}
               </Text>
             </View>
           </MetricCard>
@@ -1174,6 +1160,7 @@ export const BodyCompositionDetail = () => {
                   min={waistToHipRange.min}
                   max={waistToHipRange.max}
                   segments={waistToHipSegments}
+                  equalWidths={false}
                 />
               </View>
             )}
@@ -1184,7 +1171,7 @@ export const BodyCompositionDetail = () => {
                 <Lightbulb size={14} color="#F59E0B" />
               </View>
               <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
-                {abdominalHealth.waistToHip ? t('health.waistToHipRule') : t('health.missingHipForWaistHip')}
+                {abdominalHealth.waistToHip ? t('health.waistToHipSummary') : t('health.missingHipForWaistHip')}
               </Text>
             </View>
           </MetricCard>
@@ -1702,23 +1689,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  advancedInlineBox: {
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  advancedInlineTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  advancedInlineText: {
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-
   tipsContainer: {
     gap: 12,
   },

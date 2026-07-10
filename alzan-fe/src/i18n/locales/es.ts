@@ -710,9 +710,11 @@ export default {
     waistToHeight: 'Abdomen/altura',
     waistToHip: 'Abdomen/cadera',
     recomposition: 'Recomposición',
+    status: 'Estado',
     advancedMarkers: 'Marcadores avanzados',
     bri: 'BRI',
     absi: 'ABSI',
+    abdominalCategoryLow: 'Bajo',
     abdominalCategoryVeryLow: 'Muy bajo',
     abdominalCategoryHealthy: 'Zona saludable',
     abdominalCategoryIncreased: 'Riesgo aumentado',
@@ -723,21 +725,24 @@ export default {
     waistToHeightFormula: 'Abdomen/altura = abdomen en cm / altura en cm',
     waistToHeightRule:
       'Una referencia práctica es mantener el abdomen por debajo de la mitad de tu altura. Es un indicador, no un diagnóstico médico.',
+    waistToHeightSummary:
+      'Indica si tu abdomen está por debajo de la mitad de tu altura; más bajo suele reducir riesgo abdominal.',
     waistToHipDescription:
       'El ratio abdomen/cadera ayuda a leer la distribución de grasa y si el peso se concentra más en la zona abdominal.',
     waistToHipFormula: 'Abdomen/cadera = abdomen en cm / cadera en cm',
     waistToHipRule:
       'La lectura usa rangos por sexo y conviene interpretarla junto con abdomen/altura y la tendencia de grasa corporal.',
+    waistToHipSummary:
+      'Indica cómo se distribuye el perímetro entre abdomen y cadera; más alto suele indicar más concentración abdominal.',
     abdominalAdvancedDescription:
-      'BRI y ABSI son índices avanzados de forma corporal. Son menos intuitivos, por eso Alzan los muestra solo como contexto complementario.',
-    briExplanation:
-      'BRI estima lo redondeada que es la forma corporal usando abdomen y altura. Ayuda a contextualizar el volumen abdominal más allá del peso.',
+      'BRI y ABSI son índices complementarios de forma corporal. Sirven como contexto, pero no son objetivos principales ni diagnósticos médicos.',
+    briExplanation: 'BRI es un índice experimental de forma abdominal basado en abdomen y altura.',
     briDirection:
-      'Más bajo suele ser mejor cuando viene de un perímetro abdominal menor; valores más altos suelen indicar más concentración abdominal.',
+      'Un BRI más alto suele indicar más redondez abdominal. Úsalo como contexto extra, no como objetivo principal.',
     absiExplanation:
-      'ABSI compara abdomen con IMC y altura. Sirve para ver si la cintura es mayor de lo esperado para tu tamaño corporal.',
+      'ABSI compara cintura con IMC y altura para ver si la cintura es mayor de lo esperado para tu tamaño corporal.',
     absiDirection:
-      'Más bajo suele ser mejor cuando refleja una cintura menor para el mismo tamaño corporal; valores más altos sugieren más contexto de riesgo abdominal.',
+      'Un ABSI más alto sugiere una cintura mayor para el mismo tamaño corporal. Úsalo como señal complementaria de riesgo.',
     missingAbdomenForAbdominal: 'Añade abdomen para calcular los marcadores de salud abdominal.',
     missingHipForWaistHip: 'Añade cadera para calcular abdomen/cadera.',
     recompositionDescription:
@@ -745,6 +750,10 @@ export default {
     recompositionFormula: 'Tendencia = cambio de abdomen + cambio de peso + conservación de pecho/brazo/muslo',
     recompositionNoMedicalFormula:
       'Pecho, brazo y muslo ayudan a seguir cambios de perímetros y conservación muscular relativa, pero no recalculan grasa ni músculo.',
+    pdfAbdominalHealthSection: 'Salud abdominal',
+    pdfAbdominalHealthHint:
+      'Estos ratios ayudan a entender el riesgo abdominal y la distribución de grasa. Son indicadores, no diagnósticos.',
+    pdfAbdominalMetricPurpose: 'Para qué sirve',
     recompositionPositive: 'Recomposición positiva',
     recompositionPositiveAdvice: 'El abdomen baja mientras los perímetros clave se mantienen. Mantén el ritmo actual.',
     recompositionCorrect: 'Progreso correcto',

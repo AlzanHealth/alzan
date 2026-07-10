@@ -11,6 +11,7 @@ import { TranslationKey } from '../../../i18n/locales/en';
 import { DistanceUnit, MeasurementType, Row, User, WeightUnit } from '../../../types/requests.types';
 import { convertLengthToUi, convertWeightToUi } from '../../../utils/unitConversionUtils';
 import iconSource from '../../../../assets/icon.png';
+import { BodyCompositionLog } from './bodyCompositionService';
 
 interface PDFExportOptions {
   startDate: string;
@@ -54,6 +55,7 @@ type SummaryCard = {
 type DayBucket = {
   date: string;
   weights: WeightLog[];
+  composition: BodyCompositionLog[];
   measurements: BodyMeasurement[];
   sleep: SleepSession[];
   restingHr: RestingHrLog[];
@@ -112,7 +114,7 @@ const formatNumber = (value: number | null | undefined, digits = 1): string => {
 const formatSignedNumber = (value: number | null | undefined, unit: string, digits = 1): string => {
   if (value == null || Number.isNaN(value)) return '-';
   const prefix = value > 0 ? '+' : '';
-  return `${prefix}${formatNumber(value, digits)} ${unit}`;
+  return `${prefix}${formatNumber(value, digits)}${unit ? ` ${unit}` : ''}`;
 };
 
 const formatDurationMinutes = (minutes: number | null | undefined): string => {
@@ -139,6 +141,30 @@ const getBmi = (weightKg: number | null | undefined, heightCm: number | null | u
 const getDelta = (first: number | null | undefined, last: number | null | undefined): number | null => {
   if (first == null || last == null) return null;
   return Number((last - first).toFixed(1));
+};
+
+const getRatioDelta = (first: number | null | undefined, last: number | null | undefined): number | null => {
+  if (first == null || last == null) return null;
+  return Number((last - first).toFixed(2));
+};
+
+const formatRatio = (value: number | null | undefined): string => (value == null ? '-' : formatNumber(value, 2));
+
+const getAbdominalCategoryLabel = (category: string | null | undefined): string => {
+  switch (category) {
+    case 'low':
+      return t('health.abdominalCategoryLow');
+    case 'healthy':
+      return t('health.abdominalCategoryHealthy');
+    case 'increased_risk':
+      return t('health.abdominalCategoryIncreased');
+    case 'moderate_risk':
+      return t('health.abdominalCategoryModerate');
+    case 'high_risk':
+      return t('health.abdominalCategoryHigh');
+    default:
+      return '-';
+  }
 };
 
 const average = (values: number[]): number | null => {
@@ -219,6 +245,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
       profileResult,
       preferencesResult,
       weightsResult,
+      compositionResult,
       measurementsResult,
       sleepResult,
       hrResult,
@@ -236,6 +263,13 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
         .gte('measured_at', start.toISOString())
         .lt('measured_at', endExclusive.toISOString())
         .order('measured_at', { ascending: true }),
+      supabase
+        .from('body_composition_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('calculated_for_date', startDate)
+        .lte('calculated_for_date', endDate)
+        .order('calculated_for_date', { ascending: true }),
       supabase
         .from('body_measurements')
         .select('*')
@@ -283,6 +317,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
       profileResult.error,
       preferencesResult.error,
       weightsResult.error,
+      compositionResult.error,
       measurementsResult.error,
       sleepResult.error,
       hrResult.error,
@@ -296,6 +331,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
     const weightUnit: WeightUnit = preferencesResult.data?.weight_unit === 'lb' ? 'lb' : 'kg';
     const distanceUnit: DistanceUnit = preferencesResult.data?.distance_unit === 'miles' ? 'miles' : 'km';
     const weights = (weightsResult.data ?? []) as WeightLog[];
+    const compositionLogs = (compositionResult.data ?? []) as BodyCompositionLog[];
     const measurements = (measurementsResult.data ?? []) as BodyMeasurement[];
     const sleepSessions = (sleepResult.data ?? []) as SleepSession[];
     const restingHrLogs = (hrResult.data ?? []) as RestingHrLog[];
@@ -305,6 +341,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
 
     const hasData =
       weights.length > 0 ||
+      compositionLogs.length > 0 ||
       measurements.length > 0 ||
       sleepSessions.length > 0 ||
       restingHrLogs.length > 0 ||
@@ -319,10 +356,19 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
     const lastWeight = weights[weights.length - 1];
     const latestBodyFat = [...weights].reverse().find(log => log.bodyfat_percent != null)?.bodyfat_percent ?? null;
     const latestMuscleMass = [...weights].reverse().find(log => log.muscle_mass_kg != null)?.muscle_mass_kg ?? null;
+    const waistToHeightLogs = compositionLogs.filter(log => log.waist_to_height_ratio != null);
+    const waistToHipLogs = compositionLogs.filter(log => log.waist_to_hip_ratio != null);
+    const latestWaistToHeight = waistToHeightLogs[waistToHeightLogs.length - 1] ?? null;
+    const latestWaistToHip = waistToHipLogs[waistToHipLogs.length - 1] ?? null;
     const latestBmi = getBmi(lastWeight?.weight_kg, profile?.height_cm ?? null);
     const weightDeltaKg = getDelta(firstWeight?.weight_kg, lastWeight?.weight_kg);
     const bodyFatDelta = getDelta(firstWeight?.bodyfat_percent, lastWeight?.bodyfat_percent);
     const muscleDeltaKg = getDelta(firstWeight?.muscle_mass_kg, lastWeight?.muscle_mass_kg);
+    const waistToHeightDelta = getRatioDelta(
+      waistToHeightLogs[0]?.waist_to_height_ratio,
+      latestWaistToHeight?.waist_to_height_ratio,
+    );
+    const waistToHipDelta = getRatioDelta(waistToHipLogs[0]?.waist_to_hip_ratio, latestWaistToHip?.waist_to_hip_ratio);
     const avgSleepMinutes = average(sleepSessions.map(log => log.total_sleep_min ?? Number.NaN));
     const avgSleepQuality = average(sleepSessions.map(log => log.sleep_score ?? Number.NaN));
     const avgRestingHr = average(restingHrLogs.map(log => log.resting_hr_bpm));
@@ -380,6 +426,30 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
         value: muscleMassDisplay,
         meta: muscleDeltaKg == null ? undefined : `${t('health.pdfChange')}: ${muscleDeltaDisplay}`,
       },
+      ...(latestWaistToHeight
+        ? [
+            {
+              label: t('health.waistToHeight'),
+              value: formatRatio(latestWaistToHeight.waist_to_height_ratio),
+              meta:
+                waistToHeightDelta == null
+                  ? getAbdominalCategoryLabel(latestWaistToHeight.waist_to_height_category)
+                  : `${t('health.pdfChange')}: ${formatSignedNumber(waistToHeightDelta, '', 2)}`,
+            },
+          ]
+        : []),
+      ...(latestWaistToHip
+        ? [
+            {
+              label: t('health.waistToHip'),
+              value: formatRatio(latestWaistToHip.waist_to_hip_ratio),
+              meta:
+                waistToHipDelta == null
+                  ? getAbdominalCategoryLabel(latestWaistToHip.waist_to_hip_category)
+                  : `${t('health.pdfChange')}: ${formatSignedNumber(waistToHipDelta, '', 2)}`,
+            },
+          ]
+        : []),
       {
         label: t('settings.sleep'),
         value: avgSleepMinutes ? formatDurationMinutes(avgSleepMinutes) : '-',
@@ -400,7 +470,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
       },
       {
         label: t('health.pdfDataPoints'),
-        value: `${weights.length + measurements.length + sleepSessions.length + restingHrLogs.length + hydrationLogs.length + feedbackLogs.length}`,
+        value: `${weights.length + compositionLogs.length + measurements.length + sleepSessions.length + restingHrLogs.length + hydrationLogs.length + feedbackLogs.length}`,
         meta: `${totalDays} ${t('health.days')}`,
       },
     ];
@@ -414,10 +484,13 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
         goal.valid_from,
       ]);
 
+    const compositionByDate = new Map(compositionLogs.map(log => [log.calculated_for_date, log]));
+
     const weightRows = weights.map(log => {
       const bmi = getBmi(log.weight_kg, profile?.height_cm ?? null);
       const bodyFatKg = log.bodyfat_percent != null ? log.weight_kg * (log.bodyfat_percent / 100) : null;
       const leanKg = bodyFatKg != null ? log.weight_kg - bodyFatKg : null;
+      const compositionLog = compositionByDate.get(getDateKeyFromTimestamp(log.measured_at));
       return [
         formatDateTime(log.measured_at),
         convertWeightToUi(log.weight_kg, weightUnit, 1).label,
@@ -426,8 +499,20 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
         bodyFatKg != null ? convertWeightToUi(bodyFatKg, weightUnit, 1).label : '-',
         leanKg != null ? convertWeightToUi(leanKg, weightUnit, 1).label : '-',
         log.muscle_mass_kg != null ? convertWeightToUi(log.muscle_mass_kg, weightUnit, 1).label : '-',
+        formatRatio(compositionLog?.waist_to_height_ratio),
+        formatRatio(compositionLog?.waist_to_hip_ratio),
       ];
     });
+
+    const abdominalRows = compositionLogs
+      .filter(log => log.waist_to_height_ratio != null || log.waist_to_hip_ratio != null)
+      .map(log => [
+        format(parseISO(log.calculated_for_date), datePattern, { locale: dateLocale }),
+        formatRatio(log.waist_to_height_ratio),
+        getAbdominalCategoryLabel(log.waist_to_height_category),
+        formatRatio(log.waist_to_hip_ratio),
+        getAbdominalCategoryLabel(log.waist_to_hip_category),
+      ]);
 
     const measurementRows = measurements.map(measurement => [
       formatDateTime(measurement.measured_at),
@@ -473,12 +558,22 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
     const ensureDay = (date: string): DayBucket => {
       const existing = dayBuckets.get(date);
       if (existing) return existing;
-      const next = { date, weights: [], measurements: [], sleep: [], restingHr: [], hydration: [], feedback: [] };
+      const next = {
+        date,
+        weights: [],
+        composition: [],
+        measurements: [],
+        sleep: [],
+        restingHr: [],
+        hydration: [],
+        feedback: [],
+      };
       dayBuckets.set(date, next);
       return next;
     };
 
     weights.forEach(log => ensureDay(getDateKeyFromTimestamp(log.measured_at)).weights.push(log));
+    compositionLogs.forEach(log => ensureDay(log.calculated_for_date).composition.push(log));
     measurements.forEach(log => ensureDay(getDateKeyFromTimestamp(log.measured_at)).measurements.push(log));
     sleepSessions.forEach(log => ensureDay(log.date).sleep.push(log));
     restingHrLogs.forEach(log => ensureDay(getDateKeyFromTimestamp(log.measured_at)).restingHr.push(log));
@@ -499,6 +594,16 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
             if (log.muscle_mass_kg != null)
               parts.push(`${t('health.muscleMass')} ${convertWeightToUi(log.muscle_mass_kg, weightUnit, 1).label}`);
             lines.push(`${t('settings.weight')}: ${parts.join(' · ')}`);
+          });
+          bucket.composition.forEach(log => {
+            const parts = [];
+            if (log.waist_to_height_ratio != null) {
+              parts.push(`${t('health.waistToHeight')} ${formatRatio(log.waist_to_height_ratio)}`);
+            }
+            if (log.waist_to_hip_ratio != null) {
+              parts.push(`${t('health.waistToHip')} ${formatRatio(log.waist_to_hip_ratio)}`);
+            }
+            if (parts.length) lines.push(`${t('health.abdominalHealth')}: ${parts.join(' · ')}`);
           });
           if (bucket.measurements.length) {
             lines.push(
@@ -693,9 +798,33 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
             t('health.pdfFatMass'),
             t('health.leanMass'),
             t('health.muscleMass'),
+            t('health.waistToHeight'),
+            t('health.waistToHip'),
           ],
           weightRows,
           t('health.pdfNoWeightData'),
+        )}
+
+        <div class="section-title">${escapeHtml(t('health.pdfAbdominalHealthSection'))}</div>
+        <div class="section-subtitle">${escapeHtml(t('health.pdfAbdominalHealthHint'))}</div>
+        ${renderTable(
+          [
+            t('health.recordDate'),
+            t('health.waistToHeight'),
+            t('health.status'),
+            t('health.waistToHip'),
+            t('health.status'),
+          ],
+          abdominalRows,
+          t('health.pdfNoMeasurements'),
+        )}
+        ${renderTable(
+          [t('health.measure'), t('health.pdfAbdominalMetricPurpose')],
+          [
+            [t('health.waistToHeight'), t('health.waistToHeightSummary')],
+            [t('health.waistToHip'), t('health.waistToHipSummary')],
+          ],
+          t('health.pdfNoMeasurements'),
         )}
 
         <div class="data-grid">

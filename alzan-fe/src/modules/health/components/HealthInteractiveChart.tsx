@@ -11,6 +11,7 @@ import {
 } from '../../../components/stats/SimpleChart';
 import { useWeightLogs } from '../hooks/useWeight';
 import { useMeasurements } from '../hooks/useMeasurements';
+import { useBodyCompositionLogs } from '../hooks/useBodyCompositionLogs';
 import { useProfile } from '../../../hooks/settings/useProfile';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { GlassCard } from '../../../components/GlassCard';
@@ -32,7 +33,8 @@ import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 
 type TimeRange = 'S' | 'M' | '6M' | 'A';
-export type MetricType = 'weight' | 'bmi' | 'bodyFat' | 'muscle' | MeasurementType;
+type AbdominalHistoryMetric = 'waistToHeight' | 'waistToHip';
+export type MetricType = 'weight' | 'bmi' | 'bodyFat' | 'muscle' | AbdominalHistoryMetric | MeasurementType;
 
 type HealthInteractiveChartProps = {
   onExportPress?: () => void;
@@ -57,6 +59,7 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
 
   const { data: weightLogs, isLoading: loadingWeight } = useWeightLogs(365);
   const { data: measurements, isLoading: loadingMeas } = useMeasurements(undefined, 365);
+  const { data: compositionLogs, isLoading: loadingComposition } = useBodyCompositionLogs(365);
 
   const { profile } = useProfile();
   const { convertWeightToUi, units } = useUnitConversion();
@@ -70,6 +73,8 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
       { label: t('health.chest'), value: 'chest' },
       { label: t('health.abdomen'), value: 'abdomen' },
       { label: t('health.hips'), value: 'hips' },
+      { label: t('health.waistToHeight'), value: 'waistToHeight' },
+      { label: t('health.waistToHip'), value: 'waistToHip' },
       { label: t('health.thigh'), value: 'thigh' },
     ],
     [t],
@@ -96,7 +101,7 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
   }, [profile?.height_cm]);
 
   const { chartData, dateRange, xAxisTicks, domainStart, domainEnd, visibleDurationMs } = useMemo(() => {
-    if (!weightLogs && !measurements) {
+    if (!weightLogs && !measurements && !compositionLogs) {
       return {
         chartData: [],
         dateRange: '',
@@ -137,6 +142,22 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
           .map(l => ({
             date: new Date(l.measured_at),
             value: (l.muscle_mass_kg! / l.weight_kg) * 100,
+          })) || [];
+    } else if (metric === 'waistToHeight') {
+      rawData =
+        compositionLogs
+          ?.filter(log => log.waist_to_height_ratio != null && log.waist_to_height_ratio > 0)
+          .map(log => ({
+            date: new Date(`${log.calculated_for_date}T12:00:00`),
+            value: log.waist_to_height_ratio!,
+          })) || [];
+    } else if (metric === 'waistToHip') {
+      rawData =
+        compositionLogs
+          ?.filter(log => log.waist_to_hip_ratio != null && log.waist_to_hip_ratio > 0)
+          .map(log => ({
+            date: new Date(`${log.calculated_for_date}T12:00:00`),
+            value: log.waist_to_hip_ratio!,
           })) || [];
     } else {
       let typesToSearch: string[] = [metric];
@@ -270,9 +291,9 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
       domainEnd: rangeDomainEnd,
       visibleDurationMs: visibleSpanMs,
     };
-  }, [weightLogs, measurements, metric, range, heightM, convertWeightToUi]);
+  }, [weightLogs, measurements, compositionLogs, metric, range, heightM, convertWeightToUi]);
 
-  const isLoading = loadingWeight || loadingMeas;
+  const isLoading = loadingWeight || loadingMeas || loadingComposition;
 
   const effectiveVisibleRange = useMemo(() => {
     if (visibleRange) {
@@ -392,10 +413,16 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
   }, [metric, profile, weightLogs, measurements, age, sex]);
 
   const getUnit = () => {
+    if (metric === 'waistToHeight' || metric === 'waistToHip') return '';
     if (metric === 'bodyFat' || metric === 'muscle') return '%';
     if (metric === 'weight') return units.weight;
     if (metric === 'bmi') return '';
     return 'cm';
+  };
+
+  const formatMetricValue = (value: number) => {
+    if (metric === 'waistToHeight' || metric === 'waistToHip') return value.toFixed(2);
+    return value.toFixed(1);
   };
 
   const handlePointSelect = (point: ChartDataPointSelect) => {
@@ -545,7 +572,7 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
           )}
           <View style={styles.valueRow}>
             <Text style={[styles.infoValue, { color: themeColors.textPrimary }]}>
-              {displayValue !== null ? displayValue.toFixed(1) : '-'}
+              {displayValue !== null ? formatMetricValue(displayValue) : '-'}
             </Text>
             <Text style={[styles.infoUnit, { color: themeColors.textSecondary }]}>{getUnit()}</Text>
           </View>

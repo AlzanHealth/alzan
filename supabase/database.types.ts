@@ -902,7 +902,15 @@ export type Database = {
           source_weight_log_id: string | null
           updated_at: string
           user_id: string
-          weight_kg_used: number
+          waist_to_height_category: string | null
+          waist_to_height_formula: string | null
+          waist_to_height_inputs: Json
+          waist_to_height_ratio: number | null
+          waist_to_hip_category: string | null
+          waist_to_hip_formula: string | null
+          waist_to_hip_inputs: Json
+          waist_to_hip_ratio: number | null
+          weight_kg_used: number | null
         }
         Insert: {
           bmi?: number | null
@@ -924,7 +932,15 @@ export type Database = {
           source_weight_log_id?: string | null
           updated_at?: string
           user_id: string
-          weight_kg_used: number
+          waist_to_height_category?: string | null
+          waist_to_height_formula?: string | null
+          waist_to_height_inputs?: Json
+          waist_to_height_ratio?: number | null
+          waist_to_hip_category?: string | null
+          waist_to_hip_formula?: string | null
+          waist_to_hip_inputs?: Json
+          waist_to_hip_ratio?: number | null
+          weight_kg_used?: number | null
         }
         Update: {
           bmi?: number | null
@@ -946,7 +962,15 @@ export type Database = {
           source_weight_log_id?: string | null
           updated_at?: string
           user_id?: string
-          weight_kg_used?: number
+          waist_to_height_category?: string | null
+          waist_to_height_formula?: string | null
+          waist_to_height_inputs?: Json
+          waist_to_height_ratio?: number | null
+          waist_to_hip_category?: string | null
+          waist_to_hip_formula?: string | null
+          waist_to_hip_inputs?: Json
+          waist_to_hip_ratio?: number | null
+          weight_kg_used?: number | null
         }
         Relationships: [
           {

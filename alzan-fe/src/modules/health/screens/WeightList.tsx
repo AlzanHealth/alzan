@@ -7,6 +7,7 @@ import { Plus, Trash2 } from 'lucide-react-native';
 import { typography } from '../../../theme';
 import { useWeightLogs, useDeleteWeightLog } from '../hooks/useWeight';
 import { useMeasurements, useDeleteMeasurement } from '../hooks/useMeasurements';
+import { useBodyCompositionLogs } from '../hooks/useBodyCompositionLogs';
 import { format } from 'date-fns';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,6 +17,7 @@ import { BodyMeasurement, MeasurementType, WeightLog } from '../../../types/requ
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import { Alert } from '../../../components/common/Alert';
+import { BodyCompositionLog } from '../services/bodyCompositionService';
 
 export const WeightList = () => {
   const { t } = useTranslation();
@@ -28,16 +30,28 @@ export const WeightList = () => {
   const { convertWeightToUi } = useUnitConversion();
   const { profile } = useProfile();
 
-  // Determine if it's a weight-based log or a body measurement
+  // Determine if it is a weight-based log, computed composition metric, or direct body measurement.
   const isWeightLog = ['weight', 'bmi', 'bodyFat', 'muscle'].includes(metric);
+  const isAbdominalCompositionMetric = metric === 'waistToHeight' || metric === 'waistToHip';
 
   // Fetch Data
   const weightQuery = useWeightLogs();
+  const compositionQuery = useBodyCompositionLogs();
   // safe cast since we check above for the non measurements
-  const measurementQuery = useMeasurements(isWeightLog ? undefined : (metric as MeasurementType));
+  const measurementQuery = useMeasurements(
+    isWeightLog || isAbdominalCompositionMetric ? undefined : (metric as MeasurementType),
+  );
 
-  const logs: (WeightLog | BodyMeasurement)[] = isWeightLog ? weightQuery.data || [] : measurementQuery.data || [];
-  const isLoading = isWeightLog ? weightQuery.isLoading : measurementQuery.isLoading;
+  const logs: (WeightLog | BodyMeasurement | BodyCompositionLog)[] = isWeightLog
+    ? weightQuery.data || []
+    : isAbdominalCompositionMetric
+      ? compositionQuery.data || []
+      : measurementQuery.data || [];
+  const isLoading = isWeightLog
+    ? weightQuery.isLoading
+    : isAbdominalCompositionMetric
+      ? compositionQuery.isLoading
+      : measurementQuery.isLoading;
 
   // Delete Mutations
   const deleteWeightLog = useDeleteWeightLog();
@@ -60,7 +74,14 @@ export const WeightList = () => {
     ]);
   };
 
-  const getValueAndUnit = (item: WeightLog | BodyMeasurement) => {
+  const getValueAndUnit = (item: WeightLog | BodyMeasurement | BodyCompositionLog) => {
+    if (isAbdominalCompositionMetric) {
+      const compositionLog = item as BodyCompositionLog;
+      const value =
+        metric === 'waistToHeight' ? compositionLog.waist_to_height_ratio : compositionLog.waist_to_hip_ratio;
+      return { value: value != null ? value.toFixed(2) : '-', unit: '' };
+    }
+
     item = item as unknown as WeightLog;
     if (metric === 'weight') {
       const converted = convertWeightToUi(item.weight_kg);
@@ -87,7 +108,14 @@ export const WeightList = () => {
     return { value: measurement?.value_cm ? measurement?.value_cm.toFixed(1) : '-', unit: 'cm' };
   };
 
-  const renderItem = ({ item }: { item: WeightLog | BodyMeasurement }) => {
+  const getItemDate = (item: WeightLog | BodyMeasurement | BodyCompositionLog) => {
+    if (isAbdominalCompositionMetric) {
+      return new Date(`${(item as BodyCompositionLog).calculated_for_date}T12:00:00`);
+    }
+    return new Date((item as WeightLog | BodyMeasurement).measured_at);
+  };
+
+  const renderItem = ({ item }: { item: WeightLog | BodyMeasurement | BodyCompositionLog }) => {
     const { value, unit } = getValueAndUnit(item);
 
     // Skip rendering items that don't have valid values for the selected metric
@@ -100,12 +128,16 @@ export const WeightList = () => {
             {value} <Text style={{ fontSize: 16, color: themeColors.textSecondary }}>{unit}</Text>
           </Text>
           <Text style={[styles.logDate, dynamicStyles.subtitle]}>
-            {format(new Date(item.measured_at), 'd MMM yyyy, HH:mm', { locale: getDateFnsLocale() })}
+            {format(getItemDate(item), isAbdominalCompositionMetric ? 'd MMM yyyy' : 'd MMM yyyy, HH:mm', {
+              locale: getDateFnsLocale(),
+            })}
           </Text>
         </View>
-        <TouchableOpacity onPress={() => handleDelete(item.id, `${value} ${unit}`)} style={styles.deleteButton}>
-          <Trash2 size={18} color={themeColors.textSecondary} />
-        </TouchableOpacity>
+        {!isAbdominalCompositionMetric && (
+          <TouchableOpacity onPress={() => handleDelete(item.id, `${value} ${unit}`)} style={styles.deleteButton}>
+            <Trash2 size={18} color={themeColors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -130,20 +162,20 @@ export const WeightList = () => {
 
         <FlatList
           data={logs
-            ?.sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime())
+            ?.sort((a, b) => getItemDate(b).getTime() - getItemDate(a).getTime())
             .filter((item, index, self) => {
               // Deduplicate logic:
               // For all metrics, if there are multiple entries on the same day with the SAME value,
               // only show the oldest one (last in the sorted array).
               // If values are different on the same day, show both.
 
-              const itemDate = new Date(item.measured_at).toDateString();
+              const itemDate = getItemDate(item).toDateString();
               const { value: itemValue } = getValueAndUnit(item);
 
               // Find all items with same date and same displayed value
               // We compare the formatted string value to handle precision differences effectively
               const sameDaySameValueItems = self.filter(i => {
-                const iDate = new Date(i.measured_at).toDateString();
+                const iDate = getItemDate(i).toDateString();
                 const { value: iValue } = getValueAndUnit(i);
                 return iDate === itemDate && iValue === itemValue;
               });

@@ -1,7 +1,7 @@
 import { MaleOrFemale } from '../../../types/requests.types';
 import { AnthroMeasurements, CompositionInputKey } from './bodyComposition';
 
-export type AbdominalRiskCategory = 'very_low' | 'healthy' | 'increased_risk' | 'moderate_risk' | 'high_risk';
+export type AbdominalRiskCategory = 'low' | 'very_low' | 'healthy' | 'increased_risk' | 'moderate_risk' | 'high_risk';
 export type RecompositionStatus =
   | 'positive'
   | 'correct'
@@ -52,6 +52,11 @@ export interface AbdominalHealthResult {
   missingInputs: CompositionInputKey[];
 }
 
+export interface PersistedAbdominalHealthResult {
+  waistToHeight: AbdominalMarkerResult | null;
+  waistToHip: AbdominalMarkerResult | null;
+}
+
 export interface RecompositionSnapshot {
   weightKg?: number;
   abdomen?: number;
@@ -94,8 +99,8 @@ const isValidMeasurement = (value: number | undefined, min: number, max: number)
   typeof value === 'number' && value >= min && value <= max;
 
 export const getWaistToHeightCategory = (ratio: number): CategoryResult<AbdominalRiskCategory> => {
-  if (ratio < 0.45) {
-    return { category: 'very_low', labelKey: 'health.abdominalCategoryVeryLow', color: '#38BDF8' };
+  if (ratio < 0.4) {
+    return { category: 'low', labelKey: 'health.abdominalCategoryLow', color: '#38BDF8' };
   }
   if (ratio < 0.5) {
     return { category: 'healthy', labelKey: 'health.abdominalCategoryHealthy', color: '#10B981' };
@@ -110,7 +115,7 @@ export const getWaistToHeightRangeConfig = (): AbdominalRangeConfig => ({
   min: 0.35,
   max: 0.7,
   segments: [
-    { to: 0.45, color: '#38BDF8', labelKey: 'health.abdominalCategoryVeryLow' },
+    { to: 0.4, color: '#38BDF8', labelKey: 'health.abdominalCategoryLow' },
     { to: 0.5, color: '#10B981', labelKey: 'health.abdominalCategoryHealthy' },
     { to: 0.6, color: '#F59E0B', labelKey: 'health.abdominalCategoryIncreased' },
     { to: 0.7, color: '#EF4444', labelKey: 'health.abdominalCategoryHigh' },
@@ -119,18 +124,16 @@ export const getWaistToHeightRangeConfig = (): AbdominalRangeConfig => ({
 
 export const getWaistToHipCategory = (ratio: number, sex: MaleOrFemale): CategoryResult<AbdominalRiskCategory> => {
   if (sex === 'female') {
-    if (ratio < 0.75) return { category: 'very_low', labelKey: 'health.abdominalCategoryVeryLow', color: '#38BDF8' };
     if (ratio < 0.8) return { category: 'healthy', labelKey: 'health.abdominalCategoryHealthy', color: '#10B981' };
     if (ratio < 0.85) {
-      return { category: 'moderate_risk', labelKey: 'health.abdominalCategoryModerate', color: '#F59E0B' };
+      return { category: 'increased_risk', labelKey: 'health.abdominalCategoryIncreased', color: '#F59E0B' };
     }
     return { category: 'high_risk', labelKey: 'health.abdominalCategoryHigh', color: '#EF4444' };
   }
 
-  if (ratio < 0.85) return { category: 'very_low', labelKey: 'health.abdominalCategoryVeryLow', color: '#38BDF8' };
   if (ratio < 0.9) return { category: 'healthy', labelKey: 'health.abdominalCategoryHealthy', color: '#10B981' };
   if (ratio < 1) {
-    return { category: 'moderate_risk', labelKey: 'health.abdominalCategoryModerate', color: '#F59E0B' };
+    return { category: 'increased_risk', labelKey: 'health.abdominalCategoryIncreased', color: '#F59E0B' };
   }
   return { category: 'high_risk', labelKey: 'health.abdominalCategoryHigh', color: '#EF4444' };
 };
@@ -141,9 +144,8 @@ export const getWaistToHipRangeConfig = (sex: MaleOrFemale): AbdominalRangeConfi
       min: 0.65,
       max: 0.95,
       segments: [
-        { to: 0.75, color: '#38BDF8', labelKey: 'health.abdominalCategoryVeryLow' },
         { to: 0.8, color: '#10B981', labelKey: 'health.abdominalCategoryHealthy' },
-        { to: 0.85, color: '#F59E0B', labelKey: 'health.abdominalCategoryModerate' },
+        { to: 0.85, color: '#F59E0B', labelKey: 'health.abdominalCategoryIncreased' },
         { to: 0.95, color: '#EF4444', labelKey: 'health.abdominalCategoryHigh' },
       ],
     };
@@ -153,9 +155,8 @@ export const getWaistToHipRangeConfig = (sex: MaleOrFemale): AbdominalRangeConfi
     min: 0.75,
     max: 1.1,
     segments: [
-      { to: 0.85, color: '#38BDF8', labelKey: 'health.abdominalCategoryVeryLow' },
       { to: 0.9, color: '#10B981', labelKey: 'health.abdominalCategoryHealthy' },
-      { to: 1, color: '#F59E0B', labelKey: 'health.abdominalCategoryModerate' },
+      { to: 1, color: '#F59E0B', labelKey: 'health.abdominalCategoryIncreased' },
       { to: 1.1, color: '#EF4444', labelKey: 'health.abdominalCategoryHigh' },
     ],
   };
@@ -254,6 +255,14 @@ export const calculateAbdominalHealth = ({
   };
 };
 
+export const calculatePersistedAbdominalHealth = (input: AbdominalHealthInput): PersistedAbdominalHealthResult => {
+  const result = calculateAbdominalHealth(input);
+  return {
+    waistToHeight: result.waistToHeight,
+    waistToHip: result.waistToHip,
+  };
+};
+
 const delta = (current?: number, previous?: number): number | undefined => {
   if (!isPositive(current) || !isPositive(previous)) return undefined;
   return round2(current - previous);
@@ -280,9 +289,9 @@ export const calculateRecompositionTrend = ({ current, previous }: Recomposition
 
   if (deltas.abdomen === undefined) return emptyTrend;
 
-  const usedMeasurements = (Object.entries(deltas) as [CompositionInputKey, number | undefined][])
+  const usedMeasurements = (Object.entries(deltas) as [keyof typeof deltas, number | undefined][])
     .filter(([, value]) => value !== undefined)
-    .map(([key]) => key);
+    .map(([key]) => (key === 'weightKg' ? 'weight' : key));
   const abdomenDown = deltas.abdomen <= -0.5;
   const abdomenUp = deltas.abdomen >= 0.5;
   const weightDown = deltas.weightKg !== undefined && deltas.weightKg <= -0.3;

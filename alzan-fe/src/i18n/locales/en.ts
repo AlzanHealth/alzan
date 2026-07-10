@@ -701,9 +701,11 @@ const en = {
     waistToHeight: 'Abdomen/height',
     waistToHip: 'Abdomen/hip',
     recomposition: 'Recomposition',
+    status: 'Status',
     advancedMarkers: 'Advanced markers',
     bri: 'BRI',
     absi: 'ABSI',
+    abdominalCategoryLow: 'Low',
     abdominalCategoryVeryLow: 'Very low',
     abdominalCategoryHealthy: 'Healthy zone',
     abdominalCategoryIncreased: 'Increased risk',
@@ -714,21 +716,23 @@ const en = {
     waistToHeightFormula: 'Abdomen/height = abdomen cm / height cm',
     waistToHeightRule:
       'A practical reference is to keep abdomen below half of height. It is an indicator, not a medical diagnosis.',
+    waistToHeightSummary:
+      'Shows whether your abdomen is below half of your height; lower usually reduces abdominal risk.',
     waistToHipDescription:
       'Abdomen-to-hip ratio helps read fat distribution and whether more weight is concentrated around the abdominal area.',
     waistToHipFormula: 'Abdomen/hip = abdomen cm / hip cm',
     waistToHipRule:
       'Interpretation uses sex-specific ranges and should be read together with abdomen/height and body fat trend.',
+    waistToHipSummary:
+      'Shows how your perimeter is distributed between abdomen and hip; higher usually means more abdominal concentration.',
     abdominalAdvancedDescription:
-      'BRI and ABSI are advanced body-shape indexes. They are less intuitive, so Alzan shows them as complementary context only.',
-    briExplanation:
-      'BRI estimates how round the body shape is from abdomen and height. It helps contextualize abdominal volume beyond weight alone.',
-    briDirection:
-      'Lower is usually better when it comes from less abdominal perimeter; higher values usually mean more abdominal concentration.',
+      'BRI and ABSI are complementary body-shape indexes. They are useful context, but they are not main goals or medical diagnoses.',
+    briExplanation: 'BRI is an experimental abdominal-shape index based on abdomen and height.',
+    briDirection: 'A higher BRI usually means more abdominal roundness. Use it as extra context, not as a main target.',
     absiExplanation:
-      'ABSI compares abdomen with BMI and height. It is useful to see whether the waist is larger than expected for your size.',
+      'ABSI compares waist with BMI and height to see whether waist is larger than expected for your size.',
     absiDirection:
-      'Lower is usually better when it reflects a smaller waist for the same body size; higher values suggest more abdominal risk context.',
+      'A higher ABSI suggests a larger waist for the same body size. Use it as a complementary risk signal.',
     missingAbdomenForAbdominal: 'Add abdomen to calculate abdominal health markers.',
     missingHipForWaistHip: 'Add hip to calculate abdomen/hip.',
     recompositionDescription:
@@ -736,6 +740,10 @@ const en = {
     recompositionFormula: 'Trend = abdomen change + weight change + chest/arm/thigh preservation',
     recompositionNoMedicalFormula:
       'Chest, arm, and thigh help track perimeter changes and relative muscle preservation, but they do not recalculate body fat or muscle mass.',
+    pdfAbdominalHealthSection: 'Abdominal health',
+    pdfAbdominalHealthHint:
+      'These ratios help understand abdominal risk and fat distribution. They are indicators, not diagnoses.',
+    pdfAbdominalMetricPurpose: 'What it helps with',
     recompositionPositive: 'Positive recomposition',
     recompositionPositiveAdvice: 'Abdomen is down while key perimeters are maintained. Keep the current pace.',
     recompositionCorrect: 'Correct progress',
