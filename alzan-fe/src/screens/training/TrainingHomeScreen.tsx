@@ -844,8 +844,16 @@ export const TrainingHomeScreen = () => {
                   <View style={styles.planHeader}>
                     <TouchableOpacity
                       accessibilityRole="button"
-                      disabled={isCompleted || plan.isExtraSession || !templateId}
-                      onPress={openPreview}
+                      disabled={isCompleted ? !plan.completedSession?.id : plan.isExtraSession || !templateId}
+                      onPress={() => {
+                        if (isCompleted) {
+                          if (plan.completedSession?.id) {
+                            navigation.navigate('EnduranceSessionDetail', { sessionId: plan.completedSession.id });
+                          }
+                        } else {
+                          openPreview();
+                        }
+                      }}
                       activeOpacity={0.82}
                       style={styles.planInfoButton}
                     >
@@ -900,8 +908,16 @@ export const TrainingHomeScreen = () => {
                         isThisSessionActive && { backgroundColor: colors.success },
                         isCompleted && { backgroundColor: colors.danger },
                       ]}
-                      disabled={isCompleted}
-                      onPress={startPlan}
+                      disabled={isCompleted ? !plan.completedSession?.id : false}
+                      onPress={
+                        isCompleted
+                          ? () => {
+                              if (plan.completedSession?.id) {
+                                navigation.navigate('EnduranceSessionDetail', { sessionId: plan.completedSession.id });
+                              }
+                            }
+                          : startPlan
+                      }
                     >
                       {!isCompleted && <Play size={12} color="#FFF" style={{ marginRight: 4 }} />}
                       <Text style={styles.startPlanText}>
