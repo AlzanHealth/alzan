@@ -26,6 +26,7 @@ type TestFitLap = {
   avgHeartRate?: number;
   maxHeartRate?: number;
   lapTrigger?: number;
+  omitStartTimestamp?: boolean;
 };
 
 function fitTimestamp(iso: string): number {
@@ -149,7 +150,7 @@ function buildTestFit(params: {
   ];
   for (const lap of laps) {
     appendFitData(data, 1, [
-      { ...lapFields[0], value: startedAt + lap.startOffsetSeconds },
+      { ...lapFields[0], value: lap.omitStartTimestamp ? 0 : startedAt + lap.startOffsetSeconds },
       { ...lapFields[1], value: Math.round(lap.durationSeconds * 1000) },
       { ...lapFields[2], value: Math.round(lap.distanceM * 100) },
       { ...lapFields[3], value: lap.avgHeartRate ?? 120 },
@@ -366,6 +367,92 @@ function assertSuuntoFitRemovesMixedOneKilometerAutolaps(): void {
   );
 }
 
+function assertSuuntoFitKeepsFifteenStructuredIntervals(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 8350,
+    durationSeconds: 2475,
+    laps: [
+      { startOffsetSeconds: 0, durationSeconds: 600, distanceM: 1600, avgHeartRate: 146, lapTrigger: 0 },
+      { startOffsetSeconds: 0, durationSeconds: 342, distanceM: 1000, avgHeartRate: 141, lapTrigger: 0 },
+      { startOffsetSeconds: 600, durationSeconds: 105.3, distanceM: 400, avgHeartRate: 153, lapTrigger: 0 },
+      { startOffsetSeconds: 705.3, durationSeconds: 90, distanceM: 123, avgHeartRate: 150, lapTrigger: 0 },
+      { startOffsetSeconds: 795.3, durationSeconds: 109.2, distanceM: 400, avgHeartRate: 153, lapTrigger: 0 },
+      { startOffsetSeconds: 904.5, durationSeconds: 90, distanceM: 121, avgHeartRate: 157, lapTrigger: 0 },
+      { startOffsetSeconds: 994.5, durationSeconds: 103, distanceM: 400, avgHeartRate: 160, lapTrigger: 0 },
+      { startOffsetSeconds: 1097.5, durationSeconds: 90, distanceM: 130, avgHeartRate: 156, lapTrigger: 0 },
+      { startOffsetSeconds: 1187.5, durationSeconds: 106.6, distanceM: 400, avgHeartRate: 161, lapTrigger: 0 },
+      { startOffsetSeconds: 1294.1, durationSeconds: 90, distanceM: 136, avgHeartRate: 156, lapTrigger: 0 },
+      { startOffsetSeconds: 1384.1, durationSeconds: 107.8, distanceM: 400, avgHeartRate: 161, lapTrigger: 0 },
+      { startOffsetSeconds: 1491.9, durationSeconds: 90, distanceM: 144, avgHeartRate: 155, lapTrigger: 0 },
+      { startOffsetSeconds: 1581.9, durationSeconds: 99.7, distanceM: 400, avgHeartRate: 164, lapTrigger: 0 },
+      { startOffsetSeconds: 1681.6, durationSeconds: 90, distanceM: 121, avgHeartRate: 159, lapTrigger: 0 },
+      { startOffsetSeconds: 1771.6, durationSeconds: 600, distanceM: 1600, avgHeartRate: 169, lapTrigger: 0 },
+      { startOffsetSeconds: 2371.6, durationSeconds: 103.3, distanceM: 304, avgHeartRate: 176, lapTrigger: 0 },
+      { startOffsetSeconds: 1681.6, durationSeconds: 193.3, distanceM: 425, avgHeartRate: 165, lapTrigger: 0 },
+    ],
+  });
+
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-running-fifteen-intervals.fit');
+
+  assert.deepEqual(
+    canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
+    [1600, 400, 123, 400, 121, 400, 130, 400, 136, 400, 144, 400, 121, 1600, 304],
+  );
+}
+
+function assertSuuntoFitKeepsRepeatedUntimedRecoveries(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 2700,
+    durationSeconds: 1260,
+    laps: [
+      { startOffsetSeconds: 0, durationSeconds: 600, distanceM: 1600, avgHeartRate: 146, lapTrigger: 0 },
+      {
+        startOffsetSeconds: 600,
+        durationSeconds: 90,
+        distanceM: 121,
+        avgHeartRate: 157,
+        lapTrigger: 0,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 690,
+        durationSeconds: 100,
+        distanceM: 400,
+        avgHeartRate: 164,
+        lapTrigger: 0,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 790,
+        durationSeconds: 90,
+        distanceM: 121,
+        avgHeartRate: 159,
+        lapTrigger: 0,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 880,
+        durationSeconds: 103,
+        distanceM: 304,
+        avgHeartRate: 176,
+        lapTrigger: 0,
+        omitStartTimestamp: true,
+      },
+    ],
+  });
+
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-repeated-untimed-recoveries.fit');
+
+  assert.deepEqual(
+    canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
+    [1600, 121, 400, 121, 304],
+  );
+}
+
 function assertSuuntoFitKeepsRealOneKilometerIntervals(): void {
   const fit = buildTestFit({
     sport: 1,
@@ -387,6 +474,39 @@ function assertSuuntoFitKeepsRealOneKilometerIntervals(): void {
     canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
     [1000, 200, 1000, 200, 1000],
   );
+}
+
+function assertSuuntoFitKeepsOneKilometerAutolapsWhenNoStructuredPartialsExist(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 3000,
+    durationSeconds: 900,
+    laps: [
+      { startOffsetSeconds: 0, durationSeconds: 300, distanceM: 1000, avgHeartRate: 145, lapTrigger: 2 },
+      { startOffsetSeconds: 300, durationSeconds: 301, distanceM: 1000, avgHeartRate: 148, lapTrigger: 2 },
+      { startOffsetSeconds: 601, durationSeconds: 299, distanceM: 1000, avgHeartRate: 150, lapTrigger: 2 },
+    ],
+  });
+
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-steady-one-km-autolaps.fit');
+
+  assert.deepEqual(
+    canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
+    [1000, 1000, 1000],
+  );
+}
+
+function assertSuuntoFitAcceptsLeadingBytesBeforeHeader(): void {
+  const fit = buildTestFit({ sport: 2, subSport: 0, distanceM: 1000, includeGps: true });
+  const prefixed = new Uint8Array(fit.byteLength + 1);
+  prefixed[0] = 0x0a;
+  prefixed.set(fit, 1);
+
+  const canonical = parseSuuntoActivityFileToCanonical(prefixed, 'suunto-prefixed.fit');
+
+  assert.equal(canonical.sportType, 'cycling');
+  assert.equal(canonical.summary.distanceM, 1000);
 }
 
 function assertSuuntoFitCanonicalParsesWithoutGps(): void {
@@ -557,7 +677,11 @@ function assertSuuntoHealthCanonicalParsesWithoutPersistence(): void {
 assertSuuntoSportMapping();
 assertSuuntoFitCanonicalParsesGpsAndLaps();
 assertSuuntoFitRemovesMixedOneKilometerAutolaps();
+assertSuuntoFitKeepsFifteenStructuredIntervals();
+assertSuuntoFitKeepsRepeatedUntimedRecoveries();
 assertSuuntoFitKeepsRealOneKilometerIntervals();
+assertSuuntoFitKeepsOneKilometerAutolapsWhenNoStructuredPartialsExist();
+assertSuuntoFitAcceptsLeadingBytesBeforeHeader();
 assertSuuntoFitCanonicalParsesWithoutGps();
 assertSuuntoFitWithoutGpsStillParsesAsRouteImport();
 assertSuuntoJsonCanonicalParsesSummary();

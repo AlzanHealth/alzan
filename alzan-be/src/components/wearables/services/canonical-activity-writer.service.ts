@@ -7,6 +7,7 @@ import {
   CanonicalActivity,
   CanonicalActivityMetricSample,
 } from '../../activity-import/parsers/activity-import-canonical.types';
+import { normaliseCanonicalActivityLaps } from '../../activity-import/parsers/canonical-lap-normalizer';
 import { encodePolyline } from '../../activity-import/parsers/route-import.parser';
 import {
   ActivityDatabaseProvider,
@@ -423,7 +424,10 @@ export class CanonicalActivityWriterService {
     if (deleteError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LAPS_DELETE_FAILED');
     if (activity.laps.length === 0) return;
 
-    const rows: ActivityLapInsert[] = activity.laps.map(lap => ({
+    const laps = normaliseCanonicalActivityLaps(activity.laps, activity.summary);
+    if (laps.length === 0) return;
+
+    const rows: ActivityLapInsert[] = laps.map(lap => ({
       session_id: sessionId,
       user_id: userId,
       lap_index: lap.lapIndex,

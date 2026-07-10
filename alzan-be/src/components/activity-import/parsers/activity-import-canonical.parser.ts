@@ -1,5 +1,6 @@
 import { CanonicalActivity } from './activity-import-canonical.types';
 import { parseAppleHealthActivityJsonToCanonical } from './apple-health-activity-canonical.mapper';
+import { normaliseCanonicalActivityLaps } from './canonical-lap-normalizer';
 import { parseCorosActivityFileToCanonical } from './coros-activity-canonical.mapper';
 import { parseFitbitActivityJsonToCanonical } from './fitbit-activity-canonical.mapper';
 import { buildEmptyGenericActivity, parseGenericActivityJsonToCanonical } from './generic-activity-canonical.mapper';
@@ -371,6 +372,13 @@ function isStravaJson(parsed: JsonRecord): boolean {
   );
 }
 
+function normaliseParsedActivity(activity: CanonicalActivity): CanonicalActivity {
+  return {
+    ...activity,
+    laps: normaliseCanonicalActivityLaps(activity.laps, activity.summary),
+  };
+}
+
 export function parseActivityFileToCanonical(
   content: string | Uint8Array,
   filename: string,
@@ -381,43 +389,43 @@ export function parseActivityFileToCanonical(
     if (typeof content === 'string') throw new Error('Invalid FIT file.');
     const manufacturer = detectFitManufacturer(content);
     if (lower.includes('coros')) {
-      return parseCorosActivityFileToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseCorosActivityFileToCanonical(content, filename, options));
     }
     if (lower.includes('polar')) {
-      return parsePolarActivityFileToCanonical(content, filename, options);
+      return normaliseParsedActivity(parsePolarActivityFileToCanonical(content, filename, options));
     }
     if (manufacturer === GARMIN_MANUFACTURER_ID || lower.includes('garmin')) {
-      return parseGarminActivityFileToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseGarminActivityFileToCanonical(content, filename, options));
     }
-    return parseSuuntoActivityFileToCanonical(content, filename, options);
+    return normaliseParsedActivity(parseSuuntoActivityFileToCanonical(content, filename, options));
   }
   if (lower.endsWith('.json')) {
     if (typeof content !== 'string') throw new Error('Invalid JSON file.');
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) throw new Error('Invalid JSON file.');
     if (lower.includes('health_connect') || lower.includes('health-connect') || isHealthConnectJson(parsed))
-      return parseHealthConnectActivityJsonToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseHealthConnectActivityJsonToCanonical(content, filename, options));
     if (lower.includes('apple_health') || lower.includes('apple-health') || isAppleHealthJson(parsed))
-      return parseAppleHealthActivityJsonToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseAppleHealthActivityJsonToCanonical(content, filename, options));
     if (lower.includes('coros') || isCorosJson(parsed))
-      return parseCorosActivityFileToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseCorosActivityFileToCanonical(content, filename, options));
     if (lower.includes('whoop') || isWhoopJson(parsed))
-      return parseWhoopActivityJsonToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseWhoopActivityJsonToCanonical(content, filename, options));
     if (lower.includes('ultrahuman') || isUltrahumanJson(parsed))
-      return parseUltrahumanActivityJsonToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseUltrahumanActivityJsonToCanonical(content, filename, options));
     if (lower.includes('oura') || isOuraJson(parsed))
-      return parseOuraActivityJsonToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseOuraActivityJsonToCanonical(content, filename, options));
     if (lower.includes('fitbit') || isFitbitJson(parsed))
-      return parseFitbitActivityJsonToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseFitbitActivityJsonToCanonical(content, filename, options));
     if (lower.includes('polar') || isPolarJson(parsed))
-      return parsePolarActivityFileToCanonical(content, filename, options);
+      return normaliseParsedActivity(parsePolarActivityFileToCanonical(content, filename, options));
     if (lower.includes('strava') || isStravaJson(parsed))
-      return parseStravaActivityJsonToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseStravaActivityJsonToCanonical(content, filename, options));
     if (lower.includes('garmin') || isGarminJson(parsed))
-      return parseGarminActivityFileToCanonical(content, filename, options);
+      return normaliseParsedActivity(parseGarminActivityFileToCanonical(content, filename, options));
     if (lower.includes('suunto') || isSuuntoJson(parsed))
-      return parseSuuntoActivityFileToCanonical(content, filename, options);
-    return parseGenericActivityJsonToCanonical(content, filename);
+      return normaliseParsedActivity(parseSuuntoActivityFileToCanonical(content, filename, options));
+    return normaliseParsedActivity(parseGenericActivityJsonToCanonical(content, filename));
   }
-  return buildEmptyGenericActivity();
+  return normaliseParsedActivity(buildEmptyGenericActivity());
 }
