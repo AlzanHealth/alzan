@@ -67,6 +67,7 @@ import { getHeartRateZoneFillPercentage } from './helpers/heartRateZoneDisplay.h
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
 const HYROX_SPORT_TYPE = 'hyrox' as ActivitySession['sport_type'];
+const SPLIT_DISTANCE_TOLERANCE_M = 10;
 const SPORTS_WITH_SPECIFIC_MODALITY_METRIC = new Set<string>([
   VOLLEYBALL_SPORT_TYPE,
   TRAIL_SPORT_TYPE,
@@ -75,6 +76,137 @@ const SPORTS_WITH_SPECIFIC_MODALITY_METRIC = new Set<string>([
   'golf',
   HYROX_SPORT_TYPE,
 ]);
+
+function isOneKilometerSessionLapSequence(laps: SessionLap[]): boolean {
+  if (laps.length === 0) return false;
+
+  return laps.every((lap, index) => {
+    if (lap.distance_m == null || !Number.isFinite(lap.distance_m) || lap.distance_m <= 0) return false;
+    const isLast = index === laps.length - 1;
+    const fullLap = Math.abs(lap.distance_m - 1000) <= SPLIT_DISTANCE_TOLERANCE_M;
+    const partialFinalLap = isLast && lap.distance_m > 0 && lap.distance_m < 1000 + SPLIT_DISTANCE_TOLERANCE_M;
+
+    return fullLap || partialFinalLap;
+  });
+}
+
+function buildDistanceSplitTargets(totalDistanceM: number): number[] {
+  if (!Number.isFinite(totalDistanceM) || totalDistanceM < 1000 - SPLIT_DISTANCE_TOLERANCE_M) return [];
+
+  const targets = new Set<number>([1000]);
+  const upperFiveKmBucket = Math.ceil(Math.max(totalDistanceM, 1000) / 5000) * 5000;
+
+  for (let target = 5000; target <= upperFiveKmBucket; target += 5000) {
+    targets.add(target);
+  }
+
+  return Array.from(targets).sort((left, right) => left - right);
+}
+
+function buildDistanceSessionLapBuckets(laps: SessionLap[]): Array<{ splitDistanceM: number; laps: SessionLap[] }> {
+  if (!isOneKilometerSessionLapSequence(laps)) return [];
+
+  const totalDistanceM = laps.reduce((sum, lap) => sum + (lap.distance_m ?? 0), 0);
+
+  return buildDistanceSplitTargets(totalDistanceM)
+    .map(splitDistanceM => ({
+      splitDistanceM,
+      laps: buildAggregatedSessionLaps(laps, splitDistanceM),
+    }))
+    .filter(bucket => bucket.laps.length > 0);
+}
+
+function buildAggregatedSessionLaps(laps: SessionLap[], splitDistanceM: number): SessionLap[] {
+  if (splitDistanceM <= 1000) {
+    return laps.map((lap, index) => ({
+      ...lap,
+      id: `${lap.id}-distance-1000`,
+      lap_index: index + 1,
+      split_group: 'distance',
+      split_group_order: 0,
+      split_distance_m: 1000,
+      lap_type: 'distance',
+    }));
+  }
+
+  const aggregated: SessionLap[] = [];
+  let current: SessionLap[] = [];
+  let currentDistanceM = 0;
+
+  const flushCurrent = () => {
+    if (current.length === 0 || currentDistanceM <= 0) return;
+    const first = current[0];
+    const last = current[current.length - 1];
+    const durationSeconds = sumSessionLapValues(current.map(lap => lap.duration_s));
+
+    aggregated.push({
+      ...first,
+      id: `${first.id}-distance-${splitDistanceM}-${aggregated.length + 1}`,
+      lap_index: aggregated.length + 1,
+      split_group: 'distance',
+      split_group_order: 0,
+      split_distance_m: splitDistanceM,
+      distance_m: currentDistanceM,
+      duration_s: durationSeconds,
+      avg_pace_s_per_km:
+        durationSeconds != null && currentDistanceM > 0 ? durationSeconds / (currentDistanceM / 1000) : null,
+      avg_heart_rate: weightedSessionLapAverage(current, lap => lap.avg_heart_rate),
+      max_heart_rate: maxSessionLapValue(current.map(lap => lap.max_heart_rate)),
+      start_offset_s: first.start_offset_s,
+      end_offset_s: last.end_offset_s,
+    });
+
+    current = [];
+    currentDistanceM = 0;
+  };
+
+  for (const lap of laps) {
+    current.push(lap);
+    currentDistanceM += lap.distance_m ?? 0;
+
+    if (currentDistanceM >= splitDistanceM - SPLIT_DISTANCE_TOLERANCE_M) {
+      flushCurrent();
+    }
+  }
+
+  flushCurrent();
+
+  return aggregated;
+}
+
+function sumSessionLapValues(values: Array<number | null>): number | null {
+  let total = 0;
+  let hasValue = false;
+
+  for (const value of values) {
+    if (value == null || !Number.isFinite(value)) continue;
+    total += value;
+    hasValue = true;
+  }
+
+  return hasValue ? total : null;
+}
+
+function maxSessionLapValue(values: Array<number | null>): number | null {
+  const safeValues = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (safeValues.length === 0) return null;
+  return Math.max(...safeValues);
+}
+
+function weightedSessionLapAverage(laps: SessionLap[], getValue: (lap: SessionLap) => number | null): number | null {
+  let weightedTotal = 0;
+  let totalWeight = 0;
+
+  for (const lap of laps) {
+    const value = getValue(lap);
+    const weight = lap.duration_s ?? lap.distance_m ?? 0;
+    if (value == null || !Number.isFinite(value) || weight <= 0) continue;
+    weightedTotal += value * weight;
+    totalWeight += weight;
+  }
+
+  return totalWeight > 0 ? weightedTotal / totalWeight : null;
+}
 
 const createPendingDetailSession = (sessionId?: string): ActivitySession =>
   ({
@@ -274,19 +406,51 @@ export const EnduranceSessionDetailScreen = () => {
       });
     });
 
-    return Array.from(grouped.entries())
-      .sort((left, right) => {
-        const leftGroup = left[1];
-        const rightGroup = right[1];
+    const groups = Array.from(grouped.entries()).map(([groupKey, group]) => ({ ...group, key: groupKey }));
+    const derivedDistanceGroups = groups
+      .filter(group => group.splitGroup === 'custom' && isOneKilometerSessionLapSequence(group.laps))
+      .flatMap(group =>
+        buildDistanceSessionLapBuckets([...group.laps].sort((left, right) => left.lap_index - right.lap_index)).map(
+          bucket => ({
+            key: `derived-distance-${bucket.splitDistanceM}`,
+            splitGroup: 'distance' as const,
+            splitDistanceM: bucket.splitDistanceM,
+            splitGroupOrder: 0,
+            laps: bucket.laps,
+          }),
+        ),
+      );
+    const groupsWithDerivedDistance = [
+      ...derivedDistanceGroups,
+      ...groups.filter(group => {
+        const customIsOneKilometer = group.splitGroup === 'custom' && isOneKilometerSessionLapSequence(group.laps);
+        const duplicatedByDerivedDistance =
+          group.splitGroup === 'distance' &&
+          group.splitDistanceM != null &&
+          derivedDistanceGroups.some(derivedGroup => derivedGroup.splitDistanceM === group.splitDistanceM);
 
-        if (leftGroup.splitGroupOrder !== rightGroup.splitGroupOrder) {
-          return leftGroup.splitGroupOrder - rightGroup.splitGroupOrder;
+        return !customIsOneKilometer && !duplicatedByDerivedDistance;
+      }),
+    ];
+
+    return groupsWithDerivedDistance
+      .sort((left, right) => {
+        if (left.splitGroup !== right.splitGroup) {
+          return left.splitGroup === 'distance' ? -1 : 1;
         }
 
-        return (leftGroup.splitDistanceM ?? 0) - (rightGroup.splitDistanceM ?? 0);
+        if (left.splitGroup === 'distance' && right.splitGroup === 'distance') {
+          return (left.splitDistanceM ?? 0) - (right.splitDistanceM ?? 0);
+        }
+
+        if (left.splitGroupOrder !== right.splitGroupOrder) {
+          return left.splitGroupOrder - right.splitGroupOrder;
+        }
+
+        return (left.splitDistanceM ?? 0) - (right.splitDistanceM ?? 0);
       })
-      .map(([groupKey, group]) => ({
-        key: groupKey,
+      .map(group => ({
+        key: group.key,
         label:
           group.splitGroup === 'distance' && group.splitDistanceM != null && group.splitDistanceM > 0
             ? formatSplitDistanceBucketLabel(group.splitDistanceM)

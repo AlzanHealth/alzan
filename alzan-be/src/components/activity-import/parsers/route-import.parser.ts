@@ -1,5 +1,6 @@
 import { CanonicalActivity, CanonicalSportSubtype, CanonicalSportType } from './activity-import-canonical.types';
 import { parseActivityFileToCanonical } from './activity-import-canonical.parser';
+import { buildDistanceSplitTargets, SPLIT_DISTANCE_TOLERANCE_M } from './lap-split-utils';
 
 /**
  * mapService.ts
@@ -153,7 +154,6 @@ const FIT_EPOCH_OFFSET_SECONDS = 631065600;
 const FIT_INVALID_SINT32 = 2147483647;
 const FIT_SEMICIRCLES_TO_DEGREES = 180 / 2147483648;
 const RADIANS_TO_DEGREES = 180 / Math.PI;
-const SPLIT_DISTANCE_TOLERANCE_M = 10;
 const SPLIT_DURATION_TOLERANCE_SECONDS = 2;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -606,30 +606,6 @@ function buildDistanceSplits(points: RoutePoint[], splitDistanceM: number): Rout
   }
 
   return laps;
-}
-
-function buildDistanceSplitTargets(totalDistanceM: number): number[] {
-  if (!Number.isFinite(totalDistanceM) || totalDistanceM <= 0) return [];
-
-  const targets = new Set<number>();
-
-  if (totalDistanceM >= 1000) {
-    targets.add(1000);
-  }
-
-  const maxFiveKmStep = Math.floor(totalDistanceM / 5000);
-  for (let step = 1; step <= maxFiveKmStep; step += 1) {
-    targets.add(step * 5000);
-  }
-
-  const remainderToFiveKm = totalDistanceM % 5000;
-  const shouldAddUpperBucket = remainderToFiveKm > SPLIT_DISTANCE_TOLERANCE_M || maxFiveKmStep === 0;
-
-  if (shouldAddUpperBucket) {
-    targets.add((maxFiveKmStep + 1) * 5000);
-  }
-
-  return Array.from(targets).sort((a, b) => a - b);
 }
 
 function resolveHeartRateZone(normalisedHeartRate: number): 1 | 2 | 3 | 4 | 5 {

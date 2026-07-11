@@ -45,6 +45,7 @@ type FakeRecordedMutation = {
 
 interface CanonicalActivityWriterServicePrivate {
   insertInChunks(table: InsertableTable, rows: Array<Record<string, unknown>>, errorCode: string): Promise<void>;
+  replaceLaps(sessionId: string, userId: string, activity: CanonicalActivity): Promise<void>;
   resolveExistingWriteSessionId(sessionId: string): Promise<string>;
   sanitizePositionSamples(samples: CanonicalActivityPointSample[]): CanonicalActivityPointSample[];
 }
@@ -464,6 +465,56 @@ async function assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate(): P
   assert.equal(linkedPayloads[0]?.relatedId, 'survivor-session');
 }
 
+async function assertOneKilometerWearableLapsArePersistedAsDistanceGroups(): Promise<void> {
+  const activity = buildCanonicalRun();
+  activity.summary.distanceM = 9220;
+  activity.laps = [
+    ...Array.from({ length: 9 }, (_, index) => ({
+      lapIndex: index + 1,
+      lapType: 'auto' as const,
+      distanceM: 1000,
+      durationSeconds: 300 + index,
+      avgPaceSecondsPerKm: 300 + index,
+      avgHeartRate: 140 + index,
+      maxHeartRate: 150 + index,
+      startOffsetSeconds: index * 300,
+      endOffsetSeconds: (index + 1) * 300,
+    })),
+    {
+      lapIndex: 10,
+      lapType: 'auto',
+      distanceM: 220,
+      durationSeconds: 70,
+      avgPaceSecondsPerKm: 318.18,
+      avgHeartRate: 155,
+      maxHeartRate: 162,
+      startOffsetSeconds: 2700,
+      endOffsetSeconds: 2770,
+    },
+  ];
+  const client = createFullSupabaseClient({});
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {} as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.replaceLaps('session-1', 'user-1', activity);
+
+  const insertedRows = client.inserts.find(insert => insert.table === 'activity_laps')?.rows ?? [];
+  const splitDistances = Array.from(new Set(insertedRows.map(row => row.split_distance_m))).sort(
+    (left, right) => Number(left) - Number(right),
+  );
+
+  assert.deepEqual(splitDistances, [1000, 5000, 10000]);
+  assert.equal(
+    insertedRows.some(row => row.split_group === 'custom'),
+    false,
+  );
+  assert.ok(insertedRows.some(row => row.split_distance_m === 10000 && row.distance_m === 9220));
+}
+
 function assertPositionSamplesAreSanitizedForValidRoutes(): void {
   const client = createFakeSupabaseClient(250);
   const service = createService(client);
@@ -512,6 +563,7 @@ async function run(): Promise<void> {
   await assertRetryableChunkFailuresAreSplit();
   await assertStrongPendingDuplicateWritesToSurvivor();
   await assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate();
+  await assertOneKilometerWearableLapsArePersistedAsDistanceGroups();
 }
 
 void run();

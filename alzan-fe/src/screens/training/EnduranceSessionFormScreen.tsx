@@ -89,6 +89,8 @@ interface SplitTab {
   laps: RouteImportLap[];
 }
 
+const SPLIT_DISTANCE_TOLERANCE_M = 10;
+
 function getDistanceSplitBuckets(details: RouteImportDetails | null): RouteImportDistanceSplitBucket[] {
   if (!details) return [];
 
@@ -115,6 +117,132 @@ function getDistanceSplitBuckets(details: RouteImportDetails | null): RouteImpor
 
 function areCloseValues(a: number, b: number, tolerance: number): boolean {
   return Math.abs(a - b) <= tolerance;
+}
+
+function isOneKilometerRouteLapSequence(laps: RouteImportLap[]): boolean {
+  if (laps.length === 0) return false;
+
+  return laps.every((lap, index) => {
+    const isLast = index === laps.length - 1;
+    const fullLap = Math.abs(lap.distanceM - 1000) <= SPLIT_DISTANCE_TOLERANCE_M;
+    const partialFinalLap = isLast && lap.distanceM > 0 && lap.distanceM < 1000 + SPLIT_DISTANCE_TOLERANCE_M;
+
+    return fullLap || partialFinalLap;
+  });
+}
+
+function buildDistanceSplitTargets(totalDistanceM: number): number[] {
+  if (!Number.isFinite(totalDistanceM) || totalDistanceM < 1000 - SPLIT_DISTANCE_TOLERANCE_M) return [];
+
+  const targets = new Set<number>([1000]);
+  const upperFiveKmBucket = Math.ceil(Math.max(totalDistanceM, 1000) / 5000) * 5000;
+
+  for (let target = 5000; target <= upperFiveKmBucket; target += 5000) {
+    targets.add(target);
+  }
+
+  return Array.from(targets).sort((left, right) => left - right);
+}
+
+function buildDistanceBucketsFromRouteLaps(laps: RouteImportLap[]): RouteImportDistanceSplitBucket[] {
+  if (!isOneKilometerRouteLapSequence(laps)) return [];
+
+  const totalDistanceM = laps.reduce((sum, lap) => sum + lap.distanceM, 0);
+
+  return buildDistanceSplitTargets(totalDistanceM)
+    .map(splitDistanceM => ({
+      splitDistanceM,
+      laps: buildAggregatedRouteLaps(laps, splitDistanceM),
+    }))
+    .filter(bucket => bucket.laps.length > 0);
+}
+
+function buildAggregatedRouteLaps(laps: RouteImportLap[], splitDistanceM: number): RouteImportLap[] {
+  if (splitDistanceM <= 1000) {
+    return laps.map((lap, index) => ({
+      ...lap,
+      lapIndex: index + 1,
+      lapType: 'distance',
+    }));
+  }
+
+  const aggregated: RouteImportLap[] = [];
+  let current: RouteImportLap[] = [];
+  let currentDistanceM = 0;
+
+  const flushCurrent = () => {
+    if (current.length === 0 || currentDistanceM <= 0) return;
+    const first = current[0];
+    const last = current[current.length - 1];
+    const durationSeconds = sumNullable(current.map(lap => lap.durationSeconds));
+
+    aggregated.push({
+      ...first,
+      lapIndex: aggregated.length + 1,
+      lapType: 'distance',
+      distanceM: currentDistanceM,
+      durationSeconds,
+      avgPaceSecondsPerKm:
+        durationSeconds != null && currentDistanceM > 0 ? durationSeconds / (currentDistanceM / 1000) : null,
+      avgHeartRate: weightedRouteLapAverage(current, lap => lap.avgHeartRate),
+      maxHeartRate: maxNullable(current.map(lap => lap.maxHeartRate)),
+      startOffsetSeconds: first.startOffsetSeconds,
+      endOffsetSeconds: last.endOffsetSeconds,
+    });
+
+    current = [];
+    currentDistanceM = 0;
+  };
+
+  for (const lap of laps) {
+    current.push(lap);
+    currentDistanceM += lap.distanceM;
+
+    if (currentDistanceM >= splitDistanceM - SPLIT_DISTANCE_TOLERANCE_M) {
+      flushCurrent();
+    }
+  }
+
+  flushCurrent();
+
+  return aggregated;
+}
+
+function sumNullable(values: Array<number | null>): number | null {
+  let total = 0;
+  let hasValue = false;
+
+  for (const value of values) {
+    if (value == null || !Number.isFinite(value)) continue;
+    total += value;
+    hasValue = true;
+  }
+
+  return hasValue ? total : null;
+}
+
+function maxNullable(values: Array<number | null>): number | null {
+  const safeValues = values.filter((value): value is number => value != null && Number.isFinite(value));
+  if (safeValues.length === 0) return null;
+  return Math.max(...safeValues);
+}
+
+function weightedRouteLapAverage(
+  laps: RouteImportLap[],
+  getValue: (lap: RouteImportLap) => number | null,
+): number | null {
+  let weightedTotal = 0;
+  let totalWeight = 0;
+
+  for (const lap of laps) {
+    const value = getValue(lap);
+    const weight = lap.durationSeconds ?? lap.distanceM;
+    if (value == null || !Number.isFinite(value) || weight <= 0) continue;
+    weightedTotal += value * weight;
+    totalWeight += weight;
+  }
+
+  return totalWeight > 0 ? weightedTotal / totalWeight : null;
 }
 
 function areEquivalentLaps(left: RouteImportLap[], right: RouteImportLap[]): boolean {
@@ -664,9 +792,17 @@ export const EnduranceSessionFormScreen = () => {
   const splitTabs = React.useMemo<SplitTab[]>(() => {
     const tabs: SplitTab[] = [];
     const customSplits = routeDetails?.customSplits ?? [];
+    const nativeDistanceBuckets = buildDistanceBucketsFromRouteLaps(customSplits);
+    const mergedDistanceBuckets = [
+      ...nativeDistanceBuckets,
+      ...distanceSplitBuckets.filter(
+        bucket => !nativeDistanceBuckets.some(nativeBucket => nativeBucket.splitDistanceM === bucket.splitDistanceM),
+      ),
+    ].sort((left, right) => left.splitDistanceM - right.splitDistanceM);
     const customDuplicatesDistanceBucket =
-      customSplits.length > 0 && distanceSplitBuckets.some(bucket => areEquivalentLaps(customSplits, bucket.laps));
-    const shouldShowCustom = customSplits.length > 0 && !customDuplicatesDistanceBucket;
+      customSplits.length > 0 && mergedDistanceBuckets.some(bucket => areEquivalentLaps(customSplits, bucket.laps));
+    const shouldShowCustom =
+      customSplits.length > 0 && !customDuplicatesDistanceBucket && !isOneKilometerRouteLapSequence(customSplits);
 
     if (shouldShowCustom) {
       tabs.push({
@@ -678,7 +814,7 @@ export const EnduranceSessionFormScreen = () => {
       });
     }
 
-    for (const bucket of distanceSplitBuckets) {
+    for (const bucket of mergedDistanceBuckets) {
       tabs.push({
         key: `distance-${bucket.splitDistanceM}`,
         label: formatSplitDistanceBucketLabel(bucket.splitDistanceM),

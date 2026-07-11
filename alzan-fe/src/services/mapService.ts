@@ -580,24 +580,13 @@ function buildDistanceSplits(points: RoutePoint[], splitDistanceM: number): Rout
 }
 
 function buildDistanceSplitTargets(totalDistanceM: number): number[] {
-  if (!Number.isFinite(totalDistanceM) || totalDistanceM <= 0) return [];
+  if (!Number.isFinite(totalDistanceM) || totalDistanceM < 1000 - SPLIT_DISTANCE_TOLERANCE_M) return [];
 
-  const targets = new Set<number>();
+  const targets = new Set<number>([1000]);
+  const upperFiveKmBucket = Math.ceil(Math.max(totalDistanceM, 1000) / 5000) * 5000;
 
-  if (totalDistanceM >= 1000) {
-    targets.add(1000);
-  }
-
-  const maxFiveKmStep = Math.floor(totalDistanceM / 5000);
-  for (let step = 1; step <= maxFiveKmStep; step += 1) {
-    targets.add(step * 5000);
-  }
-
-  const remainderToFiveKm = totalDistanceM % 5000;
-  const shouldAddUpperBucket = remainderToFiveKm > SPLIT_DISTANCE_TOLERANCE_M || maxFiveKmStep === 0;
-
-  if (shouldAddUpperBucket) {
-    targets.add((maxFiveKmStep + 1) * 5000);
+  for (let target = 5000; target <= upperFiveKmBucket; target += 5000) {
+    targets.add(target);
   }
 
   return Array.from(targets).sort((a, b) => a - b);

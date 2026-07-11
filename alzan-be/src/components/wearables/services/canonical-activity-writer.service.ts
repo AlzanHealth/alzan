@@ -8,6 +8,10 @@ import {
   CanonicalActivityMetricSample,
 } from '../../activity-import/parsers/activity-import-canonical.types';
 import { normaliseCanonicalActivityLaps } from '../../activity-import/parsers/canonical-lap-normalizer';
+import {
+  buildDistanceSplitBucketsFromLaps,
+  isOneKilometerAutoLapSequence,
+} from '../../activity-import/parsers/lap-split-utils';
 import { encodePolyline } from '../../activity-import/parsers/route-import.parser';
 import {
   ActivityDatabaseProvider,
@@ -419,32 +423,67 @@ export class CanonicalActivityWriterService {
     const { error: deleteError } = await this.supabaseAdminService.client
       .from('activity_laps')
       .delete()
-      .eq('session_id', sessionId)
-      .eq('split_group', 'custom');
+      .eq('session_id', sessionId);
     if (deleteError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LAPS_DELETE_FAILED');
     if (activity.laps.length === 0) return;
 
     const laps = normaliseCanonicalActivityLaps(activity.laps, activity.summary);
     if (laps.length === 0) return;
 
-    const rows: ActivityLapInsert[] = laps.map(lap => ({
-      session_id: sessionId,
-      user_id: userId,
-      lap_index: lap.lapIndex,
-      lap_type: lap.lapType,
-      split_group: 'custom',
-      split_group_order: 0,
-      split_distance_m: null,
-      distance_m: lap.distanceM,
-      duration_s: lap.durationSeconds,
-      avg_heart_rate: lap.avgHeartRate == null ? null : Math.round(lap.avgHeartRate),
-      max_heart_rate: lap.maxHeartRate == null ? null : Math.round(lap.maxHeartRate),
-      avg_pace_s_per_km: lap.avgPaceSecondsPerKm == null ? null : Math.round(lap.avgPaceSecondsPerKm),
-      start_offset_s: lap.startOffsetSeconds == null ? null : Math.round(lap.startOffsetSeconds),
-      end_offset_s: lap.endOffsetSeconds == null ? null : Math.round(lap.endOffsetSeconds),
-    }));
+    const distanceBuckets = buildDistanceSplitBucketsFromLaps(laps);
+    const tabRows =
+      distanceBuckets.length > 0
+        ? distanceBuckets.flatMap((bucket, bucketIndex) =>
+            bucket.laps.map(lap =>
+              this.buildActivityLapInsert({
+                lap,
+                sessionId,
+                userId,
+                splitGroup: 'distance',
+                splitGroupOrder: bucketIndex,
+                splitDistanceM: bucket.splitDistanceM,
+              }),
+            ),
+          )
+        : laps.map(lap =>
+            this.buildActivityLapInsert({
+              lap,
+              sessionId,
+              userId,
+              splitGroup: isOneKilometerAutoLapSequence(laps) ? 'distance' : 'custom',
+              splitGroupOrder: 0,
+              splitDistanceM: isOneKilometerAutoLapSequence(laps) ? 1000 : null,
+            }),
+          );
+    const rows: ActivityLapInsert[] = tabRows;
     const { error } = await this.supabaseAdminService.client.from('activity_laps').insert(rows);
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LAPS_INSERT_FAILED');
+  }
+
+  private buildActivityLapInsert(params: {
+    lap: CanonicalActivity['laps'][number];
+    sessionId: string;
+    userId: string;
+    splitGroup: 'custom' | 'distance';
+    splitGroupOrder: number;
+    splitDistanceM: number | null;
+  }): ActivityLapInsert {
+    return {
+      session_id: params.sessionId,
+      user_id: params.userId,
+      lap_index: params.lap.lapIndex,
+      lap_type: params.lap.lapType,
+      split_group: params.splitGroup,
+      split_group_order: params.splitGroupOrder,
+      split_distance_m: params.splitDistanceM,
+      distance_m: params.lap.distanceM,
+      duration_s: params.lap.durationSeconds,
+      avg_heart_rate: params.lap.avgHeartRate == null ? null : Math.round(params.lap.avgHeartRate),
+      max_heart_rate: params.lap.maxHeartRate == null ? null : Math.round(params.lap.maxHeartRate),
+      avg_pace_s_per_km: params.lap.avgPaceSecondsPerKm == null ? null : Math.round(params.lap.avgPaceSecondsPerKm),
+      start_offset_s: params.lap.startOffsetSeconds == null ? null : Math.round(params.lap.startOffsetSeconds),
+      end_offset_s: params.lap.endOffsetSeconds == null ? null : Math.round(params.lap.endOffsetSeconds),
+    };
   }
 
   private async replaceHeartRateZones(sessionId: string, activity: CanonicalActivity): Promise<void> {

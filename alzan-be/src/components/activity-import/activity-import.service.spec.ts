@@ -185,7 +185,7 @@ async function assertReplaceStrengthStreamPersistsImportedMetrics(): Promise<voi
   ]);
 }
 
-function assertProviderSplitsAreNotHiddenByComputedDistanceBuckets(): void {
+function assertOneKilometerProviderSplitsBecomeDistanceTabs(): void {
   const service = getPrivateService();
   const providerSplits: RouteImportLap[] = [
     {
@@ -236,10 +236,13 @@ function assertProviderSplitsAreNotHiddenByComputedDistanceBuckets(): void {
     heartRateZones: [],
   });
 
-  assert.equal(tabs[0].splitGroup, 'custom');
+  assert.equal(tabs[0].splitGroup, 'distance');
+  assert.equal(tabs[0].splitDistanceM, 1000);
   assert.equal(tabs[0].laps[2].durationSeconds, 321.9);
-  assert.equal(tabs[1].splitGroup, 'distance');
-  assert.equal(tabs[1].laps[2].durationSeconds, 346.9);
+  assert.equal(
+    tabs.some(tab => tab.splitGroup === 'custom'),
+    false,
+  );
 }
 
 function assertRouteLapRowsKeepDecimalDurations(): void {
@@ -269,10 +272,49 @@ function assertRouteLapRowsKeepDecimalDurations(): void {
   assert.equal(rows[0]?.duration_s, 105.3);
 }
 
+function assertNonStandardRouteSplitsStayCustom(): void {
+  const service = getPrivateService();
+  const tabs = service.resolveRouteTabs({
+    customSplits: [
+      {
+        lapIndex: 1,
+        lapType: 'manual',
+        distanceM: 400,
+        durationSeconds: 90,
+        avgPaceSecondsPerKm: 225,
+        avgHeartRate: 150,
+        maxHeartRate: 162,
+        startOffsetSeconds: 0,
+        endOffsetSeconds: 90,
+      },
+      {
+        lapIndex: 2,
+        lapType: 'manual',
+        distanceM: 200,
+        durationSeconds: 80,
+        avgPaceSecondsPerKm: 400,
+        avgHeartRate: 145,
+        maxHeartRate: 155,
+        startOffsetSeconds: 90,
+        endOffsetSeconds: 170,
+      },
+    ],
+    distanceSplits: [],
+    splits1k: [],
+    splits5k: [],
+    splits10k: [],
+    heartRateZones: [],
+  });
+
+  assert.equal(tabs.length, 1);
+  assert.equal(tabs[0].splitGroup, 'custom');
+}
+
 async function run(): Promise<void> {
   assertBuildStrengthSessionUpdateUsesImportedMasterValues();
-  assertProviderSplitsAreNotHiddenByComputedDistanceBuckets();
+  assertOneKilometerProviderSplitsBecomeDistanceTabs();
   assertRouteLapRowsKeepDecimalDurations();
+  assertNonStandardRouteSplitsStayCustom();
   await assertReplaceStrengthHeartRateZonesReplacesRows();
   await assertReplaceStrengthStreamPersistsImportedMetrics();
 }
