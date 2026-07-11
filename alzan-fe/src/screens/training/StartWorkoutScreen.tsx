@@ -282,6 +282,8 @@ export const StartWorkoutScreen = () => {
             const inSuperset = isExerciseInSuperset(index);
             const connectorActive = isConnectorActive(index);
             const isWarmupExercise = !!item.is_warmup;
+            const dropSetMode = item.drop_set_mode || 'none';
+            const isDropSetExercise = !isWarmupExercise && dropSetMode !== 'none';
 
             return (
               <React.Fragment key={item.id || index}>
@@ -297,6 +299,10 @@ export const StartWorkoutScreen = () => {
                       borderColor: themeColors.warning + '80',
                       backgroundColor: themeColors.warning + '10',
                     },
+                    isDropSetExercise && {
+                      borderColor: '#5856D680',
+                      backgroundColor: 'rgba(88,86,214,0.08)',
+                    },
                   ]}
                 >
                   <View style={styles.exerciseHeader}>
@@ -308,19 +314,25 @@ export const StartWorkoutScreen = () => {
                     {(item?.target_sets || 3) +
                       ` ${setsLabel} · ${item?.target_reps_min ?? item?.target_reps_max ?? 8} ${repsLabel}`}
                   </Text>
-                  {isWarmupExercise && (
+                  {(isWarmupExercise || isDropSetExercise) && (
                     <View
                       style={[
                         styles.warmupBadge,
                         styles.warmupBadgeCentered,
                         {
-                          borderColor: themeColors.warning + '55',
-                          backgroundColor: themeColors.warning + '1A',
+                          borderColor: isWarmupExercise ? themeColors.warning + '55' : 'rgba(88,86,214,0.35)',
+                          backgroundColor: isWarmupExercise ? themeColors.warning + '1A' : 'rgba(88,86,214,0.12)',
                         },
                       ]}
                     >
-                      <Text style={[styles.warmupBadgeText, { color: themeColors.warning }]}>
-                        {t('training.warmup')}
+                      <Text
+                        style={[styles.warmupBadgeText, { color: isWarmupExercise ? themeColors.warning : '#5856D6' }]}
+                      >
+                        {isWarmupExercise
+                          ? t('training.warmup')
+                          : `${t('training.dropSet')} · ${
+                              dropSetMode === 'all' ? t('training.dropSetAll') : t('training.dropSetLast')
+                            }`}
                       </Text>
                     </View>
                   )}
@@ -453,7 +465,7 @@ const styles = StyleSheet.create({
   },
   exercisesCard: { padding: spacing.m, marginBottom: spacing.m },
   row: { marginBottom: spacing.s },
-  exerciseName: { ...typography.h4, marginBottom: 2, flex: 1, paddingRight: 110 },
+  exerciseName: { ...typography.h4, marginBottom: 2, flex: 1, paddingRight: 150 },
   exerciseDetails: { ...typography.caption },
   warmupBadge: {
     borderWidth: 1,

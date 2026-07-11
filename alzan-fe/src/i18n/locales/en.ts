@@ -1407,7 +1407,12 @@ const en = {
     completeSetInstruction: 'Press the check to complete the set.',
     onlyCompletedSetsSavedInstruction: 'Only sets marked as completed are saved.',
     supersetInstruction: 'Tap the infinity icon between two exercises to link them as a superset.',
-    warmupSetInstruction: 'Tap a set number to mark or unmark it as warm-up (W).',
+    warmupSetInstruction: 'Tap a set number to cycle normal, warm-up (W), and drop set (D).',
+    dropSetInstruction:
+      'Drop set (D): after reaching the planned reps or fatigue, lower the weight and continue with little or no rest. In templates, tap Drop set to apply it to the last set or all sets.',
+    dropSet: 'Drop set',
+    dropSetLast: 'Last',
+    dropSetAll: 'All',
     repsOrTimeGoal: 'The repetitions or time goal.',
     repsColon: 'reps',
     weightLiftedLabel: 'Weight lifted in this exercise.',

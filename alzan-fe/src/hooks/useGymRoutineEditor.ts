@@ -78,6 +78,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
           target_reps_min: repsValue,
           target_reps_max: repsValue,
           is_warmup: te.is_warmup ?? false,
+          drop_set_mode: te.drop_set_mode ?? 'none',
           exercise: te.exercise
             ? {
                 ...te.exercise,
@@ -185,6 +186,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
             exercise_id: ex.exercise_id,
             order_index: index,
             is_warmup: !!ex.is_warmup,
+            drop_set_mode: ex.is_warmup ? 'none' : ex.drop_set_mode || 'none',
             target_sets: normalizePositiveInteger(ex.target_sets, 3),
             target_reps_min: repsValue,
             target_reps_max: repsValue,

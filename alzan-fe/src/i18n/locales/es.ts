@@ -1421,7 +1421,12 @@ export default {
     completeSetInstruction: 'Pulsa el check para completar la serie.',
     onlyCompletedSetsSavedInstruction: 'Solo se guardan las series marcadas como completadas.',
     supersetInstruction: 'Pulse el infinito entre dos ejercicios para vincularlos como una superserie.',
-    warmupSetInstruction: 'Toca el número de set para marcar o desmarcar como calentamiento (W).',
+    warmupSetInstruction: 'Toca el número de set para alternar normal, calentamiento (W) y drop set (D).',
+    dropSetInstruction:
+      'Drop set (D): al llegar a las reps objetivo o al fallo, baja el peso y continúa con poco o ningún descanso. En plantillas, toca Drop set para aplicarlo a la última serie o a todas.',
+    dropSet: 'Drop set',
+    dropSetLast: 'Última',
+    dropSetAll: 'Todas',
     repsOrTimeGoal: 'El objetivo de repeticiones o tiempo.',
     repsColon: 'Reps',
     weightLiftedLabel: 'Carga levantada en este ejercicio.',

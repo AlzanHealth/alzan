@@ -211,6 +211,7 @@ export const GymRoutineEditorScreen = () => {
           exercise_id: selectedExercise.id,
           order_index: prev.length,
           is_warmup: false,
+          drop_set_mode: 'none',
           target_sets: 3,
           target_reps_min: defaultTargets.target_reps_min,
           target_reps_max: defaultTargets.target_reps_max,
@@ -299,6 +300,23 @@ export const GymRoutineEditorScreen = () => {
       next[exerciseIndex] = {
         ...target,
         is_warmup: !target.is_warmup,
+        drop_set_mode: !target.is_warmup ? 'none' : target.drop_set_mode,
+      };
+      return next;
+    });
+  };
+
+  const toggleExerciseDropSet = (exerciseIndex: number) => {
+    setExercises(prev => {
+      const next = [...prev];
+      const target = next[exerciseIndex];
+      if (!target) return prev;
+      const currentMode = target.drop_set_mode || 'none';
+      const nextMode = currentMode === 'none' ? 'last' : currentMode === 'last' ? 'all' : 'none';
+      next[exerciseIndex] = {
+        ...target,
+        is_warmup: false,
+        drop_set_mode: nextMode,
       };
       return next;
     });
@@ -916,7 +934,9 @@ export const GymRoutineEditorScreen = () => {
                   const connectorActive = isConnectorActive(index);
                   const exerciseKey = getExerciseRenderKey(item, index);
                   const isWarmupExercise = !!item.is_warmup;
-                  const exerciseCardKey = `${exerciseKey}-${isWarmupExercise ? 'warmup' : 'regular'}`;
+                  const dropSetMode = item.drop_set_mode || 'none';
+                  const isDropSetExercise = !isWarmupExercise && dropSetMode !== 'none';
+                  const exerciseCardKey = `${exerciseKey}-${isWarmupExercise ? 'warmup' : dropSetMode}`;
                   const deleteAnimation = getDeleteExerciseAnimation(exerciseKey);
                   const isDeleting = deletingExerciseKeys.has(exerciseKey);
                   if (!exerciseFillAnimations.current[index]) {
@@ -999,6 +1019,12 @@ export const GymRoutineEditorScreen = () => {
                                     borderColor: themeColors.primary + '66',
                                   },
                                 ],
+                              isDropSetExercise && [
+                                styles.exerciseCardDropSet,
+                                {
+                                  borderColor: '#5856D666',
+                                },
+                              ],
                             ]}
                           >
                             {/* Superset animated background fill */}
@@ -1031,22 +1057,40 @@ export const GymRoutineEditorScreen = () => {
                                 },
                               ]}
                             />
+                            {isDropSetExercise && (
+                              <View
+                                pointerEvents="none"
+                                style={[styles.dropSetFillOverlay, { backgroundColor: '#5856D61A' }]}
+                              />
+                            )}
                             <View style={styles.exerciseCardContent}>
                               {/* Exercise name row with index badge */}
                               <View style={styles.exerciseNameRow}>
                                 <View
                                   style={[
                                     styles.exerciseIndexBadge,
-                                    { backgroundColor: isWarmupExercise ? '#FF950020' : `${themeColors.primary}18` },
+                                    {
+                                      backgroundColor: isWarmupExercise
+                                        ? '#FF950020'
+                                        : isDropSetExercise
+                                          ? '#5856D620'
+                                          : `${themeColors.primary}18`,
+                                    },
                                   ]}
                                 >
                                   <Text
                                     style={[
                                       styles.exerciseIndexText,
-                                      { color: isWarmupExercise ? '#FF9500' : themeColors.primary },
+                                      {
+                                        color: isWarmupExercise
+                                          ? '#FF9500'
+                                          : isDropSetExercise
+                                            ? '#5856D6'
+                                            : themeColors.primary,
+                                      },
                                     ]}
                                   >
-                                    {isWarmupExercise ? 'W' : index + 1}
+                                    {isWarmupExercise ? 'W' : isDropSetExercise ? 'D' : index + 1}
                                   </Text>
                                 </View>
                                 <Text style={[styles.exerciseName, dynamicStyles.title]} numberOfLines={2}>
@@ -1090,6 +1134,27 @@ export const GymRoutineEditorScreen = () => {
                                       ]}
                                     >
                                       {t('training.warmup')}
+                                    </Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    onPress={() => toggleExerciseDropSet(index)}
+                                    style={[
+                                      styles.dropSetExerciseToggle,
+                                      isDropSetExercise && styles.dropSetExerciseToggleActive,
+                                    ]}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.warmupExerciseToggleText,
+                                        { color: isDropSetExercise ? '#5856D6' : themeColors.textSecondary },
+                                      ]}
+                                    >
+                                      {isDropSetExercise
+                                        ? `${t('training.dropSet')} · ${
+                                            dropSetMode === 'all' ? t('training.dropSetAll') : t('training.dropSetLast')
+                                          }`
+                                        : t('training.dropSet')}
                                     </Text>
                                   </TouchableOpacity>
                                   <TouchableOpacity onPress={() => setHelpModalVisible(true)} style={styles.actionBtn}>
@@ -1342,6 +1407,13 @@ export const GymRoutineEditorScreen = () => {
                 <Text style={[styles.helpLabel, { color: themeColors.primary }]}>W</Text>
                 <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
                   {t('training.warmupSetInstruction')}
+                </Text>
+              </View>
+
+              <View style={styles.helpRow}>
+                <Text style={[styles.helpLabel, { color: '#5856D6' }]}>D</Text>
+                <Text style={[styles.helpText, { color: themeColors.textPrimary }]}>
+                  {t('training.dropSetInstruction')}
                 </Text>
               </View>
 
@@ -1627,6 +1699,9 @@ const styles = StyleSheet.create({
   exerciseCardWarmup: {
     borderWidth: 1.5,
   },
+  exerciseCardDropSet: {
+    borderWidth: 1.5,
+  },
   exerciseCardSuperset: {
     borderWidth: 1.5,
   },
@@ -1651,12 +1726,16 @@ const styles = StyleSheet.create({
   exerciseActionsBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 8,
     marginBottom: 10,
   },
   exerciseActionsRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    flex: 1,
     gap: 6,
   },
   exerciseHeader: {
@@ -1680,6 +1759,14 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
+    borderRadius: borderRadius.m,
+  },
+  dropSetFillOverlay: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '100%',
     borderRadius: borderRadius.m,
   },
   actionButtonsRow: {
@@ -1728,6 +1815,27 @@ const styles = StyleSheet.create({
     shadowColor: '#FF9500',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  dropSetExerciseToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(153,153,153,0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    minWidth: 64,
+    justifyContent: 'center',
+  },
+  dropSetExerciseToggleActive: {
+    borderColor: 'rgba(88,86,214,0.6)',
+    backgroundColor: 'rgba(88,86,214,0.14)',
+    shadowColor: '#5856D6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.22,
     shadowRadius: 6,
     elevation: 3,
   },

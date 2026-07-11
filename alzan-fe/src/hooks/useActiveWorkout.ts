@@ -245,6 +245,7 @@ export const useActiveWorkout = (sessionId?: string) => {
           exercises = (templateExercises || []).map(te => ({
             ...te,
             is_warmup: te.is_warmup ?? false,
+            drop_set_mode: te.drop_set_mode ?? 'none',
             exercise: te.exercise
               ? {
                   ...te.exercise,
@@ -308,6 +309,7 @@ export const useActiveWorkout = (sessionId?: string) => {
                   rest_seconds: 60,
                   superset_next_exercise_id: null,
                   is_warmup: false,
+                  drop_set_mode: 'none',
                   exercise: {
                     ...exerciseData,
                     exercise_type_code: exerciseData.exercise_type?.code || null,

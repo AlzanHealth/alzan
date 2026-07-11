@@ -4666,6 +4666,7 @@ export type Database = {
       }
       workout_template_exercises: {
         Row: {
+          drop_set_mode: string
           exercise_id: string
           id: string
           is_warmup: boolean
@@ -4682,6 +4683,7 @@ export type Database = {
           workout_template_id: string
         }
         Insert: {
+          drop_set_mode?: string
           exercise_id: string
           id?: string
           is_warmup?: boolean
@@ -4698,6 +4700,7 @@ export type Database = {
           workout_template_id: string
         }
         Update: {
+          drop_set_mode?: string
           exercise_id?: string
           id?: string
           is_warmup?: boolean

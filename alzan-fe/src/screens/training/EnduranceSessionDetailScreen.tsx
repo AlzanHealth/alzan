@@ -1842,66 +1842,85 @@ export const EnduranceSessionDetailScreen = () => {
                           </Text>
                           <View style={{ width: 30 }} />
                         </View>
-                        {group.sets.map(set => (
-                          <View
-                            key={set.id}
-                            style={[
-                              styles.setRow,
-                              set.is_warmup && {
-                                backgroundColor: `${themeColors.warning}12`,
-                                borderRadius: 10,
-                              },
-                              { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
-                            ]}
-                          >
-                            <View style={styles.setIndexCell}>
-                              <Text
-                                style={[
-                                  styles.setNumber,
-                                  dynamicStyles.sublabel,
-                                  set.is_warmup && { color: themeColors.warning, fontWeight: '700' },
-                                ]}
-                              >
-                                {set.set_number}
-                              </Text>
-                              {set.is_warmup && (
-                                <View
+                        {group.sets.map(set => {
+                          const isDropSet = set.set_type === 'drop_set';
+                          return (
+                            <View
+                              key={set.id}
+                              style={[
+                                styles.setRow,
+                                set.is_warmup && {
+                                  backgroundColor: `${themeColors.warning}12`,
+                                  borderRadius: 10,
+                                },
+                                isDropSet && {
+                                  backgroundColor: 'rgba(88,86,214,0.1)',
+                                  borderRadius: 10,
+                                },
+                                { borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
+                              ]}
+                            >
+                              <View style={styles.setIndexCell}>
+                                <Text
                                   style={[
-                                    styles.warmupSetBadge,
-                                    {
-                                      backgroundColor: `${themeColors.warning}1F`,
-                                      borderColor: `${themeColors.warning}55`,
-                                    },
+                                    styles.setNumber,
+                                    dynamicStyles.sublabel,
+                                    set.is_warmup && { color: themeColors.warning, fontWeight: '700' },
+                                    isDropSet && { color: '#5856D6', fontWeight: '700' },
                                   ]}
                                 >
-                                  <Text style={[styles.warmupSetBadgeText, { color: themeColors.warning }]}>W</Text>
-                                </View>
-                              )}
+                                  {set.set_number}
+                                </Text>
+                                {(set.is_warmup || isDropSet) && (
+                                  <View
+                                    style={[
+                                      styles.warmupSetBadge,
+                                      {
+                                        backgroundColor: set.is_warmup
+                                          ? `${themeColors.warning}1F`
+                                          : 'rgba(88,86,214,0.12)',
+                                        borderColor: set.is_warmup
+                                          ? `${themeColors.warning}55`
+                                          : 'rgba(88,86,214,0.35)',
+                                      },
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.warmupSetBadgeText,
+                                        { color: set.is_warmup ? themeColors.warning : '#5856D6' },
+                                      ]}
+                                    >
+                                      {set.is_warmup ? 'W' : 'D'}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={[styles.setCellValue, dynamicStyles.title, { flex: 1 }]}>{set.reps}</Text>
+                              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={[styles.setCellValue, dynamicStyles.title]}>
+                                  {toDisplayWeight(set.weight_kg)}
+                                </Text>
+                                {set.is_pr && (
+                                  <View style={styles.prBadge}>
+                                    <Award size={10} color="#FF9500" />
+                                  </View>
+                                )}
+                              </View>
+                              <TouchableOpacity
+                                style={styles.editSetButton}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                onPress={() => {
+                                  setEditingSet(set);
+                                  setEditReps(String(set.reps));
+                                  setEditWeight(String(toDisplayWeight(set.weight_kg)));
+                                }}
+                              >
+                                <Pencil size={13} color={themeColors.textSecondary} />
+                              </TouchableOpacity>
                             </View>
-                            <Text style={[styles.setCellValue, dynamicStyles.title, { flex: 1 }]}>{set.reps}</Text>
-                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                              <Text style={[styles.setCellValue, dynamicStyles.title]}>
-                                {toDisplayWeight(set.weight_kg)}
-                              </Text>
-                              {set.is_pr && (
-                                <View style={styles.prBadge}>
-                                  <Award size={10} color="#FF9500" />
-                                </View>
-                              )}
-                            </View>
-                            <TouchableOpacity
-                              style={styles.editSetButton}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                              onPress={() => {
-                                setEditingSet(set);
-                                setEditReps(String(set.reps));
-                                setEditWeight(String(toDisplayWeight(set.weight_kg)));
-                              }}
-                            >
-                              <Pencil size={13} color={themeColors.textSecondary} />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
+                          );
+                        })}
                       </View>
                     </GlassCard>
 
