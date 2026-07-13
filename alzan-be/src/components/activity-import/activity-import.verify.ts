@@ -65,7 +65,7 @@ const verificationCases: VerificationCase[] = [
   {
     kind: 'service',
     provider: 'suunto',
-    check: 'Suunto cloud sync only imports workout summaries from the last 20 days',
+    check: 'Suunto cloud sync uses a 30-day first import, 3-day overlap and 20-day repair window',
     specFile: 'src/components/wearables/services/suunto-cloud-sync.service.spec.ts',
   },
   {

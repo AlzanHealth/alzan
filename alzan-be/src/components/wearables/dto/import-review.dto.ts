@@ -13,6 +13,11 @@ export class TemplateAssociationInputDto {
   @IsUUID()
   workout_template_id?: string | null;
 
+  @ApiPropertyOptional({ name: 'workout_plan_id', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  workout_plan_id?: string;
+
   @ApiPropertyOptional({ name: 'target_session_id', format: 'uuid' })
   @IsOptional()
   @IsUUID()

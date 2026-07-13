@@ -57,6 +57,7 @@ interface FitParseState {
   laps: CanonicalActivityLap[];
   nativeHeartRateZones: CanonicalActivityHeartRateZone[];
   device: CanonicalActivity['device'];
+  localTimestampSeconds: number | null;
 }
 
 interface FitLapAccumulator {
@@ -87,6 +88,7 @@ const FIT_FILE_ID_MESSAGE_NUMBER = 0;
 const FIT_SESSION_MESSAGE_NUMBER = 18;
 const FIT_LAP_MESSAGE_NUMBER = 19;
 const FIT_RECORD_MESSAGE_NUMBER = 20;
+const FIT_ACTIVITY_MESSAGE_NUMBER = 34;
 const FIT_EPOCH_OFFSET_SECONDS = 631065600;
 const FIT_INVALID_SINT32 = 2147483647;
 const FIT_SEMICIRCLES_TO_DEGREES = 180 / 2147483648;
@@ -223,6 +225,55 @@ function fitTimestampToSeconds(value: number | null): number | null {
 function secondsToIso(value: number | null): string | null {
   if (value == null || value <= 0) return null;
   return new Date(value * 1000).toISOString();
+}
+
+function formatUtcOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes < 0 ? '-' : '+';
+  const absolute = Math.abs(offsetMinutes);
+  const hours = Math.floor(absolute / 60)
+    .toString()
+    .padStart(2, '0');
+  const minutes = (absolute % 60).toString().padStart(2, '0');
+  return `${sign}${hours}:${minutes}`;
+}
+
+function toLocalTimestamp(utcTimestamp: string | null, offsetMinutes: number): string | null {
+  if (!utcTimestamp) return null;
+  const timestamp = Date.parse(utcTimestamp);
+  if (!Number.isFinite(timestamp)) return null;
+  return new Date(timestamp + offsetMinutes * 60_000).toISOString().slice(0, 19);
+}
+
+function applyFitLocalTimestamp(state: FitParseState): void {
+  if (state.localTimestampSeconds == null) return;
+  const referenceTimestamp = state.summary.endedAt ?? state.summary.startedAt ?? null;
+  if (!referenceTimestamp) return;
+  const referenceSeconds = Date.parse(referenceTimestamp) / 1000;
+  if (!Number.isFinite(referenceSeconds)) return;
+  const offsetMinutes = Math.round((state.localTimestampSeconds - referenceSeconds) / 60);
+  if (Math.abs(offsetMinutes) > 14 * 60) return;
+  state.summary.timezone = formatUtcOffset(offsetMinutes);
+  state.summary.startedAtLocal = toLocalTimestamp(state.summary.startedAt ?? null, offsetMinutes);
+  state.summary.endedAtLocal = toLocalTimestamp(state.summary.endedAt ?? null, offsetMinutes);
+}
+
+export function applySuuntoWorkoutSummaryTimeMetadata(
+  activity: CanonicalActivity,
+  workoutSummary: Record<string, unknown>,
+): CanonicalActivity {
+  const rawOffset =
+    workoutSummary.timeOffsetInMinutes ?? workoutSummary.time_offset_in_minutes ?? workoutSummary.TimeOffsetInMinutes;
+  const offsetMinutes = readNumber(rawOffset);
+  if (offsetMinutes == null || !Number.isInteger(offsetMinutes) || Math.abs(offsetMinutes) > 14 * 60) return activity;
+  return {
+    ...activity,
+    summary: {
+      ...activity.summary,
+      timezone: formatUtcOffset(offsetMinutes),
+      startedAtLocal: toLocalTimestamp(activity.summary.startedAt, offsetMinutes),
+      endedAtLocal: toLocalTimestamp(activity.summary.endedAt, offsetMinutes),
+    },
+  };
 }
 
 function resolveOffsetSeconds(startedAt: string | null, timestamp: string | null): number | null {
@@ -677,6 +728,10 @@ function parseFitDataMessage(
       if (field.fieldNumber === 253) state.summary.endedAt = secondsToIso(fitTimestampToSeconds(numericValue));
     }
 
+    if (definition.globalMessageNumber === FIT_ACTIVITY_MESSAGE_NUMBER && field.fieldNumber === 5) {
+      state.localTimestampSeconds = fitTimestampToSeconds(numericValue);
+    }
+
     if (definition.globalMessageNumber === FIT_RECORD_MESSAGE_NUMBER) {
       if (field.fieldNumber === 0 && numericValue != null) record.lat = semicirclesToDegrees(numericValue);
       if (field.fieldNumber === 1 && numericValue != null) record.lon = semicirclesToDegrees(numericValue);
@@ -797,6 +852,7 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
     laps: [],
     nativeHeartRateZones: [],
     device: null,
+    localTimestampSeconds: null,
   };
 
   let offset = dataStart;
@@ -823,6 +879,8 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
     if (!definition) throw new Error('Invalid Suunto FIT file.');
     offset = parseFitDataMessage(dataView, offset, dataEnd, definition, state);
   }
+
+  applyFitLocalTimestamp(state);
 
   const sport = mapSuuntoActivityToCanonicalSport({ fitSport: state.sport, fitSubSport: state.subSport });
   return buildCanonicalActivity({
@@ -1109,6 +1167,9 @@ function buildCanonicalActivity(params: {
     startedAt: params.summary.startedAt ?? null,
     endedAt:
       params.summary.endedAt ?? deriveEndTime(params.summary.startedAt ?? null, params.summary.durationSeconds ?? null),
+    timezone: params.summary.timezone ?? null,
+    startedAtLocal: params.summary.startedAtLocal ?? null,
+    endedAtLocal: params.summary.endedAtLocal ?? null,
     durationSeconds: roundNullable(params.summary.durationSeconds),
     elapsedSeconds: roundNullable(params.summary.elapsedSeconds),
     distanceM: params.summary.distanceM ?? null,
@@ -1153,6 +1214,7 @@ function buildCanonicalActivity(params: {
         : buildHeartRateZones(params.streams.heartRate, summary.durationSeconds, params.estimatedMaxHeartRate),
     device: params.device,
     vendorFields: params.vendorFields,
+    hydrationVersion: 1,
   };
 }
 

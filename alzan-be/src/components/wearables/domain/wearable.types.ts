@@ -10,7 +10,7 @@ export type WearableProvider = Database['public']['Enums']['wearable_provider_en
 export type ActivityDatabaseProvider = Database['public']['Enums']['provider_enum'];
 export type SourceChannel = 'cloud' | 'apple_health' | 'health_connect' | 'file_import' | 'manual';
 export type SyncDomain = 'activities' | 'daily_activity' | 'sleep' | 'recovery' | 'health_metrics' | 'body';
-export type SyncStatus = 'idle' | 'running' | 'success' | 'error' | 'paused' | 'expired';
+export type SyncStatus = 'idle' | 'running' | 'success' | 'partial' | 'error' | 'paused' | 'expired';
 export type LocalSyncObjectType =
   | 'activity'
   | 'daily_activity'
@@ -106,6 +106,9 @@ export interface UpsertActivityInput {
   userId: string;
   activity: CanonicalActivity;
   provenance: CanonicalProvenance;
+  lifecycleImportId?: string | null;
+  lifecycleJobId?: string | null;
+  canonicalVersion?: number;
 }
 
 export interface UpsertDailyActivityInput {

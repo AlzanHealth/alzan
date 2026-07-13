@@ -89,6 +89,7 @@ interface FakeFullSupabaseClient {
   updates: FakeRecordedMutation[];
   upserts: FakeRecordedMutation[];
   from(table: string): FakeFullTableClient;
+  rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: null }>;
 }
 
 function createFakeSupabaseClient(
@@ -211,6 +212,39 @@ function createFullSupabaseClient(rows: Record<string, Array<Record<string, unkn
     rows,
     updates: [],
     upserts: [],
+    async rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: null }> {
+      assert.equal(fn, 'persist_wearable_activity_bundle');
+      const sessionId = String(args.p_session_id);
+      const sessionPayload = args.p_session_payload as Record<string, unknown>;
+      client.updates.push({
+        filters: [{ column: 'id', value: sessionId }],
+        payload: sessionPayload,
+        table: 'activity_sessions',
+      });
+      if (args.p_clear_provenance_session_id) {
+        client.updates.push({
+          filters: [{ column: 'id', value: args.p_clear_provenance_session_id }],
+          payload: { provider_activity_id: null, source_record_id: null },
+          table: 'activity_sessions',
+        });
+      }
+      for (const [argument, table] of [
+        ['p_laps', 'activity_laps'],
+        ['p_heart_rate_zones', 'activity_heart_rate_zones'],
+        ['p_streams', 'activity_streams'],
+        ['p_stream_samples', 'activity_stream_samples'],
+        ['p_route_points', 'activity_route_points'],
+      ] as const) {
+        const rows = args[argument] as Array<Record<string, unknown>>;
+        if (rows.length > 0) client.inserts.push({ filters: [], rows, table });
+      }
+      client.upserts.push({
+        filters: [],
+        payload: args.p_provider_fields as Record<string, unknown>,
+        table: 'activity_provider_fields',
+      });
+      return { data: sessionId, error: null };
+    },
     from(table: string): FakeFullTableClient {
       return {
         delete(): FakeFullQuery {
@@ -462,7 +496,7 @@ async function assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate(): P
     ),
   );
   assert.equal(completedPlans[0], 'survivor-session');
-  assert.equal(linkedPayloads[0]?.relatedId, 'survivor-session');
+  assert.equal(linkedPayloads.length, 0, 'bundle transaction owns raw-payload linking');
 }
 
 async function assertOneKilometerWearableLapsArePersistedAsDistanceGroups(): Promise<void> {

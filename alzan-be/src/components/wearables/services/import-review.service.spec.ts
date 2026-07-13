@@ -47,7 +47,7 @@ interface FakeSupabaseClient {
   rpcCalls: FakeRpcOperation[];
   updates: FakeOperation[];
   from(table: string): FakeSupabaseTableClient;
-  rpc(name: string, args: Record<string, unknown>): Promise<{ error: FakeSupabaseError | null }>;
+  rpc(name: string, args: Record<string, unknown>): Promise<FakeQueryResult>;
 }
 
 type FakeReconciliationService = Pick<
@@ -119,10 +119,43 @@ function createFakeSupabaseClient(rows: Record<string, Array<Record<string, unkn
         },
       };
     },
-    async rpc(name: string, args: Record<string, unknown>): Promise<{ error: FakeSupabaseError | null }> {
+    async rpc(name: string, args: Record<string, unknown>): Promise<FakeQueryResult> {
       client.rpcCalls.push({ args, name });
       if (name === 'absorb_and_delete_session') {
         client.rows.activity_sessions = (client.rows.activity_sessions ?? []).filter(row => row.id !== args.p_source);
+      }
+      if (name === 'associate_activity_session_template') {
+        client.rows.activity_sessions = (client.rows.activity_sessions ?? []).map(row =>
+          row.id === args.p_session_id
+            ? {
+                ...row,
+                endurance_template_id: args.p_endurance_template_id ?? null,
+                workout_template_id: args.p_workout_template_id ?? null,
+              }
+            : row,
+        );
+        const planned = (client.rows.workout_plans ?? []).filter(row => row.status === 'planned');
+        const explicitPlan = planned.find(row => row.id === args.p_workout_plan_id);
+        const exactPlan = planned.find(
+          row =>
+            (args.p_endurance_template_id != null && row.endurance_template_id === args.p_endurance_template_id) ||
+            (args.p_workout_template_id != null && row.gym_template_id === args.p_workout_template_id),
+        );
+        const selectedPlan = explicitPlan ?? exactPlan ?? (planned.length === 1 ? planned[0] : null);
+        if (selectedPlan) {
+          client.rows.workout_plans = (client.rows.workout_plans ?? []).map(row =>
+            row.id === selectedPlan.id
+              ? {
+                  ...row,
+                  status: 'completed',
+                  activity_session_id: args.p_session_id,
+                  endurance_template_id: args.p_endurance_template_id ?? row.endurance_template_id,
+                  gym_template_id: args.p_workout_template_id ?? row.gym_template_id,
+                }
+              : row,
+          );
+        }
+        return { data: { status: 'associated', session_id: args.p_session_id }, error: null };
       }
       return { error: null };
     },
@@ -239,6 +272,27 @@ async function assertAssociateTemplateUsesTargetForPendingDuplicate(): Promise<v
   assert.equal(sessionId, 'survivor-session');
   assert.equal(imported?.endurance_template_id ?? null, null);
   assert.equal(survivor?.endurance_template_id, 'template-1');
+}
+
+async function assertAssociationUsesExplicitPlanAtomically(): Promise<void> {
+  const client = createFakeSupabaseClient({
+    activity_sessions: [baseSession({ id: 'session-1', endurance_template_id: null })],
+  });
+  client.rpc = async (name: string, args: Record<string, unknown>): Promise<FakeQueryResult> => {
+    client.rpcCalls.push({ args, name });
+    return { error: null, data: { status: 'associated', session_id: 'session-1' } };
+  };
+  const service = createService(client);
+
+  const sessionId = await service.associateTemplate('user-1', 'session-1', {
+    enduranceTemplateId: 'template-1',
+    workoutTemplateId: null,
+    workoutPlanId: 'plan-1',
+  });
+
+  assert.equal(sessionId, 'session-1');
+  assert.equal(client.rpcCalls[0]?.name, 'associate_activity_session_template');
+  assert.equal(client.rpcCalls[0]?.args.p_workout_plan_id, 'plan-1');
 }
 
 async function assertAssociateEnduranceTemplateCompletesExactPendingPlan(): Promise<void> {
@@ -424,6 +478,7 @@ async function run(): Promise<void> {
   await assertMissingSourceWithoutTargetStillFails();
   await assertAssociateTemplateUsesTargetWhenSourceWasDeleted();
   await assertAssociateTemplateUsesTargetForPendingDuplicate();
+  await assertAssociationUsesExplicitPlanAtomically();
   await assertAssociateEnduranceTemplateCompletesExactPendingPlan();
   await assertAssociateEnduranceTemplateReplacesOnlyPendingSameSportPlan();
   await assertAssociateEnduranceTemplateDoesNotReplaceAmbiguousSameSportPlans();

@@ -3,6 +3,8 @@ import {
   ActivityLapLike,
   buildActivityTotals,
   buildTemplateTotals,
+  countComparableTotalSignals,
+  countComparableStructuralSignals,
   deriveActivityStructure,
   deriveTemplateDistanceMatchedActivityStructure,
   deriveTemplateStructure,
@@ -11,6 +13,7 @@ import {
   scoreStructuralMatch,
   scoreTotalsMatch,
   STRONG_MATCH,
+  isMatchMarginSufficient,
 } from './endurance-template-match';
 
 function lap(distanceM: number, durationSeconds: number): ActivityLapLike {
@@ -170,6 +173,23 @@ function assertDifferentWorkoutIsNoStructuralMatch(): void {
   assert.ok(score < POSSIBLE_MATCH, `expected no match (<60), got ${score}`);
 }
 
+function assertStructuralSignalsOnlyCountComparableValues(): void {
+  assert.equal(
+    countComparableStructuralSignals(
+      { repCount: 5, repDistanceM: null, repPaceSecPerKm: null, recoveryDurationS: null },
+      { repCount: 5, repDistanceM: null, repPaceSecPerKm: null, recoveryDurationS: null },
+    ),
+    1,
+  );
+  assert.equal(
+    countComparableStructuralSignals(
+      { repCount: 5, repDistanceM: 400, repPaceSecPerKm: null, recoveryDurationS: null },
+      { repCount: 5, repDistanceM: 400, repPaceSecPerKm: 240, recoveryDurationS: 90 },
+    ),
+    2,
+  );
+}
+
 function assertSteadyAutolapsProduceNoStructure(): void {
   // Steady 10k with uniform 1km autolaps: no interval structure.
   const laps: ActivityLapLike[] = [];
@@ -209,8 +229,72 @@ function assertTemplateDistanceMatchIgnoresWarmupAndCooldown(): void {
   assert.ok(score >= STRONG_MATCH, `expected strong distance-based structural match, got ${score}`);
 }
 
+function assertRequiredBoundaryPhasesCannotBeSkipped(): void {
+  const boundarySteps: EnduranceStepLike[] = [
+    {
+      id: 'warmup',
+      parentStepId: null,
+      isGroup: false,
+      repetitions: null,
+      orderIndex: -1,
+      phaseType: 'warmup',
+      durationType: 'open',
+      durationS: null,
+      distanceM: null,
+      targetType: null,
+      targetMin: null,
+      targetMax: null,
+    },
+    ...templateSteps(5, 400, 240, 75),
+    {
+      id: 'cooldown',
+      parentStepId: null,
+      isGroup: false,
+      repetitions: null,
+      orderIndex: 2,
+      phaseType: 'cooldown',
+      durationType: 'open',
+      durationS: null,
+      distanceM: null,
+      targetType: null,
+      targetMin: null,
+      targetMax: null,
+    },
+  ];
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(intervalLaps(5, 400, 100, 75), boundarySteps), null);
+  assert.ok(
+    deriveTemplateDistanceMatchedActivityStructure(
+      [lap(1200, 420), ...intervalLaps(5, 400, 100, 75), lap(1000, 400)],
+      boundarySteps,
+    ),
+  );
+}
+
+function assertBoundaryPhaseTargetsMustMatch(): void {
+  const steps = templateSteps(5, 400, 240, 75);
+  steps.push({
+    id: 'distance-warmup',
+    parentStepId: null,
+    isGroup: false,
+    repetitions: null,
+    orderIndex: -1,
+    phaseType: 'warmup',
+    durationType: 'distance',
+    durationS: null,
+    distanceM: 3000,
+    targetType: null,
+    targetMin: null,
+    targetMax: null,
+  });
+  assert.equal(
+    deriveTemplateDistanceMatchedActivityStructure([lap(100, 40), ...intervalLaps(5, 400, 100, 75)], steps),
+    null,
+  );
+  assert.ok(deriveTemplateDistanceMatchedActivityStructure([lap(3000, 900), ...intervalLaps(5, 400, 100, 75)], steps));
+}
+
 function assertTemplateDistanceMatchWorksForMultipleDistances(): void {
-  const distances = [200, 400, 800, 1000];
+  const distances = [100, 200, 400, 800, 1000];
   for (const distance of distances) {
     const activityStructure = deriveTemplateDistanceMatchedActivityStructure(
       intervalLaps(5, distance, Math.max(40, distance / 4), 75),
@@ -220,6 +304,23 @@ function assertTemplateDistanceMatchWorksForMultipleDistances(): void {
     assert.equal(activityStructure.repCount, 5);
     assert.equal(Math.round(activityStructure.repDistanceM ?? 0), distance);
   }
+}
+
+function assertShortIntervalsDoNotUseEightyMeterTolerance(): void {
+  const structure = deriveTemplateDistanceMatchedActivityStructure(
+    intervalLaps(5, 180, 40, 75),
+    templateSteps(5, 100, 240, 75),
+  );
+  assert.equal(structure, null);
+}
+
+function assertShortIntervalsAllowTwentyPercentDistanceDifference(): void {
+  const structure = deriveTemplateDistanceMatchedActivityStructure(
+    intervalLaps(5, 120, 40, 75),
+    templateSteps(5, 100, 240, 75),
+  );
+  assert.ok(structure);
+  assert.equal(structure.repCount, 5);
 }
 
 function assertTemplateDistanceMatchSupportsMixedBlocks(): void {
@@ -297,6 +398,19 @@ function assertTotalsMissingVariablesRenormalize(): void {
   assert.equal(scoreTotalsMatch({ distanceM: null, durationS: null, avgPaceSecPerKm: null }, template), 0);
 }
 
+function assertAutoMatchNeedsTwoSignalsAndClearMargin(): void {
+  assert.equal(
+    countComparableTotalSignals(
+      { distanceM: 10000, durationS: null, avgPaceSecPerKm: null },
+      { distanceM: 10000, durationS: null, avgPaceSecPerKm: null },
+    ),
+    1,
+  );
+  assert.equal(isMatchMarginSufficient(90, 82), true);
+  assert.equal(isMatchMarginSufficient(90, 83), false);
+  assert.equal(isMatchMarginSufficient(90, null), true);
+}
+
 function assertBuildActivityTotalsDerivesPace(): void {
   const totals = buildActivityTotals({ distanceM: 10000, durationS: 3000 });
   assert.equal(totals.avgPaceSecPerKm, 300);
@@ -313,14 +427,20 @@ assertExactIntervalsAreStrongStructuralMatch();
 assertOneExtraRepIsStillStrongMatch();
 assertTwoExtraRepsArePossibleMatch();
 assertDifferentWorkoutIsNoStructuralMatch();
+assertStructuralSignalsOnlyCountComparableValues();
 assertSteadyAutolapsProduceNoStructure();
 assertTooFewLapsProduceNoStructure();
 assertTemplateDistanceMatchIgnoresWarmupAndCooldown();
+assertRequiredBoundaryPhasesCannotBeSkipped();
+assertBoundaryPhaseTargetsMustMatch();
 assertTemplateDistanceMatchWorksForMultipleDistances();
+assertShortIntervalsDoNotUseEightyMeterTolerance();
+assertShortIntervalsAllowTwentyPercentDistanceDifference();
 assertTemplateDistanceMatchSupportsMixedBlocks();
 assertTemplateDistanceMatchRejectsDifferentSequence();
 assertTemplateWithoutIntervalsHasNoStructure();
 assertTotalsBands();
 assertTotalsMissingVariablesRenormalize();
+assertAutoMatchNeedsTwoSignalsAndClearMargin();
 assertBuildActivityTotalsDerivesPace();
 assertBuildTemplateTotalsFallsBackToSteps();

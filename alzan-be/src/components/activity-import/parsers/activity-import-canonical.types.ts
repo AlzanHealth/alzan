@@ -48,6 +48,9 @@ export interface CanonicalActivityStreams {
 export interface CanonicalActivitySummary {
   startedAt: string | null;
   endedAt: string | null;
+  timezone?: string | null;
+  startedAtLocal?: string | null;
+  endedAtLocal?: string | null;
   durationSeconds: number | null;
   elapsedSeconds: number | null;
   distanceM: number | null;
@@ -112,6 +115,7 @@ export interface CanonicalActivity {
   device: CanonicalActivityDevice | null;
   vendorFields: Record<string, unknown>;
   provenance?: CanonicalActivityProvenance;
+  hydrationVersion?: number;
 }
 
 export interface CanonicalSleepStageInterval {

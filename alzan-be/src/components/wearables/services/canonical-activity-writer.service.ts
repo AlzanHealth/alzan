@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { Json } from '../../../types/database.types';
 import { Database, Insert, Update } from '../../../types/requests.types';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
@@ -25,7 +26,6 @@ import { RawPayloadService } from './raw-payload.service';
 
 type ActivitySessionInsert = Insert<'activity_sessions'>;
 type ActivitySessionUpdate = Update<'activity_sessions'>;
-type DeviceInsert = Insert<'devices'>;
 type ActivityLapInsert = Insert<'activity_laps'>;
 type ActivityHeartRateZoneInsert = Insert<'activity_heart_rate_zones'>;
 type ActivityStreamInsert = Insert<'activity_streams'>;
@@ -45,6 +45,7 @@ type ExistingSessionMeta = {
   duplicate_score: number | null;
   source: string | null;
   sport_type: string;
+  endurance_template_id: string | null;
 };
 
 const WEARABLE_IMPORT_SOURCE = 'wearable_import';
@@ -70,10 +71,12 @@ export class CanonicalActivityWriterService {
 
   constructor(
     private readonly supabaseAdminService: SupabaseAdminService,
-    private readonly rawPayloadService: RawPayloadService,
+    rawPayloadService: RawPayloadService,
     private readonly dedupeService: DedupeService,
     private readonly importReconciliationService: ImportReconciliationService,
-  ) {}
+  ) {
+    void rawPayloadService;
+  }
 
   public async upsertActivity(input: UpsertActivityInput): Promise<string> {
     const deviceId = await this.ensureDevice(input.userId, input.activity, input.provenance);
@@ -81,13 +84,16 @@ export class CanonicalActivityWriterService {
     const sessionPayload = this.buildSessionPayload(input, deviceId);
 
     let sessionId: string;
+    let sessionPayloadToPersist: ActivitySessionInsert | ActivitySessionUpdate;
+    let clearProvenanceSessionId: string | null = null;
+    let completeAssociatedPlans = false;
     let strengthAssociation = false;
     let shouldRunEnduranceTemplateMatch = false;
     if (existingSessionId) {
       const writeSessionId = await this.resolveExistingWriteSessionId(existingSessionId);
       const redirectedDuplicate = writeSessionId !== existingSessionId;
       if (writeSessionId !== existingSessionId) {
-        await this.clearProvenance(existingSessionId);
+        clearProvenanceSessionId = existingSessionId;
       }
       // Re-sync of an activity already linked to a session. If that session
       // is an Alzan strength session that absorbed the external activity,
@@ -96,18 +102,20 @@ export class CanonicalActivityWriterService {
       const existingMeta = await this.getSessionMeta(writeSessionId);
       if (redirectedDuplicate) {
         strengthAssociation = isStrengthSport(input.activity.sportType);
-        sessionId = await this.updateSession(
-          writeSessionId,
-          strengthAssociation
-            ? this.buildStrengthAssociationPayload(input, deviceId)
-            : this.buildEnduranceAssociationPayload(input, deviceId),
-        );
-        await this.importReconciliationService.completePlansForAssociatedSession(input.userId, sessionId);
+        sessionId = writeSessionId;
+        sessionPayloadToPersist = strengthAssociation
+          ? this.buildStrengthAssociationPayload(input, deviceId)
+          : this.buildEnduranceAssociationPayload(input, deviceId);
+        completeAssociatedPlans = true;
       } else if (isStrengthSport(existingMeta?.sport_type) && existingMeta?.source !== 'imported') {
         strengthAssociation = true;
-        sessionId = await this.updateSession(writeSessionId, this.buildProvenancePayload(input, deviceId));
+        sessionId = writeSessionId;
+        sessionPayloadToPersist = this.buildProvenancePayload(input, deviceId);
       } else {
-        sessionId = await this.updateSession(writeSessionId, sessionPayload);
+        sessionId = writeSessionId;
+        sessionPayloadToPersist = sessionPayload;
+        shouldRunEnduranceTemplateMatch =
+          !isStrengthSport(existingMeta?.sport_type) && existingMeta?.endurance_template_id == null;
       }
     } else if (isStrengthSport(input.activity.sportType)) {
       // The watch never creates sets: a same-day Alzan strength session may
@@ -115,49 +123,75 @@ export class CanonicalActivityWriterService {
       const directive = await this.importReconciliationService.resolveStrengthDirective(input.userId, input.activity);
       if (directive.kind === 'associate') {
         strengthAssociation = true;
-        sessionId = await this.updateSession(directive.targetSessionId, {
+        sessionId = directive.targetSessionId;
+        sessionPayloadToPersist = {
           ...directive.payload,
           ...this.buildProvenancePayload(input, deviceId),
-        });
-        await this.importReconciliationService.completePlansForAssociatedSession(input.userId, sessionId);
+        };
+        completeAssociatedPlans = true;
       } else {
-        sessionId = await this.insertSession({ ...sessionPayload, ...directive.extraFields } as ActivitySessionInsert);
+        sessionId = randomUUID();
+        sessionPayloadToPersist = { ...sessionPayload, ...directive.extraFields } as ActivitySessionInsert;
+        await this.insertHydrationSkeleton(sessionId, sessionPayloadToPersist as ActivitySessionInsert);
       }
     } else {
       const directive = await this.importReconciliationService.resolveEnduranceDirective(input.userId, input.activity);
       if (directive.kind === 'associate') {
-        sessionId = await this.updateSession(
-          directive.targetSessionId,
-          this.buildEnduranceAssociationPayload(input, deviceId),
-        );
-        await this.importReconciliationService.completePlansForAssociatedSession(input.userId, sessionId);
+        sessionId = directive.targetSessionId;
+        sessionPayloadToPersist = this.buildEnduranceAssociationPayload(input, deviceId);
+        completeAssociatedPlans = true;
       } else {
-        sessionId = await this.insertSession({
+        sessionId = randomUUID();
+        sessionPayloadToPersist = {
           ...sessionPayload,
           ...(directive.extraFields ?? {}),
-        } as ActivitySessionInsert);
+        } as ActivitySessionInsert;
+        await this.insertHydrationSkeleton(sessionId, sessionPayloadToPersist as ActivitySessionInsert);
         shouldRunEnduranceTemplateMatch = directive.runTemplateMatch;
       }
     }
 
-    if (!strengthAssociation) {
-      await this.replaceLaps(sessionId, input.userId, input.activity);
-    }
-    await this.replaceHeartRateZones(sessionId, input.activity);
-    await this.replaceStreams(sessionId, input.userId, input.activity, input.provenance);
-    await this.replaceRoutePoints(sessionId, input.userId, input.activity, input.provenance);
-    await this.upsertProviderFields(sessionId, input.userId, input.activity, input.provenance);
-    await this.rawPayloadService.linkPayload({
-      rawPayloadId: input.provenance.rawPayloadId,
-      relatedTable: 'activity_sessions',
-      relatedId: sessionId,
+    await this.persistActivityBundle({
+      input,
+      sessionId,
+      sessionPayload: sessionPayloadToPersist,
+      clearProvenanceSessionId,
+      replaceLaps: !strengthAssociation,
     });
 
+    if (completeAssociatedPlans) {
+      await this.importReconciliationService.completePlansForAssociatedSession(input.userId, sessionId);
+    }
+
     if (shouldRunEnduranceTemplateMatch) {
-      await this.importReconciliationService.runEnduranceTemplateMatch(input.userId, sessionId);
+      try {
+        await this.importReconciliationService.runEnduranceTemplateMatch(input.userId, sessionId);
+        await this.finishLifecycleReconciliation(input.lifecycleImportId, null);
+      } catch (error) {
+        this.logger.warn(`Template matching deferred for imported session ${sessionId}`, error as Error);
+        await this.finishLifecycleReconciliation(input.lifecycleImportId, this.errorMessage(error));
+      }
+    } else {
+      await this.finishLifecycleReconciliation(input.lifecycleImportId, null);
     }
 
     return sessionId;
+  }
+
+  private async finishLifecycleReconciliation(
+    importId: string | null | undefined,
+    errorCode: string | null,
+  ): Promise<void> {
+    if (!importId) return;
+    const { error } = await this.supabaseAdminService.client.rpc('finish_wearable_activity_reconciliation', {
+      p_import_id: importId,
+      p_error_code: errorCode as string,
+    });
+    if (error) this.logger.error('Failed to persist wearable reconciliation status', error as Error);
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'WEARABLE_RECONCILIATION_FAILED';
   }
 
   private async resolveExistingWriteSessionId(sessionId: string): Promise<string> {
@@ -176,7 +210,9 @@ export class CanonicalActivityWriterService {
   private async getSessionMeta(sessionId: string): Promise<ExistingSessionMeta | null> {
     const { data, error } = await this.supabaseAdminService.client
       .from('activity_sessions')
-      .select('sport_type, source, duplicate_of_session_id, duplicate_resolution, duplicate_score')
+      .select(
+        'sport_type, source, endurance_template_id, duplicate_of_session_id, duplicate_resolution, duplicate_score',
+      )
       .eq('id', sessionId)
       .maybeSingle();
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LOOKUP_FAILED');
@@ -209,34 +245,15 @@ export class CanonicalActivityWriterService {
     const name = activity.device.name?.trim() || null;
     const model = activity.device.model?.trim() || null;
     if (!serial && !name && !model) return null;
-    const provider = this.toActivityDatabaseProvider(provenance.provider);
-
-    if (serial) {
-      const { data, error } = await this.supabaseAdminService.client
-        .from('devices')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('provider', provider)
-        .eq('device_serial', serial)
-        .maybeSingle();
-      if (error) throw new InternalServerErrorException('WEARABLE_DEVICE_READ_FAILED');
-      if (data?.id) return data.id;
-    }
-
-    const payload: DeviceInsert = {
-      user_id: userId,
-      provider,
-      device_name: name,
-      device_model: model,
-      device_serial: serial,
-    };
-    const { data, error } = await this.supabaseAdminService.client
-      .from('devices')
-      .insert(payload)
-      .select('id')
-      .single();
+    const { data, error } = await this.supabaseAdminService.client.rpc('upsert_wearable_device', {
+      p_user_id: userId,
+      p_provider: provenance.provider,
+      p_device_name: name as string,
+      p_device_model: model as string,
+      p_device_serial: serial as string,
+    });
     if (error) throw new InternalServerErrorException('WEARABLE_DEVICE_CREATE_FAILED');
-    return data.id;
+    return data;
   }
 
   private async findExistingSessionId(
@@ -298,6 +315,9 @@ export class CanonicalActivityWriterService {
       sport_subtype: input.activity.sportSubtype,
       start_time: summary.startedAt ?? new Date().toISOString(),
       end_time: summary.endedAt,
+      timezone: summary.timezone ?? null,
+      started_at_local: summary.startedAtLocal ?? null,
+      ended_at_local: summary.endedAtLocal ?? null,
       duration_s: summary.durationSeconds,
       distance_m: summary.distanceM,
       elev_gain_m: summary.elevationGainM,
@@ -338,6 +358,9 @@ export class CanonicalActivityWriterService {
     const payload: ActivitySessionUpdate = {
       status: 'completed',
       end_time: summary.endedAt,
+      timezone: summary.timezone ?? null,
+      started_at_local: summary.startedAtLocal ?? null,
+      ended_at_local: summary.endedAtLocal ?? null,
       duration_s: summary.durationSeconds,
       distance_m: summary.distanceM,
       elev_gain_m: summary.elevationGainM,
@@ -392,6 +415,89 @@ export class CanonicalActivityWriterService {
     };
   }
 
+  private async insertHydrationSkeleton(sessionId: string, payload: ActivitySessionInsert): Promise<void> {
+    await this.insertSession({
+      id: sessionId,
+      user_id: payload.user_id,
+      sport_type: payload.sport_type,
+      sport_subtype: payload.sport_subtype,
+      start_time: payload.start_time,
+      end_time: null,
+      source: payload.source,
+      provider: payload.provider,
+      provider_activity_id: payload.provider_activity_id,
+      source_channel: payload.source_channel,
+      source_package: payload.source_package,
+      source_provider_key: payload.source_provider_key,
+      source_record_id: payload.source_record_id,
+      source_updated_at: payload.source_updated_at,
+      raw_payload_id: payload.raw_payload_id,
+    });
+  }
+
+  private async persistActivityBundle(params: {
+    input: UpsertActivityInput;
+    sessionId: string;
+    sessionPayload: ActivitySessionInsert | ActivitySessionUpdate;
+    clearProvenanceSessionId: string | null;
+    replaceLaps: boolean;
+  }): Promise<void> {
+    const { input, sessionId } = params;
+    const positionSamples = this.sanitizePositionSamples(input.activity.streams.position);
+    const routePoints: ActivityRoutePointInsert[] = positionSamples.map((point, index) => ({
+      session_id: sessionId,
+      user_id: input.userId,
+      point_index: index,
+      timestamp: point.timestamp,
+      offset_s: point.offsetSeconds,
+      lat: point.lat,
+      lon: point.lon,
+      altitude_m: point.altitudeM,
+      distance_m: point.distanceM,
+      speed_mps: point.speedMps,
+      horizontal_accuracy_m: point.horizontalAccuracyM,
+      vertical_accuracy_m: point.verticalAccuracyM,
+      source: WEARABLE_IMPORT_SOURCE,
+      source_channel: input.provenance.sourceChannel,
+      source_package: input.provenance.sourcePackage,
+      source_record_id: input.provenance.sourceRecordId,
+      raw_payload_id: input.provenance.rawPayloadId,
+      raw_payload: null,
+    }));
+    const providerFields = this.buildProviderFieldsPayload(sessionId, input.userId, input.activity, input.provenance);
+    const { error } = await this.supabaseAdminService.client.rpc('persist_wearable_activity_bundle', {
+      p_user_id: input.userId,
+      p_session_id: sessionId,
+      p_session_payload: this.toJson(params.sessionPayload),
+      p_clear_provenance_session_id: (params.clearProvenanceSessionId ?? null) as string,
+      p_replace_laps: params.replaceLaps,
+      p_laps: this.toJson(this.buildLapRows(sessionId, input.userId, input.activity)),
+      p_heart_rate_zones: this.toJson(
+        input.activity.heartRateZones.map(zone => ({
+          session_id: sessionId,
+          zone: zone.zone,
+          duration_s: zone.durationSeconds,
+          percentage: Number.parseFloat(Math.max(0, Math.min(100, zone.percentage)).toFixed(2)),
+        })),
+      ),
+      p_streams: this.toJson(this.buildStreamRows(sessionId, input.userId, input.activity, input.provenance)),
+      p_stream_samples: this.toJson(
+        this.buildStreamSampleRows(sessionId, input.userId, input.activity, input.provenance),
+      ),
+      p_route_points: this.toJson(routePoints),
+      p_route_polyline:
+        positionSamples.length > 0
+          ? encodePolyline(positionSamples.map(point => [point.lat, point.lon] as [number, number]))
+          : (null as unknown as string),
+      p_provider_fields: this.toJson(providerFields),
+      p_raw_payload_id: (input.provenance.rawPayloadId ?? null) as string,
+      p_import_id: (input.lifecycleImportId ?? null) as string,
+      p_job_id: (input.lifecycleJobId ?? null) as string,
+      p_canonical_version: input.canonicalVersion ?? input.activity.hydrationVersion ?? 1,
+    });
+    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_BUNDLE_PERSIST_FAILED');
+  }
+
   private async insertSession(payload: ActivitySessionInsert): Promise<string> {
     const { data, error } = await this.supabaseAdminService.client
       .from('activity_sessions')
@@ -402,33 +508,22 @@ export class CanonicalActivityWriterService {
     return data.id;
   }
 
-  private async updateSession(sessionId: string, payload: ActivitySessionUpdate): Promise<string> {
-    const { error } = await this.supabaseAdminService.client
-      .from('activity_sessions')
-      .update(payload)
-      .eq('id', sessionId);
-    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_UPDATE_FAILED');
-    return sessionId;
-  }
-
-  private async clearProvenance(sessionId: string): Promise<void> {
-    const { error } = await this.supabaseAdminService.client
-      .from('activity_sessions')
-      .update({ provider_activity_id: null, source_record_id: null })
-      .eq('id', sessionId);
-    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_PROVENANCE_CLEAR_FAILED');
-  }
-
-  private async replaceLaps(sessionId: string, userId: string, activity: CanonicalActivity): Promise<void> {
+  public async replaceLaps(sessionId: string, userId: string, activity: CanonicalActivity): Promise<void> {
     const { error: deleteError } = await this.supabaseAdminService.client
       .from('activity_laps')
       .delete()
       .eq('session_id', sessionId);
     if (deleteError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LAPS_DELETE_FAILED');
-    if (activity.laps.length === 0) return;
+    const rows = this.buildLapRows(sessionId, userId, activity);
+    if (rows.length === 0) return;
+    const { error } = await this.supabaseAdminService.client.from('activity_laps').insert(rows);
+    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LAPS_INSERT_FAILED');
+  }
 
+  private buildLapRows(sessionId: string, userId: string, activity: CanonicalActivity): ActivityLapInsert[] {
+    if (activity.laps.length === 0) return [];
     const laps = normaliseCanonicalActivityLaps(activity.laps, activity.summary);
-    if (laps.length === 0) return;
+    if (laps.length === 0) return [];
 
     const distanceBuckets = buildDistanceSplitBucketsFromLaps(laps);
     const tabRows =
@@ -455,9 +550,7 @@ export class CanonicalActivityWriterService {
               splitDistanceM: isOneKilometerAutoLapSequence(laps) ? 1000 : null,
             }),
           );
-    const rows: ActivityLapInsert[] = tabRows;
-    const { error } = await this.supabaseAdminService.client.from('activity_laps').insert(rows);
-    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_LAPS_INSERT_FAILED');
+    return tabRows;
   }
 
   private buildActivityLapInsert(params: {
@@ -486,7 +579,7 @@ export class CanonicalActivityWriterService {
     };
   }
 
-  private async replaceHeartRateZones(sessionId: string, activity: CanonicalActivity): Promise<void> {
+  public async replaceHeartRateZones(sessionId: string, activity: CanonicalActivity): Promise<void> {
     const { error: deleteError } = await this.supabaseAdminService.client
       .from('activity_heart_rate_zones')
       .delete()
@@ -504,7 +597,7 @@ export class CanonicalActivityWriterService {
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_ZONES_INSERT_FAILED');
   }
 
-  private async replaceStreams(
+  public async replaceStreams(
     sessionId: string,
     userId: string,
     activity: CanonicalActivity,
@@ -590,7 +683,7 @@ export class CanonicalActivityWriterService {
     );
   }
 
-  private async replaceRoutePoints(
+  public async replaceRoutePoints(
     sessionId: string,
     userId: string,
     activity: CanonicalActivity,
@@ -656,13 +749,26 @@ export class CanonicalActivityWriterService {
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_POLYLINE_UPDATE_FAILED');
   }
 
-  private async upsertProviderFields(
+  public async upsertProviderFields(
     sessionId: string,
     userId: string,
     activity: CanonicalActivity,
     provenance: CanonicalProvenance,
   ): Promise<void> {
-    const payload: ActivityProviderFieldsInsert = {
+    const payload = this.buildProviderFieldsPayload(sessionId, userId, activity, provenance);
+    const { error } = await this.supabaseAdminService.client
+      .from('activity_provider_fields')
+      .upsert(payload, { onConflict: 'session_id' });
+    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_PROVIDER_FIELDS_UPSERT_FAILED');
+  }
+
+  private buildProviderFieldsPayload(
+    sessionId: string,
+    userId: string,
+    activity: CanonicalActivity,
+    provenance: CanonicalProvenance,
+  ): ActivityProviderFieldsInsert {
+    return {
       session_id: sessionId,
       user_id: userId,
       provider: provenance.provider,
@@ -676,10 +782,6 @@ export class CanonicalActivityWriterService {
       raw_metadata: this.readRawMetadata(activity.vendorFields),
       updated_at: new Date().toISOString(),
     };
-    const { error } = await this.supabaseAdminService.client
-      .from('activity_provider_fields')
-      .upsert(payload, { onConflict: 'session_id' });
-    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_PROVIDER_FIELDS_UPSERT_FAILED');
   }
 
   private getMetricStreams(activity: CanonicalActivity): Array<{
@@ -711,6 +813,10 @@ export class CanonicalActivityWriterService {
   private readRawMetadata(vendorFields: Record<string, unknown>): Json | null {
     const rawMetadata = vendorFields.rawMetadata ?? vendorFields.appleHealthMetadata;
     return rawMetadata == null ? null : (rawMetadata as Json);
+  }
+
+  private toJson(value: unknown): Json {
+    return JSON.parse(JSON.stringify(value)) as Json;
   }
 
   private toActivityDatabaseProvider(provider: WearableProvider): ActivityDatabaseProvider {

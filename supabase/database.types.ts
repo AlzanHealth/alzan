@@ -4436,6 +4436,153 @@ export type Database = {
           },
         ]
       }
+      wearable_activity_imports: {
+        Row: {
+          attempts: number
+          canonical_version: number
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          job_id: string | null
+          last_error_code: string | null
+          last_reconciliation_error: string | null
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          reconciliation_status: string
+          session_id: string | null
+          source_channel: string
+          source_package: string | null
+          source_record_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          canonical_version?: number
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          last_error_code?: string | null
+          last_reconciliation_error?: string | null
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          reconciliation_status?: string
+          session_id?: string | null
+          source_channel: string
+          source_package?: string | null
+          source_record_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          canonical_version?: number
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          last_error_code?: string | null
+          last_reconciliation_error?: string | null
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          reconciliation_status?: string
+          session_id?: string | null
+          source_channel?: string
+          source_package?: string | null
+          source_record_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wearable_activity_imports_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "wearable_sync_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wearable_activity_imports_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "activity_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wearable_activity_imports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wearable_sync_jobs: {
+        Row: {
+          completed_at: string | null
+          counters: Json
+          created_at: string
+          id: string
+          last_error: string | null
+          last_reconciliation_error: string | null
+          lease_expires_at: string
+          lease_token: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          reconciliation_status: string
+          started_at: string
+          status: string
+          sync_domain: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          counters?: Json
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_reconciliation_error?: string | null
+          lease_expires_at: string
+          lease_token?: string
+          provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          reconciliation_status?: string
+          started_at?: string
+          status?: string
+          sync_domain: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          counters?: Json
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_reconciliation_error?: string | null
+          lease_expires_at?: string
+          lease_token?: string
+          provider?: Database["public"]["Enums"]["wearable_provider_enum"]
+          reconciliation_status?: string
+          started_at?: string
+          status?: string
+          sync_domain?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wearable_sync_jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       weight_logs: {
         Row: {
           bodyfat_percent: number | null
@@ -4828,7 +4975,46 @@ export type Database = {
         Args: { p_source: string; p_target: string }
         Returns: undefined
       }
+      associate_activity_session_template: {
+        Args: {
+          p_endurance_template_id?: string
+          p_session_id: string
+          p_user_id: string
+          p_workout_plan_id?: string
+          p_workout_template_id?: string
+        }
+        Returns: Json
+      }
       check_username: { Args: { username_input: string }; Returns: boolean }
+      claim_wearable_activity_import: {
+        Args: {
+          p_canonical_version: number
+          p_job_id: string
+          p_provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          p_source_channel: string
+          p_source_package: string
+          p_source_record_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      claim_wearable_sync_job: {
+        Args: {
+          p_lease_seconds?: number
+          p_provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          p_sync_domain: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      complete_wearable_activity_import: {
+        Args: {
+          p_canonical_version: number
+          p_import_id: string
+          p_session_id: string
+        }
+        Returns: undefined
+      }
       delete_user_account: { Args: never; Returns: undefined }
       duplicate_recipe: { Args: { p_recipe_id: string }; Returns: string }
       ensure_recipe_ingredient: {
@@ -4849,6 +5035,124 @@ export type Database = {
       ensure_recipe_public_slug: {
         Args: { p_recipe_id: string }
         Returns: string
+      }
+      fail_wearable_activity_import: {
+        Args: {
+          p_error_code: string
+          p_import_id: string
+          p_retryable: boolean
+        }
+        Returns: undefined
+      }
+      finish_wearable_activity_reconciliation: {
+        Args: { p_error_code?: string; p_import_id: string }
+        Returns: undefined
+      }
+      finish_wearable_sync_job: {
+        Args: {
+          p_counters?: Json
+          p_job_id: string
+          p_last_error?: string
+          p_lease_token: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      get_activity_sessions_for_local_date: {
+        Args: { p_local_date: string; p_timezone: string; p_user_id: string }
+        Returns: {
+          avg_cadence: number | null
+          avg_heart_rate: number | null
+          avg_power_w: number | null
+          avg_speed_m_per_s: number | null
+          avg_temp_c: number | null
+          base_load: string | null
+          board: string | null
+          boots_used: string | null
+          calories_kcal: number | null
+          climbing_grade: string | null
+          contact_level: string | null
+          created_at: string
+          description: string | null
+          device_id: string | null
+          distance_m: number | null
+          duplicate_of_session_id: string | null
+          duplicate_resolution:
+            | Database["public"]["Enums"]["import_duplicate_resolution_enum"]
+            | null
+          duplicate_score: number | null
+          duration_s: number | null
+          elev_gain_m: number | null
+          elev_loss_m: number | null
+          end_time: string | null
+          ended_at_local: string | null
+          endurance_template_id: string | null
+          epoc: number | null
+          football_session_type: string | null
+          golf_club_focus: string | null
+          hyrox_station_focus: string | null
+          id: string
+          import_review_seen_at: string | null
+          imported_at: string | null
+          max_cadence: number | null
+          max_heart_rate: number | null
+          max_power_w: number | null
+          max_temp_c: number | null
+          min_heart_rate: number | null
+          name: string | null
+          needs_strength_review: boolean
+          notes: string | null
+          pending_watch_metrics: Json | null
+          pool_type: string | null
+          provider: Database["public"]["Enums"]["provider_enum"]
+          provider_activity_id: string | null
+          pte: number | null
+          racket_used: string | null
+          raw_payload_id: string | null
+          recovery_time_s: number | null
+          rival: string | null
+          route_polyline: string | null
+          rpe: number | null
+          ski_type: string | null
+          slope_type: string | null
+          snowboard_type: string | null
+          source: Database["public"]["Enums"]["activity_source_enum"]
+          source_channel: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          source_updated_at: string | null
+          sport_subtype: string | null
+          sport_type: Database["public"]["Enums"]["sport_type_enum"]
+          start_time: string
+          started_at_local: string | null
+          status: Database["public"]["Enums"]["activity_status_enum"]
+          stroke: string | null
+          suggested_endurance_template_id: string | null
+          surface: string | null
+          template_match_method:
+            | Database["public"]["Enums"]["import_match_method_enum"]
+            | null
+          template_match_score: number | null
+          timezone: string | null
+          total_reps: number | null
+          total_sets: number | null
+          total_steps: number | null
+          total_volume_kg: number | null
+          tss_hr: number | null
+          updated_at: string
+          user_id: string
+          visibility: Database["public"]["Enums"]["visibility_enum"] | null
+          vo2_max: number | null
+          wetsuit: string | null
+          workout_template_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "activity_sessions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_home_summary: {
         Args: {
@@ -4893,10 +5197,39 @@ export type Database = {
         }
         Returns: undefined
       }
+      persist_wearable_activity_bundle: {
+        Args: {
+          p_canonical_version: number
+          p_clear_provenance_session_id: string
+          p_heart_rate_zones: Json
+          p_import_id: string
+          p_job_id: string
+          p_laps: Json
+          p_provider_fields: Json
+          p_raw_payload_id: string
+          p_replace_laps: boolean
+          p_route_points: Json
+          p_route_polyline: string
+          p_session_id: string
+          p_session_payload: Json
+          p_stream_samples: Json
+          p_streams: Json
+          p_user_id: string
+        }
+        Returns: string
+      }
       publish_recipe: { Args: { p_recipe_id: string }; Returns: undefined }
       refresh_recipe_popularity_aggregates: { Args: never; Returns: undefined }
       refresh_recipe_snapshot: {
         Args: { p_recipe_id: string }
+        Returns: undefined
+      }
+      renew_wearable_sync_job: {
+        Args: {
+          p_job_id: string
+          p_lease_seconds?: number
+          p_lease_token: string
+        }
         Returns: undefined
       }
       reset_user_data: { Args: never; Returns: undefined }
@@ -4963,8 +5296,50 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       slugify_recipe_name: { Args: { p_name: string }; Returns: string }
+      store_external_raw_payload: {
+        Args: {
+          p_object_type: string
+          p_payload: Json
+          p_payload_hash: string
+          p_provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          p_size_bytes: number
+          p_source_channel: string
+          p_source_package: string
+          p_source_record_id: string
+          p_trace_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       unaccent: { Args: { "": string }; Returns: string }
       unpublish_recipe: { Args: { p_recipe_id: string }; Returns: undefined }
+      upsert_integration_sync_state: {
+        Args: {
+          p_anchor_token: string
+          p_attempted_at: string
+          p_cursor_token: string
+          p_last_error: string
+          p_last_record_at: string
+          p_metadata: Json
+          p_provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          p_source_channel: string
+          p_source_package: string
+          p_status: string
+          p_sync_domain: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      upsert_wearable_device: {
+        Args: {
+          p_device_model: string
+          p_device_name: string
+          p_device_serial: string
+          p_provider: Database["public"]["Enums"]["wearable_provider_enum"]
+          p_user_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       activity_source_enum:

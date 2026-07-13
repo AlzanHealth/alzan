@@ -5,6 +5,8 @@ import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import {
   buildActivityTotals,
   buildTemplateTotals,
+  countComparableTotalSignals,
+  countComparableStructuralSignals,
   deriveActivityStructure,
   deriveTemplateDistanceMatchedActivityStructure,
   deriveTemplateStructure,
@@ -12,7 +14,9 @@ import {
   POSSIBLE_MATCH,
   scoreStructuralMatch,
   scoreTotalsMatch,
+  isMatchMarginSufficient,
   STRONG_MATCH,
+  templateHasBoundaryPhases,
 } from '../../activity-import/matching/endurance-template-match';
 import {
   isSameLocalDay,
@@ -25,6 +29,7 @@ import {
   WatchStrengthMetrics,
 } from '../../activity-import/matching/reconciliation-plan';
 import { CanonicalActivity } from '../../activity-import/parsers/activity-import-canonical.types';
+import { resolveActivityLocalDate } from '../domain/activity-local-date';
 
 type ActivitySessionRow = Row<'activity_sessions'>;
 type ActivitySessionInsert = Insert<'activity_sessions'>;
@@ -49,6 +54,9 @@ interface TemplateMatchResult {
   score: number;
   method: MatchMethod;
   plannedPlanId: string | null;
+  signalCount: number;
+  runnerUpScore: number | null;
+  planSelectionRequired: boolean;
 }
 
 @Injectable()
@@ -148,7 +156,12 @@ export class ImportReconciliationService {
     if (!session || session.sport_type === 'strength') return;
     if (session.endurance_template_id != null) return;
 
-    const localDate = (session.started_at_local ?? session.start_time).slice(0, 10);
+    const localDate = resolveActivityLocalDate({
+      startTime: session.start_time,
+      startedAtLocal: session.started_at_local,
+      timezone: session.timezone,
+    });
+    if (!localDate) return;
     const plannedPlans = await this.findPlannedPlans(userId, localDate);
     const laps = await this.getSessionLaps(sessionId);
 
@@ -172,7 +185,28 @@ export class ImportReconciliationService {
     }
     if (best == null || best.score < POSSIBLE_MATCH) return;
 
-    if (best.score >= STRONG_MATCH) {
+    if (
+      best.score >= STRONG_MATCH &&
+      best.signalCount >= 2 &&
+      !best.planSelectionRequired &&
+      isMatchMarginSufficient(best.score, best.runnerUpScore)
+    ) {
+      if (best.plannedPlanId != null) {
+        const { error } = await this.supabaseAdminService.client.rpc('associate_activity_session_template', {
+          p_user_id: userId,
+          p_session_id: sessionId,
+          p_endurance_template_id: best.templateId,
+          p_workout_template_id: undefined,
+          p_workout_plan_id: best.plannedPlanId,
+        });
+        if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_ASSOCIATION_FAILED');
+        await this.updateSession(sessionId, {
+          template_match_score: best.score,
+          template_match_method: best.method,
+          ...(session.name == null ? { name: best.templateName } : {}),
+        });
+        return;
+      }
       await this.updateSession(sessionId, {
         endurance_template_id: best.templateId,
         suggested_endurance_template_id: null,
@@ -180,9 +214,6 @@ export class ImportReconciliationService {
         template_match_method: best.method,
         ...(session.name == null ? { name: best.templateName } : {}),
       });
-      if (best.plannedPlanId != null) {
-        await this.completePlan(best.plannedPlanId, sessionId);
-      }
       return;
     }
     await this.updateSession(sessionId, {
@@ -201,53 +232,10 @@ export class ImportReconciliationService {
     try {
       const session = await this.getSession(userId, sessionId);
       if (!session) return;
-      const localDate = (session.started_at_local ?? session.start_time).slice(0, 10);
       await this.completePlansBySessionId(userId, sessionId);
-      if (session.endurance_template_id) {
-        await this.completePlansByTemplate(userId, localDate, sessionId, {
-          endurance_template_id: session.endurance_template_id,
-        });
-      }
-      if (session.workout_template_id) {
-        await this.completePlansByTemplate(userId, localDate, sessionId, {
-          gym_template_id: session.workout_template_id,
-        });
-      }
     } catch (error) {
       this.logger.warn(`Plan completion skipped for associated session ${sessionId}`, error as Error);
     }
-  }
-
-  /**
-   * Re-runs lightweight association for recent provider imports. This is safe
-   * to execute repeatedly: already associated sessions only complete their
-   * matching calendar plan, while generic endurance sessions get template
-   * matching again with the current laps/plans/templates.
-   */
-  public async reconcileImportedEnduranceSessions(
-    userId: string,
-    provider: ActivitySessionRow['provider'],
-    sinceIso: string,
-  ): Promise<number> {
-    const { data, error } = await this.supabaseAdminService.client
-      .from('activity_sessions')
-      .select('id, sport_type, endurance_template_id')
-      .eq('user_id', userId)
-      .eq('provider', provider)
-      .not('end_time', 'is', null)
-      .gte('start_time', sinceIso)
-      .order('start_time', { ascending: false });
-    if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PROVIDER_SESSIONS_READ_FAILED');
-
-    const sessions = (data ?? []).filter(session => session.sport_type !== 'strength' && session.sport_type !== 'gym');
-    for (const session of sessions) {
-      if (session.endurance_template_id) {
-        await this.completePlansForAssociatedSession(userId, session.id);
-      } else {
-        await this.runEnduranceTemplateMatch(userId, session.id);
-      }
-    }
-    return sessions.length;
   }
 
   /** Splits watch metrics vs an existing session into applicable/conflicting/previous. */
@@ -365,17 +353,20 @@ export class ImportReconciliationService {
     }));
     const activityTotals = buildActivityTotals({ distanceM: session.distance_m, durationS: session.duration_s });
 
-    let best: TemplateMatchResult | null = null;
+    const matches: TemplateMatchResult[] = [];
     for (const template of templates) {
       const steps = (stepsByTemplate.get(template.id) ?? []).map(this.toStepLike);
+      const templateAwareStructure = deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps);
       const activityStructure =
-        deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps) ?? deriveActivityStructure(lapLikes);
+        templateAwareStructure ?? (templateHasBoundaryPhases(steps) ? null : deriveActivityStructure(lapLikes));
       let score: number;
       let method: MatchMethod;
+      let signalCount: number;
       const templateStructure = activityStructure != null ? deriveTemplateStructure(steps) : null;
       if (activityStructure != null && templateStructure != null) {
         score = scoreStructuralMatch(activityStructure, templateStructure);
         method = 'structural';
+        signalCount = countComparableStructuralSignals(activityStructure, templateStructure);
       } else {
         const templateTotals = buildTemplateTotals(
           { totalDistanceM: template.total_distance_m, totalDurationS: template.total_duration_s },
@@ -383,19 +374,25 @@ export class ImportReconciliationService {
         );
         score = scoreTotalsMatch(activityTotals, templateTotals);
         method = 'totals';
+        signalCount = countComparableTotalSignals(activityTotals, templateTotals);
       }
-      if (best == null || score > best.score) {
-        const plannedPlan = plannedPlans.find(plan => plan.endurance_template_id === template.id) ?? null;
-        best = {
-          templateId: template.id,
-          templateName: template.base_name,
-          score,
-          method,
-          plannedPlanId: plannedPlan?.id ?? null,
-        };
-      }
+      const matchingPlans = plannedPlans.filter(plan => plan.endurance_template_id === template.id);
+      const plannedPlan = matchingPlans.length === 1 ? matchingPlans[0] : null;
+      matches.push({
+        templateId: template.id,
+        templateName: template.base_name,
+        score,
+        method,
+        plannedPlanId: plannedPlan?.id ?? null,
+        signalCount,
+        runnerUpScore: null,
+        planSelectionRequired: matchingPlans.length > 1,
+      });
     }
-    return best;
+    matches.sort((left, right) => right.score - left.score || left.templateId.localeCompare(right.templateId));
+    const best = matches[0] ?? null;
+    if (!best) return null;
+    return { ...best, runnerUpScore: matches[1]?.score ?? null };
   }
 
   private toStepLike(step: EnduranceStepRow): EnduranceStepLike {
@@ -485,7 +482,7 @@ export class ImportReconciliationService {
       | CanonicalActivity,
   ): { startTime: string | null; startedAtLocal: string | null } {
     if ('summary' in reference) {
-      return { startTime: reference.summary.startedAt, startedAtLocal: null };
+      return { startTime: reference.summary.startedAt, startedAtLocal: reference.summary.startedAtLocal ?? null };
     }
     if ('start_time' in reference) {
       return { startTime: reference.start_time, startedAtLocal: reference.started_at_local ?? null };
@@ -567,19 +564,6 @@ export class ImportReconciliationService {
     return result;
   }
 
-  private async completePlan(planId: string, sessionId: string): Promise<void> {
-    const { error } = await this.supabaseAdminService.client
-      .from('workout_plans')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        activity_session_id: sessionId,
-      })
-      .eq('id', planId)
-      .eq('status', 'planned');
-    if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_COMPLETE_FAILED');
-  }
-
   private async completePlansBySessionId(userId: string, sessionId: string): Promise<void> {
     const { error } = await this.supabaseAdminService.client
       .from('workout_plans')
@@ -591,28 +575,6 @@ export class ImportReconciliationService {
       .eq('user_id', userId)
       .eq('activity_session_id', sessionId)
       .eq('status', 'planned');
-    if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_COMPLETE_FAILED');
-  }
-
-  private async completePlansByTemplate(
-    userId: string,
-    localDate: string,
-    sessionId: string,
-    match: { endurance_template_id?: string; gym_template_id?: string },
-  ): Promise<void> {
-    let query = this.supabaseAdminService.client
-      .from('workout_plans')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        activity_session_id: sessionId,
-      })
-      .eq('user_id', userId)
-      .eq('planned_date', localDate)
-      .eq('status', 'planned');
-    if (match.endurance_template_id) query = query.eq('endurance_template_id', match.endurance_template_id);
-    if (match.gym_template_id) query = query.eq('gym_template_id', match.gym_template_id);
-    const { error } = await query;
     if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_COMPLETE_FAILED');
   }
 

@@ -25,56 +25,26 @@ export class IntegrationSyncStateService {
   constructor(private readonly supabaseAdminService: SupabaseAdminService) {}
 
   public async saveState(input: SaveSyncStateInput): Promise<void> {
-    const existingId = await this.findExistingId(input);
     const now = new Date().toISOString();
-    const payload = {
-      cursor_token: input.cursorToken,
-      anchor_token: input.anchorToken,
-      last_record_at: input.lastRecordAt,
-      status: input.status ?? 'success',
-      last_error: input.lastError ?? null,
-      metadata: this.toJson(input.metadata),
-      last_attempt_at: now,
-      last_success_at: input.status === 'error' ? undefined : now,
-      updated_at: now,
-    };
-
-    if (existingId) {
-      const { error } = await this.supabaseAdminService.client
-        .from('integration_sync_state')
-        .update(payload)
-        .eq('id', existingId);
-      if (error) throw new BadRequestException('SYNC_STATE_UPDATE_FAILED');
-      return;
-    }
-
-    const { error } = await this.supabaseAdminService.client.from('integration_sync_state').insert({
-      user_id: input.userId,
-      provider: input.provider,
-      source_channel: input.sourceChannel,
-      source_package: input.sourcePackage,
-      sync_domain: input.syncDomain,
-      ...payload,
+    const { error } = await this.supabaseAdminService.client.rpc('upsert_integration_sync_state', {
+      p_user_id: input.userId,
+      p_provider: input.provider,
+      p_source_channel: input.sourceChannel,
+      p_source_package: input.sourcePackage as string,
+      p_sync_domain: input.syncDomain,
+      p_cursor_token: (input.cursorToken ?? null) as string,
+      p_anchor_token: (input.anchorToken ?? null) as string,
+      p_last_record_at: (input.lastRecordAt ?? null) as string,
+      p_status: input.status ?? 'success',
+      p_last_error: (input.lastError ?? null) as string,
+      p_metadata: this.toJson(input.metadata),
+      p_attempted_at: now,
     });
-    if (error) throw new BadRequestException('SYNC_STATE_INSERT_FAILED');
+    if (error) throw new BadRequestException('SYNC_STATE_UPSERT_FAILED');
   }
 
   public async markFailed(input: SyncStateIdentity, errorMessage: string): Promise<void> {
     await this.saveState({ ...input, status: 'error', lastError: errorMessage });
-  }
-
-  private async findExistingId(input: SyncStateIdentity): Promise<string | null> {
-    let query = this.supabaseAdminService.client
-      .from('integration_sync_state')
-      .select('id')
-      .eq('user_id', input.userId)
-      .eq('provider', input.provider)
-      .eq('source_channel', input.sourceChannel)
-      .eq('sync_domain', input.syncDomain);
-    query = input.sourcePackage ? query.eq('source_package', input.sourcePackage) : query.is('source_package', null);
-    const { data, error } = await query.maybeSingle();
-    if (error) throw new BadRequestException('SYNC_STATE_READ_FAILED');
-    return data?.id ?? null;
   }
 
   private toJson(value: Record<string, unknown> | null | undefined): Json | null {

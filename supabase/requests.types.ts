@@ -720,7 +720,14 @@ type IntegrationSyncStateTable = {
     last_success_at: string | null;
     last_attempt_at: string | null;
     last_record_at: string | null;
-    status: "idle" | "running" | "success" | "error" | "paused" | "expired";
+    status:
+      | "idle"
+      | "running"
+      | "success"
+      | "partial"
+      | "error"
+      | "paused"
+      | "expired";
     last_error: string | null;
     metadata: Json | null;
     created_at: string;
@@ -738,7 +745,14 @@ type IntegrationSyncStateTable = {
     last_success_at?: string | null;
     last_attempt_at?: string | null;
     last_record_at?: string | null;
-    status?: "idle" | "running" | "success" | "error" | "paused" | "expired";
+    status?:
+      | "idle"
+      | "running"
+      | "success"
+      | "partial"
+      | "error"
+      | "paused"
+      | "expired";
     last_error?: string | null;
     metadata?: Json | null;
     created_at?: string;
@@ -756,7 +770,14 @@ type IntegrationSyncStateTable = {
     last_success_at?: string | null;
     last_attempt_at?: string | null;
     last_record_at?: string | null;
-    status?: "idle" | "running" | "success" | "error" | "paused" | "expired";
+    status?:
+      | "idle"
+      | "running"
+      | "success"
+      | "partial"
+      | "error"
+      | "paused"
+      | "expired";
     last_error?: string | null;
     metadata?: Json | null;
     created_at?: string;

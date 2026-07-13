@@ -32,9 +32,16 @@ export class CloudProviderSyncController {
     const result = await this.suuntoCloudSyncService.syncActivities(ctx.user.id);
     return {
       provider: result.provider,
+      job_id: result.jobId,
+      status: result.status,
       activities_imported: result.activitiesImported,
       activities_skipped: result.activitiesSkipped,
+      activities_updated: 0,
+      activities_repaired: result.activitiesRepaired,
+      activities_failed: result.activitiesFailed,
       activities_reconciled: result.activitiesReconciled,
+      errors_by_code: result.errorsByCode,
+      phase_durations_ms: result.phaseDurationsMs,
       last_success_at: result.lastSuccessAt,
     };
   }

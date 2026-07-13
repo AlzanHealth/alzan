@@ -75,7 +75,8 @@ const TOTALS_BANDS: readonly Band[] = [
 ];
 
 const TEMPLATE_DISTANCE_MATCH_RELATIVE_TOLERANCE = 0.2;
-const TEMPLATE_DISTANCE_MATCH_ABSOLUTE_TOLERANCE_M = 80;
+const TEMPLATE_DISTANCE_MATCH_ABSOLUTE_TOLERANCE_M = 10;
+export const MIN_AUTO_MATCH_MARGIN = 8;
 const MIN_USEFUL_LAP_DURATION_S = 10;
 const MIN_WORK_REPS = 2;
 const MIN_PACE_SPREAD = 0.1;
@@ -279,6 +280,42 @@ function deriveTemplateWorkDistances(steps: EnduranceStepLike[]): number[] {
     .filter((value): value is number => value != null && value > 0);
 }
 
+export function templateHasBoundaryPhases(steps: EnduranceStepLike[]): boolean {
+  return steps.some(step => ['warmup', 'warm_up', 'cooldown', 'cool_down'].includes(step.phaseType));
+}
+
+function hasRequiredBoundaryLaps(
+  steps: EnduranceStepLike[],
+  laps: ActivityLapLike[],
+  matches: Array<{ index: number; lap: ActivityLapLike }>,
+): boolean {
+  const expandedSteps = expandTemplateSteps(steps).map(entry => entry.step);
+  const warmupSteps = expandedSteps.filter(step => step.phaseType === 'warmup' || step.phaseType === 'warm_up');
+  const cooldownSteps = expandedSteps.filter(step => step.phaseType === 'cooldown' || step.phaseType === 'cool_down');
+  const firstMatch = matches[0]?.index ?? -1;
+  const lastMatch = matches.at(-1)?.index ?? -1;
+  return (
+    (warmupSteps.length === 0 || boundaryLapsMatch(warmupSteps, laps.slice(0, firstMatch))) &&
+    (cooldownSteps.length === 0 || boundaryLapsMatch(cooldownSteps, laps.slice(lastMatch + 1)))
+  );
+}
+
+function boundaryLapsMatch(boundarySteps: EnduranceStepLike[], boundaryLaps: ActivityLapLike[]): boolean {
+  if (boundaryLaps.length === 0) return false;
+  const targetDistanceM = boundarySteps.reduce((sum, step) => sum + (stepDistanceM(step) ?? 0), 0);
+  if (targetDistanceM > 0) {
+    const actualDistanceM = boundaryLaps.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0);
+    return doesDistanceMatch(actualDistanceM, targetDistanceM);
+  }
+  const targetDurationS = boundarySteps.reduce((sum, step) => sum + (stepDurationS(step) ?? 0), 0);
+  if (targetDurationS > 0) {
+    const actualDurationS = boundaryLaps.reduce((sum, lap) => sum + (lap.durationSeconds ?? 0), 0);
+    const toleranceS = Math.max(10, targetDurationS * TEMPLATE_DISTANCE_MATCH_RELATIVE_TOLERANCE);
+    return Math.abs(actualDurationS - targetDurationS) <= toleranceS;
+  }
+  return true;
+}
+
 function hasSingleWorkDistance(distances: number[]): boolean {
   if (distances.length === 0) return false;
   const firstDistance = distances[0];
@@ -375,6 +412,7 @@ export function deriveTemplateDistanceMatchedActivityStructure(
     : collectOrderedWorkLaps(laps, targetDistancesM);
   if (matches.length < MIN_WORK_REPS) return null;
   if (!hasSingleWorkDistance(targetDistancesM) && matches.length !== targetDistancesM.length) return null;
+  if (!hasRequiredBoundaryLaps(templateSteps, laps, matches)) return null;
   const distances = matches
     .map(match => match.lap.distanceM)
     .filter((value): value is number => value != null && value > 0);
@@ -387,23 +425,42 @@ export function deriveTemplateDistanceMatchedActivityStructure(
   };
 }
 
-function pairScore(actual: number | null, target: number | null, bands: readonly Band[]): number {
-  if (actual == null && target == null) return 100;
-  if (actual == null || target == null) return 60;
-  return bandScore(relativeDiff(actual, target), bands);
-}
-
 /**
  * Structural match score (0-100). Weights per spec: reps 40%, distance per
  * rep 30%, pace per rep 20%, recovery 10%.
  */
 export function scoreStructuralMatch(activity: IntervalStructure, template: IntervalStructure): number {
-  const repsScore = bandScore(relativeDiff(activity.repCount, template.repCount), REPS_BANDS);
-  const distanceScore = pairScore(activity.repDistanceM, template.repDistanceM, REP_DISTANCE_BANDS);
-  const paceScore = pairScore(activity.repPaceSecPerKm, template.repPaceSecPerKm, REP_PACE_BANDS);
-  const recoveryScore = pairScore(activity.recoveryDurationS, template.recoveryDurationS, RECOVERY_BANDS);
-  const total = repsScore * 0.4 + distanceScore * 0.3 + paceScore * 0.2 + recoveryScore * 0.1;
+  const parts = [{ weight: 0.4, score: bandScore(relativeDiff(activity.repCount, template.repCount), REPS_BANDS) }];
+  if (activity.repDistanceM != null && template.repDistanceM != null) {
+    parts.push({
+      weight: 0.3,
+      score: bandScore(relativeDiff(activity.repDistanceM, template.repDistanceM), REP_DISTANCE_BANDS),
+    });
+  }
+  if (activity.repPaceSecPerKm != null && template.repPaceSecPerKm != null) {
+    parts.push({
+      weight: 0.2,
+      score: bandScore(relativeDiff(activity.repPaceSecPerKm, template.repPaceSecPerKm), REP_PACE_BANDS),
+    });
+  }
+  if (activity.recoveryDurationS != null && template.recoveryDurationS != null) {
+    parts.push({
+      weight: 0.1,
+      score: bandScore(relativeDiff(activity.recoveryDurationS, template.recoveryDurationS), RECOVERY_BANDS),
+    });
+  }
+  const totalWeight = parts.reduce((sum, part) => sum + part.weight, 0);
+  const total = parts.reduce((sum, part) => sum + part.score * part.weight, 0) / totalWeight;
   return Math.round(total * 100) / 100;
+}
+
+export function countComparableStructuralSignals(activity: IntervalStructure, template: IntervalStructure): number {
+  return (
+    1 +
+    Number(activity.repDistanceM != null && template.repDistanceM != null) +
+    Number(activity.repPaceSecPerKm != null && template.repPaceSecPerKm != null) +
+    Number(activity.recoveryDurationS != null && template.recoveryDurationS != null)
+  );
 }
 
 /**
@@ -429,6 +486,18 @@ export function scoreTotalsMatch(activity: ActivityTotals, template: TemplateTot
   if (totalWeight === 0) return 0;
   const total = parts.reduce((sum, part) => sum + part.score * part.weight, 0) / totalWeight;
   return Math.round(total * 100) / 100;
+}
+
+export function countComparableTotalSignals(activity: ActivityTotals, template: TemplateTotals): number {
+  return [
+    activity.distanceM != null && template.distanceM != null,
+    activity.avgPaceSecPerKm != null && template.avgPaceSecPerKm != null,
+    activity.durationS != null && template.durationS != null,
+  ].filter(Boolean).length;
+}
+
+export function isMatchMarginSufficient(bestScore: number, secondScore: number | null): boolean {
+  return secondScore == null || bestScore - secondScore >= MIN_AUTO_MATCH_MARGIN;
 }
 
 /** Builds activity totals from session-level metrics. */

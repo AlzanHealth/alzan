@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Json } from '../../../types/database.types';
 import { Row, Update } from '../../../types/requests.types';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { DUPLICATE_THRESHOLD } from '../../activity-import/matching/duplicate-score';
@@ -12,8 +19,6 @@ import { RawPayloadService } from './raw-payload.service';
 
 type ActivitySessionRow = Row<'activity_sessions'>;
 type ActivitySessionUpdate = Update<'activity_sessions'>;
-type EnduranceTemplateRow = Row<'endurance_workout_templates'>;
-type WorkoutPlanRow = Row<'workout_plans'>;
 
 const PENDING_METRIC_COLUMNS = [
   'duration_s',
@@ -43,62 +48,59 @@ export class ImportReviewService {
   public async associateTemplate(
     userId: string,
     sessionId: string,
-    input: { enduranceTemplateId?: string | null; workoutTemplateId?: string | null },
+    input: {
+      enduranceTemplateId?: string | null;
+      workoutTemplateId?: string | null;
+      workoutPlanId?: string;
+    },
     targetSessionId?: string,
   ): Promise<string> {
     const session = await this.getCanonicalActionSession(userId, sessionId, targetSessionId);
-    const localDate = this.sessionLocalDate(session);
-
-    if (input.enduranceTemplateId) {
-      const templateSport = await this.getOwnedTemplateSport(
-        userId,
-        'endurance_workout_templates',
-        input.enduranceTemplateId,
-      );
-      // An endurance template must match the session's sport (no associating a
-      // cycling template to a run). The FE picker already filters by sport;
-      // this is defense-in-depth at the API boundary.
-      if (templateSport !== session.sport_type) {
-        throw new BadRequestException('IMPORT_REVIEW_TEMPLATE_SPORT_MISMATCH');
-      }
-      await this.revertPlansCompletedBySession(session.id);
-      await this.updateSession(session.id, {
-        endurance_template_id: input.enduranceTemplateId,
-        suggested_endurance_template_id: null,
-        template_match_score: null,
-        template_match_method: null,
-      });
-      await this.completeOrReplacePlannedEndurancePlan(
-        userId,
-        localDate,
-        session.id,
-        input.enduranceTemplateId,
-        templateSport,
-      );
-      return session.id;
-    }
-    if (input.workoutTemplateId) {
-      await this.assertOwnedRow(userId, 'workout_templates', input.workoutTemplateId);
-      // Gym routines only attach to strength/gym sessions.
-      if (session.sport_type !== 'strength' && session.sport_type !== 'gym') {
-        throw new BadRequestException('IMPORT_REVIEW_TEMPLATE_SPORT_MISMATCH');
-      }
-      await this.revertPlansCompletedBySession(session.id);
-      await this.updateSession(session.id, { workout_template_id: input.workoutTemplateId });
-      await this.completePlannedPlan(userId, localDate, session.id, { gym_template_id: input.workoutTemplateId });
-      return session.id;
-    }
-
-    // Remove association: clear template links and revert any plan this
-    // session had completed, so the calendar shows the plan as pending again.
-    await this.revertPlansCompletedBySession(session.id);
-    await this.updateSession(session.id, {
-      endurance_template_id: null,
-      workout_template_id: null,
-      template_match_score: null,
-      template_match_method: null,
+    const { data, error } = await this.supabaseAdminService.client.rpc('associate_activity_session_template', {
+      p_user_id: userId,
+      p_session_id: session.id,
+      p_endurance_template_id: input.enduranceTemplateId ?? undefined,
+      p_workout_template_id: input.workoutTemplateId ?? undefined,
+      p_workout_plan_id: input.workoutPlanId,
     });
+    if (error) this.throwTemplateAssociationError(error.message);
+    const result = this.parseTemplateAssociationResult(data);
+    if (result.status === 'selection_required') {
+      throw new ConflictException({
+        message: 'IMPORT_REVIEW_PLAN_SELECTION_REQUIRED',
+        candidates: result.candidates,
+      });
+    }
     return session.id;
+  }
+
+  private parseTemplateAssociationResult(value: Json): {
+    status: 'associated' | 'selection_required';
+    candidates: Json[];
+  } {
+    if (value == null || Array.isArray(value) || typeof value !== 'object') {
+      throw new InternalServerErrorException('IMPORT_REVIEW_ASSOCIATION_INVALID_RESPONSE');
+    }
+    const status = value.status;
+    const candidates = value.candidates;
+    if (status !== 'associated' && status !== 'selection_required') {
+      throw new InternalServerErrorException('IMPORT_REVIEW_ASSOCIATION_INVALID_RESPONSE');
+    }
+    return { status, candidates: Array.isArray(candidates) ? candidates : [] };
+  }
+
+  private throwTemplateAssociationError(message: string): never {
+    const knownErrors = [
+      'IMPORT_REVIEW_TEMPLATE_INPUT_INVALID',
+      'IMPORT_REVIEW_TEMPLATE_NOT_FOUND',
+      'IMPORT_REVIEW_TEMPLATE_SPORT_MISMATCH',
+      'IMPORT_REVIEW_PLAN_INVALID',
+      'IMPORT_REVIEW_PLAN_SPORT_MISMATCH',
+    ];
+    const errorCode = knownErrors.find(code => message.includes(code));
+    if (errorCode) throw new BadRequestException(errorCode);
+    if (message.includes('IMPORT_REVIEW_SESSION_NOT_FOUND')) throw new NotFoundException('ACTIVITY_SESSION_NOT_FOUND');
+    throw new InternalServerErrorException('IMPORT_REVIEW_ASSOCIATION_FAILED');
   }
 
   /** Clears a pending template suggestion ("keep generic"). */
@@ -445,101 +447,6 @@ export class ImportReviewService {
     if (error) throw new InternalServerErrorException('IMPORT_REVIEW_ABSORB_FAILED');
   }
 
-  private async revertPlansCompletedBySession(sessionId: string): Promise<void> {
-    await this.run(
-      this.supabaseAdminService.client
-        .from('workout_plans')
-        .update({ status: 'planned', completed_at: null, activity_session_id: null })
-        .eq('activity_session_id', sessionId),
-      'PLANS_REVERT',
-    );
-  }
-
-  private async completePlannedPlan(
-    userId: string,
-    localDate: string,
-    sessionId: string,
-    match: { endurance_template_id?: string; gym_template_id?: string },
-  ): Promise<void> {
-    let query = this.supabaseAdminService.client
-      .from('workout_plans')
-      .update({ status: 'completed', completed_at: new Date().toISOString(), activity_session_id: sessionId })
-      .eq('user_id', userId)
-      .eq('planned_date', localDate)
-      .eq('status', 'planned');
-    if (match.endurance_template_id) query = query.eq('endurance_template_id', match.endurance_template_id);
-    if (match.gym_template_id) query = query.eq('gym_template_id', match.gym_template_id);
-    await this.run(query, 'PLAN_COMPLETE');
-  }
-
-  private async completeOrReplacePlannedEndurancePlan(
-    userId: string,
-    localDate: string,
-    sessionId: string,
-    enduranceTemplateId: string,
-    sportType: EnduranceTemplateRow['sport_type'],
-  ): Promise<void> {
-    const plans = await this.findSameSportPendingEndurancePlans(userId, localDate, sportType);
-    const exactPlan = plans.find(plan => plan.endurance_template_id === enduranceTemplateId);
-    if (exactPlan) {
-      await this.completeEndurancePlan(exactPlan.id, sessionId, enduranceTemplateId);
-      return;
-    }
-    if (plans.length === 1) {
-      await this.completeEndurancePlan(plans[0].id, sessionId, enduranceTemplateId);
-    }
-  }
-
-  private async completeEndurancePlan(planId: string, sessionId: string, enduranceTemplateId: string): Promise<void> {
-    await this.run(
-      this.supabaseAdminService.client
-        .from('workout_plans')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          activity_session_id: sessionId,
-          endurance_template_id: enduranceTemplateId,
-        })
-        .eq('id', planId)
-        .eq('status', 'planned'),
-      'PLAN_COMPLETE',
-    );
-  }
-
-  private async findSameSportPendingEndurancePlans(
-    userId: string,
-    localDate: string,
-    sportType: EnduranceTemplateRow['sport_type'],
-  ): Promise<WorkoutPlanRow[]> {
-    const { data: plans, error: plansError } = await this.supabaseAdminService.client
-      .from('workout_plans')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('planned_date', localDate)
-      .eq('status', 'planned');
-    if (plansError) throw new InternalServerErrorException('IMPORT_REVIEW_PLANS_READ_FAILED');
-    const pendingPlans = (plans ?? []).filter(plan => plan.endurance_template_id != null);
-    if (pendingPlans.length === 0) return [];
-    const templates = await this.findOwnedEnduranceTemplatesBySport(userId, sportType);
-    const templateIds = new Set(templates.map(template => template.id));
-    return pendingPlans.filter(
-      plan => plan.endurance_template_id != null && templateIds.has(plan.endurance_template_id),
-    );
-  }
-
-  private async findOwnedEnduranceTemplatesBySport(
-    userId: string,
-    sportType: EnduranceTemplateRow['sport_type'],
-  ): Promise<Pick<EnduranceTemplateRow, 'id'>[]> {
-    const { data, error } = await this.supabaseAdminService.client
-      .from('endurance_workout_templates')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('sport_type', sportType);
-    if (error) throw new InternalServerErrorException('IMPORT_REVIEW_TEMPLATE_READ_FAILED');
-    return data ?? [];
-  }
-
   /** Reads the previous app metric values stored for an optional revert. */
   private readPreviousWatchMetrics(session: ActivitySessionRow): Record<string, unknown> | null {
     const raw = session.pending_watch_metrics;
@@ -602,10 +509,6 @@ export class ImportReviewService {
     };
   }
 
-  private sessionLocalDate(session: ActivitySessionRow): string {
-    return (session.started_at_local ?? session.start_time).slice(0, 10);
-  }
-
   private async getOwnedSession(userId: string, sessionId: string): Promise<ActivitySessionRow> {
     const { data, error } = await this.supabaseAdminService.client
       .from('activity_sessions')
@@ -620,38 +523,6 @@ export class ImportReviewService {
 
   private isNotFoundException(error: unknown): boolean {
     return error instanceof NotFoundException;
-  }
-
-  private async assertOwnedRow(
-    userId: string,
-    table: 'endurance_workout_templates' | 'workout_templates',
-    id: string,
-  ): Promise<void> {
-    const { data, error } = await this.supabaseAdminService.client
-      .from(table)
-      .select('id')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (error) throw new InternalServerErrorException('IMPORT_REVIEW_TEMPLATE_READ_FAILED');
-    if (!data) throw new NotFoundException('IMPORT_REVIEW_TEMPLATE_NOT_FOUND');
-  }
-
-  /** Returns the owned template's sport_type, or throws if not found. */
-  private async getOwnedTemplateSport(
-    userId: string,
-    table: 'endurance_workout_templates',
-    id: string,
-  ): Promise<EnduranceTemplateRow['sport_type']> {
-    const { data, error } = await this.supabaseAdminService.client
-      .from(table)
-      .select('sport_type')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (error) throw new InternalServerErrorException('IMPORT_REVIEW_TEMPLATE_READ_FAILED');
-    if (!data) throw new NotFoundException('IMPORT_REVIEW_TEMPLATE_NOT_FOUND');
-    return data.sport_type;
   }
 
   private async updateSession(sessionId: string, payload: ActivitySessionUpdate): Promise<void> {

@@ -16,6 +16,7 @@ import { PolarAccessLinkService } from './services/polar-access-link.service';
 import { ProviderOriginService } from './services/provider-origin.service';
 import { RawPayloadService } from './services/raw-payload.service';
 import { SuuntoCloudSyncService } from './services/suunto-cloud-sync.service';
+import { WearableImportLifecycleService } from './services/wearable-import-lifecycle.service';
 
 @Api(SwaggerApi.WEARABLES_API)
 @Module({
@@ -32,6 +33,7 @@ import { SuuntoCloudSyncService } from './services/suunto-cloud-sync.service';
     CanonicalHealthWriterService,
     LocalHealthSyncService,
     PolarAccessLinkService,
+    WearableImportLifecycleService,
     SuuntoCloudSyncService,
   ],
   exports: [

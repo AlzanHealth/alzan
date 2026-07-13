@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ActivityImportReview } from '../openapi/generated/alzan-be/sdk.gen';
+import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 
 interface ReviewActionTarget {
   targetSessionId?: string;
@@ -15,13 +16,7 @@ export const useImportReview = (sessionId?: string) => {
 
   const invalidate = (nextSessionId?: string) => {
     queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
-    queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
-    queryClient.invalidateQueries({ queryKey: ['weekDots'] });
-    queryClient.invalidateQueries({ queryKey: ['weeklyPlans'] });
-    queryClient.invalidateQueries({ queryKey: ['calendarDots'] });
-    queryClient.invalidateQueries({ queryKey: ['scheduledWorkoutPreview'] });
+    invalidateTrainingCalendar(queryClient);
     queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
     queryClient.invalidateQueries({ queryKey: ['importReviewAssociatedTemplate'] });
     queryClient.invalidateQueries({ queryKey: ['importReviewSuggestedTemplate'] });
@@ -47,10 +42,12 @@ export const useImportReview = (sessionId?: string) => {
     mutationFn: ({
       enduranceTemplateId,
       workoutTemplateId,
+      workoutPlanId,
       targetSessionId,
     }: {
       enduranceTemplateId?: string | null;
       workoutTemplateId?: string | null;
+      workoutPlanId?: string;
     } & ReviewActionTarget) => {
       if (!sessionId) throw new Error('SESSION_REQUIRED');
       return run(
@@ -59,6 +56,7 @@ export const useImportReview = (sessionId?: string) => {
           body: {
             endurance_template_id: enduranceTemplateId ?? null,
             workout_template_id: workoutTemplateId ?? null,
+            workout_plan_id: workoutPlanId,
             target_session_id: targetSessionId,
           },
         }),

@@ -1,5 +1,6 @@
 import { strict as assert } from 'assert';
 import {
+  applySuuntoWorkoutSummaryTimeMetadata,
   mapSuuntoActivityToCanonicalSport,
   parseSuuntoActivityFileToCanonical,
 } from './suunto-activity-canonical.mapper';
@@ -92,6 +93,7 @@ function buildTestFit(params: {
   includeGps?: boolean;
   lapTrigger?: number;
   laps?: TestFitLap[];
+  localOffsetMinutes?: number;
 }): Uint8Array {
   const startedAt = fitTimestamp('2026-05-01T08:00:00Z');
   const durationSeconds = params.durationSeconds ?? 3600;
@@ -128,6 +130,17 @@ function buildTestFit(params: {
     { ...sessionFields[11], value: [300000, 600000, 900000, 1200000, 600000] },
     { ...sessionFields[12], value: startedAt + durationSeconds },
   ]);
+
+  if (params.localOffsetMinutes != null) {
+    const activityFields = [{ fieldNumber: 5, size: 4, baseType: 0x86 }];
+    appendFitDefinition(data, 3, 34, activityFields);
+    appendFitData(data, 3, [
+      {
+        ...activityFields[0],
+        value: startedAt + durationSeconds + params.localOffsetMinutes * 60,
+      },
+    ]);
+  }
 
   const lapFields = [
     { fieldNumber: 2, size: 4, baseType: 0x86 },
@@ -520,6 +533,32 @@ function assertSuuntoFitCanonicalParsesWithoutGps(): void {
   assert.equal(canonical.summary.caloriesKcal, 500);
 }
 
+function assertSuuntoFitCanonicalPreservesOriginalLocalTime(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 5000,
+    localOffsetMinutes: 120,
+  });
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-local-time.fit');
+
+  assert.equal(canonical.summary.timezone, '+02:00');
+  assert.equal(canonical.summary.startedAtLocal, '2026-05-01T10:00:00');
+  assert.equal(canonical.summary.endedAtLocal, '2026-05-01T11:00:00');
+}
+
+function assertSuuntoSummaryOffsetOverridesFitFallback(): void {
+  const canonical = parseSuuntoActivityFileToCanonical(
+    buildTestFit({ sport: 1, subSport: 0, distanceM: 5000 }),
+    'suunto-summary-offset.fit',
+  );
+  const enriched = applySuuntoWorkoutSummaryTimeMetadata(canonical, { timeOffsetInMinutes: -210 });
+
+  assert.equal(enriched.summary.timezone, '-03:30');
+  assert.equal(enriched.summary.startedAtLocal, '2026-05-01T04:30:00');
+  assert.equal(enriched.summary.endedAtLocal, '2026-05-01T05:30:00');
+}
+
 function assertSuuntoFitWithoutGpsStillParsesAsRouteImport(): void {
   const fit = buildTestFit({ sport: 64, subSport: 85, distanceM: 0, includeGps: false });
   const routeImport = parseRouteFileWithSummary(fit, 'suunto-padel.fit', { estimatedMaxHeartRate: 190 });
@@ -683,6 +722,8 @@ assertSuuntoFitKeepsRealOneKilometerIntervals();
 assertSuuntoFitKeepsOneKilometerAutolapsWhenNoStructuredPartialsExist();
 assertSuuntoFitAcceptsLeadingBytesBeforeHeader();
 assertSuuntoFitCanonicalParsesWithoutGps();
+assertSuuntoFitCanonicalPreservesOriginalLocalTime();
+assertSuuntoSummaryOffsetOverridesFitFallback();
 assertSuuntoFitWithoutGpsStillParsesAsRouteImport();
 assertSuuntoJsonCanonicalParsesSummary();
 assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks();

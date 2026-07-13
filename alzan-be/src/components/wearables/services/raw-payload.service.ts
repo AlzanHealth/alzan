@@ -21,22 +21,18 @@ export class RawPayloadService {
       payload: payloadJson,
     });
 
-    const { data, error } = await this.supabaseAdminService.client
-      .from('external_raw_payloads_v2')
-      .insert({
-        user_id: input.userId,
-        provider: input.provider,
-        source_channel: input.sourceChannel,
-        source_package: input.sourcePackage,
-        object_type: input.objectType,
-        source_record_id: input.sourceRecordId,
-        payload_hash: payloadHash,
-        payload: payloadJson,
-        size_bytes: Buffer.byteLength(JSON.stringify(payloadJson), 'utf8'),
-        trace_id: input.traceId,
-      })
-      .select('id')
-      .single();
+    const { data, error } = await this.supabaseAdminService.client.rpc('store_external_raw_payload', {
+      p_user_id: input.userId,
+      p_provider: input.provider,
+      p_source_channel: input.sourceChannel,
+      p_source_package: input.sourcePackage as string,
+      p_object_type: input.objectType,
+      p_source_record_id: input.sourceRecordId as string,
+      p_payload_hash: payloadHash,
+      p_payload: payloadJson,
+      p_size_bytes: Buffer.byteLength(JSON.stringify(payloadJson), 'utf8'),
+      p_trace_id: input.traceId as string,
+    });
 
     if (error) {
       this.logger.warn({
@@ -49,7 +45,7 @@ export class RawPayloadService {
       return { id: null, payloadHash };
     }
 
-    return { id: data.id, payloadHash };
+    return { id: data, payloadHash };
   }
 
   public async linkPayload(input: RawPayloadLinkInput): Promise<void> {

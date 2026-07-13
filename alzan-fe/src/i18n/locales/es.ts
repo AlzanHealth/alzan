@@ -1116,6 +1116,12 @@ export default {
     light: 'Claro',
     syncAppsDescription:
       'Conecta tus aplicaciones de salud y deporte favoritas para sincronizar tus entrenamientos automáticamente.',
+    syncCompleteTitle: 'Sincronización completada',
+    syncPartialTitle: 'Sincronización completada con errores',
+    syncAlreadyRunningTitle: 'Sincronización en curso',
+    syncAlreadyRunningMessage: 'Ya hay otra sincronización activa. No se ha iniciado un proceso duplicado.',
+    syncActivitiesSummary:
+      'Importadas: {{imported}} · Omitidas: {{skipped}} · Reparadas: {{repaired}} · Fallidas: {{failed}}',
     healthDataConsentTitle: 'Consentimiento de datos de salud',
     healthDataConsentMessage:
       'Para conectar esta integración, Alzan necesita tu consentimiento explícito para tratar datos de salud como entrenamientos, sueño, frecuencia cardiaca, peso y métricas de recuperación. Puedes retirarlo más adelante desde Privacidad.',

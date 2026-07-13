@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { Providers } from '../openapi/generated/alzan-be/sdk.gen';
 import { wearablesLocalHealthApi } from '../modules/wearables';
+import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 
 const SUUNTO_PROVIDER = 'suunto';
 const QUERY_KEY = ['suuntoConnection'];
@@ -115,17 +116,24 @@ export function useSuuntoConnection() {
 
   const syncMutation = useMutation({
     mutationFn: async () => wearablesLocalHealthApi.syncSuuntoActivities(),
-    onSuccess: () => {
+    onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
-      queryClient.invalidateQueries({ queryKey: ['weeklyPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['calendarDots'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['homeSummary'] });
+      if (result.status === 'running') {
+        Alert.alert(t('settings.syncAlreadyRunningTitle'), t('settings.syncAlreadyRunningMessage'));
+        return;
+      }
+      invalidateTrainingCalendar(queryClient);
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+      Alert.alert(
+        result.status === 'partial' ? t('settings.syncPartialTitle') : t('settings.syncCompleteTitle'),
+        t('settings.syncActivitiesSummary', {
+          imported: result.activities_imported,
+          skipped: result.activities_skipped ?? 0,
+          repaired: result.activities_repaired ?? 0,
+          failed: result.activities_failed ?? 0,
+        }),
+      );
     },
     onError: (error: Error) => {
       Alert.alert(t('common.error'), error.message);

@@ -1103,6 +1103,12 @@ const en = {
     dark: 'Dark',
     light: 'Light',
     syncAppsDescription: 'Connect your favorite health and sports apps to sync your workouts automatically.',
+    syncCompleteTitle: 'Sync complete',
+    syncPartialTitle: 'Sync completed with errors',
+    syncAlreadyRunningTitle: 'Sync already running',
+    syncAlreadyRunningMessage: 'Another activity sync is still in progress. No duplicate sync was started.',
+    syncActivitiesSummary:
+      'Imported: {{imported}} · Skipped: {{skipped}} · Repaired: {{repaired}} · Failed: {{failed}}',
     healthDataConsentTitle: 'Health data consent',
     healthDataConsentMessage:
       'To connect this integration, Alzan needs your explicit consent to process health data such as workouts, sleep, heart rate, weight, and recovery metrics. You can revoke this later from Privacy settings.',

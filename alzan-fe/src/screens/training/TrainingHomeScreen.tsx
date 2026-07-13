@@ -42,6 +42,8 @@ import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
 import { Alert } from '../../components/common/Alert';
 import { moveWorkoutPlan } from '../../modules/training/services/trainingRescheduleService';
 import { ActivityImportReview } from '../../openapi/generated/alzan-be/sdk.gen';
+import { matchPlansToCompletedSessions } from './helpers/dailyPlanSessionMerge.helper';
+import { invalidateTrainingCalendar } from '../../lib/trainingQueryKeys';
 
 interface DailyEntry {
   id: string;
@@ -55,14 +57,14 @@ interface DailyEntry {
   isScheduledTemplate?: boolean;
   workout_templates?: {
     id: string;
-    base_name: string;
+    base_name: string | null;
     description: string;
     sport_type: string;
     suggested_day_of_week?: number | null;
   } | null;
   endurance_workout_templates?: {
     id: string;
-    base_name: string;
+    base_name: string | null;
     description: string;
     sport_type: string;
     scheduled_day?: number | null;
@@ -79,8 +81,8 @@ interface CompletedSession {
   workout_template_id: string | null;
   endurance_template_id: string | null;
   start_time: string;
-  name: string;
-  source: string;
+  name: string | null;
+  source: string | null;
   distance_m: number | null;
   duration_s: number | null;
 }
@@ -170,15 +172,18 @@ export const TrainingHomeScreen = () => {
     mutationFn: async ({
       sessionId,
       enduranceTemplateId,
+      workoutPlanId,
     }: {
       sessionId: string;
       enduranceTemplateId: string;
+      workoutPlanId: string;
     }): Promise<string> => {
       const { data } = await ActivityImportReview.associateTemplate({
         path: { id: sessionId },
         body: {
           endurance_template_id: enduranceTemplateId,
           workout_template_id: null,
+          workout_plan_id: workoutPlanId,
         },
       });
       if (!data?.session_id) throw new Error('IMPORT_REVIEW_ACTION_FAILED');
@@ -186,14 +191,7 @@ export const TrainingHomeScreen = () => {
     },
     onSuccess: nextSessionId => {
       setPreviewPlan(null);
-      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
-      queryClient.invalidateQueries({ queryKey: ['weeklyPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['calendarDots'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['homeSummary'] });
-      queryClient.invalidateQueries({ queryKey: ['scheduledWorkoutPreview'] });
+      invalidateTrainingCalendar(queryClient);
       queryClient.invalidateQueries({ queryKey: ['importReviewAssociatedTemplate'] });
       queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
       queryClient.invalidateQueries({ queryKey: ['activitySession', nextSessionId] });
@@ -539,26 +537,24 @@ export const TrainingHomeScreen = () => {
 
   // Fetch completed sessions for the selected date
   const { data: completedSessions } = useQuery({
-    queryKey: ['completedSessions', format(selectedDate, 'yyyy-MM-dd'), user?.id],
+    queryKey: ['completedSessions', format(selectedDate, 'yyyy-MM-dd'), user?.id, timezone],
     queryFn: async () => {
       if (!user) return [];
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const startOfDayStr = `${dateStr}T00:00:00`;
-      const endOfDayStr = `${dateStr}T23:59:59`;
-
       const { data, error } = await supabase
-        .from('activity_sessions')
+        .rpc('get_activity_sessions_for_local_date', {
+          p_user_id: user.id,
+          p_local_date: dateStr,
+          p_timezone: timezone,
+        })
         .select(
           'id, sport_type, sport_subtype, workout_template_id, endurance_template_id, start_time, name, source, distance_m, duration_s',
         )
-        .eq('user_id', user.id)
         .eq('needs_strength_review', false)
         .or(
           'duplicate_resolution.is.null,duplicate_resolution.neq.pending,duplicate_score.lt.80,duplicate_score.is.null',
         )
-        .not('end_time', 'is', null) // Only completed sessions
-        .gte('start_time', startOfDayStr)
-        .lte('start_time', endOfDayStr);
+        .not('end_time', 'is', null); // Only completed sessions
 
       if (error) throw error;
       return (data as unknown as CompletedSession[]) || [];
@@ -569,39 +565,12 @@ export const TrainingHomeScreen = () => {
 
   // Merge Manual Plans with Unmatched Completed Sessions
   const dailyPlans = React.useMemo(() => {
-    const plans = manualPlans ? [...manualPlans] : [];
+    const sourcePlans = manualPlans ? [...manualPlans] : [];
     const sessions = completedSessions || [];
-
-    // Track matched sessions to avoid duplication
-    const matchedSessionIds = new Set<string>();
+    const { plans, matchedSessionIds } = matchPlansToCompletedSessions(sourcePlans, sessions);
     const linkedSessionIds = new Set(
       plans.map(plan => plan.activity_session_id).filter((value): value is string => Boolean(value)),
     );
-
-    // 1. Iterate plans to find matches. Explicit DB links win before legacy fallbacks.
-    plans.forEach(plan => {
-      const template = plan.workout_templates || plan.endurance_workout_templates;
-      const isGym = !!plan.gym_template_id;
-      const planTemplateId = isGym ? plan.gym_template_id || template?.id : plan.endurance_template_id || template?.id;
-
-      const match = sessions.find((s: CompletedSession) => {
-        if (plan.activity_session_id && s.id === plan.activity_session_id) return true;
-        if (isGym) {
-          // Match by template ID or Name+Type for older gym sessions.
-          return (
-            s.workout_template_id === planTemplateId || (s.name === template?.base_name && s.sport_type === 'strength')
-          );
-        }
-        if (s.endurance_template_id && s.endurance_template_id === planTemplateId) return true;
-        // Legacy fallback for imports created before template/session links existed.
-        return s.sport_type === template?.sport_type && s.name === template?.base_name;
-      });
-
-      if (match) {
-        matchedSessionIds.add(match.id);
-        plan.completedSession = match;
-      }
-    });
 
     // 2. Create "Plan-like" objects for unmatched sessions
     const extraSessions = sessions.filter(s => !matchedSessionIds.has(s.id) && !linkedSessionIds.has(s.id));
@@ -691,6 +660,7 @@ export const TrainingHomeScreen = () => {
       associateCompletedSessionMutation.mutate({
         sessionId: session.id,
         enduranceTemplateId: previewPlan.templateId,
+        workoutPlanId: previewPlan.id,
       });
 
     if (previewAssociateCandidates.length === 1) {

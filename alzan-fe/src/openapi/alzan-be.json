@@ -971,8 +971,17 @@
         "type": "object",
         "properties": {
           "provider": { "type": "string" },
+          "job_id": { "type": "string" },
+          "status": { "type": "string" },
           "activities_imported": { "type": "number" },
-          "last_success_at": { "type": "string" }
+          "activities_skipped": { "type": "number" },
+          "activities_updated": { "type": "number" },
+          "activities_repaired": { "type": "number" },
+          "activities_failed": { "type": "number" },
+          "activities_reconciled": { "type": "number" },
+          "errors_by_code": { "type": "object" },
+          "phase_durations_ms": { "type": "object" },
+          "last_success_at": { "type": "string", "nullable": true }
         },
         "required": ["provider", "activities_imported", "last_success_at"]
       },
@@ -981,6 +990,7 @@
         "properties": {
           "endurance_template_id": { "type": "string", "nullable": true, "format": "uuid" },
           "workout_template_id": { "type": "string", "nullable": true, "format": "uuid" },
+          "workout_plan_id": { "type": "string", "format": "uuid" },
           "target_session_id": { "type": "string", "format": "uuid" }
         }
       },

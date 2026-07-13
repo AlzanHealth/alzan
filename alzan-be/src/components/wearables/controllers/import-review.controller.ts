@@ -30,6 +30,7 @@ export class ImportReviewController {
       {
         enduranceTemplateId: body.endurance_template_id ?? null,
         workoutTemplateId: body.workout_template_id ?? null,
+        workoutPlanId: body.workout_plan_id,
       },
       body.target_session_id,
     );
