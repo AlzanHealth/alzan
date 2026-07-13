@@ -21,6 +21,11 @@ Compatibility layers:
 4. Prefer the smallest matching skill set instead of loading everything.
 5. More specific subtree instructions win over broader ones.
 
+## Local Demo Access
+
+- Use only against local Supabase: `info@alzan.com` / `FakePassword1`.
+- The seeded account and password source of truth are [`supabase/seeds/0_user.sql`](supabase/seeds/0_user.sql); never use these credentials against a remote environment.
+
 ## Skill Routing
 
 - Frontend work in `alzan-fe/`: use `fe-react-native-expert-developer` first, then the relevant `fe-*` skills, then `shared-*`.
