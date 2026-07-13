@@ -76,13 +76,19 @@ export const measurementApi = {
   async deleteMeasurement(id: string) {
     console.log('[measurementApi.deleteMeasurement] Iniciando - id:', id);
     try {
-      const { error } = await supabase.from('body_measurements').delete().eq('id', id);
+      const { data, error } = await supabase
+        .from('body_measurements')
+        .delete()
+        .eq('id', id)
+        .select('user_id, measured_at')
+        .single();
 
       if (error) {
         console.error('[measurementApi.deleteMeasurement] Error:', error);
         throw error;
       }
       console.log('[measurementApi.deleteMeasurement] Éxito');
+      return data;
     } catch (err) {
       console.error('[measurementApi.deleteMeasurement] Exception:', err);
       throw err;

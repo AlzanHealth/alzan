@@ -341,7 +341,8 @@ WITH latest_abdomen AS (
     m.measured_at::date AS calculated_for_date,
     m.value_cm AS abdomen_cm,
     u.height_cm,
-    u.sex
+    u.sex,
+    u.date_of_birth
   FROM public.body_measurements m
   JOIN public.users u ON u.id = m.user_id
   WHERE m.measurement_type = 'abdomen'
@@ -353,6 +354,11 @@ computed AS (
   SELECT
     abdomen.user_id,
     abdomen.calculated_for_date,
+    abdomen.abdomen_cm,
+    abdomen.height_cm,
+    abdomen.sex,
+    hips.value_cm AS hips_cm,
+    EXTRACT(YEAR FROM age(abdomen.calculated_for_date, abdomen.date_of_birth))::integer AS age_years,
     recent_weight.id AS source_weight_log_id,
     recent_weight.weight_kg AS weight_kg_used,
     round((abdomen.abdomen_cm / abdomen.height_cm)::numeric, 2) AS waist_to_height_ratio,
@@ -397,12 +403,46 @@ computed AS (
     ORDER BY w.measured_at DESC
     LIMIT 1
   ) recent_weight ON true
+),
+composition AS (
+  SELECT
+    computed.*,
+    round((weight_kg_used / power(height_cm / 100.0, 2))::numeric, 1) AS bmi,
+    round((
+      CASE sex
+        WHEN 'female' THEN 76 - 20 * (height_cm / abdomen_cm)
+        ELSE 64 - 20 * (height_cm / abdomen_cm)
+      END
+    )::numeric, 1) AS bodyfat_percent,
+    round((
+      CASE sex
+        WHEN 'female' THEN 2.89 + 0.255 * weight_kg_used - 0.175 * hips_cm - 0.038 * age_years + 0.118 * height_cm
+        ELSE 39.5 + 0.665 * weight_kg_used - 0.185 * abdomen_cm - 0.418 * hips_cm - 0.08 * age_years
+      END
+    )::numeric, 1) AS muscle_mass_kg
+  FROM computed
+  WHERE weight_kg_used IS NOT NULL
+    AND hips_cm IS NOT NULL
+    AND age_years IS NOT NULL
+    AND sex IN ('male', 'female')
 )
 INSERT INTO public.body_composition_logs (
   user_id,
   calculated_for_date,
   source_weight_log_id,
   weight_kg_used,
+  bmi,
+  bodyfat_percent,
+  bodyfat_method,
+  bodyfat_precision_level,
+  bodyfat_formula,
+  bodyfat_inputs,
+  muscle_mass_kg,
+  muscle_percent,
+  muscle_method,
+  muscle_precision_level,
+  muscle_formula,
+  muscle_inputs,
   waist_to_height_ratio,
   waist_to_height_category,
   waist_to_height_formula,
@@ -410,13 +450,46 @@ INSERT INTO public.body_composition_logs (
   waist_to_hip_ratio,
   waist_to_hip_category,
   waist_to_hip_formula,
-  waist_to_hip_inputs
+  waist_to_hip_inputs,
+  calculation_version,
+  calculation_status,
+  input_snapshot
 )
 SELECT
   user_id,
   calculated_for_date,
   source_weight_log_id,
   weight_kg_used,
+  CASE WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL ELSE bmi END,
+  CASE WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL ELSE bodyfat_percent END,
+  CASE WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL ELSE 'rfm' END,
+  CASE WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL ELSE 3 END,
+  CASE
+    WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL
+    WHEN sex = 'female' THEN 'RFM = 76 - 20 * (heightCm / abdomenCm)'
+    ELSE 'RFM = 64 - 20 * (heightCm / abdomenCm)'
+  END,
+  CASE
+    WHEN calculated_for_date = CURRENT_DATE - 13 THEN '[]'::jsonb
+    ELSE jsonb_build_array('height', 'sex', 'abdomen')
+  END,
+  CASE WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL ELSE muscle_mass_kg END,
+  CASE
+    WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL
+    ELSE round((muscle_mass_kg / weight_kg_used * 100)::numeric, 1)
+  END,
+  CASE WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL ELSE 'al_gindan' END,
+  CASE WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL ELSE 3 END,
+  CASE
+    WHEN calculated_for_date = CURRENT_DATE - 13 THEN NULL
+    WHEN sex = 'female' THEN 'SM = 2.89 + 0.255 * weight - 0.175 * hips - 0.038 * age + 0.118 * height'
+    ELSE 'SM = 39.5 + 0.665 * weight - 0.185 * abdomen - 0.418 * hips - 0.08 * age'
+  END,
+  CASE
+    WHEN calculated_for_date = CURRENT_DATE - 13 THEN '[]'::jsonb
+    WHEN sex = 'female' THEN jsonb_build_array('weight', 'height', 'age', 'sex', 'hips')
+    ELSE jsonb_build_array('weight', 'age', 'sex', 'abdomen', 'hips')
+  END,
   waist_to_height_ratio,
   waist_to_height_category,
   'waistToHeight = abdomen / height',
@@ -424,11 +497,32 @@ SELECT
   waist_to_hip_ratio,
   waist_to_hip_category,
   CASE WHEN waist_to_hip_ratio IS NULL THEN NULL ELSE 'waistToHip = abdomen / hips' END,
-  CASE WHEN waist_to_hip_ratio IS NULL THEN '[]'::jsonb ELSE jsonb_build_array('abdomen', 'hips', 'sex') END
-FROM computed
+  CASE WHEN waist_to_hip_ratio IS NULL THEN '[]'::jsonb ELSE jsonb_build_array('abdomen', 'hips', 'sex') END,
+  1,
+  CASE WHEN calculated_for_date = CURRENT_DATE - 13 THEN 'partial' ELSE 'complete' END,
+  jsonb_build_object(
+    'weightKg', weight_kg_used,
+    'heightCm', height_cm,
+    'age', age_years,
+    'sex', sex,
+    'measurements', jsonb_build_object('abdomen', abdomen_cm, 'hips', hips_cm)
+  )
+FROM composition
 ON CONFLICT (user_id, calculated_for_date) DO UPDATE SET
-  source_weight_log_id = COALESCE(public.body_composition_logs.source_weight_log_id, EXCLUDED.source_weight_log_id),
-  weight_kg_used = COALESCE(public.body_composition_logs.weight_kg_used, EXCLUDED.weight_kg_used),
+  source_weight_log_id = EXCLUDED.source_weight_log_id,
+  weight_kg_used = EXCLUDED.weight_kg_used,
+  bmi = EXCLUDED.bmi,
+  bodyfat_percent = EXCLUDED.bodyfat_percent,
+  bodyfat_method = EXCLUDED.bodyfat_method,
+  bodyfat_precision_level = EXCLUDED.bodyfat_precision_level,
+  bodyfat_formula = EXCLUDED.bodyfat_formula,
+  bodyfat_inputs = EXCLUDED.bodyfat_inputs,
+  muscle_mass_kg = EXCLUDED.muscle_mass_kg,
+  muscle_percent = EXCLUDED.muscle_percent,
+  muscle_method = EXCLUDED.muscle_method,
+  muscle_precision_level = EXCLUDED.muscle_precision_level,
+  muscle_formula = EXCLUDED.muscle_formula,
+  muscle_inputs = EXCLUDED.muscle_inputs,
   waist_to_height_ratio = EXCLUDED.waist_to_height_ratio,
   waist_to_height_category = EXCLUDED.waist_to_height_category,
   waist_to_height_formula = EXCLUDED.waist_to_height_formula,
@@ -437,4 +531,8 @@ ON CONFLICT (user_id, calculated_for_date) DO UPDATE SET
   waist_to_hip_category = EXCLUDED.waist_to_hip_category,
   waist_to_hip_formula = EXCLUDED.waist_to_hip_formula,
   waist_to_hip_inputs = EXCLUDED.waist_to_hip_inputs,
+  calculation_version = EXCLUDED.calculation_version,
+  calculation_status = EXCLUDED.calculation_status,
+  input_snapshot = EXCLUDED.input_snapshot,
+  composition_calculated_at = now(),
   updated_at = now();

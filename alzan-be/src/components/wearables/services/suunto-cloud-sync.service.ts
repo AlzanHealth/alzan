@@ -18,6 +18,10 @@ import { CanonicalActivityWriterService } from './canonical-activity-writer.serv
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
+import {
+  SuuntoWorkoutPaginationStrategy,
+  UnverifiedSinglePageWorkoutPaginationStrategy,
+} from './suunto-workout-pagination.strategy';
 
 type JsonRecord = Record<string, unknown>;
 type ProviderTokenRow = {
@@ -46,11 +50,15 @@ type WorkoutImportOutcome = {
   errorCode?: string;
 };
 
+type WorkoutSummaryFetchResult = {
+  workouts: JsonRecord[];
+  isPaginationVerified: boolean;
+};
+
 const FIRST_SYNC_LOOKBACK_DAYS = 30;
 const NORMAL_SYNC_OVERLAP_DAYS = 3;
 const REPAIR_LOOKBACK_DAYS = 20;
 const WORKOUT_LIST_LIMIT = 100;
-const WORKOUT_LIST_MAX = 500;
 const WORKOUT_IMPORT_CONCURRENCY = 3;
 const SUUNTO_REQUEST_RETRIES = 3;
 const SUUNTO_RETRY_BASE_DELAY_MS = 250;
@@ -63,6 +71,8 @@ export class SuuntoCloudSyncService {
   private readonly logger = new Logger(SuuntoCloudSyncService.name);
   private readonly apiBaseUrl = 'https://cloudapi.suunto.com';
   private readonly tokenUrl = 'https://cloudapi-oauth.suunto.com/oauth/token';
+  private readonly workoutPaginationStrategy: SuuntoWorkoutPaginationStrategy =
+    new UnverifiedSinglePageWorkoutPaginationStrategy(WORKOUT_LIST_LIMIT);
 
   constructor(
     private readonly configService: ConfigService,
@@ -86,7 +96,8 @@ export class SuuntoCloudSyncService {
     const phaseDurationsMs: Record<string, number> = {};
     try {
       const fetchStartedAt = Date.now();
-      const workouts = await this.fetchWorkoutSummaries(token.accessToken, userId);
+      const workoutFetch = await this.fetchWorkoutSummaries(token.accessToken, userId);
+      const workouts = workoutFetch.workouts;
       phaseDurationsMs.fetchSummaries = Date.now() - fetchStartedAt;
       const keyedWorkouts = workouts
         .map(workout => ({ workout, workoutKey: this.readWorkoutKey(workout) }))
@@ -108,10 +119,11 @@ export class SuuntoCloudSyncService {
       const activitiesRepaired = this.countOutcomes(outcomes, 'repaired');
       const activitiesFailed = this.countOutcomes(outcomes, 'failed');
       const errorsByCode = this.countErrors(outcomes);
+      if (!workoutFetch.isPaginationVerified) errorsByCode.SUUNTO_PAGINATION_UNVERIFIED = 1;
       const activitiesReconciled = activitiesImported + activitiesRepaired;
       phaseDurationsMs.reconcile = 0;
       const lastSuccessAt = new Date().toISOString();
-      const status = activitiesFailed > 0 ? 'partial' : 'success';
+      const status = activitiesFailed > 0 || !workoutFetch.isPaginationVerified ? 'partial' : 'success';
       await this.markConnectionResult(userId, lastSuccessAt, status, errorsByCode);
       await this.syncStateService.saveState({
         userId,
@@ -121,7 +133,7 @@ export class SuuntoCloudSyncService {
         syncDomain: 'activities',
         cursorToken: null,
         anchorToken: null,
-        lastRecordAt: lastSuccessAt,
+        lastRecordAt: workoutFetch.isPaginationVerified ? lastSuccessAt : null,
         status,
         metadata: {
           jobId: job.jobId,
@@ -133,6 +145,7 @@ export class SuuntoCloudSyncService {
           errorsByCode,
           phaseDurationsMs,
           canonicalVersion: CANONICAL_ACTIVITY_VERSION,
+          paginationVerified: workoutFetch.isPaginationVerified,
         },
       });
       await this.importLifecycleService.finishSyncJob({
@@ -366,26 +379,23 @@ export class SuuntoCloudSyncService {
     }, {});
   }
 
-  private async fetchWorkoutSummaries(accessToken: string, userId?: string): Promise<JsonRecord[]> {
+  private async fetchWorkoutSummaries(accessToken: string, userId?: string): Promise<WorkoutSummaryFetchResult> {
     const since = await this.resolveWorkoutLookbackStartMs(userId);
+    const response = await this.getSuunto<JsonRecord | JsonRecord[]>(
+      '/v2/workouts',
+      accessToken,
+      this.workoutPaginationStrategy.buildRequest(String(since)),
+    );
+    const page = this.extractWorkoutSummaries(response);
     const workoutsByKey = new Map<string, JsonRecord>();
-    for (let offset = 0; offset < WORKOUT_LIST_MAX; offset += WORKOUT_LIST_LIMIT) {
-      const response = await this.getSuunto<JsonRecord | JsonRecord[]>('/v2/workouts', accessToken, {
-        since: String(since),
-        limit: String(WORKOUT_LIST_LIMIT),
-        offset: String(offset),
-      });
-      const page = this.extractWorkoutSummaries(response);
-      let added = 0;
-      for (const workout of page) {
-        const workoutKey = this.readWorkoutKey(workout);
-        if (!workoutKey || workoutsByKey.has(workoutKey)) continue;
-        workoutsByKey.set(workoutKey, workout);
-        added += 1;
-      }
-      if (page.length < WORKOUT_LIST_LIMIT || added === 0) break;
-    }
-    return this.filterRecentWorkoutSummaries([...workoutsByKey.values()], since);
+    page.forEach(workout => {
+      const workoutKey = this.readWorkoutKey(workout);
+      if (workoutKey && !workoutsByKey.has(workoutKey)) workoutsByKey.set(workoutKey, workout);
+    });
+    return {
+      workouts: this.filterRecentWorkoutSummaries([...workoutsByKey.values()], since),
+      isPaginationVerified: this.workoutPaginationStrategy.isComplete(page.length),
+    };
   }
 
   private extractWorkoutSummaries(response: JsonRecord | JsonRecord[]): JsonRecord[] {

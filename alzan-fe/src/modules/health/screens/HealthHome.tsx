@@ -15,9 +15,12 @@ import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../../i18n/dateLocale';
+import { useAuth } from '../../../context/AuthContext';
+import { healthQueryKeys } from '../hooks/healthQueryKeys';
 
 export const HealthHome = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const { latestWeight, weightDelta, avgSleepMinutes, bodyComposition, latestSleep } = useHealthInsights();
 
@@ -30,9 +33,12 @@ export const HealthHome = () => {
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
-    setRefreshing(false);
-  }, [queryClient]);
+    try {
+      await queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id), refetchType: 'active' });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [queryClient, user?.id]);
 
   React.useEffect(() => {
     const parent = navigation.getParent<BottomTabNavigationProp<TabParamList>>();
@@ -49,13 +55,13 @@ export const HealthHome = () => {
   const getBmiLabel = (cat: string) => {
     switch (cat) {
       case 'underweight':
-        return 'Peso inf.';
+        return t('health.bmiUnderweight');
       case 'normal':
-        return 'Normal';
+        return t('health.bmiNormal');
       case 'overweight':
-        return 'Sobrepeso';
+        return t('health.bmiOverweight');
       case 'obese':
-        return 'Obesidad';
+        return t('health.bmiObesity');
       default:
         return '';
     }
@@ -130,12 +136,7 @@ export const HealthHome = () => {
                       style={[
                         styles.deltaValue,
                         {
-                          color:
-                            weightDelta.change < 0
-                              ? '#10B981'
-                              : weightDelta.change > 0
-                                ? '#EF4444'
-                                : colors.textSecondary,
+                          color: themeColors.textSecondary,
                         },
                       ]}
                     >

@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
+import { healthQueryKeys } from './healthQueryKeys';
 import { supabase } from '../../../lib/supabaseClient';
 
 // Fetch basic profile info: height, sex, dob
 export const useUserProfile = () => {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['userProfile', user?.id],
+    queryKey: healthQueryKeys.profile(user?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('users')

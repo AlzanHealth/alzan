@@ -54,7 +54,6 @@ import { colors, spacing, borderRadius } from '../../../theme';
 
 import { useHealthInsights } from '../hooks/useHealthInsights';
 import { useRecalculateBodyComp } from '../hooks/useRecalculateBodyComp';
-import { useWeightLogs } from '../hooks/useWeight';
 import { useProfile } from '../../../hooks/settings/useProfile';
 import { RangeBar } from '../components/RangeBar';
 import { GlassCard } from '../../../components/GlassCard';
@@ -113,7 +112,6 @@ export const BodyCompositionDetail = () => {
 
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const { bodyComposition, latestWeight, age } = useHealthInsights();
-  const { data: weightLogs } = useWeightLogs(10); // Get last 10 for delta calculation
   const { profile } = useProfile();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
   const recalculateMutation = useRecalculateBodyComp();
@@ -174,50 +172,9 @@ export const BodyCompositionDetail = () => {
     }
   };
 
-  /** Helper flag for sex-specific logic */
+  const hasDemographicRanges = age !== null && (profile?.sex === 'male' || profile?.sex === 'female');
   const isFemale = profile?.sex === 'female';
-
-  /** User age for dynamic range calculation */
-  const userAge = age || 30;
-
-  // Calculate deltas from previous measurement
-  const deltas = useMemo(() => {
-    if (!weightLogs || weightLogs.length < 2) {
-      return { bmi: undefined, bodyFat: undefined, muscle: undefined };
-    }
-
-    const latest = weightLogs[0];
-    const latestDateStr = new Date(latest.measured_at).toDateString();
-    const previous =
-      weightLogs.find((log, index) => index > 0 && new Date(log.measured_at).toDateString() !== latestDateStr) ||
-      weightLogs[1];
-    const heightM = (profile?.height_cm || 170) / 100;
-
-    // BMI delta
-    const latestBmi = latest.weight_kg / (heightM * heightM);
-    const previousBmi = previous.weight_kg / (heightM * heightM);
-    const bmiDelta = latestBmi - previousBmi;
-
-    // Body Fat delta
-    let bodyFatDelta: number | undefined;
-    if (latest.bodyfat_percent && previous.bodyfat_percent) {
-      bodyFatDelta = latest.bodyfat_percent - previous.bodyfat_percent;
-    }
-
-    // Muscle delta (as percentage)
-    let muscleDelta: number | undefined;
-    if (latest.muscle_mass_kg && previous.muscle_mass_kg && latest.weight_kg > 0 && previous.weight_kg > 0) {
-      const latestMusclePercent = (latest.muscle_mass_kg / latest.weight_kg) * 100;
-      const previousMusclePercent = (previous.muscle_mass_kg / previous.weight_kg) * 100;
-      muscleDelta = latestMusclePercent - previousMusclePercent;
-    }
-
-    return {
-      bmi: Math.abs(bmiDelta) > 0.05 ? bmiDelta : undefined,
-      bodyFat: bodyFatDelta && Math.abs(bodyFatDelta) > 0.05 ? bodyFatDelta : undefined,
-      muscle: muscleDelta && Math.abs(muscleDelta) > 0.05 ? muscleDelta : undefined,
-    };
-  }, [weightLogs, profile?.height_cm]);
+  const deltas = bodyComposition.deltas;
 
   // =========================================================================
   // DYNAMIC RANGES (Age & Sex Specific)
@@ -227,15 +184,21 @@ export const BodyCompositionDetail = () => {
   const bmiSegments = useMemo(() => toBarSegments(BMI_RANGES, isSpanish), [isSpanish]);
 
   /** Body fat bar segments based on user's age and sex */
-  const bodyFatRanges = useMemo(() => getBodyFatRanges(userAge, isFemale), [userAge, isFemale]);
+  const bodyFatRanges = useMemo(
+    () => (hasDemographicRanges && age !== null ? getBodyFatRanges(age, isFemale) : []),
+    [age, hasDemographicRanges, isFemale],
+  );
   const bodyFatSegments = useMemo(() => toBarSegments(bodyFatRanges, isSpanish), [bodyFatRanges, isSpanish]);
 
   /** Muscle mass bar segments based on user's age and sex */
-  const muscleRanges = useMemo(() => getMuscleRanges(userAge, isFemale), [userAge, isFemale]);
+  const muscleRanges = useMemo(
+    () => (hasDemographicRanges && age !== null ? getMuscleRanges(age, isFemale) : []),
+    [age, hasDemographicRanges, isFemale],
+  );
   const muscleSegments = useMemo(() => toBarSegments(muscleRanges, isSpanish), [muscleRanges, isSpanish]);
-  const abdominalSex = isFemale ? 'female' : 'male';
+  const abdominalSex = profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : null;
   const waistToHeightRange = useMemo(() => getWaistToHeightRangeConfig(), []);
-  const waistToHipRange = useMemo(() => getWaistToHipRangeConfig(abdominalSex), [abdominalSex]);
+  const waistToHipRange = useMemo(() => (abdominalSex ? getWaistToHipRangeConfig(abdominalSex) : null), [abdominalSex]);
 
   /** Current body fat category based on official ranges */
   const currentBodyFatCategory = useMemo(() => {
@@ -308,7 +271,7 @@ export const BodyCompositionDetail = () => {
   );
   const waistToHipSegments = useMemo(
     () =>
-      waistToHipRange.segments.map(segment => ({
+      (waistToHipRange?.segments ?? []).map(segment => ({
         to: segment.to,
         color: segment.color,
         label: translateDynamicKey(segment.labelKey),
@@ -332,7 +295,7 @@ export const BodyCompositionDetail = () => {
     // Body fat method info
     const muscleMethod = bodyComposition.muscle?.method || 'lee_et_al';
     const isAdvancedMuscle = muscleMethod === 'al_gindan';
-    const formulaSex = profile?.sex === 'female' ? 'female' : 'male';
+    const formulaSex = profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : null;
 
     if (infoModal === 'bmi') {
       title = t('health.imc');
@@ -341,34 +304,35 @@ export const BodyCompositionDetail = () => {
       description = t('health.bmiDescription');
       formulaTitle = t('health.methodOfCalculation');
 
-      const heightM = profile?.height_cm ? profile.height_cm / 100 : 1.75;
-      const weightKg = latestWeight?.weight_kg || 70;
+      const heightM = profile?.height_cm ? profile.height_cm / 100 : null;
+      const weightKg = latestWeight?.weight_kg ?? null;
 
-      calculationDetails = (
-        <View style={styles.calculationContainer}>
-          <Text style={styles.calcExplanation}>
-            <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')}</Text> {t('health.bmiFormula')}
-          </Text>
-          <View style={styles.calcDivider} />
-          <View style={styles.calculationRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.calcLabel}>{t('health.yourWeight')}</Text>
-              <Text style={[styles.calcValue, { color: themeColor }]}>
-                {convertWeightToUi(weightKg).value} {convertWeightToUi(weightKg).unit}
-              </Text>
+      calculationDetails =
+        heightM && weightKg ? (
+          <View style={styles.calculationContainer}>
+            <Text style={styles.calcExplanation}>
+              <Text style={{ fontWeight: '700' }}>{t('health.formulaLabel')}</Text> {t('health.bmiFormula')}
+            </Text>
+            <View style={styles.calcDivider} />
+            <View style={styles.calculationRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.calcLabel}>{t('health.yourWeight')}</Text>
+                <Text style={[styles.calcValue, { color: themeColor }]}>
+                  {convertWeightToUi(weightKg).value} {convertWeightToUi(weightKg).unit}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.calcLabel}>{t('health.yourHeight')}</Text>
+                <Text style={[styles.calcValue, { color: themeColor }]}>{heightM.toFixed(2)} m</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.calcLabel}>{t('health.yourHeight')}</Text>
-              <Text style={[styles.calcValue, { color: themeColor }]}>{heightM.toFixed(2)} m</Text>
-            </View>
+            <View style={styles.calcDivider} />
+            <Text style={styles.calcExplanation}>
+              {weightKg.toFixed(1)} ÷ ({heightM.toFixed(2)} × {heightM.toFixed(2)}) ={' '}
+              <Text style={{ fontWeight: '700', color: themeColor }}>{bodyComposition.bmi?.value || '--'}</Text>
+            </Text>
           </View>
-          <View style={styles.calcDivider} />
-          <Text style={styles.calcExplanation}>
-            {weightKg.toFixed(1)} ÷ ({heightM.toFixed(2)} × {heightM.toFixed(2)}) ={' '}
-            <Text style={{ fontWeight: '700', color: themeColor }}>{bodyComposition.bmi?.value || '--'}</Text>
-          </Text>
-        </View>
-      );
+        ) : null;
 
       tips.push(
         <View key="tip1" style={styles.tipBox}>
@@ -399,12 +363,14 @@ export const BodyCompositionDetail = () => {
       formulaTitle = t('health.methodOfCalculation');
 
       const method = bodyComposition.bodyFat?.method || 'deurenberg';
-      const formula = getLocalizedCompositionFormula({
-        metric: 'bodyFat',
-        method,
-        sex: formulaSex,
-        t: translateInfoCopy,
-      });
+      const formula = formulaSex
+        ? getLocalizedCompositionFormula({
+            metric: 'bodyFat',
+            method,
+            sex: formulaSex,
+            t: translateInfoCopy,
+          })
+        : '';
       const inputsUsed = bodyComposition.bodyFat?.inputsUsed;
       const precisionTip = getBodyFatPrecisionTip(method, translateInfoCopy);
       const getBodyFatMethodLabel = () => {
@@ -510,12 +476,14 @@ export const BodyCompositionDetail = () => {
       IconComponent = Dumbbell;
       description = t('health.muscleDescription');
       formulaTitle = t('health.methodOfCalculation');
-      const muscleFormula = getLocalizedCompositionFormula({
-        metric: 'muscle',
-        method: muscleMethod,
-        sex: formulaSex,
-        t: translateInfoCopy,
-      });
+      const muscleFormula = formulaSex
+        ? getLocalizedCompositionFormula({
+            metric: 'muscle',
+            method: muscleMethod,
+            sex: formulaSex,
+            t: translateInfoCopy,
+          })
+        : '';
       const precisionTip = getMusclePrecisionTip(muscleMethod, translateInfoCopy);
 
       const getMuscleMethodLabel = () => {
@@ -857,7 +825,7 @@ export const BodyCompositionDetail = () => {
     onInfoPress: () => void;
     delta?: number;
     deltaUnit?: string;
-    inverseColor?: boolean;
+    comparisonNote?: string;
     children?: React.ReactNode;
   }
 
@@ -872,7 +840,7 @@ export const BodyCompositionDetail = () => {
     onInfoPress,
     delta,
     deltaUnit,
-    inverseColor,
+    comparisonNote,
     children,
   }: MetricCardProps) => (
     <View style={[styles.metricCard, dynamicStyles.glassCard]}>
@@ -900,20 +868,7 @@ export const BodyCompositionDetail = () => {
           {unit && <Text style={[styles.unitText, { color: themeColors.textSecondary }]}>{unit}</Text>}
           {delta !== undefined && delta !== 0 && (
             <View style={styles.deltaContainer}>
-              <Text
-                style={[
-                  styles.deltaText,
-                  {
-                    color: inverseColor
-                      ? delta > 0
-                        ? '#EF4444'
-                        : '#10B981' // For BMI/Fat: positive = bad
-                      : delta > 0
-                        ? '#10B981'
-                        : '#EF4444', // For Muscle: positive = good
-                  },
-                ]}
-              >
+              <Text style={[styles.deltaText, { color: themeColors.textSecondary }]}>
                 {delta > 0 ? '+' : ''}
                 {delta.toFixed(1)}
                 {deltaUnit || ''}
@@ -927,6 +882,9 @@ export const BodyCompositionDetail = () => {
           </View>
         )}
       </View>
+      {comparisonNote ? (
+        <Text style={[styles.comparisonText, { color: themeColors.textSecondary }]}>{comparisonNote}</Text>
+      ) : null}
       {children}
     </View>
   );
@@ -953,8 +911,7 @@ export const BodyCompositionDetail = () => {
             value={bodyComposition.bmi?.value || '--'}
             badge={currentBmiCategory ? (isSpanish ? currentBmiCategory.labelEs : currentBmiCategory.label) : undefined}
             badgeColor={currentBmiCategory?.color}
-            delta={deltas.bmi}
-            inverseColor={true}
+            delta={deltas.bmi ?? undefined}
             onInfoPress={() => setInfoModal('bmi')}
           >
             {bodyComposition.bmi && (
@@ -976,19 +933,21 @@ export const BodyCompositionDetail = () => {
                     segments={bmiSegments}
                   />
                 </View>
-                <View
-                  style={[
-                    styles.inlineTipBox,
-                    { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background },
-                  ]}
-                >
-                  <View style={[styles.inlineTipIcon, { backgroundColor: '#3B82F620' }]}>
-                    <Lightbulb size={14} color="#3B82F6" />
+                {!bodyComposition.availableData.hasFullAnthropometry && (
+                  <View
+                    style={[
+                      styles.inlineTipBox,
+                      { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.background },
+                    ]}
+                  >
+                    <View style={[styles.inlineTipIcon, { backgroundColor: '#3B82F620' }]}>
+                      <Lightbulb size={14} color="#3B82F6" />
+                    </View>
+                    <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
+                      {t('health.addMeasurementsPrompt')}
+                    </Text>
                   </View>
-                  <Text style={[styles.inlineTipText, { color: themeColors.textSecondary }]}>
-                    {t('health.addMeasurementsPrompt')}
-                  </Text>
-                </View>
+                )}
               </>
             )}
           </MetricCard>
@@ -999,7 +958,7 @@ export const BodyCompositionDetail = () => {
             iconColor="#10B981"
             title={t('health.bodyFat')}
             value={bodyComposition.bodyFat?.percentage || '--'}
-            unit="%"
+            unit={bodyComposition.bodyFat ? '%' : undefined}
             badge={
               currentBodyFatCategory
                 ? isSpanish
@@ -1008,11 +967,11 @@ export const BodyCompositionDetail = () => {
                 : undefined
             }
             badgeColor={currentBodyFatCategory?.color}
-            delta={deltas.bodyFat}
-            inverseColor={true}
+            delta={deltas.bodyFat ?? undefined}
+            comparisonNote={deltas.bodyFatMethodChanged ? t('health.methodUpdated') : undefined}
             onInfoPress={() => setInfoModal('bodyFat')}
           >
-            {bodyComposition.bodyFat && (
+            {bodyComposition.bodyFat && hasDemographicRanges && (
               <>
                 <View style={styles.rangeWrapper}>
                   <RangeBar
@@ -1050,7 +1009,7 @@ export const BodyCompositionDetail = () => {
             iconColor="#047857"
             title={t('health.muscleMass')}
             value={bodyComposition.muscle?.percentage || '--'}
-            unit="%"
+            unit={bodyComposition.muscle ? '%' : undefined}
             badge={
               currentMuscleCategory
                 ? isSpanish
@@ -1059,11 +1018,11 @@ export const BodyCompositionDetail = () => {
                 : undefined
             }
             badgeColor={currentMuscleCategory?.color}
-            delta={deltas.muscle}
-            inverseColor={false}
+            delta={deltas.muscle ?? undefined}
+            comparisonNote={deltas.muscleMethodChanged ? t('health.methodUpdated') : undefined}
             onInfoPress={() => setInfoModal('muscle')}
           >
-            {bodyComposition.muscle && (
+            {bodyComposition.muscle && hasDemographicRanges && (
               <>
                 <View style={styles.rangeWrapper}>
                   <RangeBar
@@ -1149,7 +1108,7 @@ export const BodyCompositionDetail = () => {
             badgeColor={abdominalHealth.waistToHip?.color}
             onInfoPress={() => setInfoModal('waistToHip')}
           >
-            {abdominalHealth.waistToHip && (
+            {abdominalHealth.waistToHip && waistToHipRange && (
               <View style={styles.rangeWrapper}>
                 <RangeBar
                   hideLegend={true}
@@ -1323,7 +1282,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   infoBtn: {
-    padding: 4,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   metricBody: {
     flexDirection: 'row',
@@ -1385,6 +1347,11 @@ const styles = StyleSheet.create({
   deltaText: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  comparisonText: {
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: spacing.s,
   },
   badge: {
     paddingHorizontal: 12,

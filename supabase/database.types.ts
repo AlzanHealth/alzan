@@ -890,9 +890,12 @@ export type Database = {
           bodyfat_percent: number | null
           bodyfat_precision_level: number | null
           calculated_for_date: string
+          calculation_status: string
+          calculation_version: number
           composition_calculated_at: string
           created_at: string
           id: string
+          input_snapshot: Json
           muscle_formula: string | null
           muscle_inputs: Json
           muscle_mass_kg: number | null
@@ -920,9 +923,12 @@ export type Database = {
           bodyfat_percent?: number | null
           bodyfat_precision_level?: number | null
           calculated_for_date: string
+          calculation_status?: string
+          calculation_version?: number
           composition_calculated_at?: string
           created_at?: string
           id?: string
+          input_snapshot?: Json
           muscle_formula?: string | null
           muscle_inputs?: Json
           muscle_mass_kg?: number | null
@@ -950,9 +956,12 @@ export type Database = {
           bodyfat_percent?: number | null
           bodyfat_precision_level?: number | null
           calculated_for_date?: string
+          calculation_status?: string
+          calculation_version?: number
           composition_calculated_at?: string
           created_at?: string
           id?: string
+          input_snapshot?: Json
           muscle_formula?: string | null
           muscle_inputs?: Json
           muscle_mass_kg?: number | null
@@ -5329,6 +5338,56 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      upsert_manual_daily_steps: {
+        Args: { p_date: string; p_steps: number; p_timezone: string }
+        Returns: {
+          active_calories_kcal: number | null
+          active_distance_m: number | null
+          active_steps: number | null
+          calories_kcal: number | null
+          created_at: string
+          data_quality:
+            | Database["public"]["Enums"]["health_data_quality_enum"]
+            | null
+          date: string
+          device_id: string | null
+          distance_m: number | null
+          elevation_gain_m: number | null
+          fairly_active_min: number | null
+          first_step_at: string | null
+          floors_climbed: number | null
+          goal_achieved: boolean | null
+          id: string
+          is_manual: boolean
+          last_step_at: string | null
+          lightly_active_min: number | null
+          raw_payload: Json | null
+          raw_payload_id: string | null
+          running_steps: number | null
+          sedentary_minutes: number | null
+          source: Database["public"]["Enums"]["wearable_provider_enum"]
+          source_channel: string | null
+          source_created_at: string | null
+          source_package: string | null
+          source_provider_key: string | null
+          source_record_id: string | null
+          source_updated_at: string | null
+          step_goal: number | null
+          synced_at: string
+          timezone: string
+          total_steps: number
+          updated_at: string
+          user_id: string
+          very_active_min: number | null
+          walking_steps: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "daily_steps"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       upsert_wearable_device: {
         Args: {

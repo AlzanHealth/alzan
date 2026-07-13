@@ -3,12 +3,13 @@ import { useAuth } from '../../../context/AuthContext';
 import { measurementApi } from '../services/measurementApi';
 import { MeasurementType } from '../../../types/requests.types';
 import { bodyCompositionService } from '../services/bodyCompositionService';
+import { healthQueryKeys } from './healthQueryKeys';
 
 export const useMeasurements = (type?: MeasurementType, limit = 100) => {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['measurements', user?.id, type, limit], // Keep original type in key to avoid cache thrashing if needed, or update to queryType
+    queryKey: healthQueryKeys.measurements(user?.id, Array.isArray(type) ? type.join(',') : type, limit),
     queryFn: () => measurementApi.getMeasurements(user!.id, type, limit),
     enabled: !!user?.id,
   });
@@ -43,10 +44,9 @@ export const useAddMeasurement = () => {
         ...data,
       });
 
-      // Trigger automatic recalculation for this day using the best available recent weight and measurements.
+      // Recalculate this day and every later snapshot that can reuse this measurement.
       try {
-        const dateStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
-        await bodyCompositionService.checkAndTriggerRecalculateForMeasurements(user.id, dateStr);
+        await bodyCompositionService.invalidateAndRecalculateFromInput(user.id, targetDate.toISOString());
       } catch (err) {
         console.error('[useAddMeasurement] Error in trigger recalculate:', err);
       }
@@ -54,21 +54,21 @@ export const useAddMeasurement = () => {
       return result;
     },
     onSuccess: () => {
-      // Invalidate measurements and weight logs for this user
-      queryClient.invalidateQueries({ queryKey: ['measurements', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['bodyCompositionLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     },
   });
 };
 
 export const useDeleteMeasurement = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: measurementApi.deleteMeasurement,
+    mutationFn: async (id: string) => {
+      const deleted = await measurementApi.deleteMeasurement(id);
+      await bodyCompositionService.invalidateAndRecalculateFromInput(deleted.user_id, deleted.measured_at);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['measurements'] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     },
   });
 };

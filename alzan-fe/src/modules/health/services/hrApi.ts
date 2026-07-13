@@ -5,10 +5,14 @@ export const hrApi = {
   async getLogs(userId: string, limit = 30) {
     console.log('[hrApi.getLogs] Iniciando - userId:', userId, 'limit:', limit);
     try {
+      const fromDate = new Date();
+      fromDate.setDate(fromDate.getDate() - 29);
+      fromDate.setHours(0, 0, 0, 0);
       const { data, error } = await supabase
         .from('resting_hr_logs')
         .select('*')
         .eq('user_id', userId)
+        .gte('measured_at', fromDate.toISOString())
         .order('measured_at', { ascending: false })
         .limit(limit);
 

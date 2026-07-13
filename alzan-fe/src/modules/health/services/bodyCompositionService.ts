@@ -57,6 +57,7 @@ const addDays = (date: Date, days: number): Date =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 
 const hasKeys = (value: Record<string, unknown>): boolean => Object.keys(value).length > 0;
+const BODY_COMPOSITION_CALCULATION_VERSION = 1;
 
 const shouldReplaceRatio = (nextValue: number | null | undefined, currentValue: number | null | undefined): boolean => {
   if (nextValue == null) return false;
@@ -82,11 +83,17 @@ const buildCompositionPayload = (
   bodyfatShouldReplace: boolean,
   muscleShouldReplace: boolean,
   abdominalShouldReplace: boolean,
+  inputSnapshot: BodyCompositionLogInsert['input_snapshot'],
 ): BodyCompositionLogInsert => {
   const nextBodyFat = result && (bodyfatShouldReplace || !existing) ? result.bodyFat : null;
   const nextMuscle = result && (muscleShouldReplace || !existing) ? result.muscle : null;
   const nextWaistToHeight = abdominalShouldReplace || !existing ? abdominalHealth.waistToHeight : null;
   const nextWaistToHip = abdominalShouldReplace || !existing ? abdominalHealth.waistToHip : null;
+  const hasCompleteComposition =
+    (result?.bmi?.value ?? existing?.bmi) != null &&
+    (nextBodyFat?.percentage ?? existing?.bodyfat_percent) != null &&
+    (nextMuscle?.massKg ?? existing?.muscle_mass_kg) != null &&
+    (nextMuscle?.percentage ?? existing?.muscle_percent) != null;
 
   return {
     user_id: userId,
@@ -122,6 +129,9 @@ const buildCompositionPayload = (
       existing?.waist_to_hip_inputs ??
       []) as BodyCompositionLogInsert['waist_to_hip_inputs'],
     composition_calculated_at: new Date().toISOString(),
+    calculation_version: BODY_COMPOSITION_CALCULATION_VERSION,
+    calculation_status: hasCompleteComposition ? 'complete' : 'partial',
+    input_snapshot: inputSnapshot,
     updated_at: new Date().toISOString(),
   };
 };
@@ -201,14 +211,15 @@ export const bodyCompositionService = {
           age: this.calculateAge(profile.date_of_birth),
           sex: profile.sex,
         },
-        storedComposition: existingComposition
-          ? {
-              bodyfatPercent: existingComposition.bodyfat_percent,
-              bodyfatPrecisionLevel: existingComposition.bodyfat_precision_level,
-              muscleMassKg: existingComposition.muscle_mass_kg,
-              musclePrecisionLevel: existingComposition.muscle_precision_level,
-            }
-          : null,
+        storedComposition:
+          existingComposition && existingComposition.calculation_status !== 'stale'
+            ? {
+                bodyfatPercent: existingComposition.bodyfat_percent,
+                bodyfatPrecisionLevel: existingComposition.bodyfat_precision_level,
+                muscleMassKg: existingComposition.muscle_mass_kg,
+                musclePrecisionLevel: existingComposition.muscle_precision_level,
+              }
+            : null,
       });
 
       const abdominalHealth = calculatePersistedAbdominalHealth({
@@ -236,6 +247,20 @@ export const bodyCompositionService = {
         plan.bodyfatShouldReplace,
         plan.muscleShouldReplace,
         abdominalShouldReplace,
+        {
+          sourceWeightLogId: plan.sourceWeightLogId ?? null,
+          weightKg: plan.weightKgUsed ?? null,
+          heightCm: profile.height_cm,
+          age: this.calculateAge(profile.date_of_birth),
+          sex: profile.sex,
+          measurements: {
+            abdomen: plan.measurements.abdomen ?? null,
+            hips: plan.measurements.hips ?? null,
+            chest: plan.measurements.chest ?? null,
+            arm: plan.measurements.arm ?? null,
+            thigh: plan.measurements.thigh ?? null,
+          },
+        },
       );
 
       const { data: upsertedLog, error: upsertError } = await supabase
@@ -303,6 +328,39 @@ export const bodyCompositionService = {
     }
   },
 
+  async invalidateAndRecalculateFromInput(userId: string, measuredAt: string): Promise<void> {
+    const inputDate = new Date(measuredAt);
+    const startDate = toLocalDateString(inputDate);
+    const endDate = toLocalDateString(addDays(inputDate, RECENT_BODY_COMPOSITION_WINDOW_DAYS - 1));
+    const { data: affectedRows, error: readError } = await supabase
+      .from('body_composition_logs')
+      .select('calculated_for_date')
+      .eq('user_id', userId)
+      .gte('calculated_for_date', startDate)
+      .lte('calculated_for_date', endDate)
+      .order('calculated_for_date', { ascending: true });
+    if (readError) throw readError;
+    if (affectedRows?.length) {
+      const { error: staleError } = await supabase
+        .from('body_composition_logs')
+        .update({ calculation_status: 'stale' })
+        .eq('user_id', userId)
+        .gte('calculated_for_date', startDate)
+        .lte('calculated_for_date', endDate);
+      if (staleError) throw staleError;
+    }
+    const datesToRecalculate = new Set([startDate, ...(affectedRows ?? []).map(row => row.calculated_for_date)]);
+    for (const date of datesToRecalculate) {
+      await this.recalculateBestCompositionForDate(userId, `${date}T12:00:00`);
+    }
+  },
+
+  async repairIncompleteSnapshots(userId: string, dates: string[]): Promise<void> {
+    for (const date of dates) {
+      await this.recalculateBestCompositionForDate(userId, `${date}T12:00:00`);
+    }
+  },
+
   /**
    * Recalculates body fat for the latest weight log.
    */
@@ -348,7 +406,8 @@ export const bodyCompositionService = {
 
       const measurements = await this.getAllLatestMeasurements(userId);
       const age = this.calculateAge(profile.date_of_birth);
-      const sex = profile.sex || 'male';
+      const sex = profile.sex;
+      if (!age || (sex !== 'male' && sex !== 'female')) return null;
 
       return calculateBodyComposition({
         weightKg,
@@ -410,8 +469,8 @@ export const bodyCompositionService = {
     return measurements;
   },
 
-  calculateAge(dateOfBirth: string | null): number {
-    if (!dateOfBirth) return 30;
+  calculateAge(dateOfBirth: string | null): number | null {
+    if (!dateOfBirth) return null;
     const birth = new Date(dateOfBirth);
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();

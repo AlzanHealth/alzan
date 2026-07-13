@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
 import { sleepApi } from '../services/sleepApi';
+import { healthQueryKeys } from './healthQueryKeys';
 
 // ── Legacy sleep_logs hooks ─────────────────────────────────
 export const useSleepLogs = () => {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['sleepLogs', user?.id],
+    queryKey: [...healthQueryKeys.all(user?.id), 'legacy-sleep-logs'],
     queryFn: () => sleepApi.getLogs(user!.id),
     enabled: !!user?.id,
   });
@@ -30,18 +31,18 @@ export const useAddSleepLog = () => {
         ...data,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sleepLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     },
   });
 };
 
 export const useDeleteSleepLog = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: sleepApi.deleteLog,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sleepLogs'] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     },
   });
 };
@@ -50,7 +51,7 @@ export const useDeleteSleepLog = () => {
 export const useSleepSessions = () => {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['sleepSessions', user?.id],
+    queryKey: healthQueryKeys.sleepSessions(user?.id),
     queryFn: () => sleepApi.getSessions(user!.id),
     enabled: !!user?.id,
   });
@@ -76,15 +77,15 @@ export const useAddSleepSession = () => {
         ...data,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sleepSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     },
   });
 };
 
 export const useSleepSessionDetail = (sessionId: string | null) => {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ['sleepSessionDetail', sessionId],
+    queryKey: healthQueryKeys.sleepSession(user?.id, sessionId),
     queryFn: () => sleepApi.getSessionWithStages(sessionId!),
     enabled: !!sessionId,
   });
@@ -92,11 +93,11 @@ export const useSleepSessionDetail = (sessionId: string | null) => {
 
 export const useDeleteSleepSession = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
     mutationFn: sleepApi.deleteSession,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sleepSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     },
   });
 };

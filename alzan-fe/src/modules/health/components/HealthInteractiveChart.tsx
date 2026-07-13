@@ -27,8 +27,7 @@ import {
   startOfMonth,
   differenceInYears,
 } from 'date-fns';
-import { calculateBodyComposition, BodyCompositionInput } from '../algorithms/bodyComposition';
-import { BodyMeasurement, MaleOrFemale, MeasurementType } from '../../../types/requests.types';
+import { MeasurementType } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 
@@ -81,24 +80,13 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
   );
 
   // Calculate Age and Sex for Ranges
-  const { age, sex } = useMemo(() => {
-    let calculatedAge = 30; // Default
-    if (profile?.date_of_birth) {
-      calculatedAge = differenceInYears(new Date(), new Date(profile.date_of_birth));
-    }
+  const demographicRange = useMemo(() => {
+    if (!profile?.date_of_birth || (profile.sex !== 'male' && profile.sex !== 'female')) return null;
     return {
-      age: calculatedAge,
-      sex: (profile?.sex === 'female' ? 'female' : 'male') as MaleOrFemale,
+      age: differenceInYears(new Date(), new Date(profile.date_of_birth)),
+      sex: profile.sex,
     };
   }, [profile]);
-
-  // Get user height in meters for BMI calculation
-  const heightM = useMemo(() => {
-    if (profile?.height_cm && profile.height_cm > 0) {
-      return profile.height_cm / 100;
-    }
-    return 1.7; // Default fallback 170cm
-  }, [profile?.height_cm]);
 
   const { chartData, dateRange, xAxisTicks, domainStart, domainEnd, visibleDurationMs } = useMemo(() => {
     if (!weightLogs && !measurements && !compositionLogs) {
@@ -123,25 +111,27 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
         })) || [];
     } else if (metric === 'bmi') {
       rawData =
-        weightLogs?.map(l => ({
-          date: new Date(l.measured_at),
-          value: l.weight_kg / (heightM * heightM),
-        })) || [];
+        compositionLogs
+          ?.filter(log => log.calculation_status !== 'stale' && log.bmi != null)
+          .map(log => ({
+            date: new Date(`${log.calculated_for_date}T12:00:00`),
+            value: log.bmi!,
+          })) || [];
     } else if (metric === 'bodyFat') {
       rawData =
-        weightLogs
-          ?.filter(l => l.bodyfat_percent && l.bodyfat_percent > 0)
-          .map(l => ({
-            date: new Date(l.measured_at),
-            value: l.bodyfat_percent!,
+        compositionLogs
+          ?.filter(log => log.calculation_status !== 'stale' && log.bodyfat_percent != null)
+          .map(log => ({
+            date: new Date(`${log.calculated_for_date}T12:00:00`),
+            value: log.bodyfat_percent!,
           })) || [];
     } else if (metric === 'muscle') {
       rawData =
-        weightLogs
-          ?.filter(l => l.muscle_mass_kg && l.muscle_mass_kg > 0 && l.weight_kg > 0)
-          .map(l => ({
-            date: new Date(l.measured_at),
-            value: (l.muscle_mass_kg! / l.weight_kg) * 100,
+        compositionLogs
+          ?.filter(log => log.calculation_status !== 'stale' && log.muscle_percent != null)
+          .map(log => ({
+            date: new Date(`${log.calculated_for_date}T12:00:00`),
+            value: log.muscle_percent!,
           })) || [];
     } else if (metric === 'waistToHeight') {
       rawData =
@@ -291,7 +281,7 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
       domainEnd: rangeDomainEnd,
       visibleDurationMs: visibleSpanMs,
     };
-  }, [weightLogs, measurements, compositionLogs, metric, range, heightM, convertWeightToUi]);
+  }, [weightLogs, measurements, compositionLogs, metric, range, convertWeightToUi]);
 
   const isLoading = loadingWeight || loadingMeas || loadingComposition;
 
@@ -366,51 +356,12 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
     }
   }, [metric]);
 
-  // Calculate formula metadata for body fat and muscle
   const formulaInfo = useMemo(() => {
-    if (!['bodyFat', 'muscle'].includes(metric)) return null;
-    if (!profile || !weightLogs) return null;
-
-    const latestWeight = weightLogs.length > 0 ? weightLogs[0].weight_kg : 70;
-
-    const measInput: { [key: string]: number } = {};
-    if (measurements) {
-      const latestByType: { [key: string]: BodyMeasurement } = {};
-      measurements.forEach(m => {
-        if (
-          !latestByType[m.measurement_type] ||
-          new Date(m.measured_at) > new Date(latestByType[m.measurement_type].measured_at)
-        ) {
-          latestByType[m.measurement_type] = m;
-        }
-      });
-
-      Object.keys(latestByType).forEach(type => {
-        let key = type;
-        if (key === 'hips') key = 'hip';
-        measInput[key] = latestByType[type].value_cm;
-      });
-    }
-
-    const input: BodyCompositionInput = {
-      weightKg: latestWeight,
-      heightCm: profile.height_cm || 170,
-      age,
-      sex,
-      measurements: measInput,
-    };
-
-    const result = calculateBodyComposition(input);
-
-    if (metric === 'bodyFat' && result.bodyFat) {
-      return result.bodyFat.methodLabel;
-    }
-    if (metric === 'muscle' && result.muscle) {
-      return result.muscle.methodLabel;
-    }
-
+    const latestComplete = compositionLogs?.find(log => log.calculation_status !== 'stale');
+    if (metric === 'bodyFat') return latestComplete?.bodyfat_method ?? null;
+    if (metric === 'muscle') return latestComplete?.muscle_method ?? null;
     return null;
-  }, [metric, profile, weightLogs, measurements, age, sex]);
+  }, [compositionLogs, metric]);
 
   const getUnit = () => {
     if (metric === 'waistToHeight' || metric === 'waistToHip') return '';
@@ -603,9 +554,14 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
           />
         )}
 
-        {rangeMetricKey && rangeBarValue > 0 && (
+        {rangeMetricKey && rangeBarValue > 0 && demographicRange && (
           <View style={{ marginTop: 24 }}>
-            <MetricRangeBar value={rangeBarValue} metricKey={rangeMetricKey} age={age} sex={sex} />
+            <MetricRangeBar
+              value={rangeBarValue}
+              metricKey={rangeMetricKey}
+              age={demographicRange.age}
+              sex={demographicRange.sex}
+            />
             {formulaInfo && (
               <Text style={[styles.formulaText, { color: themeColors.textSecondary }]}>{formulaInfo}</Text>
             )}

@@ -1,6 +1,7 @@
 /**
- * Official Body Composition Ranges
- * Based on WHO (BMI), fitness standards (body fat), and Omron Healthcare (muscle)
+ * Reference ranges used consistently by detail and statistics views.
+ * BMI uses WHO classification. Body-fat and muscle tables are product reference
+ * ranges and must be presented as orientative, not diagnostic.
  */
 
 // ============================================================================
@@ -17,6 +18,12 @@ export type RangeCategory = {
 
 export type AgeGroup = '18-20' | '21-25' | '26-30' | '31-35' | '36-40' | '41-45' | '46-50' | '51-55' | '56-60' | '61+';
 export type MuscleAgeGroup = '18-39' | '40-59' | '60-80';
+
+export const RANGE_PROVENANCE = {
+  bmi: 'WHO BMI classification',
+  bodyFat: 'Orientative age- and sex-specific product reference ranges',
+  muscle: 'Orientative age- and sex-specific product reference ranges',
+} as const;
 
 // ============================================================================
 // 1. BMI RANGES (WHO Classification)

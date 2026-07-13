@@ -46,36 +46,14 @@ export const stepsApi = {
    * Insert or overwrite the manual step total for a day.
    * One manual value per day, scoped to source_package IS NULL.
    */
-  async upsertManual(params: { userId: string; date: string; steps: number; timezone: string }): Promise<void> {
-    const existing = await this.getManualForDate(params.userId, params.date);
-    const payload = {
-      timezone: params.timezone,
-      source: 'manual' as const,
-      source_package: null,
-      total_steps: params.steps,
-      is_manual: true,
-      data_quality: 'manual' as const,
-      synced_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    if (existing) {
-      const { error } = await supabase.from('daily_steps').update(payload).eq('id', existing.id);
-      if (error) {
-        console.error('[stepsApi.upsertManual] Update error:', error);
-        throw error;
-      }
-      return;
-    }
-
-    const { error } = await supabase.from('daily_steps').insert({
-      ...payload,
-      user_id: params.userId,
-      date: params.date,
+  async upsertManual(params: { date: string; steps: number; timezone: string }): Promise<void> {
+    const { error } = await supabase.rpc('upsert_manual_daily_steps', {
+      p_date: params.date,
+      p_steps: params.steps,
+      p_timezone: params.timezone,
     });
-
     if (error) {
-      console.error('[stepsApi.upsertManual] Insert error:', error);
+      console.error('[stepsApi.upsertManual] Error:', error);
       throw error;
     }
   },

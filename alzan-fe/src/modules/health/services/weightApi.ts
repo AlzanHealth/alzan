@@ -61,13 +61,19 @@ export const weightApi = {
   async deleteLog(id: string) {
     console.log('[weightApi.deleteLog] Iniciando - id:', id);
     try {
-      const { error } = await supabase.from('weight_logs').delete().eq('id', id);
+      const { data, error } = await supabase
+        .from('weight_logs')
+        .delete()
+        .eq('id', id)
+        .select('user_id, measured_at')
+        .single();
 
       if (error) {
         console.error('[weightApi.deleteLog] Error:', error);
         throw error;
       }
       console.log('[weightApi.deleteLog] Éxito');
+      return data;
     } catch (err) {
       console.error('[weightApi.deleteLog] Exception:', err);
       throw err;

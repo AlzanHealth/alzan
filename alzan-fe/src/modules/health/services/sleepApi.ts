@@ -33,11 +33,15 @@ export const sleepApi = {
 
   // ── New sleep_sessions (wearable / rich data) ───────────────
   async getSessions(userId: string, limit = 30) {
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - 29);
+    const fromDateKey = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-${String(fromDate.getDate()).padStart(2, '0')}`;
     const { data, error } = await supabase
       .from('sleep_sessions')
       .select('*')
       .eq('user_id', userId)
       .eq('is_main_sleep', true)
+      .gte('date', fromDateKey)
       .order('date', { ascending: false })
       .limit(limit);
 

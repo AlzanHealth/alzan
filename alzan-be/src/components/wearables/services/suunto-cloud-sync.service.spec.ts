@@ -6,11 +6,12 @@ import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { SuuntoCloudSyncService } from './suunto-cloud-sync.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
+import { UnverifiedSinglePageWorkoutPaginationStrategy } from './suunto-workout-pagination.strategy';
 
 type JsonRecord = Record<string, unknown>;
 
 interface SuuntoCloudSyncServicePrivate {
-  fetchWorkoutSummaries(accessToken: string): Promise<JsonRecord[]>;
+  fetchWorkoutSummaries(accessToken: string): Promise<{ workouts: JsonRecord[]; isPaginationVerified: boolean }>;
   getSuunto<T>(path: string, accessToken: string, params?: Record<string, string>): Promise<T>;
   executeSuuntoRequest<T>(request: () => Promise<T>): Promise<T>;
   selectWorkoutLookbackStartMs(
@@ -27,6 +28,13 @@ type CapturedRequest = {
   params: Record<string, string> | null;
   path: string | null;
 };
+
+function assertUnverifiedStrategyNeverInventsAnOffset(): void {
+  const strategy = new UnverifiedSinglePageWorkoutPaginationStrategy(100);
+  assert.deepEqual(strategy.buildRequest('123'), { since: '123', limit: '100' });
+  assert.equal(strategy.isComplete(99), true);
+  assert.equal(strategy.isComplete(100), false);
+}
 
 function createService(response: JsonRecord[]): {
   capturedRequest: CapturedRequest;
@@ -69,13 +77,13 @@ async function assertFirstWorkoutSyncIsLimitedToLastThirtyDays(): Promise<void> 
       { workoutKey: 'undated' },
     ]);
 
-    const actualWorkouts = await service.fetchWorkoutSummaries('access-token');
+    const actualResult = await service.fetchWorkoutSummaries('access-token');
 
     assert.equal(capturedRequest.path, '/v2/workouts');
     assert.equal(capturedRequest.accessToken, 'access-token');
     assert.equal(capturedRequest.params?.since, String(cutoffMs));
     assert.deepEqual(
-      actualWorkouts.map(workout => workout.workoutKey),
+      actualResult.workouts.map(workout => workout.workoutKey),
       ['recent-iso', 'boundary-iso', 'recent-seconds', 'recent-millis'],
     );
   } finally {
@@ -83,7 +91,7 @@ async function assertFirstWorkoutSyncIsLimitedToLastThirtyDays(): Promise<void> 
   }
 }
 
-async function assertWorkoutSummariesArePaginatedAndCapped(): Promise<void> {
+async function assertSaturatedWorkoutListIsReportedAsUnverified(): Promise<void> {
   const { service } = createService([]);
   const requestedOffsets: number[] = [];
   service.getSuunto = async <T>(_path: string, _token: string, params?: Record<string, string>): Promise<T> => {
@@ -95,10 +103,11 @@ async function assertWorkoutSummariesArePaginatedAndCapped(): Promise<void> {
     })) as T;
   };
 
-  const workouts = await service.fetchWorkoutSummaries('access-token');
+  const result = await service.fetchWorkoutSummaries('access-token');
 
-  assert.equal(workouts.length, 500);
-  assert.deepEqual(requestedOffsets, [0, 100, 200, 300, 400]);
+  assert.equal(result.workouts.length, 100);
+  assert.equal(result.isPaginationVerified, false);
+  assert.deepEqual(requestedOffsets, [0]);
 }
 
 function assertIncrementalAndRepairLookbacks(): void {
@@ -173,7 +182,7 @@ async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
       finishSyncJob: async (input: JsonRecord) => void finishedJobs.push(input),
     } as unknown as WearableImportLifecycleService,
   ) as unknown as {
-    fetchWorkoutSummaries(accessToken: string): Promise<JsonRecord[]>;
+    fetchWorkoutSummaries(accessToken: string): Promise<{ workouts: JsonRecord[]; isPaginationVerified: boolean }>;
     getUsableToken(
       userId: string,
     ): Promise<{ accessToken: string; connectionId: string; expiresAt: string | null; refreshToken: string | null }>;
@@ -208,11 +217,14 @@ async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
     expiresAt: null,
     refreshToken: null,
   });
-  service.fetchWorkoutSummaries = async () => [
-    { startTime: '2026-06-14T09:00:00.000Z', workoutKey: 'existing-workout' },
-    { startTime: '2026-06-15T09:00:00.000Z', workoutKey: 'new-workout' },
-    { startTime: '2026-06-15T09:30:00.000Z', workoutKey: 'broken-workout' },
-  ];
+  service.fetchWorkoutSummaries = async () => ({
+    workouts: [
+      { startTime: '2026-06-14T09:00:00.000Z', workoutKey: 'existing-workout' },
+      { startTime: '2026-06-15T09:00:00.000Z', workoutKey: 'new-workout' },
+      { startTime: '2026-06-15T09:30:00.000Z', workoutKey: 'broken-workout' },
+    ],
+    isPaginationVerified: false,
+  });
   service.importWorkout = async (_userId: string, accessToken: string, workoutKey: string) => {
     assert.equal(accessToken, 'access-token');
     if (workoutKey === 'broken-workout') throw new Error('SUUNTO_FIT_UNAVAILABLE');
@@ -233,11 +245,15 @@ async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
   assert.deepEqual(completedImports, [], 'bundle persistence owns the lifecycle completion');
   assert.equal(finishedJobs[0]?.status, 'partial');
   assert.equal(savedStates.length, 1);
+  assert.equal(savedStates[0]?.lastRecordAt, null);
+  assert.equal((savedStates[0]?.metadata as JsonRecord)?.paginationVerified, false);
+  assert.equal((savedStates[0]?.metadata as JsonRecord)?.errorsByCode instanceof Object, true);
 }
 
 async function run(): Promise<void> {
+  assertUnverifiedStrategyNeverInventsAnOffset();
   await assertFirstWorkoutSyncIsLimitedToLastThirtyDays();
-  await assertWorkoutSummariesArePaginatedAndCapped();
+  await assertSaturatedWorkoutListIsReportedAsUnverified();
   assertIncrementalAndRepairLookbacks();
   await assertRateLimitRetriesRespectRetryAfter();
   await assertSyncSkipsAlreadyImportedWorkouts();

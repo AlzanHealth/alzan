@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
+import { healthQueryKeys } from './healthQueryKeys';
 import { bodyCompositionService, ManualRecalculateResult } from '../services/bodyCompositionService';
 
 /**
@@ -17,11 +18,10 @@ export const useRecalculateBodyComp = () => {
       }
       return bodyCompositionService.manualRecalculate(user.id);
     },
-    onSuccess: result => {
+    onSuccess: async result => {
       if (result.success) {
         // Refresh weight logs and health insights
-        queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
-        queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
+        await queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       }
     },
   });

@@ -11,6 +11,7 @@ import { TranslationKey } from '../../../i18n/locales/en';
 import { DistanceUnit, MeasurementType, Row, User, WeightUnit } from '../../../types/requests.types';
 import { convertLengthToUi, convertWeightToUi } from '../../../utils/unitConversionUtils';
 import iconSource from '../../../../assets/icon.png';
+import { buildCompositionDeltas } from '../algorithms/compositionSnapshot';
 import { BodyCompositionLog } from './bodyCompositionService';
 
 interface PDFExportOptions {
@@ -331,7 +332,9 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
     const weightUnit: WeightUnit = preferencesResult.data?.weight_unit === 'lb' ? 'lb' : 'kg';
     const distanceUnit: DistanceUnit = preferencesResult.data?.distance_unit === 'miles' ? 'miles' : 'km';
     const weights = (weightsResult.data ?? []) as WeightLog[];
-    const compositionLogs = (compositionResult.data ?? []) as BodyCompositionLog[];
+    const compositionLogs = ((compositionResult.data ?? []) as BodyCompositionLog[]).filter(
+      log => log.calculation_status !== 'stale',
+    );
     const measurements = (measurementsResult.data ?? []) as BodyMeasurement[];
     const sleepSessions = (sleepResult.data ?? []) as SleepSession[];
     const restingHrLogs = (hrResult.data ?? []) as RestingHrLog[];
@@ -354,16 +357,16 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
     const iconSrc = iconBase64 ? `data:image/png;base64,${iconBase64}` : null;
     const firstWeight = weights[0];
     const lastWeight = weights[weights.length - 1];
-    const latestBodyFat = [...weights].reverse().find(log => log.bodyfat_percent != null)?.bodyfat_percent ?? null;
-    const latestMuscleMass = [...weights].reverse().find(log => log.muscle_mass_kg != null)?.muscle_mass_kg ?? null;
+    const latestComposition = compositionLogs[compositionLogs.length - 1] ?? null;
+    const latestBodyFat = latestComposition?.bodyfat_percent ?? null;
+    const latestMusclePercent = latestComposition?.muscle_percent ?? null;
+    const compositionDeltas = buildCompositionDeltas([...compositionLogs].reverse());
     const waistToHeightLogs = compositionLogs.filter(log => log.waist_to_height_ratio != null);
     const waistToHipLogs = compositionLogs.filter(log => log.waist_to_hip_ratio != null);
     const latestWaistToHeight = waistToHeightLogs[waistToHeightLogs.length - 1] ?? null;
     const latestWaistToHip = waistToHipLogs[waistToHipLogs.length - 1] ?? null;
-    const latestBmi = getBmi(lastWeight?.weight_kg, profile?.height_cm ?? null);
+    const latestBmi = latestComposition?.bmi ?? getBmi(lastWeight?.weight_kg, profile?.height_cm ?? null);
     const weightDeltaKg = getDelta(firstWeight?.weight_kg, lastWeight?.weight_kg);
-    const bodyFatDelta = getDelta(firstWeight?.bodyfat_percent, lastWeight?.bodyfat_percent);
-    const muscleDeltaKg = getDelta(firstWeight?.muscle_mass_kg, lastWeight?.muscle_mass_kg);
     const waistToHeightDelta = getRatioDelta(
       waistToHeightLogs[0]?.waist_to_height_ratio,
       latestWaistToHeight?.waist_to_height_ratio,
@@ -392,16 +395,6 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
             convertWeightToUi(weightDeltaKg, weightUnit, 1).unit,
             1,
           );
-    const muscleMassDisplay = latestMuscleMass ? convertWeightToUi(latestMuscleMass, weightUnit, 1).label : '-';
-    const muscleDeltaDisplay =
-      muscleDeltaKg == null
-        ? '-'
-        : formatSignedNumber(
-            convertWeightToUi(muscleDeltaKg, weightUnit, 1).value,
-            convertWeightToUi(muscleDeltaKg, weightUnit, 1).unit,
-            1,
-          );
-
     const summaryCards: SummaryCard[] = [
       {
         label: t('settings.weight'),
@@ -418,13 +411,20 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
       {
         label: t('health.bodyFat'),
         value: latestBodyFat != null ? `${formatNumber(latestBodyFat, 1)}%` : '-',
-        meta:
-          bodyFatDelta == null ? undefined : `${t('health.pdfChange')}: ${formatSignedNumber(bodyFatDelta, '%', 1)}`,
+        meta: compositionDeltas.bodyFatMethodChanged
+          ? t('health.methodUpdated')
+          : compositionDeltas.bodyFat == null
+            ? undefined
+            : `${t('health.pdfChange')}: ${formatSignedNumber(compositionDeltas.bodyFat, '%', 1)}`,
       },
       {
-        label: t('health.muscleMass'),
-        value: muscleMassDisplay,
-        meta: muscleDeltaKg == null ? undefined : `${t('health.pdfChange')}: ${muscleDeltaDisplay}`,
+        label: t('health.muscle'),
+        value: latestMusclePercent != null ? `${formatNumber(latestMusclePercent, 1)}%` : '-',
+        meta: compositionDeltas.muscleMethodChanged
+          ? t('health.methodUpdated')
+          : compositionDeltas.muscle == null
+            ? undefined
+            : `${t('health.pdfChange')}: ${formatSignedNumber(compositionDeltas.muscle, '%', 1)}`,
       },
       ...(latestWaistToHeight
         ? [
@@ -484,25 +484,41 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
         goal.valid_from,
       ]);
 
-    const compositionByDate = new Map(compositionLogs.map(log => [log.calculated_for_date, log]));
-
-    const weightRows = weights.map(log => {
-      const bmi = getBmi(log.weight_kg, profile?.height_cm ?? null);
-      const bodyFatKg = log.bodyfat_percent != null ? log.weight_kg * (log.bodyfat_percent / 100) : null;
-      const leanKg = bodyFatKg != null ? log.weight_kg - bodyFatKg : null;
-      const compositionLog = compositionByDate.get(getDateKeyFromTimestamp(log.measured_at));
-      return [
-        formatDateTime(log.measured_at),
-        convertWeightToUi(log.weight_kg, weightUnit, 1).label,
-        bmi != null ? formatNumber(bmi, 1) : '-',
-        log.bodyfat_percent != null ? `${formatNumber(log.bodyfat_percent, 1)}%` : '-',
-        bodyFatKg != null ? convertWeightToUi(bodyFatKg, weightUnit, 1).label : '-',
-        leanKg != null ? convertWeightToUi(leanKg, weightUnit, 1).label : '-',
-        log.muscle_mass_kg != null ? convertWeightToUi(log.muscle_mass_kg, weightUnit, 1).label : '-',
-        formatRatio(compositionLog?.waist_to_height_ratio),
-        formatRatio(compositionLog?.waist_to_hip_ratio),
-      ];
-    });
+    const weightRows = compositionLogs.length
+      ? compositionLogs.map(log => {
+          const weightKg = log.weight_kg_used;
+          const bodyFatKg =
+            log.bodyfat_percent != null && weightKg != null ? weightKg * (log.bodyfat_percent / 100) : null;
+          const leanKg = bodyFatKg != null && weightKg != null ? weightKg - bodyFatKg : null;
+          const methods = [log.bodyfat_method, log.muscle_method].filter(Boolean).join(' / ');
+          return [
+            format(parseISO(log.calculated_for_date), datePattern, { locale: dateLocale }),
+            weightKg != null ? convertWeightToUi(weightKg, weightUnit, 1).label : '-',
+            log.bmi != null ? formatNumber(log.bmi, 1) : '-',
+            log.bodyfat_percent != null ? `${formatNumber(log.bodyfat_percent, 1)}%` : '-',
+            bodyFatKg != null ? convertWeightToUi(bodyFatKg, weightUnit, 1).label : '-',
+            leanKg != null ? convertWeightToUi(leanKg, weightUnit, 1).label : '-',
+            log.muscle_percent != null ? `${formatNumber(log.muscle_percent, 1)}%` : '-',
+            formatRatio(log.waist_to_height_ratio),
+            formatRatio(log.waist_to_hip_ratio),
+            methods || '-',
+          ];
+        })
+      : weights.map(log => {
+          const bmi = getBmi(log.weight_kg, profile?.height_cm ?? null);
+          return [
+            formatDateTime(log.measured_at),
+            convertWeightToUi(log.weight_kg, weightUnit, 1).label,
+            bmi != null ? formatNumber(bmi, 1) : '-',
+            '-',
+            '-',
+            '-',
+            '-',
+            '-',
+            '-',
+            '-',
+          ];
+        });
 
     const abdominalRows = compositionLogs
       .filter(log => log.waist_to_height_ratio != null || log.waist_to_hip_ratio != null)
@@ -589,21 +605,26 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
             const parts = [convertWeightToUi(log.weight_kg, weightUnit, 1).label];
             const bmi = getBmi(log.weight_kg, profile?.height_cm ?? null);
             if (bmi != null) parts.push(`${t('health.imc')} ${formatNumber(bmi, 1)}`);
-            if (log.bodyfat_percent != null)
-              parts.push(`${t('health.bodyFat')} ${formatNumber(log.bodyfat_percent, 1)}%`);
-            if (log.muscle_mass_kg != null)
-              parts.push(`${t('health.muscleMass')} ${convertWeightToUi(log.muscle_mass_kg, weightUnit, 1).label}`);
             lines.push(`${t('settings.weight')}: ${parts.join(' · ')}`);
           });
           bucket.composition.forEach(log => {
-            const parts = [];
+            const parts: string[] = [];
+            if (log.bmi != null) parts.push(`${t('health.imc')} ${formatNumber(log.bmi, 1)}`);
+            if (log.bodyfat_percent != null) {
+              parts.push(
+                `${t('health.bodyFat')} ${formatNumber(log.bodyfat_percent, 1)}% (${log.bodyfat_method ?? '-'})`,
+              );
+            }
+            if (log.muscle_percent != null) {
+              parts.push(`${t('health.muscle')} ${formatNumber(log.muscle_percent, 1)}% (${log.muscle_method ?? '-'})`);
+            }
             if (log.waist_to_height_ratio != null) {
               parts.push(`${t('health.waistToHeight')} ${formatRatio(log.waist_to_height_ratio)}`);
             }
             if (log.waist_to_hip_ratio != null) {
               parts.push(`${t('health.waistToHip')} ${formatRatio(log.waist_to_hip_ratio)}`);
             }
-            if (parts.length) lines.push(`${t('health.abdominalHealth')}: ${parts.join(' · ')}`);
+            if (parts.length) lines.push(`${t('health.pdfBodyCompositionSection')}: ${parts.join(' · ')}`);
           });
           if (bucket.measurements.length) {
             lines.push(
@@ -797,9 +818,10 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
             t('health.bodyFat'),
             t('health.pdfFatMass'),
             t('health.leanMass'),
-            t('health.muscleMass'),
+            t('health.muscle'),
             t('health.waistToHeight'),
             t('health.waistToHip'),
+            t('health.methodOfCalculation'),
           ],
           weightRows,
           t('health.pdfNoWeightData'),

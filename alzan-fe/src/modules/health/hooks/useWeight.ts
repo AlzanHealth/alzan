@@ -2,11 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
 import { weightApi } from '../services/weightApi';
 import { bodyCompositionService } from '../services/bodyCompositionService';
+import { healthQueryKeys } from './healthQueryKeys';
 
 export const useWeightLogs = (limit = 100) => {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['weightLogs', user?.id, limit],
+    queryKey: healthQueryKeys.weights(user?.id, limit),
     queryFn: () => weightApi.getLogs(user!.id, limit),
     enabled: !!user?.id,
   });
@@ -68,11 +69,11 @@ export const useAddWeightLog = () => {
             bodyfat_percent: log.bodyfat_percent ?? existingLog.bodyfat_percent,
             muscle_mass_kg: log.muscle_mass_kg ?? existingLog.muscle_mass_kg,
           });
-          await bodyCompositionService.recalculateBestCompositionForDate(userId, targetDate);
+          await bodyCompositionService.invalidateAndRecalculateFromInput(userId, targetDate.toISOString());
           return result;
         }
 
-        await bodyCompositionService.recalculateBestCompositionForDate(userId, targetDate);
+        await bodyCompositionService.invalidateAndRecalculateFromInput(userId, targetDate.toISOString());
         return existingLog;
       }
 
@@ -85,28 +86,26 @@ export const useAddWeightLog = () => {
       });
 
       // Auto-calculate daily composition without duplicating weight history.
-      if (result.id) {
-        await bodyCompositionService.recalculateForWeight(userId, result.id, log.weight_kg, result.measured_at);
-      }
+      await bodyCompositionService.invalidateAndRecalculateFromInput(userId, result.measured_at);
 
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['bodyCompositionLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     },
   });
 };
 
 export const useDeleteWeightLog = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: weightApi.deleteLog,
+    mutationFn: async (id: string) => {
+      const deleted = await weightApi.deleteLog(id);
+      await bodyCompositionService.invalidateAndRecalculateFromInput(deleted.user_id, deleted.measured_at);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['weightLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['bodyCompositionLogs'] });
-      queryClient.invalidateQueries({ queryKey: ['healthInsights'] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     },
   });
 };

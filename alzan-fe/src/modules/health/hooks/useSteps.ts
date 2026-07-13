@@ -3,8 +3,7 @@ import { format } from 'date-fns';
 import { useAuth } from '../../../context/AuthContext';
 import { aggregateStepsByDate } from '../services/stepsAggregation';
 import { stepsApi } from '../services/stepsApi';
-
-const STEPS_QUERY_KEY = 'dailySteps';
+import { healthQueryKeys } from './healthQueryKeys';
 
 /**
  * Daily step rows for the last `days` days (oldest first). Used by the chart.
@@ -12,7 +11,7 @@ const STEPS_QUERY_KEY = 'dailySteps';
 export const useStepsRange = (days = 366) => {
   const { user } = useAuth();
   return useQuery({
-    queryKey: [STEPS_QUERY_KEY, user?.id, days],
+    queryKey: [...healthQueryKeys.steps(user?.id), 'range', days],
     queryFn: () => {
       const from = new Date();
       from.setDate(from.getDate() - days);
@@ -29,7 +28,7 @@ export const useTodaySteps = () => {
   const { user } = useAuth();
   const today = format(new Date(), 'yyyy-MM-dd');
   return useQuery({
-    queryKey: [STEPS_QUERY_KEY, 'today', user?.id, today],
+    queryKey: [...healthQueryKeys.steps(user?.id), 'today', today],
     queryFn: async () => {
       const rows = await stepsApi.getRange(user!.id, today);
       const byDate = aggregateStepsByDate(rows);
@@ -44,7 +43,7 @@ export const useManualStepsForDate = (date: Date) => {
   const dateKey = format(date, 'yyyy-MM-dd');
 
   return useQuery({
-    queryKey: [STEPS_QUERY_KEY, 'manual', user?.id, dateKey],
+    queryKey: [...healthQueryKeys.steps(user?.id), 'manual', dateKey],
     queryFn: () => stepsApi.getManualForDate(user!.id, dateKey),
     enabled: !!user?.id,
   });
@@ -58,14 +57,13 @@ export const useUpsertManualSteps = () => {
     mutationFn: async (params: { date: Date; steps: number }) => {
       if (!user?.id) throw new Error('No authenticated user');
       await stepsApi.upsertManual({
-        userId: user.id,
         date: format(params.date, 'yyyy-MM-dd'),
         steps: params.steps,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [STEPS_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.steps(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
