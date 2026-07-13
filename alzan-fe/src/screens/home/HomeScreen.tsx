@@ -23,11 +23,6 @@ import { format } from 'date-fns';
 import { spacing, borderRadius, typography } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { GlassCard } from '../../components/GlassCard';
-import {
-  useDashboardData,
-  UseDashboardDataActiveTodayWorkout,
-  UseDashboardDataScheduledWorkout,
-} from '../../hooks/useDashboardData';
 import { useDayNutrition } from '../../modules/nutrition/hooks/useDayNutritionLogic';
 import { MEAL_TYPES, MEAL_TYPE_LABELS } from '../../modules/nutrition/constants';
 import { WeightLogModal } from '../../components/WeightLogModal';
@@ -37,7 +32,7 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { NotificationSettings, useSettingsNotifications } from '../../hooks/settings/useSettingsNotifications';
 import { useMediaPermissions } from '../../hooks/useMediaPermissions';
 import { useHomeSettings } from '../../hooks/settings/useHomeSettings';
-import { useHomeWeeklySummary } from '../../hooks/useHomeWeeklySummary';
+import { HomeSummaryActiveWorkout, HomeSummaryScheduledWorkout, useHomeSummary } from '../../hooks/useHomeSummary';
 
 import { useHealthInsights } from '../../modules/health/hooks/useHealthInsights';
 import { useTodaySteps } from '../../modules/health/hooks/useSteps';
@@ -82,7 +77,7 @@ export const HomeScreen = () => {
   const { convertWeightToUi, convertEnergyToUi } = useUnitConversion();
   const { settings: notifSettings, refetch: refetchSettings } = useSettingsNotifications(); // Get settings
   const { homeMode, homePrimaryAction } = useHomeSettings();
-  const { data: weeklySummary } = useHomeWeeklySummary();
+  const { data: homeSummary } = useHomeSummary();
   useMediaPermissions(); // Request camera/mic permissions on mount
 
   // Auto-refresh when screen comes into focus
@@ -96,7 +91,11 @@ export const HomeScreen = () => {
   );
 
   // Data
-  const { completedWorkoutsCount, health, scheduledWorkouts, activeTodayWorkout } = useDashboardData();
+  const completedWorkoutsCount = homeSummary?.completedWorkoutsCount ?? 0;
+  const health = homeSummary?.health ?? null;
+  const scheduledWorkouts = homeSummary?.scheduledWorkouts ?? [];
+  const activeTodayWorkout = homeSummary?.activeTodayWorkout ?? null;
+  const weeklySummary = homeSummary?.weeklySummary;
   const { latestSleep } = useHealthInsights();
   const { data: todaySteps } = useTodaySteps();
   const { homeCards } = useHomeCards();
@@ -327,7 +326,7 @@ export const HomeScreen = () => {
   ];
 
   // Helper for Icon and Color
-  const getWorkoutVisuals = (workout: UseDashboardDataScheduledWorkout) => {
+  const getWorkoutVisuals = (workout: HomeSummaryScheduledWorkout) => {
     if (workout.gym_template_id) {
       return {
         icon: <Dumbbell color={colors.textPrimary} size={24} />,
@@ -345,7 +344,7 @@ export const HomeScreen = () => {
     };
   };
 
-  const getActiveWorkoutVisuals = (session: NonNullable<UseDashboardDataActiveTodayWorkout>) => {
+  const getActiveWorkoutVisuals = (session: NonNullable<HomeSummaryActiveWorkout>) => {
     if (session.sport_type === 'strength') {
       return {
         icon: <Dumbbell color={colors.textPrimary} size={24} />,

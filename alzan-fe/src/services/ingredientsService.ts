@@ -24,6 +24,22 @@ interface IngredientRuntimeFields extends DbIngredient {
   notes_en: string | null;
 }
 
+interface IngredientRankedRow extends IngredientRuntimeFields {
+  search_rank: number;
+}
+
+type SearchIngredientsRpc = {
+  rpc: (
+    fn: 'search_ingredients_ranked',
+    args: {
+      p_query: string;
+      p_category: IngredientsCategory | null;
+      p_locale: string;
+      p_limit: number;
+    },
+  ) => Promise<{ data: IngredientRankedRow[] | null; error: { message: string } | null }>;
+};
+
 export interface IngredientSearchResult extends IngredientRuntimeFields {
   name: string;
   notes: string | null;
@@ -220,7 +236,19 @@ export const searchIngredients = async (
   const normQuery = normalizeInput(query);
   if (!normQuery || normQuery.length < 2) return [];
 
-  return fetchRankedIngredients(query, languageCode, maxResults);
+  const { data, error } = await (supabase as unknown as SearchIngredientsRpc).rpc('search_ingredients_ranked', {
+    p_query: query,
+    p_category: null,
+    p_locale: languageCode,
+    p_limit: maxResults,
+  });
+
+  if (error || !data) {
+    if (error) console.error('[ingredientsService] search RPC error:', error);
+    return fetchRankedIngredients(query, languageCode, maxResults);
+  }
+
+  return data.map(item => mapIngredientResult(item, languageCode));
 };
 
 // 3. Create (Manual)
@@ -257,10 +285,26 @@ export const searchIngredientsWithFilters = async (
 
   // Text search: two-phase (strong-first) fetch so the typed term always surfaces.
   if (hasQuery && query) {
-    return fetchRankedIngredients(query, languageCode, maxResults, {
-      category,
-      letter: hasLetterFilter ? normalizedLetter : undefined,
+    const rpcLimit = hasLetterFilter ? Math.max(maxResults * 4, 40) : maxResults;
+    const { data, error } = await (supabase as unknown as SearchIngredientsRpc).rpc('search_ingredients_ranked', {
+      p_query: query,
+      p_category: category && category !== 'todas' ? category : null,
+      p_locale: languageCode,
+      p_limit: rpcLimit,
     });
+
+    if (error || !data) {
+      if (error) console.error('[ingredientsService] filtered search RPC error:', error);
+      return fetchRankedIngredients(query, languageCode, maxResults, {
+        category,
+        letter: hasLetterFilter ? normalizedLetter : undefined,
+      });
+    }
+
+    return data
+      .map(item => mapIngredientResult(item, languageCode))
+      .filter(ing => !hasLetterFilter || matchesLetter(ing, normalizedLetter))
+      .slice(0, maxResults);
   }
 
   // Filter-only browsing (category and/or letter), ordered by quality.

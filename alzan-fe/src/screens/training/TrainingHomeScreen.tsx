@@ -82,6 +82,25 @@ interface CompletedSession {
   duration_s: number | null;
 }
 
+type TrainingCalendarMarkRow = {
+  date: string;
+  planned_count: number;
+  completed_count: number;
+  has_planned: boolean;
+  has_completed: boolean;
+};
+
+type TrainingCalendarMarksRpc = {
+  rpc: (
+    fn: 'get_training_calendar_marks',
+    args: {
+      p_user_id: string;
+      p_start_date: string;
+      p_end_date: string;
+    },
+  ) => Promise<{ data: TrainingCalendarMarkRow[] | null; error: { message: string } | null }>;
+};
+
 export const TrainingHomeScreen = () => {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -371,42 +390,23 @@ export const TrainingHomeScreen = () => {
       const startStr = format(dotsStartDate, 'yyyy-MM-dd');
       const endStr = format(dotsEndDate, 'yyyy-MM-dd');
 
-      // 1. Get Scheduled Plans
-      const { data: plans } = await supabase
-        .from('workout_plans')
-        .select('planned_date, status')
-        .eq('user_id', user.id)
-        .gte('planned_date', startStr)
-        .lte('planned_date', endStr)
-        .neq('status', 'skipped');
+      const { data, error } = await (supabase as unknown as TrainingCalendarMarksRpc).rpc(
+        'get_training_calendar_marks',
+        {
+          p_user_id: user.id,
+          p_start_date: startStr,
+          p_end_date: endStr,
+        },
+      );
 
-      // 2. Get Completed Sessions
-      const { data: sessions } = await supabase
-        .from('activity_sessions')
-        .select('start_time')
-        .eq('user_id', user.id)
-        .gte('start_time', `${startStr}T00:00:00`)
-        .lte('start_time', `${endStr}T23:59:59`)
-        .not('end_time', 'is', null);
+      if (error) {
+        console.error('[TrainingHomeScreen] get_training_calendar_marks error:', error);
+        throw error;
+      }
 
-      const dots = new Set<string>();
-
-      plans?.forEach(p => {
-        if (p.planned_date) {
-          // Handle both date-only string and ISO string
-          const d = typeof p.planned_date === 'string' ? p.planned_date.split('T')[0] : '';
-          if (d) dots.add(d);
-        }
-      });
-
-      sessions?.forEach(s => {
-        if (s.start_time) {
-          const d = typeof s.start_time === 'string' ? s.start_time.split('T')[0] : '';
-          if (d) dots.add(d);
-        }
-      });
-
-      return dots;
+      return new Set(
+        (data ?? []).filter(mark => mark.has_planned || mark.has_completed).map(mark => mark.date.split('T')[0]),
+      );
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 5, // 5 minutes

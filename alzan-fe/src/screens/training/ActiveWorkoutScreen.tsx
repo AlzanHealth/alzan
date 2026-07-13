@@ -63,6 +63,78 @@ type AutoPlayQueue = {
   nextSetNumber: number;
 };
 
+const ACTIVE_SESSION_DURATION_PERSIST_INTERVAL_SECONDS = 15;
+
+const ActiveWorkoutDuration = React.memo(
+  ({
+    sessionId,
+    textColor,
+    onDurationChange,
+  }: {
+    sessionId?: string;
+    textColor: string;
+    onDurationChange: (seconds: number) => void;
+  }) => {
+    const [duration, setDuration] = useState(0);
+    const durationRef = useRef(0);
+
+    useEffect(() => {
+      let mounted = true;
+
+      const loadDuration = async () => {
+        try {
+          const stored = sessionId ? await AsyncStorage.getItem(`active_session_duration_${sessionId}`) : null;
+          const nextDuration = stored ? parseInt(stored, 10) : 0;
+          if (!mounted) return;
+          const safeDuration = Number.isFinite(nextDuration) ? nextDuration : 0;
+          durationRef.current = safeDuration;
+          setDuration(safeDuration);
+          onDurationChange(safeDuration);
+        } catch (error) {
+          console.log(error);
+          if (!mounted) return;
+          durationRef.current = 0;
+          setDuration(0);
+          onDurationChange(0);
+        }
+      };
+
+      void loadDuration();
+
+      return () => {
+        mounted = false;
+      };
+    }, [onDurationChange, sessionId]);
+
+    useFocusEffect(
+      React.useCallback(() => {
+        if (!sessionId) return undefined;
+
+        const interval = setInterval(() => {
+          setDuration(prev => {
+            const nextDuration = prev + 1;
+            durationRef.current = nextDuration;
+            onDurationChange(nextDuration);
+
+            if (nextDuration % ACTIVE_SESSION_DURATION_PERSIST_INTERVAL_SECONDS === 0) {
+              void AsyncStorage.setItem(`active_session_duration_${sessionId}`, String(nextDuration));
+            }
+
+            return nextDuration;
+          });
+        }, 1000);
+
+        return () => {
+          clearInterval(interval);
+          void AsyncStorage.setItem(`active_session_duration_${sessionId}`, String(durationRef.current));
+        };
+      }, [onDurationChange, sessionId]),
+    );
+
+    return <WorkoutDurationTimer seconds={duration} style={{ color: textColor }} />;
+  },
+);
+
 // ... (Rest of imports or utility functions if any)
 const buildSupersetLinksFromOrderedExercises = (orderedExercises: WorkoutTemplateExerciseWithDetails[]) => {
   const links = new Set<string>();
@@ -849,40 +921,10 @@ export const ActiveWorkoutScreen = () => {
     triggerMoveHighlight(exerciseId, 'down');
   };
 
-  // Timer Duration Logic
-  const [duration, setDuration] = useState(0);
-
-  useEffect(() => {
-    const loadDuration = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(`active_session_duration_${sessionId}`);
-        if (stored) {
-          setDuration(parseInt(stored, 10));
-        } else {
-          setDuration(0);
-        }
-      } catch (e) {
-        console.log(e);
-        setDuration(0);
-      }
-    };
-    loadDuration();
-  }, [sessionId]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      // Timer only runs while screen is focused
-      const interval = setInterval(() => {
-        setDuration(prev => {
-          const newVal = prev + 1;
-          AsyncStorage.setItem(`active_session_duration_${sessionId}`, String(newVal));
-          return newVal;
-        });
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }, [sessionId]),
-  );
+  const durationRef = useRef(0);
+  const handleDurationChange = React.useCallback((nextDuration: number) => {
+    durationRef.current = nextDuration;
+  }, []);
 
   const inputsRef = useRef(inputs);
   useEffect(() => {
@@ -978,9 +1020,11 @@ export const ActiveWorkoutScreen = () => {
               links: supersetPayload,
             });
 
+            const finalDuration = durationRef.current;
+
             await finishSession.mutateAsync({
               id: sessionId,
-              duration_s: duration,
+              duration_s: finalDuration,
               rpe: 0,
               notes: '',
             });
@@ -1005,7 +1049,7 @@ export const ActiveWorkoutScreen = () => {
                 volumeLoad: Math.round(savedVolume),
                 startTime: activeSessionData?.session?.start_time || new Date().toISOString(),
                 endTime: new Date().toISOString(),
-                durationSeconds: duration,
+                durationSeconds: finalDuration,
               },
             });
           } catch (e) {
@@ -1240,7 +1284,11 @@ export const ActiveWorkoutScreen = () => {
               },
             ]}
           >
-            <WorkoutDurationTimer seconds={duration} style={{ color: themeColors.textPrimary }} />
+            <ActiveWorkoutDuration
+              sessionId={sessionId}
+              textColor={themeColors.textPrimary}
+              onDurationChange={handleDurationChange}
+            />
           </View>
 
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>

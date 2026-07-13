@@ -4850,6 +4850,34 @@ export type Database = {
         Args: { p_recipe_id: string }
         Returns: string
       }
+      get_home_summary: {
+        Args: {
+          p_today: string
+          p_user_id: string
+          p_week_end: string
+          p_week_start: string
+        }
+        Returns: {
+          active_today_workout: Json
+          completed_workouts_today: number
+          scheduled_workouts_today: Json
+          weekly_health_days: number
+          weekly_nutrition_days: number
+          weekly_workouts_count: number
+          weight: Json
+          weight_trend: number
+        }[]
+      }
+      get_training_calendar_marks: {
+        Args: { p_end_date: string; p_start_date: string; p_user_id: string }
+        Returns: {
+          completed_count: number
+          date: string
+          has_completed: boolean
+          has_planned: boolean
+          planned_count: number
+        }[]
+      }
       import_ingredients_batch: { Args: { payload: Json }; Returns: number }
       import_recipes_batch: { Args: { payload: Json }; Returns: number }
       log_recipe_usage: {
@@ -4866,7 +4894,84 @@ export type Database = {
         Returns: undefined
       }
       reset_user_data: { Args: never; Returns: undefined }
+      search_ingredients_ranked: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["ingredients_category"]
+          p_limit?: number
+          p_locale?: string
+          p_query: string
+        }
+        Returns: {
+          carbs_g_100: number
+          category: Database["public"]["Enums"]["ingredients_category"]
+          created_at: string
+          fat_g_100: number
+          fiber_g_100: number
+          id: string
+          kcal_100: number
+          name_en: string
+          name_es: string
+          name_norm_es: string
+          notes_en: string
+          notes_es: string
+          protein_g_100: number
+          quality_score: number
+          salt_g_100: number
+          search_rank: number
+          sodium_mg_100: number
+          source_primary: Json
+          source_secondary: Json
+          sugar_g_100: number
+          unit_basis: Database["public"]["Enums"]["ingredients_unit_basis"]
+          updated_at: string
+        }[]
+      }
+      search_recipes_ranked: {
+        Args: {
+          p_category?: string
+          p_limit?: number
+          p_offset?: number
+          p_query: string
+          p_scope?: string
+          p_sort?: string
+          p_user_id?: string
+        }
+        Returns: {
+          carbs_g_100: number
+          created_at: string
+          deleted_at: string
+          description_en: string
+          description_es: string
+          fat_g_100: number
+          favorites_total: number
+          id: string
+          kcal_100: number
+          name_en: string
+          name_es: string
+          name_norm_es: string
+          origin_recipe_id: string
+          owner_user_id: string
+          popularity_score: number
+          protein_g_100: number
+          public_slug: string
+          published_at: string
+          quality_score: number
+          saves_total: number
+          search_rank: number
+          source: Database["public"]["Enums"]["recipe_source_enum"]
+          total_count: number
+          updated_at: string
+          users_unique_30d: number
+          uses_30d: number
+          uses_7d: number
+          uses_total: number
+          visibility: Database["public"]["Enums"]["recipe_visibility_enum"]
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       slugify_recipe_name: { Args: { p_name: string }; Returns: string }
+      unaccent: { Args: { "": string }; Returns: string }
       unpublish_recipe: { Args: { p_recipe_id: string }; Returns: undefined }
     }
     Enums: {

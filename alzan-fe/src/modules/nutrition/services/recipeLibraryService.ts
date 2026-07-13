@@ -43,6 +43,26 @@ interface RecipeRow {
   uses_total: number | null;
 }
 
+interface RankedRecipeRow extends RecipeRow {
+  search_rank: number | null;
+  total_count: number | null;
+}
+
+type SearchRecipesRpc = {
+  rpc: (
+    fn: 'search_recipes_ranked',
+    args: {
+      p_query: string;
+      p_scope: 'all' | 'source' | 'users' | 'saved' | 'favorites';
+      p_user_id: string | null;
+      p_category: DiscoverCategory;
+      p_sort: DiscoverSort;
+      p_limit: number;
+      p_offset: number;
+    },
+  ) => Promise<{ data: RankedRecipeRow[] | null; error: { message: string } | null }>;
+};
+
 interface RecipeFavoriteRow {
   recipe_id: string;
 }
@@ -169,7 +189,29 @@ export async function getDiscoverRecipes({
   category,
 }: DiscoverOptions): Promise<DiscoverPageResult> {
   const from = (Math.max(1, page) - 1) * pageSize;
-  const to = from + pageSize - 1;
+  const userId = await getCurrentUserId();
+
+  const { data: rankedData, error: rankedError } = await (supabase as unknown as SearchRecipesRpc).rpc(
+    'search_recipes_ranked',
+    {
+      p_query: query,
+      p_scope: 'all',
+      p_user_id: userId,
+      p_category: category,
+      p_sort: sort,
+      p_limit: pageSize,
+      p_offset: from,
+    },
+  );
+
+  if (!rankedError && rankedData) {
+    return {
+      recipes: await attachAuthorNames(rankedData.map(mapRecipeRow)),
+      total: rankedData[0]?.total_count ?? 0,
+    };
+  }
+
+  if (rankedError) console.error('[recipeLibraryService] search_recipes_ranked error:', rankedError);
 
   let builder = supabase
     .from('recipes')
@@ -193,6 +235,7 @@ export async function getDiscoverRecipes({
     builder = builder.order('saves_total', { ascending: false }).order('favorites_total', { ascending: false });
   else builder = builder.order('popularity_score', { ascending: false }).order('uses_7d', { ascending: false });
 
+  const to = from + pageSize - 1;
   const { data, error, count } = await builder
     .order('quality_score', { ascending: false })
     .range(from, to)
