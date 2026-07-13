@@ -387,55 +387,66 @@ BEGIN
 END;
 $$;
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
+-- Auto-dedup workout_plans: keep newest row per activity_session_id.
+DELETE FROM public.workout_plans d
+USING (
+  SELECT id
+  FROM (
+    SELECT id,
+           ROW_NUMBER() OVER (
+             PARTITION BY activity_session_id
+             ORDER BY created_at DESC, id DESC
+           ) AS rn
     FROM public.workout_plans
     WHERE activity_session_id IS NOT NULL
-    GROUP BY activity_session_id
-    HAVING count(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'WORKOUT_PLAN_SESSION_DUPLICATES_REQUIRE_REPAIR';
-  END IF;
-END;
-$$;
+  ) ranked
+  WHERE ranked.rn > 1
+) dupes
+WHERE d.id = dupes.id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS workout_plans_activity_session_uq
 ON public.workout_plans (activity_session_id)
 WHERE activity_session_id IS NOT NULL;
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
+-- Auto-dedup devices: keep newest row per (user_id, provider, device_serial).
+DELETE FROM public.devices d
+USING (
+  SELECT id
+  FROM (
+    SELECT id,
+           ROW_NUMBER() OVER (
+             PARTITION BY user_id, provider, device_serial
+             ORDER BY created_at DESC, id DESC
+           ) AS rn
     FROM public.devices
     WHERE device_serial IS NOT NULL
-    GROUP BY user_id, provider, device_serial
-    HAVING count(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'WEARABLE_DEVICE_DUPLICATES_REQUIRE_REPAIR';
-  END IF;
-END;
-$$;
+  ) ranked
+  WHERE ranked.rn > 1
+) dupes
+WHERE d.id = dupes.id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS devices_user_provider_serial_uq
 ON public.devices (user_id, provider, device_serial)
 WHERE device_serial IS NOT NULL;
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
+-- Auto-dedup external_raw_payloads_v2: keep newest row per identity group.
+DELETE FROM public.external_raw_payloads_v2 d
+USING (
+  SELECT id
+  FROM (
+    SELECT id,
+           ROW_NUMBER() OVER (
+             PARTITION BY user_id, provider, source_channel,
+                          COALESCE(source_package, ''), object_type,
+                          source_record_id, payload_hash
+             ORDER BY created_at DESC, id DESC
+           ) AS rn
     FROM public.external_raw_payloads_v2
     WHERE source_record_id IS NOT NULL
-    GROUP BY user_id, provider, source_channel, COALESCE(source_package, ''), object_type, source_record_id, payload_hash
-    HAVING count(*) > 1
-  ) THEN
-    RAISE EXCEPTION 'WEARABLE_RAW_PAYLOAD_DUPLICATES_REQUIRE_REPAIR';
-  END IF;
-END;
-$$;
+  ) ranked
+  WHERE ranked.rn > 1
+) dupes
+WHERE d.id = dupes.id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS external_raw_payloads_v2_identity_hash_uq
 ON public.external_raw_payloads_v2 (
