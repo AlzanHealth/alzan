@@ -37,7 +37,7 @@ id uuid NOT NULL DEFAULT uuid_generate_v4(),
 session_id uuid NOT NULL,
 lap_index integer NOT NULL,
 distance_m numeric,
-duration_s integer,
+duration_s numeric,
 avg_heart_rate integer,
 max_heart_rate integer,
 avg_pace_s_per_km integer,
@@ -101,9 +101,9 @@ from_order_index integer NOT NULL CHECK (from_order_index >= 0),
 to_order_index integer NOT NULL,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT activity_session_superset_links_pkey PRIMARY KEY (id),
+CONSTRAINT activity_session_superset_links_to_exercise_id_fkey FOREIGN KEY (to_exercise_id) REFERENCES public.exercises(id),
 CONSTRAINT activity_session_superset_links_from_exercise_id_fkey FOREIGN KEY (from_exercise_id) REFERENCES public.exercises(id),
-CONSTRAINT activity_session_superset_links_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
-CONSTRAINT activity_session_superset_links_to_exercise_id_fkey FOREIGN KEY (to_exercise_id) REFERENCES public.exercises(id)
+CONSTRAINT activity_session_superset_links_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id)
 );
 CREATE TABLE public.activity_session_tags (
 session_id uuid NOT NULL,
@@ -243,6 +243,39 @@ CONSTRAINT activity_streams_pkey PRIMARY KEY (id),
 CONSTRAINT activity_streams_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.activity_sessions(id),
 CONSTRAINT activity_streams_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
 CONSTRAINT activity_streams_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
+);
+CREATE TABLE public.body_composition_logs (
+id uuid NOT NULL DEFAULT gen_random_uuid(),
+user_id uuid NOT NULL,
+calculated_for_date date NOT NULL,
+source_weight_log_id uuid,
+weight_kg_used numeric CHECK (weight_kg_used > 0::numeric),
+bmi numeric CHECK (bmi IS NULL OR bmi > 0::numeric),
+bodyfat_percent numeric CHECK (bodyfat_percent IS NULL OR bodyfat_percent >= 0::numeric),
+bodyfat_method text,
+bodyfat_precision_level integer CHECK (bodyfat_precision_level IS NULL OR bodyfat_precision_level >= 1 AND bodyfat_precision_level <= 3),
+bodyfat_formula text,
+bodyfat_inputs jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(bodyfat_inputs) = 'array'::text),
+muscle_mass_kg numeric CHECK (muscle_mass_kg IS NULL OR muscle_mass_kg >= 0::numeric),
+muscle_percent numeric CHECK (muscle_percent IS NULL OR muscle_percent >= 0::numeric),
+muscle_method text,
+muscle_precision_level integer CHECK (muscle_precision_level IS NULL OR muscle_precision_level >= 1 AND muscle_precision_level <= 3),
+muscle_formula text,
+muscle_inputs jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(muscle_inputs) = 'array'::text),
+composition_calculated_at timestamp with time zone NOT NULL DEFAULT now(),
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+waist_to_height_ratio numeric CHECK (waist_to_height_ratio IS NULL OR waist_to_height_ratio > 0::numeric),
+waist_to_height_category text,
+waist_to_height_formula text,
+waist_to_height_inputs jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(waist_to_height_inputs) = 'array'::text),
+waist_to_hip_ratio numeric CHECK (waist_to_hip_ratio IS NULL OR waist_to_hip_ratio > 0::numeric),
+waist_to_hip_category text,
+waist_to_hip_formula text,
+waist_to_hip_inputs jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(waist_to_hip_inputs) = 'array'::text),
+CONSTRAINT body_composition_logs_pkey PRIMARY KEY (id),
+CONSTRAINT body_composition_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT body_composition_logs_source_weight_log_id_fkey FOREIGN KEY (source_weight_log_id) REFERENCES public.weight_logs(id)
 );
 CREATE TABLE public.body_measurements (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -756,9 +789,11 @@ data_quality USER-DEFINED NOT NULL DEFAULT 'manual'::meal_logs_data_quality,
 calc_version text NOT NULL DEFAULT 'nutrition_v1'::text,
 origin USER-DEFINED NOT NULL DEFAULT 'user'::meal_logs_origin,
 origin_confidence numeric,
+source_recipe_id uuid,
 CONSTRAINT meal_logs_pkey PRIMARY KEY (id),
 CONSTRAINT meal_logs_diet_template_meal_id_fkey FOREIGN KEY (diet_template_meal_id) REFERENCES public.diet_template_meals(id),
-CONSTRAINT meal_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+CONSTRAINT meal_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+CONSTRAINT meal_logs_source_recipe_id_fkey FOREIGN KEY (source_recipe_id) REFERENCES public.recipes(id)
 );
 CREATE TABLE public.muscle_group_translations (
 id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -782,6 +817,16 @@ read_at timestamp with time zone,
 created_at timestamp with time zone NOT NULL DEFAULT now(),
 CONSTRAINT notifications_pkey PRIMARY KEY (id),
 CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.nutrition_day_statuses (
+user_id uuid NOT NULL,
+date date NOT NULL,
+status text NOT NULL DEFAULT 'vacation'::text CHECK (status = 'vacation'::text),
+note text,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT nutrition_day_statuses_pkey PRIMARY KEY (user_id, date),
+CONSTRAINT nutrition_day_statuses_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.provider_connection_tokens (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -869,8 +914,8 @@ used_at timestamp with time zone NOT NULL DEFAULT now(),
 event_bucket_10m timestamp with time zone NOT NULL,
 is_public_eligible boolean NOT NULL DEFAULT false,
 CONSTRAINT recipe_usage_events_pkey PRIMARY KEY (id),
-CONSTRAINT recipe_usage_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT recipe_usage_events_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id)
+CONSTRAINT recipe_usage_events_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id),
+CONSTRAINT recipe_usage_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.recipes (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -1033,9 +1078,9 @@ source_provider_key text,
 source_record_id text,
 raw_payload_id uuid,
 CONSTRAINT sleep_sessions_pkey PRIMARY KEY (id),
-CONSTRAINT sleep_sessions_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id),
 CONSTRAINT sleep_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
-CONSTRAINT sleep_sessions_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id)
+CONSTRAINT sleep_sessions_device_id_fkey FOREIGN KEY (device_id) REFERENCES public.devices(id),
+CONSTRAINT sleep_sessions_raw_payload_id_fkey FOREIGN KEY (raw_payload_id) REFERENCES public.external_raw_payloads_v2(id)
 );
 CREATE TABLE public.sleep_stage_intervals (
 id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -1315,6 +1360,7 @@ rest_seconds integer,
 user_id uuid,
 superset_next_exercise_id uuid,
 is_warmup boolean NOT NULL DEFAULT false,
+drop_set_mode text NOT NULL DEFAULT 'none'::text CHECK (drop_set_mode = ANY (ARRAY['none'::text, 'last'::text, 'all'::text])),
 CONSTRAINT workout_template_exercises_pkey PRIMARY KEY (id),
 CONSTRAINT workout_template_exercises_exercise_id_fkey FOREIGN KEY (exercise_id) REFERENCES public.exercises(id),
 CONSTRAINT workout_template_exercises_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),

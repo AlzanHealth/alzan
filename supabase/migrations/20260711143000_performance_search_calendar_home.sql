@@ -29,6 +29,12 @@ CREATE INDEX IF NOT EXISTS idx_activity_sessions_user_start_completed
   ON public.activity_sessions (user_id, start_time)
   WHERE end_time IS NOT NULL;
 
+CREATE INDEX IF NOT EXISTS idx_exercises_base_name_es_trgm
+  ON public.exercises USING gin (base_name_es gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_exercises_base_name_en_trgm
+  ON public.exercises USING gin (base_name_en gin_trgm_ops);
+
 CREATE OR REPLACE FUNCTION public.search_ingredients_ranked(
   p_query text,
   p_category public.ingredients_category DEFAULT NULL,
@@ -126,34 +132,7 @@ CREATE OR REPLACE FUNCTION public.search_recipes_ranked(
   p_offset integer DEFAULT 0
 )
 RETURNS TABLE (
-  id uuid,
-  name_es text,
-  name_en text,
-  name_norm_es text,
-  description_es text,
-  description_en text,
-  kcal_100 numeric,
-  protein_g_100 numeric,
-  carbs_g_100 numeric,
-  fat_g_100 numeric,
-  quality_score integer,
-  source public.recipe_source_enum,
-  visibility public.recipe_visibility_enum,
-  owner_user_id uuid,
-  origin_recipe_id uuid,
-  popularity_score integer,
-  favorites_total integer,
-  saves_total integer,
-  uses_7d integer,
-  uses_30d integer,
-  uses_total integer,
-  users_unique_30d integer,
-  public_slug text,
-  published_at timestamptz,
-  created_at timestamptz,
-  updated_at timestamptz,
-  deleted_at timestamptz,
-  search_rank numeric,
+  items jsonb,
   total_count bigint
 )
 LANGUAGE sql
@@ -222,54 +201,89 @@ AS $$
       count(*) OVER () AS total_count
     FROM visible_recipes r
     CROSS JOIN input
+  ),
+  ordered AS (
+    SELECT ranked.*
+    FROM ranked, input
+    ORDER BY
+      CASE WHEN p_sort = 'week' THEN ranked.uses_7d END DESC NULLS LAST,
+      CASE WHEN p_sort = 'month' THEN ranked.uses_30d END DESC NULLS LAST,
+      CASE WHEN p_sort = 'saved' THEN ranked.saves_total END DESC NULLS LAST,
+      CASE WHEN p_sort = 'saved' THEN ranked.favorites_total END DESC NULLS LAST,
+      CASE WHEN p_sort NOT IN ('week', 'month', 'saved') THEN ranked.search_rank END DESC NULLS LAST,
+      ranked.quality_score DESC,
+      ranked.name_norm_es ASC
+    LIMIT (SELECT result_limit FROM input)
+    OFFSET (SELECT result_offset FROM input)
   )
   SELECT
-    ranked.id,
-    ranked.name_es,
-    ranked.name_en,
-    ranked.name_norm_es,
-    ranked.description_es,
-    ranked.description_en,
-    ranked.kcal_100,
-    ranked.protein_g_100,
-    ranked.carbs_g_100,
-    ranked.fat_g_100,
-    ranked.quality_score,
-    ranked.source,
-    ranked.visibility,
-    ranked.owner_user_id,
-    ranked.origin_recipe_id,
-    ranked.popularity_score,
-    ranked.favorites_total,
-    ranked.saves_total,
-    ranked.uses_7d,
-    ranked.uses_30d,
-    ranked.uses_total,
-    ranked.users_unique_30d,
-    ranked.public_slug,
-    ranked.published_at,
-    ranked.created_at,
-    ranked.updated_at,
-    ranked.deleted_at,
-    ranked.search_rank,
-    ranked.total_count
-  FROM ranked, input
-  ORDER BY
-    CASE WHEN p_sort = 'week' THEN ranked.uses_7d END DESC NULLS LAST,
-    CASE WHEN p_sort = 'month' THEN ranked.uses_30d END DESC NULLS LAST,
-    CASE WHEN p_sort = 'saved' THEN ranked.saves_total END DESC NULLS LAST,
-    CASE WHEN p_sort = 'saved' THEN ranked.favorites_total END DESC NULLS LAST,
-    CASE WHEN p_sort NOT IN ('week', 'month', 'saved') THEN ranked.search_rank END DESC NULLS LAST,
-    ranked.quality_score DESC,
-    ranked.name_norm_es ASC
-  LIMIT (SELECT result_limit FROM input)
-  OFFSET (SELECT result_offset FROM input);
+    coalesce(jsonb_agg(to_jsonb(ordered) - 'total_count'), '[]'::jsonb) AS items,
+    coalesce(max(ordered.total_count), (SELECT count(*) FROM ranked), 0)::bigint AS total_count
+  FROM ordered;
+$$;
+
+CREATE OR REPLACE FUNCTION public.search_exercises_ranked(
+  p_query text,
+  p_locale text DEFAULT 'es',
+  p_muscle_id integer DEFAULT NULL,
+  p_equipment_id integer DEFAULT NULL,
+  p_limit integer DEFAULT 30
+)
+RETURNS TABLE (
+  id uuid,
+  search_rank numeric
+)
+LANGUAGE sql
+STABLE
+SET search_path = public
+AS $$
+  WITH input AS (
+    SELECT
+      lower(trim(unaccent(coalesce(p_query, '')))) AS q,
+      greatest(1, least(coalesce(p_limit, 30), 90)) AS result_limit,
+      CASE WHEN coalesce(p_locale, 'es') = 'en' THEN 'en' ELSE 'es' END AS locale
+  )
+  SELECT
+    e.id,
+    (
+      CASE
+        WHEN input.locale = 'en' AND lower(coalesce(e.base_name_en, '')) = input.q THEN 100
+        WHEN input.locale <> 'en' AND lower(coalesce(e.base_name_es, '')) = input.q THEN 100
+        ELSE 0
+      END
+      + CASE
+        WHEN input.locale = 'en' AND lower(coalesce(e.base_name_en, '')) LIKE input.q || '%' THEN 60
+        WHEN input.locale <> 'en' AND lower(coalesce(e.base_name_es, '')) LIKE input.q || '%' THEN 60
+        ELSE 0
+      END
+      + CASE
+        WHEN input.locale = 'en' AND lower(coalesce(e.base_name_es, '')) LIKE input.q || '%' THEN 25
+        WHEN input.locale <> 'en' AND lower(coalesce(e.base_name_en, '')) LIKE input.q || '%' THEN 25
+        ELSE 0
+      END
+      + greatest(similarity(coalesce(e.base_name_es, ''), input.q), similarity(coalesce(e.base_name_en, ''), input.q)) * 25
+    )::numeric AS search_rank
+  FROM public.exercises e
+  CROSS JOIN input
+  WHERE input.q <> ''
+    AND length(input.q) >= 2
+    AND (p_muscle_id IS NULL OR e.primary_muscle_id = p_muscle_id)
+    AND (p_equipment_id IS NULL OR e.equipment_id = p_equipment_id)
+    AND (
+      coalesce(e.base_name_es, '') % input.q
+      OR coalesce(e.base_name_en, '') % input.q
+      OR coalesce(e.base_name_es, '') ILIKE '%' || input.q || '%'
+      OR coalesce(e.base_name_en, '') ILIKE '%' || input.q || '%'
+    )
+  ORDER BY search_rank DESC, coalesce(e.base_name_es, e.base_name_en) ASC
+  LIMIT (SELECT result_limit FROM input);
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_training_calendar_marks(
   p_user_id uuid,
   p_start_date date,
-  p_end_date date
+  p_end_date date,
+  p_timezone text DEFAULT 'UTC'
 )
 RETURNS TABLE (
   date date,
@@ -295,21 +309,20 @@ AS $$
     GROUP BY planned_date::date
   ),
   sessions AS (
-    SELECT start_time::date AS date, count(*)::integer AS completed_count
+    SELECT (start_time AT TIME ZONE coalesce(nullif(p_timezone, ''), 'UTC'))::date AS date, count(*)::integer AS completed_count
     FROM public.activity_sessions
     WHERE user_id = p_user_id
       AND p_user_id = auth.uid()
       AND end_time IS NOT NULL
       AND needs_strength_review = false
-      AND start_time >= p_start_date::timestamptz
-      AND start_time < (p_end_date + 1)::timestamptz
+      AND (start_time AT TIME ZONE coalesce(nullif(p_timezone, ''), 'UTC'))::date BETWEEN p_start_date AND p_end_date
       AND (
         duplicate_resolution IS NULL
         OR duplicate_resolution <> 'pending'::public.import_duplicate_resolution_enum
         OR duplicate_score < 80
         OR duplicate_score IS NULL
       )
-    GROUP BY start_time::date
+    GROUP BY (start_time AT TIME ZONE coalesce(nullif(p_timezone, ''), 'UTC'))::date
   )
   SELECT
     days.date,
@@ -328,7 +341,8 @@ CREATE OR REPLACE FUNCTION public.get_home_summary(
   p_user_id uuid,
   p_today date,
   p_week_start date,
-  p_week_end date
+  p_week_end date,
+  p_timezone text DEFAULT 'UTC'
 )
 RETURNS TABLE (
   completed_workouts_today integer,
@@ -345,18 +359,17 @@ STABLE
 SET search_path = public
 AS $$
   WITH today_bounds AS (
-    SELECT p_today::timestamptz AS day_start, (p_today + 1)::timestamptz AS day_end
+    SELECT p_today AS day
   ),
   week_bounds AS (
-    SELECT p_week_start::timestamptz AS week_start, (p_week_end + 1)::timestamptz AS week_end
+    SELECT p_week_start AS week_start, p_week_end AS week_end
   ),
   completed_today AS (
     SELECT count(*)::integer AS count
     FROM public.activity_sessions s, today_bounds b
     WHERE s.user_id = p_user_id
       AND p_user_id = auth.uid()
-      AND s.start_time >= b.day_start
-      AND s.start_time < b.day_end
+      AND (s.start_time AT TIME ZONE coalesce(nullif(p_timezone, ''), 'UTC'))::date = b.day
       AND s.end_time IS NOT NULL
   ),
   scheduled_today AS (
@@ -381,8 +394,7 @@ AS $$
     WHERE s.user_id = p_user_id
       AND p_user_id = auth.uid()
       AND s.end_time IS NULL
-      AND s.start_time >= b.day_start
-      AND s.start_time < b.day_end
+      AND (s.start_time AT TIME ZONE coalesce(nullif(p_timezone, ''), 'UTC'))::date = b.day
     ORDER BY s.start_time DESC
     LIMIT 1
   ),
@@ -399,8 +411,7 @@ AS $$
     FROM public.activity_sessions s, week_bounds b
     WHERE s.user_id = p_user_id
       AND p_user_id = auth.uid()
-      AND s.start_time >= b.week_start
-      AND s.start_time < b.week_end
+      AND (s.start_time AT TIME ZONE coalesce(nullif(p_timezone, ''), 'UTC'))::date BETWEEN b.week_start AND b.week_end
   ),
   nutrition_days AS (
     SELECT count(DISTINCT date)::integer AS count
@@ -412,7 +423,7 @@ AS $$
   health_days AS (
     SELECT count(DISTINCT date)::integer AS count
     FROM (
-      SELECT measured_at::date AS date FROM public.weight_logs WHERE user_id = p_user_id AND p_user_id = auth.uid() AND measured_at >= (SELECT week_start FROM week_bounds) AND measured_at < (SELECT week_end FROM week_bounds)
+      SELECT (measured_at AT TIME ZONE coalesce(nullif(p_timezone, ''), 'UTC'))::date AS date FROM public.weight_logs WHERE user_id = p_user_id AND p_user_id = auth.uid() AND (measured_at AT TIME ZONE coalesce(nullif(p_timezone, ''), 'UTC'))::date BETWEEN p_week_start AND p_week_end
       UNION
       SELECT date FROM public.sleep_sessions WHERE user_id = p_user_id AND p_user_id = auth.uid() AND date BETWEEN p_week_start AND p_week_end
       UNION
@@ -432,5 +443,6 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.search_ingredients_ranked(text, public.ingredients_category, text, integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.search_recipes_ranked(text, text, uuid, text, text, integer, integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_training_calendar_marks(uuid, date, date) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_home_summary(uuid, date, date, date) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.search_exercises_ranked(text, text, integer, integer, integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_training_calendar_marks(uuid, date, date, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_home_summary(uuid, date, date, date, text) TO authenticated;

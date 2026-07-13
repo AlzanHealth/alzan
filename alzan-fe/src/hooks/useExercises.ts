@@ -44,6 +44,24 @@ interface ExerciseLookupRow extends Exercise {
   } | null;
 }
 
+type RankedExerciseRow = {
+  id: string;
+  search_rank: number;
+};
+
+type SearchExercisesRankedRpc = {
+  rpc: (
+    fn: 'search_exercises_ranked',
+    args: {
+      p_query: string;
+      p_locale: string;
+      p_muscle_id: number | null;
+      p_equipment_id: number | null;
+      p_limit: number;
+    },
+  ) => Promise<{ data: RankedExerciseRow[] | null; error: { message: string } | null }>;
+};
+
 const EXERCISE_LOOKUP_SELECT = `
   *,
   exercise_type:exercise_types (
@@ -221,6 +239,38 @@ export const useExercises = (options?: UseExercisesOptions) => {
         const requestedLimit = typeof limit === 'number' && limit > 0 ? limit : SEARCH_CANDIDATE_FLOOR;
         const candidateLimit = Math.max(requestedLimit * SEARCH_CANDIDATE_MULTIPLIER, SEARCH_CANDIDATE_FLOOR);
 
+        const { data: rankedExercises, error: rankedError } = await (
+          supabase as unknown as SearchExercisesRankedRpc
+        ).rpc('search_exercises_ranked', {
+          p_query: trimmedSearchQuery,
+          p_locale: languageCode,
+          p_muscle_id: selectedMuscleId,
+          p_equipment_id: selectedEquipmentId,
+          p_limit: candidateLimit,
+        });
+
+        if (!rankedError && rankedExercises) {
+          const rankedIds = rankedExercises.map(item => item.id);
+          if (rankedIds.length === 0) {
+            return { exercises: [], hasMore: false };
+          }
+
+          const { data: details, error: detailsError } = await supabase
+            .from('exercises')
+            .select(EXERCISE_LOOKUP_SELECT)
+            .in('id', rankedIds)
+            .returns<ExerciseLookupRow[]>();
+
+          if (detailsError) {
+            console.error('Error fetching ranked exercises:', detailsError);
+          } else {
+            const detailsById = new Map((details ?? []).map(item => [item.id, item]));
+            rows = rankedIds.map(id => detailsById.get(id)).filter((item): item is ExerciseLookupRow => !!item);
+          }
+        } else if (rankedError) {
+          console.error('Exercise ranked search RPC failed:', rankedError);
+        }
+
         // Two-phase fetch: strong (whole-query) matches first so the typed term
         // always surfaces, then broad token matches to fill the remaining slots.
         const runExerciseSearch = async (
@@ -243,23 +293,25 @@ export const useExercises = (options?: UseExercisesOptions) => {
           return data || [];
         };
 
-        try {
-          const strongRows = await runExerciseSearch(buildExerciseStrongClauses(trimmedSearchQuery));
-          rows = strongRows;
+        if (rows.length === 0) {
+          try {
+            const strongRows = await runExerciseSearch(buildExerciseStrongClauses(trimmedSearchQuery));
+            rows = strongRows;
 
-          if (strongRows.length < requestedLimit) {
-            const broadRows = await runExerciseSearch(
-              buildExerciseBroadClauses(trimmedSearchQuery),
-              strongRows.map(row => row.id),
-            );
-            rows = [...strongRows, ...broadRows];
+            if (strongRows.length < requestedLimit) {
+              const broadRows = await runExerciseSearch(
+                buildExerciseBroadClauses(trimmedSearchQuery),
+                strongRows.map(row => row.id),
+              );
+              rows = [...strongRows, ...broadRows];
+            }
+          } catch (searchError) {
+            console.error('Exercise search timed out or failed:', searchError);
+            return {
+              exercises: [],
+              hasMore: false,
+            };
           }
-        } catch (searchError) {
-          console.error('Exercise search timed out or failed:', searchError);
-          return {
-            exercises: [],
-            hasMore: false,
-          };
         }
       } else {
         let query = createBaseQuery().order('id', { ascending: true });

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { endOfDay, format, startOfWeek } from 'date-fns';
+import { endOfDay, format, parseISO, startOfDay, startOfWeek } from 'date-fns';
 import { useAuth } from '../context/AuthContext';
+import { usePreferencesContext } from '../context/PreferencesContext';
 import { supabase } from '../lib/supabaseClient';
 
 export type HomeSummaryScheduledWorkout = {
@@ -55,21 +56,34 @@ type HomeSummaryRpc = {
       p_today: string;
       p_week_start: string;
       p_week_end: string;
+      p_timezone: string;
     },
   ) => Promise<{ data: HomeSummaryRpcRow[] | null; error: { message: string } | null }>;
 };
 
+const getDeviceTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+};
+
 export const useHomeSummary = () => {
   const { user } = useAuth();
+  const { preferences } = usePreferencesContext();
   const today = new Date();
+  const start = startOfDay(today).toISOString();
+  const end = endOfDay(today).toISOString();
   const todayStr = format(today, 'yyyy-MM-dd');
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
   const weekEnd = endOfDay(today);
   const weekStartDate = format(weekStart, 'yyyy-MM-dd');
   const weekEndDate = format(weekEnd, 'yyyy-MM-dd');
+  const timezone = preferences?.timezone || getDeviceTimezone();
 
   return useQuery({
-    queryKey: ['dashboard', 'home-summary', user?.id, todayStr, weekStartDate, weekEndDate],
+    queryKey: ['dashboard', 'home-summary', user?.id, todayStr, weekStartDate, weekEndDate, timezone],
     queryFn: async () => {
       if (!user) {
         return {
@@ -86,11 +100,120 @@ export const useHomeSummary = () => {
         p_today: todayStr,
         p_week_start: weekStartDate,
         p_week_end: weekEndDate,
+        p_timezone: timezone,
       });
 
       if (error) {
         console.error('[useHomeSummary] get_home_summary error:', error);
-        throw error;
+        const [
+          workoutsResult,
+          scheduledResult,
+          activeResult,
+          weightResult,
+          weeklyWeightResult,
+          weeklyWorkoutsResult,
+          mealLogsResult,
+          sleepResult,
+          hydrationResult,
+        ] = await Promise.all([
+          supabase
+            .from('activity_sessions')
+            .select('id')
+            .eq('user_id', user.id)
+            .gte('start_time', start)
+            .lte('start_time', end),
+          supabase
+            .from('workout_plans')
+            .select('*, workout_templates(base_name), endurance_workout_templates(base_name, sport_type)')
+            .eq('user_id', user.id)
+            .eq('planned_date', todayStr)
+            .eq('status', 'planned'),
+          supabase
+            .from('activity_sessions')
+            .select('id, sport_type, sport_subtype, name, start_time')
+            .eq('user_id', user.id)
+            .is('end_time', null)
+            .gte('start_time', start)
+            .lte('start_time', end)
+            .order('start_time', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('weight_logs')
+            .select('weight_kg, measured_at')
+            .eq('user_id', user.id)
+            .order('measured_at', { ascending: false })
+            .limit(2),
+          supabase
+            .from('weight_logs')
+            .select('measured_at')
+            .eq('user_id', user.id)
+            .gte('measured_at', weekStart.toISOString())
+            .lte('measured_at', weekEnd.toISOString()),
+          supabase
+            .from('activity_sessions')
+            .select('id')
+            .eq('user_id', user.id)
+            .gte('start_time', weekStart.toISOString())
+            .lte('start_time', weekEnd.toISOString()),
+          supabase
+            .from('meal_logs')
+            .select('date')
+            .eq('user_id', user.id)
+            .gte('date', weekStartDate)
+            .lte('date', weekEndDate),
+          supabase
+            .from('sleep_sessions')
+            .select('date')
+            .eq('user_id', user.id)
+            .gte('date', weekStartDate)
+            .lte('date', weekEndDate),
+          supabase
+            .from('daily_hydration')
+            .select('date')
+            .eq('user_id', user.id)
+            .gte('date', weekStartDate)
+            .lte('date', weekEndDate),
+        ]);
+
+        const fallbackError = [
+          workoutsResult.error,
+          scheduledResult.error,
+          activeResult.error,
+          weightResult.error,
+          weeklyWeightResult.error,
+          weeklyWorkoutsResult.error,
+          mealLogsResult.error,
+          sleepResult.error,
+          hydrationResult.error,
+        ].find(Boolean);
+        if (fallbackError) throw fallbackError;
+
+        const currentWeight = weightResult.data?.[0] ?? null;
+        const previousWeight = weightResult.data?.[1] ?? null;
+        const nutritionDates = new Set((mealLogsResult.data ?? []).map(row => row.date));
+        const healthDates = new Set<string>();
+        (weeklyWeightResult.data ?? []).forEach(row =>
+          healthDates.add(format(parseISO(row.measured_at), 'yyyy-MM-dd')),
+        );
+        (sleepResult.data ?? []).forEach(row => healthDates.add(row.date));
+        (hydrationResult.data ?? []).forEach(row => healthDates.add(row.date));
+
+        return {
+          completedWorkoutsCount: workoutsResult.data?.length ?? 0,
+          scheduledWorkouts: scheduledResult.data ?? [],
+          activeTodayWorkout: (activeResult.data as HomeSummaryActiveWorkout) ?? null,
+          health: {
+            weight: currentWeight,
+            weight_trend: currentWeight && previousWeight ? currentWeight.weight_kg - previousWeight.weight_kg : 0,
+            steps: 0,
+          },
+          weeklySummary: {
+            workoutsCount: weeklyWorkoutsResult.data?.length ?? 0,
+            nutritionDays: nutritionDates.size,
+            healthDays: healthDates.size,
+          },
+        };
       }
 
       const summary = data?.[0];

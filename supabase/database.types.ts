@@ -4852,6 +4852,7 @@ export type Database = {
       }
       get_home_summary: {
         Args: {
+          p_timezone?: string
           p_today: string
           p_user_id: string
           p_week_end: string
@@ -4869,7 +4870,12 @@ export type Database = {
         }[]
       }
       get_training_calendar_marks: {
-        Args: { p_end_date: string; p_start_date: string; p_user_id: string }
+        Args: {
+          p_end_date: string
+          p_start_date: string
+          p_timezone?: string
+          p_user_id: string
+        }
         Returns: {
           completed_count: number
           date: string
@@ -4894,6 +4900,19 @@ export type Database = {
         Returns: undefined
       }
       reset_user_data: { Args: never; Returns: undefined }
+      search_exercises_ranked: {
+        Args: {
+          p_equipment_id?: number
+          p_limit?: number
+          p_locale?: string
+          p_muscle_id?: number
+          p_query: string
+        }
+        Returns: {
+          id: string
+          search_rank: number
+        }[]
+      }
       search_ingredients_ranked: {
         Args: {
           p_category?: Database["public"]["Enums"]["ingredients_category"]
@@ -4937,35 +4956,8 @@ export type Database = {
           p_user_id?: string
         }
         Returns: {
-          carbs_g_100: number
-          created_at: string
-          deleted_at: string
-          description_en: string
-          description_es: string
-          fat_g_100: number
-          favorites_total: number
-          id: string
-          kcal_100: number
-          name_en: string
-          name_es: string
-          name_norm_es: string
-          origin_recipe_id: string
-          owner_user_id: string
-          popularity_score: number
-          protein_g_100: number
-          public_slug: string
-          published_at: string
-          quality_score: number
-          saves_total: number
-          search_rank: number
-          source: Database["public"]["Enums"]["recipe_source_enum"]
+          items: Json
           total_count: number
-          updated_at: string
-          users_unique_30d: number
-          uses_30d: number
-          uses_7d: number
-          uses_total: number
-          visibility: Database["public"]["Enums"]["recipe_visibility_enum"]
         }[]
       }
       show_limit: { Args: never; Returns: number }

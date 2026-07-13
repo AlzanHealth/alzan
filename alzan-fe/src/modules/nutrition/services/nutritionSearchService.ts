@@ -55,6 +55,26 @@ interface IngredientSearchRow extends DbIngredient {
   notes_en: string | null;
 }
 
+type SearchRecipesRankedPageRow = {
+  items: RecipeSearchRow[] | null;
+  total_count: number | null;
+};
+
+type SearchRecipesRankedRpc = {
+  rpc: (
+    fn: 'search_recipes_ranked',
+    args: {
+      p_query: string;
+      p_scope: RecipeSearchScope;
+      p_user_id: string | null;
+      p_category: 'all';
+      p_sort: 'recommended';
+      p_limit: number;
+      p_offset: number;
+    },
+  ) => Promise<{ data: SearchRecipesRankedPageRow[] | null; error: { message: string } | null }>;
+};
+
 export type RecipeLibrarySourceFilter = 'all' | 'users' | 'system';
 export type RecipeSearchScope = 'source' | 'all' | 'users' | 'saved' | 'favorites';
 
@@ -265,14 +285,77 @@ export async function searchMealByName(query: string, options: SearchMealByNameO
   const languageCode = options.locale ?? getCurrentAppLocale();
   if (!query || query.length < 2) return [];
 
+  const recipeScope = options.recipeScope ?? 'source';
+  const currentUserId = options.currentUserId ?? null;
+  const favoriteRecipeIds = options.favoriteRecipeIds ?? [];
+
+  try {
+    if (recipeScope !== 'favorites' || favoriteRecipeIds.length > 0) {
+      const [recipesResult, ingredients] = await Promise.all([
+        (supabase as unknown as SearchRecipesRankedRpc).rpc('search_recipes_ranked', {
+          p_query: query,
+          p_scope: recipeScope,
+          p_user_id: currentUserId,
+          p_category: 'all',
+          p_sort: 'recommended',
+          p_limit: 15,
+          p_offset: 0,
+        }),
+        searchIngredientsWithFilters({ query, category: 'precocinado' }, languageCode, 15),
+      ]);
+
+      if (!recipesResult.error && recipesResult.data) {
+        const recipes = recipesResult.data[0]?.items ?? [];
+        const recipeItems = recipes.map(mapRecipeToMealComponent);
+        const ingredientItems = ingredients.map(ing => ({
+          id: `ingredient_${ing.id}`,
+          name: getLocalizedIngredientName(ing, languageCode),
+          source: 'database' as const,
+          external_id: ing.id,
+          itemType: 'ingredient' as const,
+          category: ing.category,
+          quality_score: ing.quality_score,
+          source_primary: ing.source_primary,
+          source_secondary: ing.source_secondary,
+          notes_es: ing.notes_es,
+          notes_en: ing.notes_en,
+          kcal_100: Math.round(ing.kcal_100 || 0),
+          protein_g_100: roundToOneDecimal(ing.protein_g_100 || 0),
+          carbs_g_100: roundToOneDecimal(ing.carbs_g_100 || 0),
+          fat_g_100: roundToOneDecimal(ing.fat_g_100 || 0),
+        }));
+
+        return [...recipeItems, ...ingredientItems].sort((a, b) => {
+          const scoreA = getSearchRelevanceScore(
+            query,
+            a.name,
+            a.itemType === 'recipe' ? (a.description ?? null) : null,
+          );
+          const scoreB = getSearchRelevanceScore(
+            query,
+            b.name,
+            b.itemType === 'recipe' ? (b.description ?? null) : null,
+          );
+          if (scoreA !== scoreB) return scoreB - scoreA;
+          if (a.itemType === 'recipe' && b.itemType === 'recipe') {
+            return (b.recipe_popularity_score || 0) - (a.recipe_popularity_score || 0);
+          }
+          return (b.quality_score || 0) - (a.quality_score || 0);
+        });
+      }
+
+      if (recipesResult.error)
+        console.error('[nutritionSearchService] search_recipes_ranked error:', recipesResult.error);
+    }
+  } catch (error) {
+    console.error('[nutritionSearchService] RPC meal search fallback:', error);
+  }
+
   const normQuery = normalizeInput(query);
   const likePattern = buildLooseIlikePattern(query);
   const recipeTokenClauses = buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
   const ingredientTokenClauses = buildTokenIlikeClauses(query, ['name_norm_es', 'name_es', 'name_en']);
   const results: MealComponent[] = [];
-  const recipeScope = options.recipeScope ?? 'source';
-  const currentUserId = options.currentUserId ?? null;
-  const favoriteRecipeIds = options.favoriteRecipeIds ?? [];
 
   // ===== 1. SEARCH RECIPES (partial match) =====
   try {

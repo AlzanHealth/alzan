@@ -29,6 +29,7 @@ import { format, addDays, addWeeks, isSameDay, startOfWeek, subDays, startOfDay,
 import { useMutation, useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
+import { usePreferencesContext } from '../../context/PreferencesContext';
 import { propagateTrainingPlans } from '../../modules/training/services/trainingCopyService';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { DaySwitcher } from '../../components/common/DaySwitcher';
@@ -97,8 +98,17 @@ type TrainingCalendarMarksRpc = {
       p_user_id: string;
       p_start_date: string;
       p_end_date: string;
+      p_timezone: string;
     },
   ) => Promise<{ data: TrainingCalendarMarkRow[] | null; error: { message: string } | null }>;
+};
+
+const getDeviceTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
 };
 
 export const TrainingHomeScreen = () => {
@@ -106,8 +116,10 @@ export const TrainingHomeScreen = () => {
   const { colors } = useTheme();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const { user } = useAuth();
+  const { preferences } = usePreferencesContext();
   const queryClient = useQueryClient();
   const { convertDistanceToUi } = useUnitConversion();
+  const timezone = preferences?.timezone || getDeviceTimezone();
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   // Calculate range for dots (e.g. +/- 45 days to cover typical scrolling)
@@ -383,7 +395,7 @@ export const TrainingHomeScreen = () => {
 
   // Fetch dates with plans or sessions for the DaySwitcher dots
   const { data: markedDates } = useQuery({
-    queryKey: ['weekDots', user?.id], // Broad key, refetch on mount/focus
+    queryKey: ['weekDots', user?.id, timezone], // Broad key, refetch on mount/focus
     queryFn: async () => {
       if (!user) return new Set<string>();
 
@@ -396,12 +408,39 @@ export const TrainingHomeScreen = () => {
           p_user_id: user.id,
           p_start_date: startStr,
           p_end_date: endStr,
+          p_timezone: timezone,
         },
       );
 
       if (error) {
         console.error('[TrainingHomeScreen] get_training_calendar_marks error:', error);
-        throw error;
+        const [{ data: plans }, { data: sessions }] = await Promise.all([
+          supabase
+            .from('workout_plans')
+            .select('planned_date, status')
+            .eq('user_id', user.id)
+            .gte('planned_date', startStr)
+            .lte('planned_date', endStr)
+            .neq('status', 'skipped'),
+          supabase
+            .from('activity_sessions')
+            .select('start_time')
+            .eq('user_id', user.id)
+            .gte('start_time', `${startStr}T00:00:00`)
+            .lte('start_time', `${endStr}T23:59:59`)
+            .not('end_time', 'is', null),
+        ]);
+
+        const dots = new Set<string>();
+        plans?.forEach(plan => {
+          const date = typeof plan.planned_date === 'string' ? plan.planned_date.split('T')[0] : '';
+          if (date) dots.add(date);
+        });
+        sessions?.forEach(session => {
+          const date = typeof session.start_time === 'string' ? session.start_time.split('T')[0] : '';
+          if (date) dots.add(date);
+        });
+        return dots;
       }
 
       return new Set(

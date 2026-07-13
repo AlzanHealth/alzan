@@ -238,16 +238,18 @@ async function main(): Promise<void> {
 
     // --- Strength REVERT (keep mine): previous app values restored ---
     {
+      const receivedAt = new Date().toISOString();
       const session = await insertSession({
         sport_type: 'strength',
+        start_time: receivedAt,
         duration_s: 3600,
         calories_kcal: 400,
         avg_heart_rate: 120,
         source: 'imported',
-        imported_at: new Date().toISOString(),
+        imported_at: receivedAt,
         pending_watch_metrics: {
           previous: { duration_s: 3000, avg_heart_rate: 110 },
-          received_at: new Date().toISOString(),
+          received_at: receivedAt,
         },
       });
       await review.revertWatchMetrics(userId, session);
@@ -261,13 +263,15 @@ async function main(): Promise<void> {
 
     // --- Strength KEEP WATCH (and do-nothing equivalent): watch values stay ---
     {
+      const receivedAt = new Date().toISOString();
       const session = await insertSession({
         sport_type: 'strength',
+        start_time: receivedAt,
         duration_s: 3600,
         calories_kcal: 400,
         source: 'imported',
-        imported_at: new Date().toISOString(),
-        pending_watch_metrics: { previous: { duration_s: 3000 }, received_at: new Date().toISOString() },
+        imported_at: receivedAt,
+        pending_watch_metrics: { previous: { duration_s: 3000 }, received_at: receivedAt },
       });
       await review.keepWatchMetrics(userId, session);
       const kept = await getSession(session);

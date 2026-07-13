@@ -43,12 +43,16 @@ interface RecipeRow {
   uses_total: number | null;
 }
 
-interface RankedRecipeRow extends RecipeRow {
+export interface RankedRecipeRow extends RecipeRow {
   search_rank: number | null;
-  total_count: number | null;
 }
 
-type SearchRecipesRpc = {
+type RankedRecipePageRow = {
+  items: RankedRecipeRow[] | null;
+  total_count: number | null;
+};
+
+export type SearchRecipesRpc = {
   rpc: (
     fn: 'search_recipes_ranked',
     args: {
@@ -60,7 +64,7 @@ type SearchRecipesRpc = {
       p_limit: number;
       p_offset: number;
     },
-  ) => Promise<{ data: RankedRecipeRow[] | null; error: { message: string } | null }>;
+  ) => Promise<{ data: RankedRecipePageRow[] | null; error: { message: string } | null }>;
 };
 
 interface RecipeFavoriteRow {
@@ -205,9 +209,11 @@ export async function getDiscoverRecipes({
   );
 
   if (!rankedError && rankedData) {
+    const page = rankedData[0];
+    const items = page?.items ?? [];
     return {
-      recipes: await attachAuthorNames(rankedData.map(mapRecipeRow)),
-      total: rankedData[0]?.total_count ?? 0,
+      recipes: await attachAuthorNames(items.map(mapRecipeRow)),
+      total: page?.total_count ?? 0,
     };
   }
 

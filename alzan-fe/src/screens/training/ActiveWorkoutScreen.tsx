@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
@@ -1314,71 +1314,86 @@ export const ActiveWorkoutScreen = () => {
           style={{ flex: 1 }}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
-            {/* Loading Skeleton */}
-            {isLoading && visibleExercises.length === 0 && (
-              <>
-                {[1, 2, 3].map(n => (
-                  <GlassCard key={`skeleton-${n}`} style={[styles.exerciseCard, dynamicStyles.glassCard]}>
-                    <View style={styles.exerciseHeader}>
-                      <View
-                        style={[
-                          styles.skeletonText,
-                          {
-                            width: '60%',
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                          },
-                        ]}
-                      />
-                      <View
-                        style={[
-                          styles.skeletonIcon,
-                          {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                          },
-                        ]}
-                      />
-                    </View>
-                    <View
-                      style={[
-                        styles.setsHeader,
-                        {
-                          borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                        },
-                      ]}
-                    >
-                      {[1, 2, 3, 4].map(col => (
+          <FlatList
+            contentContainerStyle={styles.content}
+            data={visibleExercises}
+            extraData={{
+              completedSets: activeSessionData?.completedSets,
+              deletingExerciseIds,
+              extraSets,
+              inputs,
+              movedExerciseId,
+              setModes,
+              supersetLinks,
+            }}
+            keyboardShouldPersistTaps="handled"
+            keyExtractor={(item, index) => item.id || item.exercise_id || String(index)}
+            style={{ flex: 1 }}
+            ListHeaderComponent={
+              isLoading && visibleExercises.length === 0 ? (
+                <>
+                  {[1, 2, 3].map(n => (
+                    <GlassCard key={`skeleton-${n}`} style={[styles.exerciseCard, dynamicStyles.glassCard]}>
+                      <View style={styles.exerciseHeader}>
                         <View
-                          key={col}
                           style={[
-                            styles.skeletonCol,
+                            styles.skeletonText,
                             {
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                              width: '60%',
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
                             },
                           ]}
                         />
-                      ))}
-                    </View>
-                    {[1, 2, 3].map(setNum => (
-                      <View key={setNum} style={[styles.setRow, { height: 48 }]}>
+                        <View
+                          style={[
+                            styles.skeletonIcon,
+                            {
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <View
+                        style={[
+                          styles.setsHeader,
+                          {
+                            borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                          },
+                        ]}
+                      >
                         {[1, 2, 3, 4].map(col => (
                           <View
                             key={col}
                             style={[
-                              styles.skeletonInput,
+                              styles.skeletonCol,
                               {
-                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                               },
                             ]}
                           />
                         ))}
                       </View>
-                    ))}
-                  </GlassCard>
-                ))}
-              </>
-            )}
-            {visibleExercises.map((item, i: number) => {
+                      {[1, 2, 3].map(setNum => (
+                        <View key={setNum} style={[styles.setRow, { height: 48 }]}>
+                          {[1, 2, 3, 4].map(col => (
+                            <View
+                              key={col}
+                              style={[
+                                styles.skeletonInput,
+                                {
+                                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                                },
+                              ]}
+                            />
+                          ))}
+                        </View>
+                      ))}
+                    </GlassCard>
+                  ))}
+                </>
+              ) : null
+            }
+            renderItem={({ item, index: i }) => {
               const exerciseId = item.exercise_id;
               const totalSets = Math.max(0, (item.target_sets || 3) + (extraSets[exerciseId] || 0));
               const isTimeBased = isTimeBasedExerciseType(item.exercise?.exercise_type_code);
@@ -1730,36 +1745,41 @@ export const ActiveWorkoutScreen = () => {
                   )}
                 </React.Fragment>
               );
-            })}
+            }}
+            ListFooterComponent={
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.addExerciseBtn,
+                    {
+                      borderColor: themeColors.primary,
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.5)',
+                    },
+                  ]}
+                  onPress={() =>
+                    navigation.navigate('ExerciseSearch', {
+                      onSelect: (_exerciseId: string) => {}, // Required but not used
+                      onExerciseSelected: handleAddAdhocExercise,
+                    })
+                  }
+                >
+                  <Plus size={20} color={themeColors.primary} />
+                  <Text style={[styles.addExerciseText, { color: themeColors.primary }]}>
+                    {t('training.addExercise')}
+                  </Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.addExerciseBtn,
-                {
-                  borderColor: themeColors.primary,
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.5)',
-                },
-              ]}
-              onPress={() =>
-                navigation.navigate('ExerciseSearch', {
-                  onSelect: (_exerciseId: string) => {}, // Required but not used
-                  onExerciseSelected: handleAddAdhocExercise,
-                })
-              }
-            >
-              <Plus size={20} color={themeColors.primary} />
-              <Text style={[styles.addExerciseText, { color: themeColors.primary }]}>{t('training.addExercise')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.completeAllExercisesBtn, { backgroundColor: themeColors.success }]}
-              onPress={handleCompleteAllExercises}
-              disabled={isCompletingAll}
-            >
-              <Check size={20} color="#FFF" />
-              <Text style={styles.completeAllExercisesText}>{t('training.completeAll')}</Text>
-            </TouchableOpacity>
-          </ScrollView>
+                <TouchableOpacity
+                  style={[styles.completeAllExercisesBtn, { backgroundColor: themeColors.success }]}
+                  onPress={handleCompleteAllExercises}
+                  disabled={isCompletingAll}
+                >
+                  <Check size={20} color="#FFF" />
+                  <Text style={styles.completeAllExercisesText}>{t('training.completeAll')}</Text>
+                </TouchableOpacity>
+              </>
+            }
+          />
 
           {executionTimerVisible && (
             <ExecutionTimer
