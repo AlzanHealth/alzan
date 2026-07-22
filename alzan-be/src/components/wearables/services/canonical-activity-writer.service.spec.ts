@@ -620,6 +620,84 @@ async function assertOneKilometerWearableLapsArePersistedAsDistanceGroups(): Pro
   assert.ok(insertedRows.some(row => row.split_distance_m === 10000 && row.distance_m === 9220));
 }
 
+async function assertExactSuuntoSeriesPersistsElevenNativeLaps(): Promise<void> {
+  const activity = buildCanonicalRun();
+  activity.summary.distanceM = 7739;
+  activity.summary.durationSeconds = 2848.7;
+  const values = [
+    [1477.4, 600],
+    [1000, 294.4],
+    [190.1, 120],
+    [1000, 284.4],
+    [163.1, 120],
+    [1000, 286.7],
+    [173.1, 120],
+    [1000, 289.6],
+    [171, 120],
+    [1525.9, 600],
+  ] as const;
+  let offsetSeconds = 0;
+  activity.laps = values.map(([distanceM, durationSeconds], index) => {
+    const startOffsetSeconds = offsetSeconds;
+    offsetSeconds += durationSeconds;
+    return {
+      lapIndex: index + 1,
+      lapType: 'manual' as const,
+      distanceM,
+      durationSeconds,
+      avgPaceSecondsPerKm: (durationSeconds / distanceM) * 1000,
+      avgHeartRate: 150,
+      maxHeartRate: 170,
+      startOffsetSeconds,
+      endOffsetSeconds: offsetSeconds,
+    };
+  });
+  activity.laps.push(
+    {
+      lapIndex: 11,
+      lapType: 'distance',
+      distanceM: 36,
+      durationSeconds: 13.6,
+      avgPaceSecondsPerKm: (13.6 / 36) * 1000,
+      avgHeartRate: 165,
+      maxHeartRate: 170,
+      startOffsetSeconds: offsetSeconds,
+      endOffsetSeconds: offsetSeconds + 13.6,
+    },
+    {
+      lapIndex: 12,
+      lapType: 'distance',
+      distanceM: 739,
+      durationSeconds: 309.3,
+      avgPaceSecondsPerKm: (309.3 / 739) * 1000,
+      avgHeartRate: 163,
+      maxHeartRate: 170,
+      startOffsetSeconds: null,
+      endOffsetSeconds: null,
+    },
+  );
+  const client = createFullSupabaseClient({});
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {} as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.replaceLaps('session-1', 'user-1', activity);
+
+  const insertedRows = client.inserts.find(insert => insert.table === 'activity_laps')?.rows ?? [];
+  assert.equal(insertedRows.length, 11);
+  assert.deepEqual(
+    insertedRows.map(row => Math.round(Number(row.distance_m))),
+    [1477, 1000, 190, 1000, 163, 1000, 173, 1000, 171, 1526, 36],
+  );
+  assert.equal(
+    insertedRows.every(row => row.split_group === 'custom'),
+    true,
+  );
+}
+
 function assertPositionSamplesAreSanitizedForValidRoutes(): void {
   const client = createFakeSupabaseClient(250);
   const service = createService(client);
@@ -670,6 +748,7 @@ async function run(): Promise<void> {
   await assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate();
   await assertBundleFailureFallsBackToGenericActivityWithLaps();
   await assertOneKilometerWearableLapsArePersistedAsDistanceGroups();
+  await assertExactSuuntoSeriesPersistsElevenNativeLaps();
 }
 
 void run();

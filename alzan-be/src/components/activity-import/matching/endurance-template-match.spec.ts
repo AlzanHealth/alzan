@@ -21,11 +21,15 @@ function lap(distanceM: number, durationSeconds: number): ActivityLapLike {
   return { distanceM, durationSeconds, avgPaceSecondsPerKm: (durationSeconds / distanceM) * 1000 };
 }
 
+function autoLap(distanceM: number, durationSeconds: number): ActivityLapLike {
+  return { ...lap(distanceM, durationSeconds), lapType: 'distance' };
+}
+
 function intervalLaps(reps: number, repDistanceM: number, repDurationS: number, recoveryS: number): ActivityLapLike[] {
   const laps: ActivityLapLike[] = [];
   for (let index = 0; index < reps; index += 1) {
     laps.push(lap(repDistanceM, repDurationS));
-    if (index < reps - 1) laps.push(lap(200, recoveryS));
+    laps.push(lap(200, recoveryS));
   }
   return laps;
 }
@@ -131,6 +135,133 @@ function templateSteps(
   return steps;
 }
 
+function boundedTemplateSteps(
+  reps: number,
+  repDistanceM: number,
+  paceSecPerKm: number,
+  recoveryS: number,
+  warmupS = 900,
+  cooldownS = 600,
+): EnduranceStepLike[] {
+  return [
+    {
+      id: 'warmup',
+      parentStepId: null,
+      isGroup: false,
+      repetitions: null,
+      orderIndex: 0,
+      phaseType: 'warmup',
+      durationType: 'time',
+      durationS: warmupS,
+      distanceM: null,
+      targetType: null,
+      targetMin: null,
+      targetMax: null,
+    },
+    ...templateSteps(reps, repDistanceM, paceSecPerKm, recoveryS).map(step =>
+      step.parentStepId == null ? { ...step, orderIndex: 1 } : step,
+    ),
+    {
+      id: 'cooldown',
+      parentStepId: null,
+      isGroup: false,
+      repetitions: null,
+      orderIndex: 2,
+      phaseType: 'cooldown',
+      durationType: 'time',
+      durationS: cooldownS,
+      distanceM: null,
+      targetType: null,
+      targetMin: null,
+      targetMax: null,
+    },
+  ];
+}
+
+function exactSuuntoWorkoutLaps(): ActivityLapLike[] {
+  return [
+    lap(1477.4, 600),
+    lap(1000, 294.4),
+    lap(190.1, 120),
+    lap(1000, 284.4),
+    lap(163.1, 120),
+    lap(1000, 286.7),
+    lap(173.1, 120),
+    lap(1000, 289.6),
+    lap(171, 120),
+    lap(1525.9, 600),
+    lap(36, 13.6),
+  ];
+}
+
+function assertExactSuuntoWorkoutMatchesCompleteTemplateSequence(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  const activityStructure = deriveTemplateDistanceMatchedActivityStructure(exactSuuntoWorkoutLaps(), steps);
+  assert.ok(activityStructure, 'expected complete ordered Suunto interval structure');
+  assert.equal(activityStructure.repCount, 4);
+  assert.equal(activityStructure.recoveryDurationS, 120);
+  assert.equal(activityStructure.alignment?.isAutoMatchEligible, true);
+  assert.deepEqual(activityStructure.alignment?.matchedLapIndexes, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(activityStructure.alignment?.extraLapIndexes, [10]);
+  const templateStructure = deriveTemplateStructure(steps);
+  assert.ok(templateStructure);
+  assert.ok(scoreStructuralMatch(activityStructure, templateStructure) >= STRONG_MATCH);
+}
+
+function boundedActivityLaps(reps: number, repDurationS = 290): ActivityLapLike[] {
+  return [lap(1477, 600), ...intervalLaps(reps, 1000, repDurationS, 120), lap(1526, 600)];
+}
+
+function assertPaceIsLaxWhenCompleteStructureMatches(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  const activityStructure = deriveTemplateDistanceMatchedActivityStructure(boundedActivityLaps(4, 420), steps);
+  assert.ok(activityStructure);
+  const templateStructure = deriveTemplateStructure(steps);
+  assert.ok(templateStructure);
+  assert.ok(scoreStructuralMatch(activityStructure, templateStructure) >= STRONG_MATCH);
+}
+
+function assertBoundaryDifferenceAboveFortyPercentRejectsStructure(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  const laps = [lap(1200, 500), ...intervalLaps(4, 1000, 290, 120), lap(1526, 600)];
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, steps), null);
+}
+
+function assertOneRepetitionDifferenceOnlyProducesSuggestion(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  const templateStructure = deriveTemplateStructure(steps);
+  assert.ok(templateStructure);
+  for (const reps of [3, 5]) {
+    const activityStructure = deriveTemplateDistanceMatchedActivityStructure(boundedActivityLaps(reps), steps);
+    assert.ok(activityStructure, `expected template-aware suggestion for ${reps} reps`);
+    assert.equal(activityStructure.repCount, reps);
+    assert.equal(activityStructure.alignment?.isAutoMatchEligible, false);
+    const score = scoreStructuralMatch(activityStructure, templateStructure);
+    assert.ok(
+      score >= POSSIBLE_MATCH && score < STRONG_MATCH,
+      `expected suggestion score for ${reps} reps, got ${score}`,
+    );
+  }
+}
+
+function assertMoreThanOneRepetitionDifferenceHasNoTemplateAlignment(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  for (const reps of [2, 6]) {
+    assert.equal(
+      deriveTemplateDistanceMatchedActivityStructure(boundedActivityLaps(reps), steps),
+      null,
+      `expected no structural alignment for ${reps} observed reps versus 4 planned`,
+    );
+  }
+}
+
+function assertMissingFinalRecoveryCannotBecomeShorterWorkoutSuggestion(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  const laps = boundedActivityLaps(4);
+  laps.splice(laps.length - 2, 1);
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, steps), null);
+}
+
 function assertExactIntervalsAreStrongStructuralMatch(): void {
   // Activity: 6 x 400m at 90s (3:45/km) with 90s recoveries.
   const activityStructure = deriveActivityStructure(intervalLaps(6, 400, 90, 90));
@@ -143,25 +274,25 @@ function assertExactIntervalsAreStrongStructuralMatch(): void {
   assert.ok(score >= STRONG_MATCH, `expected strong structural match, got ${score}`);
 }
 
-function assertOneExtraRepIsStillStrongMatch(): void {
-  // 7 reps vs planned 6 -> reps diff 16.7% lands in the 10-20% band (70).
+function assertOneExtraRepIsOnlyPossibleMatch(): void {
+  // One repetition of difference may be suggested, but never auto-associated.
   const activityStructure = deriveActivityStructure(intervalLaps(7, 400, 90, 90));
   assert.ok(activityStructure);
   assert.equal(activityStructure.repCount, 7);
   const template = deriveTemplateStructure(templateSteps(6, 400, 225, 90));
   assert.ok(template);
   const score = scoreStructuralMatch(activityStructure, template);
-  assert.ok(score >= STRONG_MATCH, `7 vs 6 reps should remain strong (reps band 70), got ${score}`);
+  assert.ok(score >= POSSIBLE_MATCH && score < STRONG_MATCH, `expected possible match for 7 vs 6 reps, got ${score}`);
 }
 
-function assertTwoExtraRepsArePossibleMatch(): void {
-  // 8 reps vs planned 6 -> reps diff 33% -> reps subscore 0 -> possible match.
+function assertTwoExtraRepsAreNoStructuralMatch(): void {
+  // More than one repetition of difference is not a structural match.
   const activityStructure = deriveActivityStructure(intervalLaps(8, 400, 90, 90));
   assert.ok(activityStructure);
   const template = deriveTemplateStructure(templateSteps(6, 400, 225, 90));
   assert.ok(template);
   const score = scoreStructuralMatch(activityStructure, template);
-  assert.ok(score >= POSSIBLE_MATCH && score < STRONG_MATCH, `expected possible match (60-79), got ${score}`);
+  assert.ok(score < POSSIBLE_MATCH, `expected no structural match for 8 vs 6 reps, got ${score}`);
 }
 
 function assertDifferentWorkoutIsNoStructuralMatch(): void {
@@ -208,6 +339,42 @@ function assertContinuousAutolapsCannotMatchRecoveryTemplate(): void {
   assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, templateSteps(4, 1000, 300, 120)), null);
 }
 
+function assertUniformAutolapsCannotImitateTimeRecoveries(): void {
+  const laps = Array.from({ length: 8 }, () => autoLap(300, 60));
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, templateSteps(4, 300, 200, 60)), null);
+}
+
+function assertUniformDistanceAutolapsCannotImitateRecoveriesThroughPaceChanges(): void {
+  const laps = Array.from({ length: 8 }, (_, index) => autoLap(300, index % 2 === 0 ? 50 : 60));
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, templateSteps(4, 300, 200, 60)), null);
+}
+
+function assertUniformTimeAutolapsCannotImitateDistanceChanges(): void {
+  const laps = Array.from({ length: 8 }, (_, index) => ({
+    ...lap(index % 2 === 0 ? 300 : 100, 60),
+    lapType: 'time',
+  }));
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, templateSteps(4, 300, 200, 60)), null);
+}
+
+function assertUniformAutolapsAreRejectedBeforeOpenBoundaryAlignment(): void {
+  const steps = boundedTemplateSteps(4, 1000, 300, 30).map(step =>
+    ['warmup', 'cooldown'].includes(step.phaseType)
+      ? { ...step, durationType: 'open', durationS: null, distanceM: null }
+      : step,
+  );
+  const laps = Array.from({ length: 100 }, () => autoLap(1000, 300));
+  const startedAt = Date.now();
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, steps), null);
+  assert.ok(Date.now() - startedAt < 500, 'uniform autolaps must be rejected before combinatorial alignment');
+}
+
+function assertUniformAutolapsCannotImitateIntervalsWithoutRecoveries(): void {
+  const steps = templateSteps(4, 300, 200, 60).filter(step => step.phaseType !== 'recovery');
+  const laps = Array.from({ length: 4 }, () => autoLap(300, 60));
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, steps), null);
+}
+
 function assertRecoveryTemplateIsMarkedAsStrictlyStructured(): void {
   assert.equal(templateHasRecoveryPhases(templateSteps(4, 1000, 300, 120)), true);
   const [step] = templateSteps(1, 1000, 300, 120);
@@ -219,17 +386,64 @@ function assertRecoveryTemplateIsMarkedAsStrictlyStructured(): void {
 
 function assertRecoveryDurationMustMatchTemplate(): void {
   const tooShort = intervalLaps(4, 1000, 300, 90);
-  const closeEnough = intervalLaps(4, 1000, 300, 124);
+  const lowerBoundary = intervalLaps(4, 1000, 300, 110);
+  const upperBoundary = intervalLaps(4, 1000, 300, 130);
+  const outsideBoundary = intervalLaps(4, 1000, 300, 131);
   const template = templateSteps(4, 1000, 300, 120);
   assert.equal(deriveTemplateDistanceMatchedActivityStructure(tooShort, template), null);
-  assert.ok(deriveTemplateDistanceMatchedActivityStructure(closeEnough, template));
+  assert.ok(deriveTemplateDistanceMatchedActivityStructure(lowerBoundary, template));
+  assert.ok(deriveTemplateDistanceMatchedActivityStructure(upperBoundary, template));
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(outsideBoundary, template), null);
 }
 
 function assertMultipleRecoveryLapsAreSummed(): void {
-  const laps = [lap(1000, 300), lap(100, 60), lap(100, 60), lap(1000, 300), lap(100, 59), lap(100, 61), lap(1000, 300)];
+  const laps = [
+    lap(1000, 300),
+    lap(100, 60),
+    lap(100, 60),
+    lap(1000, 300),
+    lap(100, 59),
+    lap(100, 61),
+    lap(1000, 300),
+    lap(100, 58),
+    lap(100, 62),
+  ];
   const structure = deriveTemplateDistanceMatchedActivityStructure(laps, templateSteps(3, 1000, 300, 120));
   assert.ok(structure);
+  assert.equal(structure.repCount, 3);
   assert.equal(structure.recoveryDurationS, 120);
+}
+
+function assertDistanceRecoveriesMatchWithExistingTolerance(): void {
+  const steps = templateSteps(3, 800, 250, 120).map(step =>
+    step.phaseType === 'recovery' ? { ...step, durationType: 'distance', durationS: null, distanceM: 250 } : step,
+  );
+  const matchingLaps = [lap(800, 200), lap(210, 90), lap(800, 201), lap(290, 95), lap(800, 199), lap(250, 92)];
+  const outsideTolerance = [...matchingLaps];
+  outsideTolerance[3] = lap(301, 95);
+
+  const structure = deriveTemplateDistanceMatchedActivityStructure(matchingLaps, steps);
+  assert.ok(structure, 'expected distance recoveries within 20% tolerance to align');
+  assert.equal(structure.repCount, 3);
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(outsideTolerance, steps), null);
+}
+
+function assertExtraActivityIsOnlyAcceptedOutsideTheTemplate(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  const laps = [lap(250, 1000), ...boundedActivityLaps(4), lap(500, 180), lap(100, 40)];
+  const structure = deriveTemplateDistanceMatchedActivityStructure(laps, steps);
+  assert.ok(structure, 'expected activity before warmup and after cooldown to remain extra');
+  assert.deepEqual(structure.alignment?.extraLapIndexes, [0, 11, 12]);
+
+  const lapInsideTemplate = [
+    lap(1477, 600),
+    lap(1000, 290),
+    lap(400, 60),
+    lap(200, 120),
+    ...intervalLaps(3, 1000, 290, 120),
+    lap(1526, 600),
+  ];
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(lapInsideTemplate, steps), null);
 }
 
 function assertTooFewLapsProduceNoStructure(): void {
@@ -251,6 +465,7 @@ function assertTemplateDistanceMatchIgnoresWarmupAndCooldown(): void {
     lap(400, 108),
     lap(144, 90),
     lap(400, 100),
+    lap(150, 90),
     lap(1600, 600),
     lap(675, 234),
   ];
@@ -372,6 +587,7 @@ function assertTemplateDistanceMatchSupportsMixedBlocks(): void {
     lap(790, 198),
     lap(170, 120),
     lap(815, 203),
+    lap(170, 120),
     lap(1000, 360),
   ];
   const activityStructure = deriveTemplateDistanceMatchedActivityStructure(laps, mixedDistanceTemplateSteps());
@@ -389,6 +605,11 @@ function assertTemplateDistanceMatchRejectsDifferentSequence(): void {
     mixedDistanceTemplateSteps(),
   );
   assert.equal(activityStructure, null);
+}
+
+function assertTwoGroupsCannotEachHideOneExtraRepetition(): void {
+  const laps = [...intervalLaps(5, 400, 96, 90), ...intervalLaps(3, 800, 200, 120)];
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, mixedDistanceTemplateSteps()), null);
 }
 
 function assertTemplateWithoutIntervalsHasNoStructure(): void {
@@ -441,7 +662,8 @@ function assertAutoMatchNeedsTwoSignalsAndClearMargin(): void {
     ),
     1,
   );
-  assert.equal(isMatchMarginSufficient(90, 82), true);
+  assert.equal(isMatchMarginSufficient(90, 82), false);
+  assert.equal(isMatchMarginSufficient(90, 81.99), true);
   assert.equal(isMatchMarginSufficient(90, 83), false);
   assert.equal(isMatchMarginSufficient(90, null), true);
 }
@@ -459,16 +681,29 @@ function assertBuildTemplateTotalsFallsBackToSteps(): void {
 }
 
 assertExactIntervalsAreStrongStructuralMatch();
-assertOneExtraRepIsStillStrongMatch();
-assertTwoExtraRepsArePossibleMatch();
+assertExactSuuntoWorkoutMatchesCompleteTemplateSequence();
+assertPaceIsLaxWhenCompleteStructureMatches();
+assertBoundaryDifferenceAboveFortyPercentRejectsStructure();
+assertOneRepetitionDifferenceOnlyProducesSuggestion();
+assertMoreThanOneRepetitionDifferenceHasNoTemplateAlignment();
+assertMissingFinalRecoveryCannotBecomeShorterWorkoutSuggestion();
+assertOneExtraRepIsOnlyPossibleMatch();
+assertTwoExtraRepsAreNoStructuralMatch();
 assertDifferentWorkoutIsNoStructuralMatch();
 assertStructuralSignalsOnlyCountComparableValues();
 assertSteadyAutolapsProduceNoStructure();
 assertRecoveryMustAppearBetweenEveryWorkPair();
 assertContinuousAutolapsCannotMatchRecoveryTemplate();
+assertUniformAutolapsCannotImitateTimeRecoveries();
+assertUniformDistanceAutolapsCannotImitateRecoveriesThroughPaceChanges();
+assertUniformTimeAutolapsCannotImitateDistanceChanges();
+assertUniformAutolapsAreRejectedBeforeOpenBoundaryAlignment();
+assertUniformAutolapsCannotImitateIntervalsWithoutRecoveries();
 assertRecoveryTemplateIsMarkedAsStrictlyStructured();
 assertRecoveryDurationMustMatchTemplate();
 assertMultipleRecoveryLapsAreSummed();
+assertDistanceRecoveriesMatchWithExistingTolerance();
+assertExtraActivityIsOnlyAcceptedOutsideTheTemplate();
 assertTooFewLapsProduceNoStructure();
 assertTemplateDistanceMatchIgnoresWarmupAndCooldown();
 assertRequiredBoundaryPhasesCannotBeSkipped();
@@ -478,6 +713,7 @@ assertShortIntervalsDoNotUseEightyMeterTolerance();
 assertShortIntervalsAllowTwentyPercentDistanceDifference();
 assertTemplateDistanceMatchSupportsMixedBlocks();
 assertTemplateDistanceMatchRejectsDifferentSequence();
+assertTwoGroupsCannotEachHideOneExtraRepetition();
 assertTemplateWithoutIntervalsHasNoStructure();
 assertTotalsBands();
 assertTotalsMissingVariablesRenormalize();

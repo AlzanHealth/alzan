@@ -12,6 +12,7 @@ import {
   scoreStructuralMatch,
   scoreTotalsMatch,
   isMatchMarginSufficient,
+  isStructuralAutoMatchEligible,
   STRONG_MATCH,
   templateHasBoundaryPhases,
   templateHasRecoveryPhases,
@@ -63,6 +64,7 @@ interface TemplateMatchResult {
   signalCount: number;
   runnerUpScore: number | null;
   planSelectionRequired: boolean;
+  isAutoMatchEligible: boolean;
 }
 
 @Injectable()
@@ -151,11 +153,12 @@ export class ImportReconciliationService {
   }
 
   /**
-   * Template matching for an imported endurance session. Candidates: today's
-   * planned templates first; if none reaches a possible match, all user
-   * templates of the same sport. >= 80 auto-associates (and completes the
-   * matching workout plan), 60-79 stores a suggestion, below stays generic.
-   * Also used by the review endpoint when the user keeps both duplicates.
+   * Template matching for an imported endurance session. All same-sport
+   * templates are scored together so an equally plausible unplanned template
+   * can block an unsafe automatic association. >= 80 auto-associates (and
+   * completes the matching workout plan), 60-79 stores a suggestion, below
+   * stays generic. Also used by the review endpoint when the user keeps both
+   * duplicates.
    */
   public async runEnduranceTemplateMatch(userId: string, sessionId: string): Promise<void> {
     const session = await this.getSession(userId, sessionId);
@@ -171,27 +174,20 @@ export class ImportReconciliationService {
     const plannedPlans = await this.findEndurancePlannedPlans(userId, localDate);
     const laps = await this.getSessionLaps(sessionId);
 
-    let best: TemplateMatchResult | null = null;
-    if (plannedPlans.length > 0) {
-      const plannedTemplateIds = plannedPlans.map(plan => plan.endurance_template_id).filter(id => id !== null);
-      best = await this.scoreTemplates(session, laps, plannedTemplateIds, plannedPlans);
-    }
-    if (best == null || best.score < POSSIBLE_MATCH) {
-      const allTemplates = await this.findTemplatesBySport(userId, session.sport_type);
-      const fallback = await this.scoreTemplates(
-        session,
-        laps,
-        allTemplates.map(template => template.id),
-        plannedPlans,
-        allTemplates,
-      );
-      if (fallback != null && (best == null || fallback.score > best.score)) best = fallback;
-    }
+    const allTemplates = await this.findTemplatesBySport(userId, session.sport_type);
+    const best = await this.scoreTemplates(
+      session,
+      laps,
+      allTemplates.map(template => template.id),
+      plannedPlans,
+      allTemplates,
+    );
     if (best == null || best.score < POSSIBLE_MATCH) return;
 
     if (
       best.score >= STRONG_MATCH &&
       best.signalCount >= 2 &&
+      best.isAutoMatchEligible &&
       !best.planSelectionRequired &&
       isMatchMarginSufficient(best.score, best.runnerUpScore)
     ) {
@@ -409,6 +405,7 @@ export class ImportReconciliationService {
       distanceM: lap.distance_m,
       durationSeconds: lap.duration_s,
       avgPaceSecondsPerKm: lap.avg_pace_s_per_km,
+      lapType: lap.lap_type,
     }));
     const activityTotals = buildActivityTotals({ distanceM: session.distance_m, durationS: session.duration_s });
 
@@ -439,11 +436,13 @@ export class ImportReconciliationService {
       let score: number;
       let method: MatchMethod;
       let signalCount: number;
+      let isAutoMatchEligible: boolean;
       const templateStructure = activityStructure != null ? deriveTemplateStructure(steps) : null;
       if (activityStructure != null && templateStructure != null) {
         score = scoreStructuralMatch(activityStructure, templateStructure);
         method = 'structural';
         signalCount = countComparableStructuralSignals(activityStructure, templateStructure);
+        isAutoMatchEligible = isStructuralAutoMatchEligible(activityStructure, templateStructure);
       } else {
         const templateTotals = buildTemplateTotals(
           { totalDistanceM: template.total_distance_m, totalDurationS: template.total_duration_s },
@@ -452,6 +451,7 @@ export class ImportReconciliationService {
         score = scoreTotalsMatch(activityTotals, templateTotals);
         method = 'totals';
         signalCount = countComparableTotalSignals(activityTotals, templateTotals);
+        isAutoMatchEligible = true;
       }
       matches.push({
         templateId: template.id,
@@ -462,9 +462,15 @@ export class ImportReconciliationService {
         signalCount,
         runnerUpScore: null,
         planSelectionRequired: matchingPlans.length > 1,
+        isAutoMatchEligible,
       });
     }
-    matches.sort((left, right) => right.score - left.score || left.templateId.localeCompare(right.templateId));
+    matches.sort(
+      (left, right) =>
+        right.score - left.score ||
+        Number(right.plannedPlanId != null) - Number(left.plannedPlanId != null) ||
+        left.templateId.localeCompare(right.templateId),
+    );
     const best = matches[0] ?? null;
     if (!best) return null;
     return { ...best, runnerUpScore: matches[1]?.score ?? null };

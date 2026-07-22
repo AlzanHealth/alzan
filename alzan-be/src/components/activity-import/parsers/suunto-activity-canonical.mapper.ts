@@ -55,6 +55,8 @@ interface FitParseState {
   power: CanonicalActivityMetricSample[];
   temperature: CanonicalActivityMetricSample[];
   laps: CanonicalActivityLap[];
+  lapStartTimestamps: Array<string | null>;
+  lapElapsedDurations: Array<number | null>;
   nativeHeartRateZones: CanonicalActivityHeartRateZone[];
   device: CanonicalActivity['device'];
   localTimestampSeconds: number | null;
@@ -63,6 +65,7 @@ interface FitParseState {
 interface FitLapAccumulator {
   distanceM: number | null;
   durationSeconds: number | null;
+  elapsedSeconds: number | null;
   avgSpeedMps: number | null;
   avgHeartRate: number | null;
   maxHeartRate: number | null;
@@ -98,6 +101,7 @@ const FIT_EPOCH_OFFSET_SECONDS = 631065600;
 const FIT_INVALID_SINT32 = 2147483647;
 const FIT_SEMICIRCLES_TO_DEGREES = 180 / 2147483648;
 const RADIANS_TO_DEGREES = 180 / Math.PI;
+const SUMMARY_FIT_DISTANCE_TOLERANCE_M = 25;
 
 const EMPTY_STREAMS: CanonicalActivityStreams = {
   position: [],
@@ -519,6 +523,10 @@ function decodeFitFieldAsNumber(
       const value = dataView.getUint8(offset);
       return value === 0xff ? null : value;
     }
+    case 0x0a: {
+      const value = dataView.getUint8(offset);
+      return value === 0 ? null : value;
+    }
     case 0x01: {
       const value = dataView.getInt8(offset);
       return value === 0x7f ? null : value;
@@ -531,6 +539,10 @@ function decodeFitFieldAsNumber(
       const value = dataView.getUint16(offset, littleEndian);
       return value === 0xffff ? null : value;
     }
+    case 0x8b: {
+      const value = dataView.getUint16(offset, littleEndian);
+      return value === 0 ? null : value;
+    }
     case 0x85: {
       const value = dataView.getInt32(offset, littleEndian);
       return value === FIT_INVALID_SINT32 ? null : value;
@@ -538,6 +550,10 @@ function decodeFitFieldAsNumber(
     case 0x86: {
       const value = dataView.getUint32(offset, littleEndian);
       return value === 0xffffffff ? null : value;
+    }
+    case 0x8c: {
+      const value = dataView.getUint32(offset, littleEndian);
+      return value === 0 ? null : value;
     }
     case 0x88: {
       const value = dataView.getFloat32(offset, littleEndian);
@@ -678,6 +694,7 @@ function parseFitDataMessage(
   const lap: FitLapAccumulator = {
     distanceM: null,
     durationSeconds: null,
+    elapsedSeconds: null,
     avgSpeedMps: null,
     avgHeartRate: null,
     maxHeartRate: null,
@@ -752,8 +769,10 @@ function parseFitDataMessage(
 
     if (definition.globalMessageNumber === FIT_LAP_MESSAGE_NUMBER) {
       if (field.fieldNumber === 2) lap.startTimestampSeconds = fitTimestampToSeconds(numericValue);
-      if (field.fieldNumber === 7 && numericValue != null)
-        lap.durationSeconds = lap.durationSeconds ?? numericValue / 1000;
+      if (field.fieldNumber === 7 && numericValue != null) {
+        lap.elapsedSeconds = numericValue / 1000;
+        lap.durationSeconds = lap.durationSeconds ?? lap.elapsedSeconds;
+      }
       if (field.fieldNumber === 8 && numericValue != null) lap.durationSeconds = numericValue / 1000;
       if (field.fieldNumber === 9 && numericValue != null) lap.distanceM = numericValue / 100;
       if (field.fieldNumber === 13 && numericValue != null) lap.avgSpeedMps = numericValue / 1000;
@@ -823,6 +842,145 @@ function appendFitLap(state: FitParseState, lap: FitLapAccumulator): void {
     startOffsetSeconds,
     endOffsetSeconds,
   });
+  state.lapStartTimestamps.push(startTime);
+  state.lapElapsedDurations.push(lap.elapsedSeconds);
+}
+
+function resolveFitOffsetsAfterSummary(state: FitParseState): void {
+  const startedAt = state.summary.startedAt ?? null;
+  if (!startedAt) return;
+
+  for (const sample of state.position) {
+    if (sample.offsetSeconds == null) sample.offsetSeconds = resolveOffsetSeconds(startedAt, sample.timestamp);
+  }
+  const metricStreams = [
+    state.heartRate,
+    state.speed,
+    state.distance,
+    state.altitude,
+    state.cadence,
+    state.power,
+    state.temperature,
+  ];
+  for (const stream of metricStreams) {
+    for (const sample of stream) {
+      if (sample.offsetSeconds == null) sample.offsetSeconds = resolveOffsetSeconds(startedAt, sample.timestamp);
+    }
+  }
+
+  state.laps = state.laps.map((lap, index) => {
+    if (lap.startOffsetSeconds != null) return lap;
+    const startOffsetSeconds = resolveOffsetSeconds(startedAt, state.lapStartTimestamps[index] ?? null);
+    return {
+      ...lap,
+      startOffsetSeconds,
+      endOffsetSeconds:
+        startOffsetSeconds != null && lap.durationSeconds != null
+          ? startOffsetSeconds + lap.durationSeconds
+          : lap.endOffsetSeconds,
+    };
+  });
+}
+
+function fitLapsOverlap(left: CanonicalActivityLap, right: CanonicalActivityLap): boolean {
+  if (
+    left.startOffsetSeconds == null ||
+    left.endOffsetSeconds == null ||
+    right.startOffsetSeconds == null ||
+    right.endOffsetSeconds == null
+  ) {
+    return false;
+  }
+  return (
+    Math.min(left.endOffsetSeconds, right.endOffsetSeconds) -
+      Math.max(left.startOffsetSeconds, right.startOffsetSeconds) >
+    1
+  );
+}
+
+function buildFitTerminalRemainderLap(
+  state: FitParseState,
+  normalisedLaps: CanonicalActivityLap[],
+): CanonicalActivityLap | null {
+  const manualLaps = normalisedLaps.filter(
+    lap => lap.lapType === 'manual' && lap.startOffsetSeconds != null && lap.endOffsetSeconds != null,
+  );
+  if (manualLaps.length < 2) return null;
+
+  const rawAutolaps = state.laps.filter(
+    lap => lap.lapType === 'distance' || lap.lapType === 'time' || lap.lapType === 'auto',
+  );
+  if (!rawAutolaps.some(autolap => manualLaps.some(manualLap => fitLapsOverlap(autolap, manualLap)))) return null;
+
+  const latestManualEnd = Math.max(...manualLaps.map(lap => lap.endOffsetSeconds as number));
+  if (
+    normalisedLaps.some(
+      lap =>
+        lap.lapType !== 'manual' && lap.startOffsetSeconds != null && lap.startOffsetSeconds >= latestManualEnd - 1,
+    )
+  ) {
+    return null;
+  }
+
+  const distanceSamples = state.distance
+    .filter(sample => sample.offsetSeconds != null && Number.isFinite(sample.value))
+    .sort((left, right) => (left.offsetSeconds as number) - (right.offsetSeconds as number));
+  const distanceAtManualEnd = [...distanceSamples]
+    .reverse()
+    .find(sample => (sample.offsetSeconds as number) <= latestManualEnd);
+  const finalDistanceSample = [...distanceSamples]
+    .reverse()
+    .find(sample => (sample.offsetSeconds as number) > latestManualEnd);
+  if (!distanceAtManualEnd || !finalDistanceSample) return null;
+
+  const distanceM = finalDistanceSample.value - distanceAtManualEnd.value;
+  const endOffsetSeconds = finalDistanceSample.offsetSeconds as number;
+  const timestampDurationSeconds = endOffsetSeconds - latestManualEnd;
+  const manualElapsedSeconds = state.laps.reduce(
+    (sum, lap, index) =>
+      lap.lapType === 'manual' && state.lapElapsedDurations[index] != null
+        ? sum + (state.lapElapsedDurations[index] as number)
+        : sum,
+    0,
+  );
+  const elapsedRemainderSeconds =
+    state.summary.elapsedSeconds != null ? state.summary.elapsedSeconds - manualElapsedSeconds : null;
+  const durationSeconds =
+    elapsedRemainderSeconds != null &&
+    elapsedRemainderSeconds > 0 &&
+    Math.abs(elapsedRemainderSeconds - timestampDurationSeconds) <= 2
+      ? elapsedRemainderSeconds
+      : timestampDurationSeconds;
+  if (distanceM <= 0 || durationSeconds <= 0) return null;
+  if (
+    state.summary.distanceM != null &&
+    Math.abs(finalDistanceSample.value - state.summary.distanceM) > SUMMARY_FIT_DISTANCE_TOLERANCE_M
+  ) {
+    return null;
+  }
+
+  const tailHeartRates = state.heartRate.filter(
+    sample =>
+      sample.offsetSeconds != null &&
+      sample.offsetSeconds >= latestManualEnd &&
+      sample.offsetSeconds <= endOffsetSeconds,
+  );
+  const avgHeartRate =
+    tailHeartRates.length > 0
+      ? Math.round(tailHeartRates.reduce((sum, sample) => sum + sample.value, 0) / tailHeartRates.length)
+      : null;
+
+  return {
+    lapIndex: normalisedLaps.length + 1,
+    lapType: 'unknown',
+    distanceM,
+    durationSeconds,
+    avgPaceSecondsPerKm: durationSeconds / (distanceM / 1000),
+    avgHeartRate,
+    maxHeartRate: tailHeartRates.length > 0 ? Math.max(...tailHeartRates.map(sample => sample.value)) : null,
+    startOffsetSeconds: latestManualEnd,
+    endOffsetSeconds,
+  };
 }
 
 function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions): CanonicalActivity {
@@ -855,6 +1013,8 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
     power: [],
     temperature: [],
     laps: [],
+    lapStartTimestamps: [],
+    lapElapsedDurations: [],
     nativeHeartRateZones: [],
     device: null,
     localTimestampSeconds: null,
@@ -885,7 +1045,12 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
     offset = parseFitDataMessage(dataView, offset, dataEnd, definition, state);
   }
 
+  resolveFitOffsetsAfterSummary(state);
   applyFitLocalTimestamp(state);
+
+  const normalisedLaps = normaliseCanonicalActivityLaps(state.laps, state.summary);
+  const terminalRemainderLap = buildFitTerminalRemainderLap(state, normalisedLaps);
+  const canonicalLaps = terminalRemainderLap ? [...normalisedLaps, terminalRemainderLap] : normalisedLaps;
 
   const sport = mapSuuntoActivityToCanonicalSport({ fitSport: state.sport, fitSubSport: state.subSport });
   return buildCanonicalActivity({
@@ -903,7 +1068,7 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
       power: state.power,
       temperature: state.temperature,
     },
-    laps: normaliseCanonicalActivityLaps(state.laps, state.summary),
+    laps: canonicalLaps,
     device: state.device,
     vendorFields: { suuntoFitSport: state.sport, suuntoFitSubSport: state.subSport },
     heartRateZones: state.nativeHeartRateZones,

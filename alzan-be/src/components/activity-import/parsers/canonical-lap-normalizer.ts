@@ -1,25 +1,12 @@
 import { CanonicalActivity, CanonicalActivityLap } from './activity-import-canonical.types';
 
 const STANDARD_DISTANCE_AUTOLAP_M = 1000;
-const STANDARD_DISTANCE_AUTOLAP_TOLERANCE_M = 15;
 const SUMMARY_LAP_DISTANCE_TOLERANCE_M = 25;
 const SUMMARY_LAP_DURATION_TOLERANCE_S = 5;
 const MIN_DEMONSTRABLE_OVERLAP_SECONDS = 1;
-const MIN_INTERVAL_SIGNAL_LAPS = 4;
-const MIN_INTERVAL_PACE_SPREAD = 0.25;
-const MIN_PACE_CLUSTER_LAPS = 3;
-const MIN_PACE_CLUSTER_SEPARATION = 0.1;
 
 function valuesAreClose(value: number, target: number, tolerance: number): boolean {
   return Math.abs(value - target) <= tolerance;
-}
-
-function lapPaceSecondsPerKm(lap: CanonicalActivityLap): number | null {
-  if (lap.avgPaceSecondsPerKm != null && lap.avgPaceSecondsPerKm > 0) return lap.avgPaceSecondsPerKm;
-  if (lap.durationSeconds != null && lap.durationSeconds > 0 && lap.distanceM != null && lap.distanceM > 0) {
-    return (lap.durationSeconds / lap.distanceM) * 1000;
-  }
-  return null;
 }
 
 function isValidLap(lap: CanonicalActivityLap): boolean {
@@ -50,19 +37,8 @@ function isTotalLikeLap(lap: CanonicalActivityLap, summary: Partial<CanonicalAct
   return false;
 }
 
-function isStandardDistanceMarker(lap: CanonicalActivityLap): boolean {
-  return (
-    lap.distanceM != null &&
-    valuesAreClose(lap.distanceM, STANDARD_DISTANCE_AUTOLAP_M, STANDARD_DISTANCE_AUTOLAP_TOLERANCE_M)
-  );
-}
-
 function isAutoTriggeredLap(lap: CanonicalActivityLap): boolean {
   return lap.lapType === 'distance' || lap.lapType === 'time' || lap.lapType === 'auto';
-}
-
-function isStandardAutolapMarker(lap: CanonicalActivityLap): boolean {
-  return isStandardDistanceMarker(lap) && isAutoTriggeredLap(lap);
 }
 
 function lapHasTiming(lap: CanonicalActivityLap): boolean {
@@ -120,78 +96,43 @@ function isAggregateLap(container: CanonicalActivityLap, laps: CanonicalActivity
   return distanceMatches || durationMatches;
 }
 
-function hasNonStandardIntervalSignal(laps: CanonicalActivityLap[]): boolean {
-  const paceValues = laps
-    .map(lapPaceSecondsPerKm)
-    .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
-  if (paceValues.length < MIN_INTERVAL_SIGNAL_LAPS) return false;
-
-  const minPace = Math.min(...paceValues);
-  const maxPace = Math.max(...paceValues);
-  const medianPace = [...paceValues].sort((left, right) => left - right)[Math.floor(paceValues.length / 2)];
-  if (medianPace == null || medianPace <= 0) return false;
-
-  return (maxPace - minPace) / medianPace >= MIN_INTERVAL_PACE_SPREAD;
-}
-
-function findFastPaceCluster(laps: CanonicalActivityLap[], minimumLaps: number): Set<CanonicalActivityLap> | null {
-  const paced = laps
-    .map(lap => ({ lap, pace: lapPaceSecondsPerKm(lap) }))
-    .filter((entry): entry is { lap: CanonicalActivityLap; pace: number } => entry.pace != null && entry.pace > 0);
-  if (paced.length < minimumLaps + 1) return null;
-
-  const ordered = [...paced].sort((left, right) => left.pace - right.pace);
-  let splitIndex = -1;
-  let largestRelativeGap = 0;
-  for (let index = 0; index < ordered.length - 1; index += 1) {
-    const leftPace = ordered[index]?.pace ?? 0;
-    const rightPace = ordered[index + 1]?.pace ?? 0;
-    if (leftPace <= 0) continue;
-    const relativeGap = (rightPace - leftPace) / leftPace;
-    if (relativeGap > largestRelativeGap) {
-      largestRelativeGap = relativeGap;
-      splitIndex = index;
+function findTerminalRemainderAutolaps(
+  laps: CanonicalActivityLap[],
+  summary: Partial<CanonicalActivity['summary']>,
+): Set<CanonicalActivityLap> {
+  const nativeLaps = laps.filter(lap => !isAutoTriggeredLap(lap));
+  if (nativeLaps.length === 0) return new Set<CanonicalActivityLap>();
+  const latestNativeEnd = nativeLaps.reduce(
+    (latest, lap) => Math.max(latest, lap.endOffsetSeconds ?? Number.NEGATIVE_INFINITY),
+    Number.NEGATIVE_INFINITY,
+  );
+  const lastNativeIndex = nativeLaps.reduce((latest, lap) => Math.max(latest, lap.lapIndex), 0);
+  const candidates = laps.filter(lap => {
+    if (!isAutoTriggeredLap(lap) || nativeLaps.some(nativeLap => lapsOverlap(lap, nativeLap))) return false;
+    if (lap.startOffsetSeconds != null && Number.isFinite(latestNativeEnd)) {
+      return lap.startOffsetSeconds >= latestNativeEnd - MIN_DEMONSTRABLE_OVERLAP_SECONDS;
     }
+    return lap.lapIndex > lastNativeIndex;
+  });
+  if (candidates.length === 0) return new Set<CanonicalActivityLap>();
+  const nativeDistanceM = nativeLaps.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0);
+  const nativeDurationS = nativeLaps.reduce((sum, lap) => sum + (lap.durationSeconds ?? 0), 0);
+  let candidateDistanceM = 0;
+  let candidateDurationS = 0;
+  const selected: CanonicalActivityLap[] = [];
+  for (const candidate of candidates) {
+    selected.push(candidate);
+    candidateDistanceM += candidate.distanceM ?? 0;
+    candidateDurationS += candidate.durationSeconds ?? 0;
+    const closesDistance =
+      summary.distanceM != null &&
+      valuesAreClose(nativeDistanceM + candidateDistanceM, summary.distanceM, SUMMARY_LAP_DISTANCE_TOLERANCE_M);
+    const closesDuration =
+      summary.durationSeconds != null &&
+      valuesAreClose(nativeDurationS + candidateDurationS, summary.durationSeconds, SUMMARY_LAP_DURATION_TOLERANCE_S);
+    if (closesDistance || closesDuration) return new Set(selected);
   }
-
-  if (
-    splitIndex < minimumLaps - 1 ||
-    splitIndex >= ordered.length - 1 ||
-    largestRelativeGap < MIN_PACE_CLUSTER_SEPARATION
-  )
-    return null;
-  const work = ordered.slice(0, splitIndex + 1);
-  const workPaces = work.map(entry => entry.pace);
-  const medianPace = workPaces.slice().sort((left, right) => left - right)[Math.floor(workPaces.length / 2)];
-  if (medianPace == null || medianPace <= 0) return null;
-
-  return new Set(work.map(entry => entry.lap));
-}
-
-function findRepeatedWorkLaps(laps: CanonicalActivityLap[]): Set<CanonicalActivityLap> | null {
-  const work = findFastPaceCluster(laps, MIN_PACE_CLUSTER_LAPS);
-  if (work == null) return null;
-
-  const values = [...work]
-    .map(lap => lap.distanceM ?? lap.durationSeconds)
-    .filter((value): value is number => value != null && value > 0);
-  if (values.length < MIN_PACE_CLUSTER_LAPS) return null;
-
-  const repeatedTarget = values.find(
-    target => values.filter(value => relativeDistance(value, target) <= 0.2).length >= MIN_PACE_CLUSTER_LAPS,
-  );
-  if (repeatedTarget == null) return null;
-  return new Set(
-    [...work].filter(lap => {
-      const value = lap.distanceM ?? lap.durationSeconds;
-      return value != null && relativeDistance(value, repeatedTarget) <= 0.2;
-    }),
-  );
-}
-
-function relativeDistance(value: number, target: number): number {
-  if (target <= 0) return 1;
-  return Math.abs(value - target) / target;
+  return new Set<CanonicalActivityLap>();
 }
 
 function buildLapIdentity(lap: CanonicalActivityLap): string {
@@ -213,53 +154,38 @@ export function normaliseCanonicalActivityLaps(
   let workingLaps = [...validLaps];
   const totalLikeMask = workingLaps.map(lap => isTotalLikeLap(lap, summary));
   if (totalLikeMask.some(Boolean) && totalLikeMask.some(isTotalLike => !isTotalLike)) {
-    workingLaps = workingLaps.filter((_, index) => !totalLikeMask[index]);
+    workingLaps = workingLaps.filter(
+      (lap, index) => !totalLikeMask[index] || lap.lapType === 'manual' || !isAutoTriggeredLap(lap),
+    );
   }
 
-  const hasNativeLaps = workingLaps.some(lap => lap.lapType === 'manual');
-  const hasAutolaps = workingLaps.some(isAutoTriggeredLap);
-  if (hasNativeLaps && hasAutolaps) {
-    workingLaps = workingLaps.filter(lap => !isAutoTriggeredLap(lap));
-  }
+  const terminalRemainderAutolaps = findTerminalRemainderAutolaps(workingLaps, summary);
+  const nativeLaps = workingLaps.filter(lap => !isAutoTriggeredLap(lap));
+  const nativeAndRemainderLaps = [...nativeLaps, ...terminalRemainderAutolaps];
+  const nativeAndRemainderMetrics = {
+    distanceM: nativeAndRemainderLaps.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0),
+    durationS: nativeAndRemainderLaps.reduce((sum, lap) => sum + (lap.durationSeconds ?? 0), 0),
+  };
+  const nativeAndRemainderCloseSummary =
+    (summary.distanceM != null &&
+      valuesAreClose(nativeAndRemainderMetrics.distanceM, summary.distanceM, SUMMARY_LAP_DISTANCE_TOLERANCE_M)) ||
+    (summary.durationSeconds != null &&
+      valuesAreClose(nativeAndRemainderMetrics.durationS, summary.durationSeconds, SUMMARY_LAP_DURATION_TOLERANCE_S));
+  workingLaps = workingLaps.filter(lap => {
+    if (lap.lapType === 'manual' || !isAutoTriggeredLap(lap) || terminalRemainderAutolaps.has(lap)) return true;
+    if (nativeLaps.some(nativeLap => lapsOverlap(lap, nativeLap))) return false;
+    if (isAggregateLap(lap, workingLaps)) return false;
+    if (!lapHasTiming(lap) && nativeAndRemainderCloseSummary) return false;
+    return true;
+  });
 
-  const standardDistanceMarkerMask = workingLaps.map(isStandardDistanceMarker);
-  const standardLaps = workingLaps.filter((_, index) => standardDistanceMarkerMask[index]);
-  const nonStandardLaps = workingLaps.filter((_, index) => !standardDistanceMarkerMask[index]);
-  const hasStructuredNonStandardPartials = hasNonStandardIntervalSignal(nonStandardLaps);
-  const repeatedNonStandardWorkLaps = hasStructuredNonStandardPartials ? findRepeatedWorkLaps(nonStandardLaps) : null;
-  const hasRepeatedNonStandardWork = repeatedNonStandardWorkLaps != null;
-  const fastStandardWork = hasStructuredNonStandardPartials ? findFastPaceCluster(standardLaps, 2) : null;
-  const hasSlowStandardLaps = fastStandardWork != null && fastStandardWork.size < standardLaps.length;
-  const hasManualStandardWork =
-    workingLaps.filter((lap, index) => standardDistanceMarkerMask[index] && lap.lapType === 'manual').length >= 2;
-  const overlappedStandardMarkerMask = workingLaps.map(
-    (lap, index) =>
-      standardDistanceMarkerMask[index] && nonStandardLaps.some(nonStandardLap => lapsOverlap(lap, nonStandardLap)),
+  const aggregateLapMask = workingLaps.map(
+    lap =>
+      lap.lapType !== 'manual' &&
+      !terminalRemainderAutolaps.has(lap) &&
+      isAutoTriggeredLap(lap) &&
+      isAggregateLap(lap, workingLaps),
   );
-  if (overlappedStandardMarkerMask.some(Boolean)) {
-    workingLaps = workingLaps.filter((_, index) => !overlappedStandardMarkerMask[index]);
-  } else if (hasRepeatedNonStandardWork) {
-    workingLaps = workingLaps.filter(lap => {
-      if (!isStandardDistanceMarker(lap)) {
-        return !isAutoTriggeredLap(lap) || repeatedNonStandardWorkLaps.has(lap);
-      }
-      if (isStandardAutolapMarker(lap)) return false;
-      if (hasSlowStandardLaps && fastStandardWork?.has(lap)) return true;
-      return false;
-    });
-  } else if (hasStructuredNonStandardPartials && (hasManualStandardWork || hasSlowStandardLaps)) {
-    workingLaps = workingLaps.filter(lap => {
-      if (!isStandardDistanceMarker(lap)) {
-        return !(hasSlowStandardLaps && isAutoTriggeredLap(lap));
-      }
-      if (isStandardAutolapMarker(lap)) return false;
-      if (fastStandardWork?.has(lap)) return true;
-      if (hasSlowStandardLaps) return false;
-      return !isStandardAutolapMarker(lap);
-    });
-  }
-
-  const aggregateLapMask = workingLaps.map(lap => isAggregateLap(lap, workingLaps));
   if (aggregateLapMask.some(Boolean) && aggregateLapMask.some(isAggregate => !isAggregate)) {
     workingLaps = workingLaps.filter((_, index) => !aggregateLapMask[index]);
   }

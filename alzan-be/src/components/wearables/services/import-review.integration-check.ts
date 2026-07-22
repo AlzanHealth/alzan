@@ -13,13 +13,17 @@
  */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { strict as assert } from 'assert';
+import { randomUUID } from 'crypto';
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ImportReconciliationService } from './import-reconciliation.service';
 import { ImportReviewService } from './import-review.service';
 import { RawPayloadService } from './raw-payload.service';
+import { CanonicalActivityWriterService } from './canonical-activity-writer.service';
+import { DedupeService } from './dedupe.service';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
+import { CanonicalActivity } from '../../activity-import/parsers/activity-import-canonical.types';
 
 config({ path: resolve(__dirname, '../../../../.env') });
 
@@ -41,6 +45,7 @@ async function main(): Promise<void> {
   const rawPayload = new RawPayloadService(adminStub);
   const reconciliation = new ImportReconciliationService(adminStub);
   const review = new ImportReviewService(adminStub, rawPayload, reconciliation);
+  const writer = new CanonicalActivityWriterService(adminStub, rawPayload, new DedupeService(), reconciliation);
 
   const email = `import-review-check+${Date.now()}@example.com`;
   const { data: created, error: userError } = await client.auth.admin.createUser({
@@ -51,6 +56,8 @@ async function main(): Promise<void> {
   if (userError || !created.user) throw new Error(`createUser failed: ${userError?.message}`);
   const userId = created.user.id;
   const createdSessionIds = new Set<string>();
+  const createdTemplateIds = new Set<string>();
+  const createdPlanIds = new Set<string>();
 
   const insertSession = async (overrides: Record<string, unknown>): Promise<string> => {
     const { data, error } = await client
@@ -236,6 +243,289 @@ async function main(): Promise<void> {
       pass('endurance do-nothing: both survive, stays pending');
     }
 
+    // --- Endurance SERIES MATCH: exact ordered phases auto-link one existing session ---
+    {
+      const templateId = randomUUID();
+      const groupId = randomUUID();
+      const decoyTemplateId = randomUUID();
+      const planId = randomUUID();
+      createdTemplateIds.add(templateId);
+      createdTemplateIds.add(decoyTemplateId);
+      createdPlanIds.add(planId);
+
+      const { error: templateError } = await client.from('endurance_workout_templates').insert({
+        id: templateId,
+        user_id: userId,
+        base_name: 'Exact Suunto 4 x 1 km',
+        sport_type: 'running',
+      });
+      if (templateError) throw new Error(`insert endurance template failed: ${templateError.message}`);
+
+      const { error: stepsError } = await client.from('endurance_workout_steps').insert([
+        {
+          id: randomUUID(),
+          template_id: templateId,
+          user_id: userId,
+          order_index: 0,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'warmup',
+          duration_type: 'time',
+          duration_s: 900,
+          target_type: 'none',
+        },
+        {
+          id: groupId,
+          template_id: templateId,
+          user_id: userId,
+          order_index: 1,
+          is_group: true,
+          repetitions: 4,
+          phase_type: 'interval',
+          duration_type: 'distance',
+          target_type: 'none',
+        },
+        {
+          id: randomUUID(),
+          template_id: templateId,
+          user_id: userId,
+          parent_step_id: groupId,
+          order_index: 0,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'interval',
+          duration_type: 'distance',
+          distance_m: 1000,
+          target_type: 'pace',
+          target_min: 280,
+          target_max: 280,
+        },
+        {
+          id: randomUUID(),
+          template_id: templateId,
+          user_id: userId,
+          parent_step_id: groupId,
+          order_index: 1,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'recovery',
+          duration_type: 'time',
+          duration_s: 120,
+          target_type: 'none',
+        },
+        {
+          id: randomUUID(),
+          template_id: templateId,
+          user_id: userId,
+          order_index: 2,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'cooldown',
+          duration_type: 'time',
+          duration_s: 600,
+          target_type: 'none',
+        },
+      ]);
+      if (stepsError) throw new Error(`insert endurance steps failed: ${stepsError.message}`);
+
+      const { error: decoyTemplateError } = await client.from('endurance_workout_templates').insert({
+        id: decoyTemplateId,
+        user_id: userId,
+        base_name: 'Unplanned ambiguous 4 x 1 km',
+        sport_type: 'running',
+      });
+      if (decoyTemplateError) throw new Error(`insert decoy template failed: ${decoyTemplateError.message}`);
+      const { data: sourceSteps, error: sourceStepsError } = await client
+        .from('endurance_workout_steps')
+        .select('*')
+        .eq('template_id', templateId);
+      if (sourceStepsError) throw new Error(`read source endurance steps failed: ${sourceStepsError.message}`);
+      const decoyStepIds = new Map((sourceSteps ?? []).map(step => [step.id, randomUUID()]));
+      const { error: decoyStepsError } = await client.from('endurance_workout_steps').insert(
+        (sourceSteps ?? []).map(step => {
+          const { created_at: _createdAt, ...sourceStep } = step;
+          void _createdAt;
+          return {
+            ...sourceStep,
+            id: decoyStepIds.get(step.id),
+            template_id: decoyTemplateId,
+            parent_step_id: step.parent_step_id == null ? null : decoyStepIds.get(step.parent_step_id),
+          };
+        }),
+      );
+      if (decoyStepsError) throw new Error(`insert decoy endurance steps failed: ${decoyStepsError.message}`);
+
+      const { error: planError } = await client.from('workout_plans').insert({
+        id: planId,
+        user_id: userId,
+        planned_date: '2026-06-13',
+        status: 'planned',
+        endurance_template_id: templateId,
+      });
+      if (planError) throw new Error(`insert workout plan failed: ${planError.message}`);
+
+      const exactLaps = [
+        [1477.4, 600],
+        [1000, 294.4],
+        [190.1, 120],
+        [1000, 284.4],
+        [163.1, 120],
+        [1000, 286.7],
+        [173.1, 120],
+        [1000, 289.6],
+        [171, 120],
+        [1525.9, 600],
+        [36, 13.6],
+      ];
+      let offsetSeconds = 0;
+      const nativeLaps = exactLaps.map(([distanceM, durationSeconds], index) => {
+        const startOffsetSeconds = offsetSeconds;
+        offsetSeconds += durationSeconds;
+        return {
+          lapIndex: index + 1,
+          lapType: index === exactLaps.length - 1 ? ('distance' as const) : ('manual' as const),
+          distanceM,
+          durationSeconds,
+          avgPaceSecondsPerKm: (durationSeconds / distanceM) * 1000,
+          avgHeartRate: 150,
+          maxHeartRate: 170,
+          startOffsetSeconds,
+          endOffsetSeconds: offsetSeconds,
+        };
+      });
+      const activity: CanonicalActivity = {
+        provider: 'suunto',
+        sourceFileType: 'fit',
+        sportType: 'running',
+        sportSubtype: null,
+        providerActivityId: `suunto-series-${Date.now()}`,
+        summary: {
+          startedAt: '2026-06-13T08:00:00Z',
+          endedAt: '2026-06-13T08:47:29Z',
+          timezone: 'UTC',
+          startedAtLocal: '2026-06-13T08:00:00',
+          endedAtLocal: '2026-06-13T08:47:29',
+          durationSeconds: 2849,
+          elapsedSeconds: 2849,
+          distanceM: 7739,
+          caloriesKcal: 866,
+          avgHeartRate: 156,
+          maxHeartRate: 170,
+          minHeartRate: null,
+          avgSpeedMps: 7739 / 2849,
+          maxSpeedMps: null,
+          avgCadence: 137,
+          maxCadence: null,
+          avgPowerW: null,
+          maxPowerW: null,
+          elevationGainM: 16,
+          elevationLossM: null,
+          avgTemperatureC: null,
+          maxTemperatureC: null,
+          totalSteps: 3163,
+          recoveryTimeSeconds: null,
+          vo2Max: 50.7,
+          epoc: null,
+          pte: null,
+          tss: 57,
+        },
+        streams: {
+          position: [],
+          heartRate: [],
+          speed: [],
+          distance: [],
+          altitude: [],
+          cadence: [],
+          power: [],
+          temperature: [],
+        },
+        laps: [
+          ...nativeLaps,
+          {
+            lapIndex: 12,
+            lapType: 'distance',
+            distanceM: 739,
+            durationSeconds: 309.3,
+            avgPaceSecondsPerKm: (309.3 / 739) * 1000,
+            avgHeartRate: 163,
+            maxHeartRate: 170,
+            startOffsetSeconds: null,
+            endOffsetSeconds: null,
+          },
+        ],
+        heartRateZones: [],
+        device: null,
+        vendorFields: {},
+      };
+      const sourceRecordId = `suunto-series-source-${Date.now()}`;
+      const writerInput = {
+        userId,
+        activity,
+        provenance: {
+          provider: 'suunto' as const,
+          sourceChannel: 'cloud' as const,
+          sourcePackage: null,
+          sourceProviderKey: 'suunto',
+          sourceRecordId,
+          sourceUpdatedAt: '2026-06-13T09:00:00Z',
+          rawPayloadId: null,
+        },
+        canonicalVersion: 5,
+      };
+      const { count: sessionsBeforeMatch } = await client
+        .from('activity_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      const sessionId = await writer.upsertActivity(writerInput);
+      createdSessionIds.add(sessionId);
+      const ambiguousSession = await getSession(sessionId);
+      assert.equal(
+        ambiguousSession.endurance_template_id,
+        null,
+        'an equally scoring unplanned template blocks auto-link',
+      );
+      assert.equal(
+        ambiguousSession.suggested_endurance_template_id,
+        templateId,
+        'the planned template wins the tie only as a suggestion',
+      );
+      await client.from('endurance_workout_steps').delete().eq('template_id', decoyTemplateId);
+      await client.from('endurance_workout_templates').delete().eq('id', decoyTemplateId);
+      createdTemplateIds.delete(decoyTemplateId);
+      const repeatedSessionId = await writer.upsertActivity(writerInput);
+      assert.equal(repeatedSessionId, sessionId, 're-sync must update the same imported session');
+      const matchedSession = await getSession(sessionId);
+      assert.equal(matchedSession.endurance_template_id, templateId, 'series template must auto-associate');
+      assert.equal(matchedSession.suggested_endurance_template_id, null, 'strong structural match is not a suggestion');
+      assert.equal(matchedSession.template_match_method, 'structural');
+      assert.ok((matchedSession.template_match_score ?? 0) >= 80, 'ordered structural score must be strong');
+
+      const { data: matchedPlan, error: matchedPlanError } = await client
+        .from('workout_plans')
+        .select('*')
+        .eq('id', planId)
+        .single();
+      if (matchedPlanError) throw new Error(`read matched workout plan failed: ${matchedPlanError.message}`);
+      assert.equal(matchedPlan.status, 'completed', 'matched plan must be completed');
+      assert.equal(matchedPlan.activity_session_id, sessionId, 'matched plan must reference the imported session');
+
+      const { count: persistedLapCount } = await client
+        .from('activity_laps')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', sessionId);
+      assert.equal(persistedLapCount, 11, 'the exact Suunto workout must retain its eleven native laps');
+      const { count: sessionsAfterMatch } = await client
+        .from('activity_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      assert.equal(
+        sessionsAfterMatch,
+        (sessionsBeforeMatch ?? 0) + 1,
+        'writer and re-sync must create exactly one session',
+      );
+      pass('endurance series match: 11 laps kept, template linked, plan completed, no duplicate session');
+    }
+
     // --- Strength REVERT (keep mine): previous app values restored ---
     {
       const receivedAt = new Date().toISOString();
@@ -374,12 +664,18 @@ async function main(): Promise<void> {
       pass('safety: assign refuses to delete an app-created session');
     }
   } finally {
-    // Cleanup: children cascade on session delete; remove sessions then user.
+    for (const id of createdPlanIds) {
+      await client.from('workout_plans').delete().eq('id', id);
+    }
     for (const id of createdSessionIds) {
       await client.from('workout_sets').delete().eq('session_id', id);
       await client.from('activity_laps').delete().eq('session_id', id);
       await client.from('activity_route_points').delete().eq('session_id', id);
       await client.from('activity_sessions').delete().eq('id', id);
+    }
+    for (const id of createdTemplateIds) {
+      await client.from('endurance_workout_steps').delete().eq('template_id', id);
+      await client.from('endurance_workout_templates').delete().eq('id', id);
     }
     await client.auth.admin.deleteUser(userId);
   }

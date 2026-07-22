@@ -23,11 +23,18 @@ type FitFieldDefinition = {
 type TestFitLap = {
   startOffsetSeconds: number;
   durationSeconds: number;
+  elapsedSeconds?: number;
   distanceM: number;
   avgHeartRate?: number;
   maxHeartRate?: number;
   lapTrigger?: number;
   omitStartTimestamp?: boolean;
+};
+
+type TestFitRecord = {
+  offsetSeconds: number;
+  distanceM: number;
+  heartRate?: number;
 };
 
 function fitTimestamp(iso: string): number {
@@ -90,14 +97,19 @@ function buildTestFit(params: {
   subSport: number;
   distanceM?: number;
   durationSeconds?: number;
+  elapsedSeconds?: number;
+  endedOffsetSeconds?: number;
   includeGps?: boolean;
   lapTrigger?: number;
   laps?: TestFitLap[];
+  records?: TestFitRecord[];
+  summaryLast?: boolean;
   localOffsetMinutes?: number;
 }): Uint8Array {
   const startedAt = fitTimestamp('2026-05-01T08:00:00Z');
   const durationSeconds = params.durationSeconds ?? 3600;
   const data: number[] = [];
+  const sessionData: number[] = [];
 
   const sessionFields = [
     { fieldNumber: 2, size: 4, baseType: 0x86 },
@@ -114,12 +126,12 @@ function buildTestFit(params: {
     { fieldNumber: 65, size: 20, baseType: 0x86 },
     { fieldNumber: 253, size: 4, baseType: 0x86 },
   ];
-  appendFitDefinition(data, 0, 18, sessionFields);
-  appendFitData(data, 0, [
+  appendFitDefinition(sessionData, 0, 18, sessionFields);
+  appendFitData(sessionData, 0, [
     { ...sessionFields[0], value: startedAt },
     { ...sessionFields[1], value: params.sport },
     { ...sessionFields[2], value: params.subSport },
-    { ...sessionFields[3], value: Math.round(durationSeconds * 1000) },
+    { ...sessionFields[3], value: Math.round((params.elapsedSeconds ?? durationSeconds) * 1000) },
     { ...sessionFields[4], value: Math.round(durationSeconds * 1000) },
     { ...sessionFields[5], value: Math.round((params.distanceM ?? 0) * 100) },
     { ...sessionFields[6], value: 500 },
@@ -128,7 +140,7 @@ function buildTestFit(params: {
     { ...sessionFields[9], value: 80 },
     { ...sessionFields[10], value: 70 },
     { ...sessionFields[11], value: [300000, 600000, 900000, 1200000, 600000] },
-    { ...sessionFields[12], value: startedAt + durationSeconds },
+    { ...sessionFields[12], value: startedAt + (params.endedOffsetSeconds ?? durationSeconds) },
   ]);
 
   if (params.localOffsetMinutes != null) {
@@ -144,6 +156,7 @@ function buildTestFit(params: {
 
   const lapFields = [
     { fieldNumber: 2, size: 4, baseType: 0x86 },
+    { fieldNumber: 7, size: 4, baseType: 0x86 },
     { fieldNumber: 8, size: 4, baseType: 0x86 },
     { fieldNumber: 9, size: 4, baseType: 0x86 },
     { fieldNumber: 15, size: 1, baseType: 0x02 },
@@ -164,15 +177,16 @@ function buildTestFit(params: {
   for (const lap of laps) {
     appendFitData(data, 1, [
       { ...lapFields[0], value: lap.omitStartTimestamp ? 0 : startedAt + lap.startOffsetSeconds },
-      { ...lapFields[1], value: Math.round(lap.durationSeconds * 1000) },
-      { ...lapFields[2], value: Math.round(lap.distanceM * 100) },
-      { ...lapFields[3], value: lap.avgHeartRate ?? 120 },
-      { ...lapFields[4], value: lap.maxHeartRate ?? 150 },
-      { ...lapFields[5], value: lap.lapTrigger ?? params.lapTrigger ?? 2 },
+      { ...lapFields[1], value: Math.round((lap.elapsedSeconds ?? lap.durationSeconds) * 1000) },
+      { ...lapFields[2], value: Math.round(lap.durationSeconds * 1000) },
+      { ...lapFields[3], value: Math.round(lap.distanceM * 100) },
+      { ...lapFields[4], value: lap.avgHeartRate ?? 120 },
+      { ...lapFields[5], value: lap.maxHeartRate ?? 150 },
+      { ...lapFields[6], value: lap.lapTrigger ?? params.lapTrigger ?? 2 },
     ]);
   }
 
-  if (params.includeGps) {
+  if (params.includeGps || params.records) {
     const recordFields = [
       { fieldNumber: 0, size: 4, baseType: 0x85 },
       { fieldNumber: 1, size: 4, baseType: 0x85 },
@@ -182,38 +196,38 @@ function buildTestFit(params: {
       { fieldNumber: 253, size: 4, baseType: 0x86 },
     ];
     appendFitDefinition(data, 2, 20, recordFields);
-    appendFitData(data, 2, [
-      { ...recordFields[0], value: semicircles(40.4168) },
-      { ...recordFields[1], value: semicircles(-3.7038) },
-      { ...recordFields[2], value: (650 + 500) * 5 },
-      { ...recordFields[3], value: 118 },
-      { ...recordFields[4], value: 0 },
-      { ...recordFields[5], value: startedAt },
-    ]);
-    appendFitData(data, 2, [
-      { ...recordFields[0], value: semicircles(40.4178) },
-      { ...recordFields[1], value: semicircles(-3.7048) },
-      { ...recordFields[2], value: (660 + 500) * 5 },
-      { ...recordFields[3], value: 122 },
-      { ...recordFields[4], value: Math.round((params.distanceM ?? 150) * 100) },
-      { ...recordFields[5], value: startedAt + 60 },
-    ]);
+    const records = params.records ?? [
+      { offsetSeconds: 0, distanceM: 0, heartRate: 118 },
+      { offsetSeconds: 60, distanceM: params.distanceM ?? 150, heartRate: 122 },
+    ];
+    for (const [index, record] of records.entries()) {
+      appendFitData(data, 2, [
+        { ...recordFields[0], value: semicircles(40.4168 + index * 0.001) },
+        { ...recordFields[1], value: semicircles(-3.7038 - index * 0.001) },
+        { ...recordFields[2], value: (650 + index * 10 + 500) * 5 },
+        { ...recordFields[3], value: record.heartRate ?? 120 },
+        { ...recordFields[4], value: Math.round(record.distanceM * 100) },
+        { ...recordFields[5], value: startedAt + record.offsetSeconds },
+      ]);
+    }
   }
+
+  const fitData = params.summaryLast ? [...data, ...sessionData] : [...sessionData, ...data];
 
   const header = new Uint8Array(14);
   header[0] = 14;
   header[1] = 16;
   header[2] = 0;
   header[3] = 0;
-  new DataView(header.buffer).setUint32(4, data.length, true);
+  new DataView(header.buffer).setUint32(4, fitData.length, true);
   header[8] = '.'.charCodeAt(0);
   header[9] = 'F'.charCodeAt(0);
   header[10] = 'I'.charCodeAt(0);
   header[11] = 'T'.charCodeAt(0);
 
-  const output = new Uint8Array(header.length + data.length);
+  const output = new Uint8Array(header.length + fitData.length);
   output.set(header, 0);
-  output.set(data, header.length);
+  output.set(fitData, header.length);
   return output;
 }
 
@@ -381,9 +395,9 @@ function assertSuuntoFitRemovesMixedOneKilometerAutolaps(): void {
     distanceM: 4144,
     durationSeconds: 2110,
     laps: [
-      { startOffsetSeconds: 0, durationSeconds: 342, distanceM: 1000, avgHeartRate: 141, lapTrigger: 0 },
+      { startOffsetSeconds: 0, durationSeconds: 342, distanceM: 1000, avgHeartRate: 141, lapTrigger: 2 },
       { startOffsetSeconds: 0, durationSeconds: 600, distanceM: 1600, avgHeartRate: 146, lapTrigger: 0 },
-      { startOffsetSeconds: 600, durationSeconds: 364, distanceM: 1000, avgHeartRate: 152, lapTrigger: 0 },
+      { startOffsetSeconds: 600, durationSeconds: 364, distanceM: 1000, avgHeartRate: 152, lapTrigger: 2 },
       { startOffsetSeconds: 600, durationSeconds: 105, distanceM: 400, avgHeartRate: 153, lapTrigger: 0 },
       { startOffsetSeconds: 705, durationSeconds: 90, distanceM: 123, avgHeartRate: 150, lapTrigger: 0 },
       { startOffsetSeconds: 795, durationSeconds: 109, distanceM: 400, avgHeartRate: 153, lapTrigger: 0 },
@@ -412,7 +426,7 @@ function assertSuuntoFitKeepsFifteenStructuredIntervals(): void {
     durationSeconds: 2475,
     laps: [
       { startOffsetSeconds: 0, durationSeconds: 600, distanceM: 1600, avgHeartRate: 146, lapTrigger: 0 },
-      { startOffsetSeconds: 0, durationSeconds: 342, distanceM: 1000, avgHeartRate: 141, lapTrigger: 0 },
+      { startOffsetSeconds: 0, durationSeconds: 342, distanceM: 1000, avgHeartRate: 141, lapTrigger: 2 },
       { startOffsetSeconds: 600, durationSeconds: 105.3, distanceM: 400, avgHeartRate: 153, lapTrigger: 0 },
       { startOffsetSeconds: 705.3, durationSeconds: 90, distanceM: 123, avgHeartRate: 150, lapTrigger: 0 },
       { startOffsetSeconds: 795.3, durationSeconds: 109.2, distanceM: 400, avgHeartRate: 153, lapTrigger: 0 },
@@ -427,7 +441,7 @@ function assertSuuntoFitKeepsFifteenStructuredIntervals(): void {
       { startOffsetSeconds: 1681.6, durationSeconds: 90, distanceM: 121, avgHeartRate: 159, lapTrigger: 0 },
       { startOffsetSeconds: 1771.6, durationSeconds: 600, distanceM: 1600, avgHeartRate: 169, lapTrigger: 0 },
       { startOffsetSeconds: 2371.6, durationSeconds: 103.3, distanceM: 304, avgHeartRate: 176, lapTrigger: 0 },
-      { startOffsetSeconds: 1681.6, durationSeconds: 193.3, distanceM: 425, avgHeartRate: 165, lapTrigger: 0 },
+      { startOffsetSeconds: 1681.6, durationSeconds: 193.3, distanceM: 425, avgHeartRate: 165, lapTrigger: 2 },
     ],
   });
 
@@ -598,6 +612,124 @@ function assertSuuntoFitKeepsNativeKilometersAndRecoveries(): void {
     canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
     [1480, 1000, 190, 1000, 163, 1000, 173, 1000, 171, 1530, 36],
   );
+}
+
+function assertSuuntoSummaryLastFitRemovesOverlappingAutolapsAndBuildsTerminalRemainder(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 7739,
+    durationSeconds: 2850,
+    elapsedSeconds: 2846.068,
+    endedOffsetSeconds: 2846,
+    summaryLast: true,
+    records: [
+      { offsetSeconds: 0, distanceM: 0, heartRate: 92 },
+      { offsetSeconds: 2833, distanceM: 7703, heartRate: 165 },
+      { offsetSeconds: 2846, distanceM: 7739, heartRate: 166 },
+    ],
+    laps: [
+      { startOffsetSeconds: 0, durationSeconds: 397.6, distanceM: 1000, avgHeartRate: 136, lapTrigger: 2 },
+      {
+        startOffsetSeconds: 0,
+        durationSeconds: 600,
+        elapsedSeconds: 604.364,
+        distanceM: 1477.4,
+        avgHeartRate: 141,
+        lapTrigger: 0,
+      },
+      { startOffsetSeconds: 394, durationSeconds: 363.6, distanceM: 1000, avgHeartRate: 150, lapTrigger: 2 },
+      {
+        startOffsetSeconds: 604,
+        durationSeconds: 294.4,
+        elapsedSeconds: 293.163,
+        distanceM: 1000,
+        avgHeartRate: 157,
+        lapTrigger: 0,
+      },
+      {
+        startOffsetSeconds: 898,
+        durationSeconds: 120,
+        elapsedSeconds: 120.034,
+        distanceM: 190.1,
+        avgHeartRate: 142,
+        lapTrigger: 0,
+      },
+      { startOffsetSeconds: 758, durationSeconds: 352.1, distanceM: 1000, avgHeartRate: 152, lapTrigger: 2 },
+      {
+        startOffsetSeconds: 1018,
+        durationSeconds: 284.4,
+        elapsedSeconds: 280.97,
+        distanceM: 1000,
+        avgHeartRate: 160,
+        lapTrigger: 0,
+      },
+      {
+        startOffsetSeconds: 1299,
+        durationSeconds: 120,
+        elapsedSeconds: 120.012,
+        distanceM: 163.1,
+        avgHeartRate: 150,
+        lapTrigger: 0,
+      },
+      { startOffsetSeconds: 1110, durationSeconds: 361.2, distanceM: 1000, avgHeartRate: 158, lapTrigger: 2 },
+      {
+        startOffsetSeconds: 1419,
+        durationSeconds: 286.7,
+        elapsedSeconds: 284.989,
+        distanceM: 1000,
+        avgHeartRate: 166,
+        lapTrigger: 0,
+      },
+      { startOffsetSeconds: 1471, durationSeconds: 346.8, distanceM: 1000, avgHeartRate: 166, lapTrigger: 2 },
+      {
+        startOffsetSeconds: 1704,
+        durationSeconds: 120,
+        elapsedSeconds: 120.093,
+        distanceM: 173.1,
+        avgHeartRate: 154,
+        lapTrigger: 0,
+      },
+      { startOffsetSeconds: 1818, durationSeconds: 292.7, distanceM: 1000, avgHeartRate: 169, lapTrigger: 2 },
+      {
+        startOffsetSeconds: 1824,
+        durationSeconds: 289.6,
+        elapsedSeconds: 288.904,
+        distanceM: 1000,
+        avgHeartRate: 169,
+        lapTrigger: 0,
+      },
+      {
+        startOffsetSeconds: 2113,
+        durationSeconds: 120,
+        elapsedSeconds: 120.05,
+        distanceM: 171,
+        avgHeartRate: 152,
+        lapTrigger: 0,
+      },
+      { startOffsetSeconds: 2111, durationSeconds: 426.3, distanceM: 1000, avgHeartRate: 158, lapTrigger: 2 },
+      {
+        startOffsetSeconds: 2233,
+        durationSeconds: 600,
+        elapsedSeconds: 599.969,
+        distanceM: 1525.9,
+        avgHeartRate: 161,
+        lapTrigger: 0,
+      },
+      { startOffsetSeconds: 2537, durationSeconds: 309.3, distanceM: 739, avgHeartRate: 163, lapTrigger: 2 },
+    ],
+  });
+
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-6a5fc13f-summary-last.fit');
+
+  assert.equal(canonical.laps.length, 11);
+  assert.deepEqual(
+    canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
+    [1477, 1000, 190, 1000, 163, 1000, 173, 1000, 171, 1526, 36],
+  );
+  assert.ok(canonical.laps.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0) <= 7739);
+  assert.ok(canonical.laps.every(lap => lap.startOffsetSeconds != null && lap.endOffsetSeconds != null));
+  assert.ok(Math.abs((canonical.laps.at(-1)?.durationSeconds ?? 0) - 13.52) < 0.01);
 }
 
 function assertSuuntoExactWorkoutFitKeepsElevenNativeLapsWithoutTriggers(): void {
@@ -944,6 +1076,7 @@ assertSuuntoFitKeepsFifteenStructuredIntervals();
 assertSuuntoFitKeepsRepeatedUntimedRecoveries();
 assertSuuntoFitKeepsRealOneKilometerIntervals();
 assertSuuntoFitKeepsNativeKilometersAndRecoveries();
+assertSuuntoSummaryLastFitRemovesOverlappingAutolapsAndBuildsTerminalRemainder();
 assertSuuntoExactWorkoutFitKeepsElevenNativeLapsWithoutTriggers();
 assertSuuntoFitKeepsOneKilometerAutolapsWhenNoStructuredPartialsExist();
 assertSuuntoFitAcceptsLeadingBytesBeforeHeader();

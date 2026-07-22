@@ -13,6 +13,7 @@ export interface ActivityLapLike {
   distanceM: number | null;
   durationSeconds: number | null;
   avgPaceSecondsPerKm: number | null;
+  lapType?: string | null;
 }
 
 export interface EnduranceStepLike {
@@ -36,6 +37,22 @@ export interface IntervalStructure {
   repDistanceM: number | null;
   repPaceSecPerKm: number | null;
   recoveryDurationS: number | null;
+  alignment?: StructuralAlignment;
+}
+
+export interface StructuralAlignment {
+  componentScores: {
+    repetitions: number;
+    workDistance: number | null;
+    recovery: number | null;
+    boundaries: number | null;
+    pace: number | null;
+  };
+  repetitionDelta: number;
+  repetitionDifferenceCount: number;
+  isAutoMatchEligible: boolean;
+  matchedLapIndexes: number[];
+  extraLapIndexes: number[];
 }
 
 export interface ActivityTotals {
@@ -52,17 +69,14 @@ export interface TemplateTotals {
 
 type Band = readonly [maxDiffPct: number, score: number];
 
-const REPS_BANDS: readonly Band[] = [
-  [0.1, 100],
-  [0.2, 70],
-];
 const REP_DISTANCE_BANDS: readonly Band[] = [
   [0.1, 100],
   [0.2, 70],
 ];
 const REP_PACE_BANDS: readonly Band[] = [
   [0.15, 100],
-  [0.25, 60],
+  [0.3, 80],
+  [0.5, 50],
 ];
 const RECOVERY_BANDS: readonly Band[] = [
   [0.2, 100],
@@ -83,7 +97,24 @@ const MIN_WORK_REPS = 2;
 const MIN_PACE_SPREAD = 0.1;
 const MAX_WORK_DISTANCE_CV = 0.3;
 const MIN_WORK_RECOVERY_PACE_GAP = 0.1;
-const RECOVERY_DURATION_TOLERANCE_S = 5;
+const RECOVERY_DURATION_TOLERANCE_S = 10;
+const UNIFORM_AUTOLAP_RELATIVE_TOLERANCE = 0.05;
+const UNIFORM_AUTOLAP_DISTANCE_TOLERANCE_M = 10;
+const UNIFORM_AUTOLAP_DURATION_TOLERANCE_S = 2;
+const BOUNDARY_MAX_RELATIVE_DIFFERENCE = 0.4;
+const BOUNDARY_BANDS: readonly Band[] = [
+  [0.1, 100],
+  [0.2, 85],
+  [0.4, 60],
+];
+const STRUCTURAL_COMPONENT_WEIGHTS = {
+  repetitions: 0.25,
+  workDistance: 0.25,
+  recovery: 0.25,
+  boundaries: 0.15,
+  pace: 0.1,
+} as const;
+const POSSIBLE_REPETITION_MISMATCH_SCORE_CAP = 79;
 
 function bandScore(diffPct: number, bands: readonly Band[]): number {
   for (const [maxDiff, score] of bands) {
@@ -196,7 +227,33 @@ interface ExpandedStep {
   step: EnduranceStepLike;
 }
 
-function expandTemplateSteps(steps: EnduranceStepLike[]): ExpandedStep[] {
+interface ExpansionVariant {
+  steps: ExpandedStep[];
+  repetitionDelta: number;
+  repetitionDifferenceCount: number;
+}
+
+interface PhaseMatch {
+  step: EnduranceStepLike;
+  startIndex: number;
+  endIndex: number;
+  metrics: { durationS: number | null; distanceM: number | null };
+  workDistanceScore: number | null;
+  recoveryScore: number | null;
+  boundaryScore: number | null;
+  paceScore: number | null;
+  fitError: number;
+}
+
+interface AlignmentCandidate {
+  structure: IntervalStructure;
+  fitError: number;
+}
+
+function expandTemplateSteps(
+  steps: EnduranceStepLike[],
+  repetitionOverrides: ReadonlyMap<string, number> = new Map<string, number>(),
+): ExpandedStep[] {
   const childrenByParent = new Map<string, EnduranceStepLike[]>();
   const topLevel: EnduranceStepLike[] = [];
   for (const step of steps) {
@@ -215,14 +272,16 @@ function expandTemplateSteps(steps: EnduranceStepLike[]): ExpandedStep[] {
   for (const step of topLevel) {
     if (step.isGroup) {
       const children = [...(childrenByParent.get(step.id) ?? [])].sort(byOrder);
-      const repetitions = Math.max(1, step.repetitions ?? 1);
+      const repetitions = Math.max(1, repetitionOverrides.get(step.id) ?? step.repetitions ?? 1);
       for (let round = 0; round < repetitions; round += 1) {
         for (const child of children) expanded.push({ step: child });
       }
       continue;
     }
-    const repetitions = Math.max(1, step.repetitions ?? 1);
-    for (let round = 0; round < repetitions; round += 1) expanded.push({ step });
+    const repetitions = Math.max(1, repetitionOverrides.get(step.id) ?? step.repetitions ?? 1);
+    for (let round = 0; round < repetitions; round += 1) {
+      expanded.push({ step });
+    }
   }
   return expanded;
 }
@@ -285,25 +344,9 @@ export function deriveTemplateStructure(steps: EnduranceStepLike[]): IntervalStr
   };
 }
 
-function deriveTemplateWorkDistances(steps: EnduranceStepLike[]): number[] {
-  return expandTemplateSteps(steps)
-    .filter(entry => entry.step.phaseType === 'interval')
-    .map(entry => stepDistanceM(entry.step))
-    .filter((value): value is number => value != null && value > 0);
-}
-
 interface RecoveryRequirement {
   durationS: number | null;
   distanceM: number | null;
-}
-
-function deriveTemplateRecoveryRequirements(steps: EnduranceStepLike[]): RecoveryRequirement[] {
-  return expandTemplateSteps(steps)
-    .filter(entry => entry.step.phaseType === 'recovery')
-    .map(entry => ({
-      durationS: stepDurationS(entry.step),
-      distanceM: stepDistanceM(entry.step),
-    }));
 }
 
 export function templateHasBoundaryPhases(steps: EnduranceStepLike[]): boolean {
@@ -314,44 +357,6 @@ export function templateHasRecoveryPhases(steps: EnduranceStepLike[]): boolean {
   return expandTemplateSteps(steps).some(entry => entry.step.phaseType === 'recovery');
 }
 
-function hasRequiredBoundaryLaps(
-  steps: EnduranceStepLike[],
-  laps: ActivityLapLike[],
-  matches: Array<{ index: number; lap: ActivityLapLike }>,
-): boolean {
-  const expandedSteps = expandTemplateSteps(steps).map(entry => entry.step);
-  const warmupSteps = expandedSteps.filter(step => step.phaseType === 'warmup' || step.phaseType === 'warm_up');
-  const cooldownSteps = expandedSteps.filter(step => step.phaseType === 'cooldown' || step.phaseType === 'cool_down');
-  const firstMatch = matches[0]?.index ?? -1;
-  const lastMatch = matches.at(-1)?.index ?? -1;
-  return (
-    (warmupSteps.length === 0 || boundaryLapsMatch(warmupSteps, laps.slice(0, firstMatch))) &&
-    (cooldownSteps.length === 0 || boundaryLapsMatch(cooldownSteps, laps.slice(lastMatch + 1)))
-  );
-}
-
-function boundaryLapsMatch(boundarySteps: EnduranceStepLike[], boundaryLaps: ActivityLapLike[]): boolean {
-  if (boundaryLaps.length === 0) return false;
-  const targetDistanceM = boundarySteps.reduce((sum, step) => sum + (stepDistanceM(step) ?? 0), 0);
-  if (targetDistanceM > 0) {
-    const actualDistanceM = boundaryLaps.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0);
-    return doesDistanceMatch(actualDistanceM, targetDistanceM);
-  }
-  const targetDurationS = boundarySteps.reduce((sum, step) => sum + (stepDurationS(step) ?? 0), 0);
-  if (targetDurationS > 0) {
-    const actualDurationS = boundaryLaps.reduce((sum, lap) => sum + (lap.durationSeconds ?? 0), 0);
-    const toleranceS = Math.max(10, targetDurationS * TEMPLATE_DISTANCE_MATCH_RELATIVE_TOLERANCE);
-    return Math.abs(actualDurationS - targetDurationS) <= toleranceS;
-  }
-  return true;
-}
-
-function hasSingleWorkDistance(distances: number[]): boolean {
-  if (distances.length === 0) return false;
-  const firstDistance = distances[0];
-  return distances.every(distance => doesDistanceMatch(distance, firstDistance));
-}
-
 function doesDistanceMatch(actualDistanceM: number | null, targetDistanceM: number): boolean {
   if (actualDistanceM == null || actualDistanceM <= 0 || targetDistanceM <= 0) return false;
   const tolerance = Math.max(
@@ -359,85 +364,6 @@ function doesDistanceMatch(actualDistanceM: number | null, targetDistanceM: numb
     TEMPLATE_DISTANCE_MATCH_ABSOLUTE_TOLERANCE_M,
   );
   return Math.abs(actualDistanceM - targetDistanceM) <= tolerance;
-}
-
-function collectSameDistanceWorkLaps(
-  laps: ActivityLapLike[],
-  targetDistanceM: number,
-): Array<{ index: number; lap: ActivityLapLike }> {
-  return laps
-    .map((lap, index) => ({ index, lap }))
-    .filter(entry => doesDistanceMatch(entry.lap.distanceM, targetDistanceM));
-}
-
-function selectWorkLikeMatches(
-  matches: Array<{ index: number; lap: ActivityLapLike }>,
-  expectedCount: number,
-): Array<{ index: number; lap: ActivityLapLike }> {
-  if (matches.length <= expectedCount) return matches;
-  const pacedMatches = matches
-    .map(match => ({ ...match, pace: lapPaceSecPerKm(match.lap) }))
-    .filter((match): match is { index: number; lap: ActivityLapLike; pace: number } => match.pace != null);
-  if (pacedMatches.length !== matches.length) return matches;
-  const medianPace = median(pacedMatches.map(match => match.pace));
-  if (medianPace == null || medianPace <= 0) return matches;
-  const paceSpread =
-    (Math.max(...pacedMatches.map(match => match.pace)) - Math.min(...pacedMatches.map(match => match.pace))) /
-    medianPace;
-  if (paceSpread < MIN_WORK_RECOVERY_PACE_GAP) return matches;
-  return pacedMatches
-    .sort((left, right) => left.pace - right.pace)
-    .slice(0, expectedCount)
-    .sort((left, right) => left.index - right.index)
-    .map(({ index, lap }) => ({ index, lap }));
-}
-
-function collectOrderedWorkLaps(
-  laps: ActivityLapLike[],
-  targetDistancesM: number[],
-): Array<{ index: number; lap: ActivityLapLike }> {
-  const matches: Array<{ index: number; lap: ActivityLapLike }> = [];
-  let searchStartIndex = 0;
-  for (const targetDistanceM of targetDistancesM) {
-    const foundIndex = laps.findIndex(
-      (lap, index) => index >= searchStartIndex && doesDistanceMatch(lap.distanceM, targetDistanceM),
-    );
-    if (foundIndex < 0) return [];
-    matches.push({ index: foundIndex, lap: laps[foundIndex] });
-    searchStartIndex = foundIndex + 1;
-  }
-  return matches;
-}
-
-function readRecoverySegmentsBetweenMatches(
-  laps: ActivityLapLike[],
-  matches: Array<{ index: number; lap: ActivityLapLike }>,
-): Array<{ durationS: number | null; distanceM: number | null }> {
-  const segments: Array<{ durationS: number | null; distanceM: number | null }> = [];
-  for (let index = 0; index < matches.length - 1; index += 1) {
-    const start = matches[index].index + 1;
-    const end = matches[index + 1].index;
-    let durationS = 0;
-    let distanceM = 0;
-    let hasDuration = false;
-    let hasDistance = false;
-    for (let lapIndex = start; lapIndex < end; lapIndex += 1) {
-      const lap = laps[lapIndex];
-      if (lap.durationSeconds != null && lap.durationSeconds > 0) {
-        durationS += lap.durationSeconds;
-        hasDuration = true;
-      }
-      if (lap.distanceM != null && lap.distanceM > 0) {
-        distanceM += lap.distanceM;
-        hasDistance = true;
-      }
-    }
-    segments.push({
-      durationS: hasDuration ? durationS : null,
-      distanceM: hasDistance ? distanceM : null,
-    });
-  }
-  return segments;
 }
 
 function recoveryMatchesTemplate(
@@ -451,6 +377,381 @@ function recoveryMatchesTemplate(
   return actual.durationS != null || actual.distanceM != null;
 }
 
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function aggregateLaps(laps: ActivityLapLike[]): { durationS: number | null; distanceM: number | null } {
+  const durations = laps.map(lap => lap.durationSeconds).filter((value): value is number => value != null && value > 0);
+  const distances = laps.map(lap => lap.distanceM).filter((value): value is number => value != null && value > 0);
+  return {
+    durationS: durations.length > 0 ? durations.reduce((sum, value) => sum + value, 0) : null,
+    distanceM: distances.length > 0 ? distances.reduce((sum, value) => sum + value, 0) : null,
+  };
+}
+
+function valuesAreUniform(values: number[], absoluteTolerance: number): boolean {
+  if (values.length < 2) return false;
+  const reference = median(values);
+  if (reference == null || reference <= 0) return false;
+  const tolerance = Math.max(reference * UNIFORM_AUTOLAP_RELATIVE_TOLERANCE, absoluteTolerance);
+  return values.every(value => Math.abs(value - reference) <= tolerance);
+}
+
+function valuesAreUniformWithOptionalTerminalRemainder(values: number[], absoluteTolerance: number): boolean {
+  if (valuesAreUniform(values, absoluteTolerance)) return true;
+  if (values.length < 3) return false;
+  const core = values.slice(0, -1);
+  const terminal = values[values.length - 1];
+  const reference = median(core);
+  if (reference == null || reference <= 0 || !valuesAreUniform(core, absoluteTolerance)) return false;
+  const tolerance = Math.max(reference * UNIFORM_AUTOLAP_RELATIVE_TOLERANCE, absoluteTolerance);
+  return terminal <= reference + tolerance;
+}
+
+function isContinuousUniformAutolapSequence(laps: ActivityLapLike[]): boolean {
+  if (laps.length < 2) return false;
+  const lapTypes = new Set(laps.map(lap => lap.lapType));
+  if (lapTypes.size !== 1) return false;
+  const [lapType] = [...lapTypes];
+  if (lapType === 'distance') {
+    const distances = laps.map(lap => lap.distanceM).filter((value): value is number => value != null && value > 0);
+    return (
+      distances.length === laps.length &&
+      valuesAreUniformWithOptionalTerminalRemainder(distances, UNIFORM_AUTOLAP_DISTANCE_TOLERANCE_M)
+    );
+  }
+  if (lapType === 'time') {
+    const durations = laps
+      .map(lap => lap.durationSeconds)
+      .filter((value): value is number => value != null && value > 0);
+    return (
+      durations.length === laps.length &&
+      valuesAreUniformWithOptionalTerminalRemainder(durations, UNIFORM_AUTOLAP_DURATION_TOLERANCE_S)
+    );
+  }
+  if (lapType !== 'auto') return false;
+  const distances = laps.map(lap => lap.distanceM).filter((value): value is number => value != null && value > 0);
+  const durations = laps.map(lap => lap.durationSeconds).filter((value): value is number => value != null && value > 0);
+  return (
+    (distances.length === laps.length &&
+      valuesAreUniformWithOptionalTerminalRemainder(distances, UNIFORM_AUTOLAP_DISTANCE_TOLERANCE_M)) ||
+    (durations.length === laps.length &&
+      valuesAreUniformWithOptionalTerminalRemainder(durations, UNIFORM_AUTOLAP_DURATION_TOLERANCE_S))
+  );
+}
+
+function isBoundaryPhase(phaseType: string): boolean {
+  return ['warmup', 'warm_up', 'cooldown', 'cool_down'].includes(phaseType);
+}
+
+function scoreBoundarySegment(
+  metrics: { durationS: number | null; distanceM: number | null },
+  step: EnduranceStepLike,
+): { score: number; fitError: number } | null {
+  const targetDistanceM = stepDistanceM(step);
+  if (targetDistanceM != null) {
+    if (metrics.distanceM == null) return null;
+    const difference = relativeDiff(metrics.distanceM, targetDistanceM);
+    if (difference > BOUNDARY_MAX_RELATIVE_DIFFERENCE) return null;
+    return { score: bandScore(difference, BOUNDARY_BANDS), fitError: difference };
+  }
+  const targetDurationS = stepDurationS(step);
+  if (targetDurationS != null) {
+    if (metrics.durationS == null) return null;
+    const difference = relativeDiff(metrics.durationS, targetDurationS);
+    if (difference > BOUNDARY_MAX_RELATIVE_DIFFERENCE) return null;
+    return { score: bandScore(difference, BOUNDARY_BANDS), fitError: difference };
+  }
+  return { score: 100, fitError: 0 };
+}
+
+function matchPhaseSegment(
+  step: EnduranceStepLike,
+  laps: ActivityLapLike[],
+  startIndex: number,
+  endIndex: number,
+): PhaseMatch | null {
+  const segment = laps.slice(startIndex, endIndex);
+  if (segment.length === 0) return null;
+  const metrics = aggregateLaps(segment);
+  if (step.phaseType === 'interval') {
+    if (segment.length !== 1) return null;
+    const targetDistanceM = stepDistanceM(step);
+    const targetDurationS = step.distanceM == null ? stepDurationS(step) : null;
+    let workDistanceScore: number | null = null;
+    let fitError = 0;
+    if (targetDistanceM != null) {
+      if (!doesDistanceMatch(metrics.distanceM, targetDistanceM) || metrics.distanceM == null) return null;
+      fitError = relativeDiff(metrics.distanceM, targetDistanceM);
+      workDistanceScore = bandScore(fitError, REP_DISTANCE_BANDS);
+    } else if (targetDurationS != null) {
+      if (metrics.durationS == null) return null;
+      fitError = relativeDiff(metrics.durationS, targetDurationS);
+      if (fitError > TEMPLATE_DISTANCE_MATCH_RELATIVE_TOLERANCE) return null;
+      workDistanceScore = bandScore(fitError, REP_DISTANCE_BANDS);
+    }
+    const targetPace = stepPaceTargetSecPerKm(step);
+    const actualPace = lapPaceSecPerKm(segment[0]);
+    const paceScore =
+      targetPace != null && actualPace != null ? bandScore(relativeDiff(actualPace, targetPace), REP_PACE_BANDS) : null;
+    return {
+      step,
+      startIndex,
+      endIndex,
+      metrics,
+      workDistanceScore,
+      recoveryScore: null,
+      boundaryScore: null,
+      paceScore,
+      fitError,
+    };
+  }
+  if (step.phaseType === 'recovery') {
+    const requirement = { durationS: stepDurationS(step), distanceM: stepDistanceM(step) };
+    if (!recoveryMatchesTemplate(metrics, requirement)) return null;
+    const target = requirement.durationS ?? requirement.distanceM;
+    const actual = requirement.durationS != null ? metrics.durationS : metrics.distanceM;
+    const fitError = target != null && actual != null ? relativeDiff(actual, target) : 0;
+    return {
+      step,
+      startIndex,
+      endIndex,
+      metrics,
+      workDistanceScore: null,
+      recoveryScore: bandScore(fitError, RECOVERY_BANDS),
+      boundaryScore: null,
+      paceScore: null,
+      fitError,
+    };
+  }
+  const boundary = scoreBoundarySegment(metrics, step);
+  if (boundary == null) return null;
+  return {
+    step,
+    startIndex,
+    endIndex,
+    metrics,
+    workDistanceScore: null,
+    recoveryScore: null,
+    boundaryScore: isBoundaryPhase(step.phaseType) ? boundary.score : null,
+    paceScore: null,
+    fitError: boundary.fitError,
+  };
+}
+
+function doesLapMatchWorkStep(lap: ActivityLapLike, step: EnduranceStepLike): boolean {
+  const targetDistanceM = stepDistanceM(step);
+  if (targetDistanceM != null) return doesDistanceMatch(lap.distanceM, targetDistanceM);
+  const targetDurationS = stepDurationS(step);
+  return (
+    targetDurationS != null &&
+    lap.durationSeconds != null &&
+    relativeDiff(lap.durationSeconds, targetDurationS) <= TEMPLATE_DISTANCE_MATCH_RELATIVE_TOLERANCE
+  );
+}
+
+function boundaryContainsStructuredUnit(
+  laps: ActivityLapLike[],
+  workSteps: EnduranceStepLike[],
+  recoverySteps: EnduranceStepLike[],
+): boolean {
+  if (laps.length < 2 || workSteps.length === 0 || recoverySteps.length === 0) return false;
+  for (let workIndex = 0; workIndex < laps.length - 1; workIndex += 1) {
+    if (!workSteps.some(step => doesLapMatchWorkStep(laps[workIndex], step))) continue;
+    for (let recoveryStartIndex = workIndex + 1; recoveryStartIndex < laps.length; recoveryStartIndex += 1) {
+      for (let endIndex = recoveryStartIndex + 1; endIndex <= laps.length; endIndex += 1) {
+        const metrics = aggregateLaps(laps.slice(recoveryStartIndex, endIndex));
+        const matchesRecovery = recoverySteps.some(step =>
+          recoveryMatchesTemplate(metrics, { durationS: stepDurationS(step), distanceM: stepDistanceM(step) }),
+        );
+        if (matchesRecovery) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function buildExpansionVariants(steps: EnduranceStepLike[]): ExpansionVariant[] {
+  const exact = expandTemplateSteps(steps);
+  const variants: ExpansionVariant[] = [{ steps: exact, repetitionDelta: 0, repetitionDifferenceCount: 0 }];
+  const childrenByParent = new Map<string, EnduranceStepLike[]>();
+  for (const step of steps) {
+    if (!step.parentStepId) continue;
+    const children = childrenByParent.get(step.parentStepId) ?? [];
+    children.push(step);
+    childrenByParent.set(step.parentStepId, children);
+  }
+  const repetitionContainers = steps.filter(step => {
+    if (step.parentStepId != null) return false;
+    const children = step.isGroup ? (childrenByParent.get(step.id) ?? []) : [step];
+    return children.some(child => child.phaseType === 'interval');
+  });
+  const visit = (
+    containerIndex: number,
+    overrides: Map<string, number>,
+    repetitionDelta: number,
+    repetitionDifferenceCount: number,
+  ): void => {
+    if (containerIndex === repetitionContainers.length) {
+      if (repetitionDifferenceCount === 0) return;
+      variants.push({
+        steps: expandTemplateSteps(steps, overrides),
+        repetitionDelta,
+        repetitionDifferenceCount,
+      });
+      return;
+    }
+    const container = repetitionContainers[containerIndex];
+    const repetitions = Math.max(1, container.repetitions ?? 1);
+    for (const delta of [0, -1, 1, -2, 2]) {
+      if (repetitions + delta < 1 || repetitionDifferenceCount + Math.abs(delta) > 2) continue;
+      const nextOverrides = new Map(overrides);
+      if (delta !== 0) nextOverrides.set(container.id, repetitions + delta);
+      visit(containerIndex + 1, nextOverrides, repetitionDelta + delta, repetitionDifferenceCount + Math.abs(delta));
+    }
+  };
+  visit(0, new Map<string, number>(), 0, 0);
+  return variants;
+}
+
+function buildAlignmentCandidate(
+  laps: ActivityLapLike[],
+  phaseMatches: PhaseMatch[],
+  startIndex: number,
+  endIndex: number,
+  repetitionDelta: number,
+  repetitionDifferenceCount: number,
+): AlignmentCandidate | null {
+  const workMatches = phaseMatches.filter(match => match.step.phaseType === 'interval');
+  const recoveryMatches = phaseMatches.filter(match => match.step.phaseType === 'recovery');
+  const matchedLapIndexes = phaseMatches.flatMap(match =>
+    Array.from({ length: match.endIndex - match.startIndex }, (_, offset) => match.startIndex + offset),
+  );
+  const extraLapIndexes = [
+    ...Array.from({ length: startIndex }, (_, index) => index),
+    ...Array.from({ length: laps.length - endIndex }, (_, index) => endIndex + index),
+  ];
+  const workLaps = workMatches.flatMap(match => laps.slice(match.startIndex, match.endIndex));
+  const recoveryLaps = recoveryMatches.flatMap(match => laps.slice(match.startIndex, match.endIndex));
+  const structuredLaps = [...workLaps, ...recoveryLaps];
+  const isKnownAutolap = (lap: ActivityLapLike): boolean => ['auto', 'distance', 'time'].includes(lap.lapType ?? '');
+  if (recoveryLaps.length > 0 && structuredLaps.length > 0 && structuredLaps.every(isKnownAutolap)) {
+    const workPace = median(workLaps.map(lapPaceSecPerKm).filter((value): value is number => value != null));
+    const recoveryPace = median(recoveryLaps.map(lapPaceSecPerKm).filter((value): value is number => value != null));
+    if (workPace == null || recoveryPace == null || relativeDiff(recoveryPace, workPace) < MIN_WORK_RECOVERY_PACE_GAP)
+      return null;
+  }
+  const recoveryDurations = recoveryMatches
+    .map(match => match.metrics.durationS)
+    .filter((value): value is number => value != null && value > 0);
+  return {
+    structure: {
+      repCount: workMatches.length,
+      repDistanceM: median(
+        workLaps.map(lap => lap.distanceM).filter((value): value is number => value != null && value > 0),
+      ),
+      repPaceSecPerKm: median(
+        workLaps.map(lapPaceSecPerKm).filter((value): value is number => value != null && value > 0),
+      ),
+      recoveryDurationS: median(recoveryDurations),
+      alignment: {
+        componentScores: {
+          repetitions: repetitionDifferenceCount === 0 ? 100 : 0,
+          workDistance: average(
+            phaseMatches.map(match => match.workDistanceScore).filter((value): value is number => value != null),
+          ),
+          recovery: average(
+            phaseMatches.map(match => match.recoveryScore).filter((value): value is number => value != null),
+          ),
+          boundaries: average(
+            phaseMatches.map(match => match.boundaryScore).filter((value): value is number => value != null),
+          ),
+          pace: average(phaseMatches.map(match => match.paceScore).filter((value): value is number => value != null)),
+        },
+        repetitionDelta,
+        repetitionDifferenceCount,
+        isAutoMatchEligible: repetitionDifferenceCount === 0,
+        matchedLapIndexes,
+        extraLapIndexes,
+      },
+    },
+    fitError: phaseMatches.reduce((sum, match) => sum + match.fitError, 0),
+  };
+}
+
+function alignExpandedTemplate(laps: ActivityLapLike[], variant: ExpansionVariant): AlignmentCandidate | null {
+  const phases = variant.steps.map(entry => entry.step);
+  if (phases.length === 0 || phases.length > laps.length) return null;
+  const workSteps = phases.filter(step => step.phaseType === 'interval');
+  const recoverySteps = phases.filter(step => step.phaseType === 'recovery');
+  let bestCandidate: AlignmentCandidate | null = null;
+  const compareCandidates = (left: AlignmentCandidate, right: AlignmentCandidate): number => {
+    const leftScore = scoreAlignedComponents(left.structure.alignment?.componentScores);
+    const rightScore = scoreAlignedComponents(right.structure.alignment?.componentScores);
+    return (
+      rightScore - leftScore ||
+      left.fitError - right.fitError ||
+      (left.structure.alignment?.extraLapIndexes.length ?? 0) - (right.structure.alignment?.extraLapIndexes.length ?? 0)
+    );
+  };
+  const visit = (phaseIndex: number, lapIndex: number, startIndex: number, matches: PhaseMatch[]): void => {
+    if (phaseIndex === phases.length) {
+      const candidate = buildAlignmentCandidate(
+        laps,
+        matches,
+        startIndex,
+        lapIndex,
+        variant.repetitionDelta,
+        variant.repetitionDifferenceCount,
+      );
+      if (candidate != null && (bestCandidate == null || compareCandidates(candidate, bestCandidate) < 0)) {
+        bestCandidate = candidate;
+      }
+      return;
+    }
+    const remainingPhases = phases.length - phaseIndex - 1;
+    const maximumEndIndex = laps.length - remainingPhases;
+    const step = phases[phaseIndex];
+    const firstEndIndex = lapIndex + 1;
+    const isFinalOpenBoundary =
+      phaseIndex === phases.length - 1 &&
+      isBoundaryPhase(step.phaseType) &&
+      stepDistanceM(step) == null &&
+      stepDurationS(step) == null;
+    const firstCandidateEndIndex = isFinalOpenBoundary ? laps.length : firstEndIndex;
+    const lastEndIndex =
+      step.phaseType === 'interval' || isFinalOpenBoundary ? firstCandidateEndIndex : maximumEndIndex;
+    for (let endIndex = firstCandidateEndIndex; endIndex <= lastEndIndex; endIndex += 1) {
+      const match = matchPhaseSegment(step, laps, lapIndex, endIndex);
+      if (match == null) continue;
+      if (
+        isBoundaryPhase(step.phaseType) &&
+        boundaryContainsStructuredUnit(laps.slice(lapIndex, endIndex), workSteps, recoverySteps)
+      )
+        continue;
+      visit(phaseIndex + 1, endIndex, startIndex, [...matches, match]);
+    }
+  };
+  for (let startIndex = 0; startIndex <= laps.length - phases.length; startIndex += 1) {
+    visit(0, startIndex, startIndex, []);
+  }
+  return bestCandidate;
+}
+
+function scoreAlignedComponents(scores: StructuralAlignment['componentScores'] | undefined): number {
+  if (scores == null) return 0;
+  const entries: Array<{ score: number; weight: number }> = [];
+  for (const key of Object.keys(STRUCTURAL_COMPONENT_WEIGHTS) as Array<keyof typeof STRUCTURAL_COMPONENT_WEIGHTS>) {
+    const score = scores[key];
+    if (score != null) entries.push({ score, weight: STRUCTURAL_COMPONENT_WEIGHTS[key] });
+  }
+  const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  if (totalWeight === 0) return 0;
+  return entries.reduce((sum, entry) => sum + entry.score * entry.weight, 0) / totalWeight;
+}
+
 /**
  * Derives an activity interval structure by matching imported laps against the
  * expanded work distances from one specific template. This catches interval
@@ -461,74 +762,68 @@ export function deriveTemplateDistanceMatchedActivityStructure(
   laps: ActivityLapLike[],
   templateSteps: EnduranceStepLike[],
 ): IntervalStructure | null {
-  const targetDistancesM = deriveTemplateWorkDistances(templateSteps);
-  if (targetDistancesM.length < MIN_WORK_REPS) return null;
-  const matches = hasSingleWorkDistance(targetDistancesM)
-    ? selectWorkLikeMatches(collectSameDistanceWorkLaps(laps, targetDistancesM[0]), targetDistancesM.length)
-    : collectOrderedWorkLaps(laps, targetDistancesM);
-  if (matches.length < MIN_WORK_REPS) return null;
-  if (!hasSingleWorkDistance(targetDistancesM) && matches.length !== targetDistancesM.length) return null;
-  if (!hasRequiredBoundaryLaps(templateSteps, laps, matches)) return null;
-  const recoveryRequirements = deriveTemplateRecoveryRequirements(templateSteps);
-  const recoverySegments = readRecoverySegmentsBetweenMatches(laps, matches);
-  if (recoveryRequirements.length > 0) {
-    const requiredRecoveryCount = matches.length - 1;
-    if (recoveryRequirements.length < requiredRecoveryCount || recoverySegments.length < requiredRecoveryCount)
-      return null;
-    for (let index = 0; index < requiredRecoveryCount; index += 1) {
-      if (!recoveryMatchesTemplate(recoverySegments[index], recoveryRequirements[index])) return null;
-    }
-  }
-  const distances = matches
-    .map(match => match.lap.distanceM)
-    .filter((value): value is number => value != null && value > 0);
-  const paces = matches.map(match => lapPaceSecPerKm(match.lap)).filter((value): value is number => value != null);
-  return {
-    repCount: matches.length,
-    repDistanceM: median(distances),
-    repPaceSecPerKm: median(paces),
-    recoveryDurationS: median(
-      recoverySegments.map(segment => segment.durationS).filter((value): value is number => value != null),
-    ),
-  };
+  if (deriveTemplateStructure(templateSteps) == null) return null;
+  if (isContinuousUniformAutolapSequence(laps)) return null;
+  const candidates = buildExpansionVariants(templateSteps)
+    .map(variant => alignExpandedTemplate(laps, variant))
+    .filter((candidate): candidate is AlignmentCandidate => candidate != null)
+    .sort((left, right) => {
+      const repDifference = right.structure.repCount - left.structure.repCount;
+      if (repDifference !== 0) return repDifference;
+      const leftScore = scoreAlignedComponents(left.structure.alignment?.componentScores);
+      const rightScore = scoreAlignedComponents(right.structure.alignment?.componentScores);
+      return rightScore - leftScore || left.fitError - right.fitError;
+    });
+  const best = candidates[0] ?? null;
+  if (best == null || (best.structure.alignment?.repetitionDifferenceCount ?? 0) > 1) return null;
+  return best.structure;
 }
 
 /**
- * Structural match score (0-100). Weights per spec: reps 40%, distance per
- * rep 30%, pace per rep 20%, recovery 10%.
+ * Structural match score (0-100). Ordered alignments use repetitions 25%,
+ * work distance 25%, recovery 25%, boundaries 15% and pace 10%.
  */
 export function scoreStructuralMatch(activity: IntervalStructure, template: IntervalStructure): number {
-  const parts = [{ weight: 0.4, score: bandScore(relativeDiff(activity.repCount, template.repCount), REPS_BANDS) }];
-  if (activity.repDistanceM != null && template.repDistanceM != null) {
-    parts.push({
-      weight: 0.3,
-      score: bandScore(relativeDiff(activity.repDistanceM, template.repDistanceM), REP_DISTANCE_BANDS),
-    });
-  }
-  if (activity.repPaceSecPerKm != null && template.repPaceSecPerKm != null) {
-    parts.push({
-      weight: 0.2,
-      score: bandScore(relativeDiff(activity.repPaceSecPerKm, template.repPaceSecPerKm), REP_PACE_BANDS),
-    });
-  }
-  if (activity.recoveryDurationS != null && template.recoveryDurationS != null) {
-    parts.push({
-      weight: 0.1,
-      score: bandScore(relativeDiff(activity.recoveryDurationS, template.recoveryDurationS), RECOVERY_BANDS),
-    });
-  }
-  const totalWeight = parts.reduce((sum, part) => sum + part.weight, 0);
-  const total = parts.reduce((sum, part) => sum + part.score * part.weight, 0) / totalWeight;
-  return Math.round(total * 100) / 100;
+  if (Math.abs(activity.repCount - template.repCount) > 1) return 0;
+  const componentScores =
+    activity.alignment?.componentScores ??
+    ({
+      repetitions: activity.repCount === template.repCount ? 100 : 0,
+      workDistance:
+        activity.repDistanceM != null && template.repDistanceM != null
+          ? bandScore(relativeDiff(activity.repDistanceM, template.repDistanceM), REP_DISTANCE_BANDS)
+          : null,
+      recovery:
+        activity.recoveryDurationS != null && template.recoveryDurationS != null
+          ? bandScore(relativeDiff(activity.recoveryDurationS, template.recoveryDurationS), RECOVERY_BANDS)
+          : null,
+      boundaries: null,
+      pace:
+        activity.repPaceSecPerKm != null && template.repPaceSecPerKm != null
+          ? bandScore(relativeDiff(activity.repPaceSecPerKm, template.repPaceSecPerKm), REP_PACE_BANDS)
+          : null,
+    } satisfies StructuralAlignment['componentScores']);
+  const rawScore = scoreAlignedComponents(componentScores);
+  const score = isStructuralAutoMatchEligible(activity, template)
+    ? rawScore
+    : Math.min(rawScore, POSSIBLE_REPETITION_MISMATCH_SCORE_CAP);
+  return Math.round(score * 100) / 100;
 }
 
 export function countComparableStructuralSignals(activity: IntervalStructure, template: IntervalStructure): number {
+  if (activity.alignment != null) {
+    return Object.values(activity.alignment.componentScores).filter(score => score != null).length;
+  }
   return (
     1 +
     Number(activity.repDistanceM != null && template.repDistanceM != null) +
     Number(activity.repPaceSecPerKm != null && template.repPaceSecPerKm != null) +
     Number(activity.recoveryDurationS != null && template.recoveryDurationS != null)
   );
+}
+
+export function isStructuralAutoMatchEligible(activity: IntervalStructure, template: IntervalStructure): boolean {
+  return activity.alignment?.isAutoMatchEligible ?? activity.repCount === template.repCount;
 }
 
 /**
@@ -565,7 +860,7 @@ export function countComparableTotalSignals(activity: ActivityTotals, template: 
 }
 
 export function isMatchMarginSufficient(bestScore: number, secondScore: number | null): boolean {
-  return secondScore == null || bestScore - secondScore >= MIN_AUTO_MATCH_MARGIN;
+  return secondScore == null || bestScore - secondScore > MIN_AUTO_MATCH_MARGIN;
 }
 
 /** Builds activity totals from session-level metrics. */

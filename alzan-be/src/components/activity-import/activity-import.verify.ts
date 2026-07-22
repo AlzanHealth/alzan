@@ -45,6 +45,12 @@ const verificationCases: VerificationCase[] = [
     specFile: 'src/components/activity-import/parsers/activity-import.parsers.spec.ts',
   },
   {
+    kind: 'activity',
+    provider: 'core',
+    check: 'canonical lap normalization removes only demonstrated overlap and preserves terminal remainders',
+    specFile: 'src/components/activity-import/parsers/canonical-lap-normalizer.spec.ts',
+  },
+  {
     kind: 'service',
     provider: 'service',
     check: 'persistence payloads, route tabs and imported strength data',
