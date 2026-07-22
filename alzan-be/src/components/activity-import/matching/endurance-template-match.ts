@@ -83,6 +83,7 @@ const MIN_WORK_REPS = 2;
 const MIN_PACE_SPREAD = 0.1;
 const MAX_WORK_DISTANCE_CV = 0.3;
 const MIN_WORK_RECOVERY_PACE_GAP = 0.1;
+const RECOVERY_DURATION_TOLERANCE_S = 5;
 
 function bandScore(diffPct: number, bands: readonly Band[]): number {
   for (const [maxDiff, score] of bands) {
@@ -150,9 +151,19 @@ export function deriveActivityStructure(laps: ActivityLapLike[]): IntervalStruct
   const work = usable.filter(entry => entry.pace <= paceThreshold);
   const recovery = usable.filter(entry => entry.pace > paceThreshold);
   if (work.length < MIN_WORK_REPS || recovery.length === 0) return null;
-  // Real interval sessions alternate work and recovery; a steady run with a
-  // single slow lap (traffic stop) must not look structured.
-  if (recovery.length < Math.max(1, Math.floor((work.length - 1) / 2))) return null;
+  // Real interval sessions alternate work and recovery. Every pair of work
+  // reps must have at least one slower lap between them; counting recoveries
+  // alone would still accept a continuous run with one incidental slow lap.
+  const workIndexes = usable
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.pace <= paceThreshold)
+    .map(({ index }) => index);
+  if (recovery.length < workIndexes.length - 1) return null;
+  for (let index = 0; index < workIndexes.length - 1; index += 1) {
+    const start = workIndexes[index] + 1;
+    const end = workIndexes[index + 1];
+    if (!usable.slice(start, end).some(entry => entry.pace > paceThreshold)) return null;
+  }
 
   const medianWorkPace = median(work.map(entry => entry.pace));
   const medianRecoveryPace = median(recovery.map(entry => entry.pace));
@@ -281,8 +292,26 @@ function deriveTemplateWorkDistances(steps: EnduranceStepLike[]): number[] {
     .filter((value): value is number => value != null && value > 0);
 }
 
+interface RecoveryRequirement {
+  durationS: number | null;
+  distanceM: number | null;
+}
+
+function deriveTemplateRecoveryRequirements(steps: EnduranceStepLike[]): RecoveryRequirement[] {
+  return expandTemplateSteps(steps)
+    .filter(entry => entry.step.phaseType === 'recovery')
+    .map(entry => ({
+      durationS: stepDurationS(entry.step),
+      distanceM: stepDistanceM(entry.step),
+    }));
+}
+
 export function templateHasBoundaryPhases(steps: EnduranceStepLike[]): boolean {
   return steps.some(step => ['warmup', 'warm_up', 'cooldown', 'cool_down'].includes(step.phaseType));
+}
+
+export function templateHasRecoveryPhases(steps: EnduranceStepLike[]): boolean {
+  return expandTemplateSteps(steps).some(entry => entry.step.phaseType === 'recovery');
 }
 
 function hasRequiredBoundaryLaps(
@@ -380,20 +409,46 @@ function collectOrderedWorkLaps(
   return matches;
 }
 
-function readRecoveryDurationsBetweenMatches(
+function readRecoverySegmentsBetweenMatches(
   laps: ActivityLapLike[],
   matches: Array<{ index: number; lap: ActivityLapLike }>,
-): number[] {
-  const durations: number[] = [];
+): Array<{ durationS: number | null; distanceM: number | null }> {
+  const segments: Array<{ durationS: number | null; distanceM: number | null }> = [];
   for (let index = 0; index < matches.length - 1; index += 1) {
     const start = matches[index].index + 1;
     const end = matches[index + 1].index;
+    let durationS = 0;
+    let distanceM = 0;
+    let hasDuration = false;
+    let hasDistance = false;
     for (let lapIndex = start; lapIndex < end; lapIndex += 1) {
-      const duration = laps[lapIndex].durationSeconds;
-      if (duration != null && duration > 0) durations.push(duration);
+      const lap = laps[lapIndex];
+      if (lap.durationSeconds != null && lap.durationSeconds > 0) {
+        durationS += lap.durationSeconds;
+        hasDuration = true;
+      }
+      if (lap.distanceM != null && lap.distanceM > 0) {
+        distanceM += lap.distanceM;
+        hasDistance = true;
+      }
     }
+    segments.push({
+      durationS: hasDuration ? durationS : null,
+      distanceM: hasDistance ? distanceM : null,
+    });
   }
-  return durations;
+  return segments;
+}
+
+function recoveryMatchesTemplate(
+  actual: { durationS: number | null; distanceM: number | null },
+  expected: RecoveryRequirement,
+): boolean {
+  if (expected.durationS != null) {
+    return actual.durationS != null && Math.abs(actual.durationS - expected.durationS) <= RECOVERY_DURATION_TOLERANCE_S;
+  }
+  if (expected.distanceM != null) return doesDistanceMatch(actual.distanceM, expected.distanceM);
+  return actual.durationS != null || actual.distanceM != null;
 }
 
 /**
@@ -414,6 +469,16 @@ export function deriveTemplateDistanceMatchedActivityStructure(
   if (matches.length < MIN_WORK_REPS) return null;
   if (!hasSingleWorkDistance(targetDistancesM) && matches.length !== targetDistancesM.length) return null;
   if (!hasRequiredBoundaryLaps(templateSteps, laps, matches)) return null;
+  const recoveryRequirements = deriveTemplateRecoveryRequirements(templateSteps);
+  const recoverySegments = readRecoverySegmentsBetweenMatches(laps, matches);
+  if (recoveryRequirements.length > 0) {
+    const requiredRecoveryCount = matches.length - 1;
+    if (recoveryRequirements.length < requiredRecoveryCount || recoverySegments.length < requiredRecoveryCount)
+      return null;
+    for (let index = 0; index < requiredRecoveryCount; index += 1) {
+      if (!recoveryMatchesTemplate(recoverySegments[index], recoveryRequirements[index])) return null;
+    }
+  }
   const distances = matches
     .map(match => match.lap.distanceM)
     .filter((value): value is number => value != null && value > 0);
@@ -422,7 +487,9 @@ export function deriveTemplateDistanceMatchedActivityStructure(
     repCount: matches.length,
     repDistanceM: median(distances),
     repPaceSecPerKm: median(paces),
-    recoveryDurationS: median(readRecoveryDurationsBetweenMatches(laps, matches)),
+    recoveryDurationS: median(
+      recoverySegments.map(segment => segment.durationS).filter((value): value is number => value != null),
+    ),
   };
 }
 

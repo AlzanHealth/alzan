@@ -14,6 +14,7 @@ import {
   scoreTotalsMatch,
   STRONG_MATCH,
   isMatchMarginSufficient,
+  templateHasRecoveryPhases,
 } from './endurance-template-match';
 
 function lap(distanceM: number, durationSeconds: number): ActivityLapLike {
@@ -197,6 +198,40 @@ function assertSteadyAutolapsProduceNoStructure(): void {
   assert.equal(deriveActivityStructure(laps), null);
 }
 
+function assertRecoveryMustAppearBetweenEveryWorkPair(): void {
+  const laps = [lap(1000, 240), lap(1000, 242), lap(200, 120), lap(1000, 241)];
+  assert.equal(deriveActivityStructure(laps), null);
+}
+
+function assertContinuousAutolapsCannotMatchRecoveryTemplate(): void {
+  const laps = [lap(1000, 300), lap(1000, 301), lap(1000, 299), lap(1000, 300)];
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(laps, templateSteps(4, 1000, 300, 120)), null);
+}
+
+function assertRecoveryTemplateIsMarkedAsStrictlyStructured(): void {
+  assert.equal(templateHasRecoveryPhases(templateSteps(4, 1000, 300, 120)), true);
+  const [step] = templateSteps(1, 1000, 300, 120);
+  assert.equal(
+    templateHasRecoveryPhases([{ ...step, isGroup: false, parentStepId: null, phaseType: 'warmup' }]),
+    false,
+  );
+}
+
+function assertRecoveryDurationMustMatchTemplate(): void {
+  const tooShort = intervalLaps(4, 1000, 300, 90);
+  const closeEnough = intervalLaps(4, 1000, 300, 124);
+  const template = templateSteps(4, 1000, 300, 120);
+  assert.equal(deriveTemplateDistanceMatchedActivityStructure(tooShort, template), null);
+  assert.ok(deriveTemplateDistanceMatchedActivityStructure(closeEnough, template));
+}
+
+function assertMultipleRecoveryLapsAreSummed(): void {
+  const laps = [lap(1000, 300), lap(100, 60), lap(100, 60), lap(1000, 300), lap(100, 59), lap(100, 61), lap(1000, 300)];
+  const structure = deriveTemplateDistanceMatchedActivityStructure(laps, templateSteps(3, 1000, 300, 120));
+  assert.ok(structure);
+  assert.equal(structure.recoveryDurationS, 120);
+}
+
 function assertTooFewLapsProduceNoStructure(): void {
   assert.equal(deriveActivityStructure([lap(400, 90), lap(200, 90)]), null);
   assert.equal(deriveActivityStructure([]), null);
@@ -294,7 +329,7 @@ function assertBoundaryPhaseTargetsMustMatch(): void {
 }
 
 function assertTemplateDistanceMatchWorksForMultipleDistances(): void {
-  const distances = [100, 200, 400, 800, 1000];
+  const distances = [100, 200, 400, 600, 800, 1000, 1200, 1500, 2000];
   for (const distance of distances) {
     const activityStructure = deriveTemplateDistanceMatchedActivityStructure(
       intervalLaps(5, distance, Math.max(40, distance / 4), 75),
@@ -333,7 +368,7 @@ function assertTemplateDistanceMatchSupportsMixedBlocks(): void {
     lap(392, 94),
     lap(135, 90),
     lap(405, 97),
-    lap(160, 120),
+    lap(160, 90),
     lap(790, 198),
     lap(170, 120),
     lap(815, 203),
@@ -429,6 +464,11 @@ assertTwoExtraRepsArePossibleMatch();
 assertDifferentWorkoutIsNoStructuralMatch();
 assertStructuralSignalsOnlyCountComparableValues();
 assertSteadyAutolapsProduceNoStructure();
+assertRecoveryMustAppearBetweenEveryWorkPair();
+assertContinuousAutolapsCannotMatchRecoveryTemplate();
+assertRecoveryTemplateIsMarkedAsStrictlyStructured();
+assertRecoveryDurationMustMatchTemplate();
+assertMultipleRecoveryLapsAreSummed();
 assertTooFewLapsProduceNoStructure();
 assertTemplateDistanceMatchIgnoresWarmupAndCooldown();
 assertRequiredBoundaryPhasesCannotBeSkipped();

@@ -116,14 +116,16 @@ function assertIncrementalAndRepairLookbacks(): void {
   const dayMs = 24 * 60 * 60 * 1000;
   const lastSuccessAt = new Date(now).toISOString();
 
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 1, false, lastSuccessAt), now - 3 * dayMs);
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 1, true, lastSuccessAt), now - 20 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 3, false, lastSuccessAt), now - 3 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 3, true, lastSuccessAt), now - 20 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 2, false, lastSuccessAt), now - 30 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 1, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(
-    service.selectWorkoutLookbackStartMs(now, 1, false, new Date(now - 5 * dayMs).toISOString()),
+    service.selectWorkoutLookbackStartMs(now, 3, false, new Date(now - 5 * dayMs).toISOString()),
     now - 8 * dayMs,
   );
   assert.equal(
-    service.selectWorkoutLookbackStartMs(now, 1, false, new Date(now - 60 * dayMs).toISOString()),
+    service.selectWorkoutLookbackStartMs(now, 3, false, new Date(now - 60 * dayMs).toISOString()),
     now - 30 * dayMs,
   );
   assert.equal(service.selectWorkoutLookbackStartMs(now, undefined, false), now - 30 * dayMs);

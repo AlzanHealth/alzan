@@ -14,6 +14,7 @@ import {
   isMatchMarginSufficient,
   STRONG_MATCH,
   templateHasBoundaryPhases,
+  templateHasRecoveryPhases,
   deriveActivityStructure,
   deriveTemplateDistanceMatchedActivityStructure,
   deriveTemplateStructure,
@@ -431,7 +432,10 @@ export class ImportReconciliationService {
 
       const templateAwareStructure = deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps);
       const activityStructure =
-        templateAwareStructure ?? (templateHasBoundaryPhases(steps) ? null : deriveActivityStructure(lapLikes));
+        templateAwareStructure ??
+        (templateHasBoundaryPhases(steps) || templateHasRecoveryPhases(steps)
+          ? null
+          : deriveActivityStructure(lapLikes));
       let score: number;
       let method: MatchMethod;
       let signalCount: number;
