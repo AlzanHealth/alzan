@@ -322,10 +322,14 @@ async function main(): Promise<void> {
       const templateId = randomUUID();
       const groupId = randomUUID();
       const decoyTemplateId = randomUUID();
+      const genericTemplateId = randomUUID();
       const planId = randomUUID();
+      const genericPlanId = randomUUID();
       createdTemplateIds.add(templateId);
       createdTemplateIds.add(decoyTemplateId);
+      createdTemplateIds.add(genericTemplateId);
       createdPlanIds.add(planId);
+      createdPlanIds.add(genericPlanId);
 
       const { error: templateError } = await client.from('endurance_workout_templates').insert({
         id: templateId,
@@ -394,7 +398,7 @@ async function main(): Promise<void> {
           order_index: 2,
           is_group: false,
           repetitions: 1,
-          phase_type: 'cooldown',
+          phase_type: 'recovery',
           duration_type: 'time',
           duration_s: 600,
           target_type: 'none',
@@ -429,6 +433,17 @@ async function main(): Promise<void> {
       );
       if (decoyStepsError) throw new Error(`insert decoy endurance steps failed: ${decoyStepsError.message}`);
 
+      const { error: genericTemplateError } = await client.from('endurance_workout_templates').insert({
+        id: genericTemplateId,
+        user_id: userId,
+        base_name: 'Generic run with identical totals',
+        sport_type: 'running',
+        total_distance_m: 7739,
+        total_duration_s: 2849,
+      });
+      if (genericTemplateError)
+        throw new Error(`insert generic endurance template failed: ${genericTemplateError.message}`);
+
       const { error: planError } = await client.from('workout_plans').insert({
         id: planId,
         user_id: userId,
@@ -437,6 +452,15 @@ async function main(): Promise<void> {
         endurance_template_id: templateId,
       });
       if (planError) throw new Error(`insert workout plan failed: ${planError.message}`);
+
+      const { error: genericPlanError } = await client.from('workout_plans').insert({
+        id: genericPlanId,
+        user_id: userId,
+        planned_date: '2026-06-13',
+        status: 'planned',
+        endurance_template_id: genericTemplateId,
+      });
+      if (genericPlanError) throw new Error(`insert generic workout plan failed: ${genericPlanError.message}`);
 
       const exactLaps = [
         [1477.4, 600],
@@ -544,7 +568,7 @@ async function main(): Promise<void> {
           sourceUpdatedAt: '2026-06-13T09:00:00Z',
           rawPayloadId: null,
         },
-        canonicalVersion: 5,
+        canonicalVersion: 7,
       };
       const { count: sessionsBeforeMatch } = await client
         .from('activity_sessions')
@@ -566,10 +590,30 @@ async function main(): Promise<void> {
       await client.from('endurance_workout_steps').delete().eq('template_id', decoyTemplateId);
       await client.from('endurance_workout_templates').delete().eq('id', decoyTemplateId);
       createdTemplateIds.delete(decoyTemplateId);
+      const { error: historicalAssociationError } = await client.rpc('associate_activity_session_template', {
+        p_user_id: userId,
+        p_session_id: sessionId,
+        p_endurance_template_id: genericTemplateId,
+        p_workout_template_id: undefined,
+        p_workout_plan_id: genericPlanId,
+      });
+      if (historicalAssociationError) {
+        throw new Error(`simulate historical totals association failed: ${historicalAssociationError.message}`);
+      }
+      const { error: historicalScoreError } = await client
+        .from('activity_sessions')
+        .update({ template_match_score: 100, template_match_method: 'totals' })
+        .eq('id', sessionId);
+      if (historicalScoreError)
+        throw new Error(`mark historical totals association failed: ${historicalScoreError.message}`);
       const repeatedSessionId = await writer.upsertActivity(writerInput);
       assert.equal(repeatedSessionId, sessionId, 're-sync must update the same imported session');
       const matchedSession = await getSession(sessionId);
-      assert.equal(matchedSession.endurance_template_id, templateId, 'series template must auto-associate');
+      assert.equal(
+        matchedSession.endurance_template_id,
+        templateId,
+        're-sync must replace a historical totals-only link with the stronger interval structure',
+      );
       assert.equal(matchedSession.suggested_endurance_template_id, null, 'strong structural match is not a suggestion');
       assert.equal(matchedSession.template_match_method, 'structural');
       assert.ok((matchedSession.template_match_score ?? 0) >= 80, 'ordered structural score must be strong');
@@ -582,6 +626,15 @@ async function main(): Promise<void> {
       if (matchedPlanError) throw new Error(`read matched workout plan failed: ${matchedPlanError.message}`);
       assert.equal(matchedPlan.status, 'completed', 'matched plan must be completed');
       assert.equal(matchedPlan.activity_session_id, sessionId, 'matched plan must reference the imported session');
+
+      const { data: genericPlan, error: genericPlanReadError } = await client
+        .from('workout_plans')
+        .select('*')
+        .eq('id', genericPlanId)
+        .single();
+      if (genericPlanReadError) throw new Error(`read generic workout plan failed: ${genericPlanReadError.message}`);
+      assert.equal(genericPlan.status, 'planned', 'a totals-only generic plan must not beat the interval structure');
+      assert.equal(genericPlan.activity_session_id, null, 'the generic plan must remain unassociated');
 
       const { count: persistedLapCount } = await client
         .from('activity_laps')

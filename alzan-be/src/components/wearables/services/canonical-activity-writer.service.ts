@@ -46,6 +46,7 @@ type ExistingSessionMeta = {
   source: string | null;
   sport_type: string;
   endurance_template_id: string | null;
+  template_match_method: string | null;
   workout_template_id: string | null;
 };
 
@@ -120,7 +121,8 @@ export class CanonicalActivityWriterService {
           shouldRunStrengthTemplateMatch = existingMeta?.workout_template_id == null;
         } else {
           shouldRunEnduranceTemplateMatch =
-            !isStrengthSport(existingMeta?.sport_type) && existingMeta?.endurance_template_id == null;
+            !isStrengthSport(existingMeta?.sport_type) &&
+            (existingMeta?.endurance_template_id == null || existingMeta?.template_match_method === 'totals');
         }
       }
     } else if (isStrengthSport(input.activity.sportType)) {
@@ -226,7 +228,7 @@ export class CanonicalActivityWriterService {
     const { data, error } = await this.supabaseAdminService.client
       .from('activity_sessions')
       .select(
-        'sport_type, source, endurance_template_id, workout_template_id, duplicate_of_session_id, duplicate_resolution, duplicate_score',
+        'sport_type, source, endurance_template_id, template_match_method, workout_template_id, duplicate_of_session_id, duplicate_resolution, duplicate_score',
       )
       .eq('id', sessionId)
       .maybeSingle();

@@ -208,6 +208,19 @@ function assertExactSuuntoWorkoutMatchesCompleteTemplateSequence(): void {
   assert.ok(scoreStructuralMatch(activityStructure, templateStructure) >= STRONG_MATCH);
 }
 
+function assertFinalTopLevelRecoveryCanRepresentCooldown(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120).map(step =>
+    step.phaseType === 'cooldown' ? { ...step, phaseType: 'recovery' } : step,
+  );
+  const activityStructure = deriveTemplateDistanceMatchedActivityStructure(exactSuuntoWorkoutLaps(), steps);
+  assert.ok(activityStructure, 'expected a final top-level recovery phase to consume the 10 minute cooldown');
+  assert.deepEqual(activityStructure.alignment?.matchedLapIndexes, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(activityStructure.alignment?.extraLapIndexes, [10]);
+  const templateStructure = deriveTemplateStructure(steps);
+  assert.ok(templateStructure);
+  assert.ok(scoreStructuralMatch(activityStructure, templateStructure) >= STRONG_MATCH);
+}
+
 function boundedActivityLaps(reps: number, repDurationS = 290): ActivityLapLike[] {
   return [lap(1477, 600), ...intervalLaps(reps, 1000, repDurationS, 120), lap(1526, 600)];
 }
@@ -682,6 +695,7 @@ function assertBuildTemplateTotalsFallsBackToSteps(): void {
 
 assertExactIntervalsAreStrongStructuralMatch();
 assertExactSuuntoWorkoutMatchesCompleteTemplateSequence();
+assertFinalTopLevelRecoveryCanRepresentCooldown();
 assertPaceIsLaxWhenCompleteStructureMatches();
 assertBoundaryDifferenceAboveFortyPercentRejectsStructure();
 assertOneRepetitionDifferenceOnlyProducesSuggestion();

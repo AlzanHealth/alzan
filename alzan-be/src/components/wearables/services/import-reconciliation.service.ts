@@ -154,16 +154,19 @@ export class ImportReconciliationService {
 
   /**
    * Template matching for an imported endurance session. All same-sport
-   * templates are scored together so an equally plausible unplanned template
-   * can block an unsafe automatic association. >= 80 auto-associates (and
-   * completes the matching workout plan), 60-79 stores a suggestion, below
-   * stays generic. Also used by the review endpoint when the user keeps both
-   * duplicates.
+   * templates are evaluated, but a credible ordered interval structure takes
+   * precedence over totals-only similarity. Equally plausible structural
+   * templates still block an unsafe automatic association. >= 80
+   * auto-associates (and completes the matching workout plan), 60-79 stores a
+   * suggestion, below stays generic. Also used by the review endpoint when
+   * the user keeps both duplicates.
    */
   public async runEnduranceTemplateMatch(userId: string, sessionId: string): Promise<void> {
     const session = await this.getSession(userId, sessionId);
     if (!session || session.sport_type === 'strength') return;
-    if (session.endurance_template_id != null) return;
+    const isReevaluatingTotalsAssociation =
+      session.endurance_template_id != null && session.template_match_method === 'totals';
+    if (session.endurance_template_id != null && !isReevaluatingTotalsAssociation) return;
 
     const localDate = resolveActivityLocalDate({
       startTime: session.start_time,
@@ -184,20 +187,30 @@ export class ImportReconciliationService {
     );
     if (best == null || best.score < POSSIBLE_MATCH) return;
 
-    if (
+    const canAutoAssociate =
       best.score >= STRONG_MATCH &&
       best.signalCount >= 2 &&
       best.isAutoMatchEligible &&
       !best.planSelectionRequired &&
-      isMatchMarginSufficient(best.score, best.runnerUpScore)
-    ) {
-      if (best.plannedPlanId != null) {
+      isMatchMarginSufficient(best.score, best.runnerUpScore);
+    if (isReevaluatingTotalsAssociation && (best.method !== 'structural' || !canAutoAssociate)) return;
+
+    if (canAutoAssociate) {
+      if (best.plannedPlanId != null || isReevaluatingTotalsAssociation) {
+        if (isReevaluatingTotalsAssociation && best.templateId === session.endurance_template_id) {
+          await this.updateSession(sessionId, {
+            template_match_score: best.score,
+            template_match_method: best.method,
+            ...(session.name == null ? { name: best.templateName } : {}),
+          });
+          return;
+        }
         const { error } = await this.supabaseAdminService.client.rpc('associate_activity_session_template', {
           p_user_id: userId,
           p_session_id: sessionId,
           p_endurance_template_id: best.templateId,
           p_workout_template_id: undefined,
-          p_workout_plan_id: best.plannedPlanId,
+          p_workout_plan_id: best.plannedPlanId ?? undefined,
         });
         if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_ASSOCIATION_FAILED');
         await this.updateSession(sessionId, {
@@ -216,6 +229,7 @@ export class ImportReconciliationService {
       });
       return;
     }
+    if (isReevaluatingTotalsAssociation) return;
     await this.updateSession(sessionId, {
       suggested_endurance_template_id: best.templateId,
       template_match_score: best.score,
@@ -465,15 +479,23 @@ export class ImportReconciliationService {
         isAutoMatchEligible,
       });
     }
-    matches.sort(
+    // Structural and totals scores are not interchangeable evidence. Once a
+    // template proves the ordered work/recovery sequence, a generic workout
+    // with identical totals must not outrank it merely because its totals are
+    // numerically closer.
+    const credibleStructuralMatches = matches.filter(
+      match => match.method === 'structural' && match.score >= POSSIBLE_MATCH,
+    );
+    const rankedMatches = credibleStructuralMatches.length > 0 ? credibleStructuralMatches : matches;
+    rankedMatches.sort(
       (left, right) =>
         right.score - left.score ||
         Number(right.plannedPlanId != null) - Number(left.plannedPlanId != null) ||
         left.templateId.localeCompare(right.templateId),
     );
-    const best = matches[0] ?? null;
+    const best = rankedMatches[0] ?? null;
     if (!best) return null;
-    return { ...best, runnerUpScore: matches[1]?.score ?? null };
+    return { ...best, runnerUpScore: rankedMatches[1]?.score ?? null };
   }
 
   private toStepLike(step: EnduranceStepRow): EnduranceStepLike {
