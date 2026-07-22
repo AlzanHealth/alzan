@@ -89,6 +89,11 @@ const FIT_SESSION_MESSAGE_NUMBER = 18;
 const FIT_LAP_MESSAGE_NUMBER = 19;
 const FIT_RECORD_MESSAGE_NUMBER = 20;
 const FIT_ACTIVITY_MESSAGE_NUMBER = 34;
+const FIT_LAP_TRIGGER_FIELD_NUMBER = 24;
+const FIT_LAP_TRIGGER_MANUAL = 0;
+const FIT_LAP_TRIGGER_DURATION = 1;
+const FIT_LAP_TRIGGER_DISTANCE = 2;
+const FIT_LAP_TRIGGER_FITNESS_EQUIPMENT = 8;
 const FIT_EPOCH_OFFSET_SECONDS = 631065600;
 const FIT_INVALID_SINT32 = 2147483647;
 const FIT_SEMICIRCLES_TO_DEGREES = 180 / 2147483648;
@@ -631,9 +636,9 @@ function setLargest(
 }
 
 function mapFitLapTrigger(value: number | null): CanonicalActivityLap['lapType'] {
-  if (value === 0) return 'manual';
-  if (value === 1) return 'time';
-  if (value === 2) return 'distance';
+  if (value === FIT_LAP_TRIGGER_MANUAL || value === FIT_LAP_TRIGGER_FITNESS_EQUIPMENT) return 'manual';
+  if (value === FIT_LAP_TRIGGER_DURATION) return 'time';
+  if (value === FIT_LAP_TRIGGER_DISTANCE) return 'distance';
   return 'unknown';
 }
 
@@ -754,7 +759,7 @@ function parseFitDataMessage(
       if (field.fieldNumber === 13 && numericValue != null) lap.avgSpeedMps = numericValue / 1000;
       if (field.fieldNumber === 15 && numericValue != null) lap.avgHeartRate = numericValue;
       if (field.fieldNumber === 16 && numericValue != null) lap.maxHeartRate = numericValue;
-      if (field.fieldNumber === 26)
+      if (field.fieldNumber === FIT_LAP_TRIGGER_FIELD_NUMBER)
         lap.lapType = mapFitLapTrigger(numericValue != null ? Math.round(numericValue) : null);
     }
 

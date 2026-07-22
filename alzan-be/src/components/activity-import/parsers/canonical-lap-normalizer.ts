@@ -57,8 +57,12 @@ function isStandardDistanceMarker(lap: CanonicalActivityLap): boolean {
   );
 }
 
-function isAutolapDistanceMarker(lap: CanonicalActivityLap): boolean {
-  return isStandardDistanceMarker(lap) && (lap.lapType === 'distance' || lap.lapType === 'auto');
+function isAutoTriggeredLap(lap: CanonicalActivityLap): boolean {
+  return lap.lapType === 'distance' || lap.lapType === 'time' || lap.lapType === 'auto';
+}
+
+function isStandardAutolapMarker(lap: CanonicalActivityLap): boolean {
+  return isStandardDistanceMarker(lap) && isAutoTriggeredLap(lap);
 }
 
 function lapHasTiming(lap: CanonicalActivityLap): boolean {
@@ -164,17 +168,24 @@ function findFastPaceCluster(laps: CanonicalActivityLap[], minimumLaps: number):
   return new Set(work.map(entry => entry.lap));
 }
 
-function hasRepeatedWorkLaps(laps: CanonicalActivityLap[]): boolean {
+function findRepeatedWorkLaps(laps: CanonicalActivityLap[]): Set<CanonicalActivityLap> | null {
   const work = findFastPaceCluster(laps, MIN_PACE_CLUSTER_LAPS);
-  if (work == null) return false;
+  if (work == null) return null;
 
   const values = [...work]
     .map(lap => lap.distanceM ?? lap.durationSeconds)
     .filter((value): value is number => value != null && value > 0);
-  if (values.length < MIN_PACE_CLUSTER_LAPS) return false;
+  if (values.length < MIN_PACE_CLUSTER_LAPS) return null;
 
-  return values.some(
+  const repeatedTarget = values.find(
     target => values.filter(value => relativeDistance(value, target) <= 0.2).length >= MIN_PACE_CLUSTER_LAPS,
+  );
+  if (repeatedTarget == null) return null;
+  return new Set(
+    [...work].filter(lap => {
+      const value = lap.distanceM ?? lap.durationSeconds;
+      return value != null && relativeDistance(value, repeatedTarget) <= 0.2;
+    }),
   );
 }
 
@@ -205,11 +216,18 @@ export function normaliseCanonicalActivityLaps(
     workingLaps = workingLaps.filter((_, index) => !totalLikeMask[index]);
   }
 
+  const hasNativeLaps = workingLaps.some(lap => lap.lapType === 'manual');
+  const hasAutolaps = workingLaps.some(isAutoTriggeredLap);
+  if (hasNativeLaps && hasAutolaps) {
+    workingLaps = workingLaps.filter(lap => !isAutoTriggeredLap(lap));
+  }
+
   const standardDistanceMarkerMask = workingLaps.map(isStandardDistanceMarker);
   const standardLaps = workingLaps.filter((_, index) => standardDistanceMarkerMask[index]);
   const nonStandardLaps = workingLaps.filter((_, index) => !standardDistanceMarkerMask[index]);
   const hasStructuredNonStandardPartials = hasNonStandardIntervalSignal(nonStandardLaps);
-  const hasRepeatedNonStandardWork = hasStructuredNonStandardPartials && hasRepeatedWorkLaps(nonStandardLaps);
+  const repeatedNonStandardWorkLaps = hasStructuredNonStandardPartials ? findRepeatedWorkLaps(nonStandardLaps) : null;
+  const hasRepeatedNonStandardWork = repeatedNonStandardWorkLaps != null;
   const fastStandardWork = hasStructuredNonStandardPartials ? findFastPaceCluster(standardLaps, 2) : null;
   const hasSlowStandardLaps = fastStandardWork != null && fastStandardWork.size < standardLaps.length;
   const hasManualStandardWork =
@@ -222,16 +240,22 @@ export function normaliseCanonicalActivityLaps(
     workingLaps = workingLaps.filter((_, index) => !overlappedStandardMarkerMask[index]);
   } else if (hasRepeatedNonStandardWork) {
     workingLaps = workingLaps.filter(lap => {
-      if (!isStandardDistanceMarker(lap)) return true;
+      if (!isStandardDistanceMarker(lap)) {
+        return !isAutoTriggeredLap(lap) || repeatedNonStandardWorkLaps.has(lap);
+      }
+      if (isStandardAutolapMarker(lap)) return false;
       if (hasSlowStandardLaps && fastStandardWork?.has(lap)) return true;
       return false;
     });
   } else if (hasStructuredNonStandardPartials && (hasManualStandardWork || hasSlowStandardLaps)) {
     workingLaps = workingLaps.filter(lap => {
-      if (!isStandardDistanceMarker(lap)) return true;
+      if (!isStandardDistanceMarker(lap)) {
+        return !(hasSlowStandardLaps && isAutoTriggeredLap(lap));
+      }
+      if (isStandardAutolapMarker(lap)) return false;
       if (fastStandardWork?.has(lap)) return true;
       if (hasSlowStandardLaps) return false;
-      return !isAutolapDistanceMarker(lap);
+      return !isStandardAutolapMarker(lap);
     });
   }
 

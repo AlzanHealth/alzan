@@ -150,6 +150,11 @@ const FIT_LOCAL_MESSAGE_TYPES = 16;
 const FIT_LAP_MESSAGE_NUMBER = 19;
 const FIT_SESSION_MESSAGE_NUMBER = 18;
 const FIT_RECORD_MESSAGE_NUMBER = 20;
+const FIT_LAP_TRIGGER_FIELD_NUMBER = 24;
+const FIT_LAP_TRIGGER_MANUAL = 0;
+const FIT_LAP_TRIGGER_DURATION = 1;
+const FIT_LAP_TRIGGER_DISTANCE = 2;
+const FIT_LAP_TRIGGER_FITNESS_EQUIPMENT = 8;
 const FIT_EPOCH_OFFSET_SECONDS = 631065600;
 const FIT_INVALID_SINT32 = 2147483647;
 const FIT_SEMICIRCLES_TO_DEGREES = 180 / 2147483648;
@@ -1741,9 +1746,9 @@ function setFitSummaryOverride(
 function mapFitLapTriggerToLapType(triggerValue: number | null): RouteImportLap['lapType'] {
   if (triggerValue == null) return 'unknown';
 
-  if (triggerValue === 0) return 'manual';
-  if (triggerValue === 1) return 'time';
-  if (triggerValue === 2) return 'distance';
+  if (triggerValue === FIT_LAP_TRIGGER_MANUAL || triggerValue === FIT_LAP_TRIGGER_FITNESS_EQUIPMENT) return 'manual';
+  if (triggerValue === FIT_LAP_TRIGGER_DURATION) return 'time';
+  if (triggerValue === FIT_LAP_TRIGGER_DISTANCE) return 'distance';
 
   return 'unknown';
 }
@@ -1966,7 +1971,7 @@ function parseFitDataMessage(
         lapMaxHeartRate = numericValue;
       } else if (field.fieldNumber === 2 && numericValue != null) {
         lapStartTimestampSeconds = numericValue + FIT_EPOCH_OFFSET_SECONDS;
-      } else if (field.fieldNumber === 26 && numericValue != null) {
+      } else if (field.fieldNumber === FIT_LAP_TRIGGER_FIELD_NUMBER && numericValue != null) {
         lapType = mapFitLapTriggerToLapType(Math.round(numericValue));
       }
     }

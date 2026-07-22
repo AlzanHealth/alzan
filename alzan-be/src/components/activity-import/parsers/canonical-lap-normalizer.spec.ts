@@ -76,7 +76,7 @@ function assertUntimedAutolapsAreDroppedWhenStructured(): void {
 function assertStructuredWorkoutKeepsNativeSeriesAndRecoveries(): void {
   const normalised = normaliseCanonicalActivityLaps(
     [
-      lap({ lapIndex: 1, lapType: 'distance', distanceM: 1480, durationSeconds: 600 }),
+      lap({ lapIndex: 1, lapType: 'manual', distanceM: 1480, durationSeconds: 600 }),
       lap({ lapIndex: 2, lapType: 'manual', distanceM: 1000, durationSeconds: 294 }),
       lap({ lapIndex: 3, lapType: 'manual', distanceM: 190, durationSeconds: 120 }),
       lap({ lapIndex: 4, lapType: 'manual', distanceM: 1000, durationSeconds: 284 }),
@@ -85,7 +85,7 @@ function assertStructuredWorkoutKeepsNativeSeriesAndRecoveries(): void {
       lap({ lapIndex: 7, lapType: 'manual', distanceM: 173, durationSeconds: 120 }),
       lap({ lapIndex: 8, lapType: 'manual', distanceM: 1000, durationSeconds: 290 }),
       lap({ lapIndex: 9, lapType: 'manual', distanceM: 171, durationSeconds: 120 }),
-      lap({ lapIndex: 10, lapType: 'distance', distanceM: 1530, durationSeconds: 600 }),
+      lap({ lapIndex: 10, lapType: 'manual', distanceM: 1530, durationSeconds: 600 }),
       lap({ lapIndex: 11, lapType: 'manual', distanceM: 36, durationSeconds: 13.6 }),
     ],
     summary({ distanceM: 7740, durationSeconds: 2849.6 }),
@@ -221,6 +221,99 @@ function assertStructuredWorkoutDropsUntypedAutolapsForAnySeriesDistance(): void
   }
 }
 
+function assertFastAutolapDoesNotReplaceNativeFinalSeriesLap(): void {
+  const normalised = normaliseCanonicalActivityLaps(
+    [
+      lap({ lapIndex: 1, lapType: 'distance', distanceM: 1000, durationSeconds: 397.6 }),
+      lap({ lapIndex: 2, distanceM: 1477.4, durationSeconds: 600 }),
+      lap({ lapIndex: 3, lapType: 'distance', distanceM: 1000, durationSeconds: 363.6 }),
+      lap({ lapIndex: 4, distanceM: 1000, durationSeconds: 294.4 }),
+      lap({ lapIndex: 5, distanceM: 190.1, durationSeconds: 120 }),
+      lap({ lapIndex: 6, lapType: 'distance', distanceM: 1000, durationSeconds: 352.1 }),
+      lap({ lapIndex: 7, distanceM: 1000, durationSeconds: 284.4 }),
+      lap({ lapIndex: 8, distanceM: 163.1, durationSeconds: 120 }),
+      lap({ lapIndex: 9, lapType: 'distance', distanceM: 1000, durationSeconds: 361.2 }),
+      lap({ lapIndex: 10, distanceM: 1000, durationSeconds: 286.7 }),
+      lap({ lapIndex: 11, distanceM: 173.1, durationSeconds: 120 }),
+      lap({ lapIndex: 12, lapType: 'distance', distanceM: 1000, durationSeconds: 346.8 }),
+      lap({ lapIndex: 13, lapType: 'distance', distanceM: 1000, durationSeconds: 292.7 }),
+      lap({ lapIndex: 14, distanceM: 1000, durationSeconds: 289.6 }),
+      lap({ lapIndex: 15, distanceM: 171, durationSeconds: 120 }),
+      lap({ lapIndex: 16, distanceM: 1525.9, durationSeconds: 600 }),
+      lap({ lapIndex: 17, distanceM: 36, durationSeconds: 13.6 }),
+      lap({ lapIndex: 18, lapType: 'distance', distanceM: 739, durationSeconds: 309.3 }),
+    ],
+    summary({ distanceM: 7739, durationSeconds: 2850 }),
+  );
+
+  assert.deepEqual(
+    normalised.map(item => Math.round(item.distanceM ?? 0)),
+    [1477, 1000, 190, 1000, 163, 1000, 173, 1000, 171, 1526, 36],
+  );
+}
+
+function assertDurationAutolapIsDroppedFromStructuredIntervals(): void {
+  const normalised = normaliseCanonicalActivityLaps(
+    [
+      lap({ lapIndex: 1, lapType: 'time', distanceM: 500, durationSeconds: 180 }),
+      lap({ lapIndex: 2, lapType: 'manual', distanceM: 800, durationSeconds: 200 }),
+      lap({ lapIndex: 3, lapType: 'manual', distanceM: 200, durationSeconds: 120 }),
+      lap({ lapIndex: 4, lapType: 'manual', distanceM: 800, durationSeconds: 201 }),
+      lap({ lapIndex: 5, lapType: 'manual', distanceM: 200, durationSeconds: 120 }),
+      lap({ lapIndex: 6, lapType: 'manual', distanceM: 800, durationSeconds: 199 }),
+    ],
+    summary({ distanceM: 2800, durationSeconds: 760 }),
+  );
+
+  assert.deepEqual(
+    normalised.map(item => Math.round(item.distanceM ?? 0)),
+    [800, 200, 800, 200, 800],
+  );
+}
+
+function assertExplicitNativeLapsWinWithoutPaceSignal(): void {
+  const normalised = normaliseCanonicalActivityLaps(
+    [
+      lap({ lapIndex: 1, lapType: 'distance', distanceM: 1000, durationSeconds: 300 }),
+      lap({ lapIndex: 2, lapType: 'manual', distanceM: 1500, durationSeconds: 450 }),
+      lap({ lapIndex: 3, lapType: 'distance', distanceM: 1000, durationSeconds: 300 }),
+      lap({ lapIndex: 4, lapType: 'manual', distanceM: 750, durationSeconds: 225 }),
+      lap({ lapIndex: 5, lapType: 'manual', distanceM: 250, durationSeconds: 75 }),
+      lap({ lapIndex: 6, lapType: 'manual', distanceM: 750, durationSeconds: 225 }),
+      lap({ lapIndex: 7, lapType: 'manual', distanceM: 250, durationSeconds: 75 }),
+      lap({ lapIndex: 8, lapType: 'manual', distanceM: 750, durationSeconds: 225 }),
+      lap({ lapIndex: 9, lapType: 'time', distanceM: 500, durationSeconds: 150 }),
+    ],
+    summary({ distanceM: 4250, durationSeconds: 1275 }),
+  );
+
+  assert.deepEqual(
+    normalised.map(item => Math.round(item.distanceM ?? 0)),
+    [1500, 750, 250, 750, 250, 750],
+  );
+}
+
+function assertFastDurationAutolapsAreDroppedWhenNativeTriggersAreMissing(): void {
+  const normalised = normaliseCanonicalActivityLaps(
+    [
+      lap({ lapIndex: 1, lapType: 'time', distanceM: 1000, durationSeconds: 400 }),
+      lap({ lapIndex: 2, distanceM: 800, durationSeconds: 200 }),
+      lap({ lapIndex: 3, distanceM: 200, durationSeconds: 120 }),
+      lap({ lapIndex: 4, lapType: 'time', distanceM: 1000, durationSeconds: 242 }),
+      lap({ lapIndex: 5, distanceM: 800, durationSeconds: 201 }),
+      lap({ lapIndex: 6, distanceM: 200, durationSeconds: 120 }),
+      lap({ lapIndex: 7, lapType: 'time', distanceM: 1000, durationSeconds: 241 }),
+      lap({ lapIndex: 8, distanceM: 800, durationSeconds: 199 }),
+    ],
+    summary({ distanceM: 2800, durationSeconds: 840 }),
+  );
+
+  assert.deepEqual(
+    normalised.map(item => Math.round(item.distanceM ?? 0)),
+    [800, 200, 800, 200, 800],
+  );
+}
+
 function assertOneKilometerLapsRemainWhenThereAreNoStructuredPartials(): void {
   const normalised = normaliseCanonicalActivityLaps(
     [
@@ -237,17 +330,17 @@ function assertOneKilometerLapsRemainWhenThereAreNoStructuredPartials(): void {
   );
 }
 
-function assertRealOneKilometerSeriesRemainWhenAutolapTyped(): void {
+function assertRealOneKilometerSeriesRemainWhenNative(): void {
   const normalised = normaliseCanonicalActivityLaps(
     [
       lap({ lapIndex: 1, lapType: 'manual', distanceM: 1600, durationSeconds: 600 }),
-      lap({ lapIndex: 2, lapType: 'distance', distanceM: 1000, durationSeconds: 240 }),
+      lap({ lapIndex: 2, lapType: 'manual', distanceM: 1000, durationSeconds: 240 }),
       lap({ lapIndex: 3, lapType: 'manual', distanceM: 200, durationSeconds: 120 }),
-      lap({ lapIndex: 4, lapType: 'distance', distanceM: 1000, durationSeconds: 242 }),
+      lap({ lapIndex: 4, lapType: 'manual', distanceM: 1000, durationSeconds: 242 }),
       lap({ lapIndex: 5, lapType: 'manual', distanceM: 200, durationSeconds: 120 }),
-      lap({ lapIndex: 6, lapType: 'distance', distanceM: 1000, durationSeconds: 241 }),
+      lap({ lapIndex: 6, lapType: 'manual', distanceM: 1000, durationSeconds: 241 }),
       lap({ lapIndex: 7, lapType: 'manual', distanceM: 200, durationSeconds: 120 }),
-      lap({ lapIndex: 8, lapType: 'distance', distanceM: 1000, durationSeconds: 239 }),
+      lap({ lapIndex: 8, lapType: 'manual', distanceM: 1000, durationSeconds: 239 }),
       lap({ lapIndex: 9, lapType: 'manual', distanceM: 1530, durationSeconds: 600 }),
     ],
     summary({ distanceM: 7530, durationSeconds: 2382 }),
@@ -284,6 +377,10 @@ assertOverlappingKilometerMarkersDoNotHideOtherSeries();
 assertStructuredWorkoutDropsAutolapsButKeepsManualSeries();
 assertStructuredWorkoutDropsUntypedAutolapsButKeepsNativeSeries();
 assertStructuredWorkoutDropsUntypedAutolapsForAnySeriesDistance();
+assertFastAutolapDoesNotReplaceNativeFinalSeriesLap();
+assertDurationAutolapIsDroppedFromStructuredIntervals();
+assertExplicitNativeLapsWinWithoutPaceSignal();
+assertFastDurationAutolapsAreDroppedWhenNativeTriggersAreMissing();
 assertOneKilometerLapsRemainWhenThereAreNoStructuredPartials();
-assertRealOneKilometerSeriesRemainWhenAutolapTyped();
+assertRealOneKilometerSeriesRemainWhenNative();
 assertRepeatedUntimedRecoveriesRemain();
