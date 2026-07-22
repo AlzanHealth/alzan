@@ -461,8 +461,8 @@ FROM (
     NULL::text,
     NULL::text,
     NULL::text,
-    tuesday,
-    tuesday + 7
+    tuesday - 7,
+    tuesday + 6
   FROM next_days
 ) templates;
 

@@ -61,6 +61,7 @@ import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { formatPaceTime } from '../../utils/unitConversionUtils';
 import {
   calculateProgressionWeeks,
+  calculateStartDateFromEndAndWeeks,
   EligibleProgressionStep,
   ensureStepProgressionKeys,
   getEligibleProgressionSteps,
@@ -692,8 +693,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   const getRecurrenceStartDateForSave = (scheduledDay: number | null): string | null => {
     if (!isRecurring || scheduledDay === null) return null;
-    if (recurrenceStartDate && originalScheduledDay === scheduledDay) {
+    if (recurrenceStartDate) {
       return recurrenceStartDate;
+    }
+    const weeks = parseInt(recurrenceWeeks, 10);
+    if (recurrenceEndDate.trim() && !isNaN(weeks) && weeks >= 1) {
+      const calculatedStart = calculateStartDateFromEndAndWeeks(recurrenceEndDate.trim(), weeks);
+      if (calculatedStart) return calculatedStart;
     }
     return getNextScheduledDateString(new Date(), scheduledDay);
   };
@@ -3179,6 +3185,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         setRecurrenceStartDate(null);
                         setStepProgressions([]);
                         setProgressionPicker(null);
+                      } else if (!recurrenceWeeks) {
+                        setRecurrenceWeeks('2');
                       }
                     }}
                     singleSelect={true}

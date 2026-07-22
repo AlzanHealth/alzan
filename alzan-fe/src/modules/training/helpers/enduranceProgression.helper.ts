@@ -69,6 +69,18 @@ export const getNextScheduledDateString = (fromDate: Date, dayOfWeek: number): s
   return format(addDays(normalizedFromDate, daysUntilTarget), 'yyyy-MM-dd');
 };
 
+export const calculateStartDateFromEndAndWeeks = (
+  endDateStr: string | null | undefined,
+  weeks: number,
+): string | null => {
+  if (!endDateStr || !weeks || weeks < 1) return null;
+  const endDate = parseDateOnly(endDateStr);
+  if (!endDate) return null;
+
+  const startDate = addDays(endDate, -(weeks * 7 - 1));
+  return format(startDate, 'yyyy-MM-dd');
+};
+
 export const calculateProgressionWeeks = (
   startDateStr: string | null | undefined,
   endDateStr: string | null | undefined,
@@ -133,6 +145,7 @@ export const getEligibleProgressionSteps = (
 ): EligibleProgressionStep[] => {
   if (!isStructuredProgressionSport(sportType)) return [];
 
+  const stepsWithKeys = ensureStepProgressionKeys(steps);
   const eligibleSteps: EligibleProgressionStep[] = [];
 
   const visit = (stepList: ProgressionBuilderStep[], parentPath = '') => {
@@ -147,7 +160,7 @@ export const getEligibleProgressionSteps = (
     });
   };
 
-  visit(steps);
+  visit(stepsWithKeys);
   return eligibleSteps;
 };
 

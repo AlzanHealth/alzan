@@ -268,6 +268,9 @@ async function main(): Promise<void> {
             'Plantilla de series: Calentamiento 15min Zona 2 + 6x (400m a 4:00/km + 2min rec) + 10min enfriamiento.',
           total_distance_m: 2400,
           total_duration_s: 2796,
+          scheduled_day: 2,
+          recurrence_start_date: dayAt(7, 0).slice(0, 10),
+          recurrence_end_date: dayAt(-6, 0).slice(0, 10),
         },
       ])
     ).error,
