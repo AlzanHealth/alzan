@@ -10,6 +10,7 @@ export type ImportReviewDetailStep =
   | 'strength_assignment'
   | 'watch_metrics'
   | 'suggested_template'
+  | 'deferred_template'
   | 'planned_routine'
   | 'template_management'
   | 'resolved';
@@ -118,7 +119,9 @@ export const getImportReviewDetailState = ({
     return { priority: 'blocking', mainStep: 'watch_metrics', hasWeakDuplicateNotice, duplicateScore };
   }
   if (!associatedTemplateId && hasSuggestedTemplate) {
-    return { priority: 'soft', mainStep: 'suggested_template', hasWeakDuplicateNotice, duplicateScore };
+    const mainStep: ImportReviewDetailStep =
+      session.template_suggestion_deferred_at == null ? 'suggested_template' : 'deferred_template';
+    return { priority: 'soft', mainStep, hasWeakDuplicateNotice, duplicateScore };
   }
   if (!associatedTemplateId && hasPlannedRoutine) {
     return { priority: 'soft', mainStep: 'planned_routine', hasWeakDuplicateNotice, duplicateScore };

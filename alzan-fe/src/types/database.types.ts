@@ -493,6 +493,7 @@ export type Database = {
           surface: string | null;
           template_match_method: Database['public']['Enums']['import_match_method_enum'] | null;
           template_match_score: number | null;
+          template_suggestion_deferred_at: string | null;
           timezone: string | null;
           total_reps: number | null;
           total_sets: number | null;
@@ -576,6 +577,7 @@ export type Database = {
           surface?: string | null;
           template_match_method?: Database['public']['Enums']['import_match_method_enum'] | null;
           template_match_score?: number | null;
+          template_suggestion_deferred_at?: string | null;
           timezone?: string | null;
           total_reps?: number | null;
           total_sets?: number | null;
@@ -659,6 +661,7 @@ export type Database = {
           surface?: string | null;
           template_match_method?: Database['public']['Enums']['import_match_method_enum'] | null;
           template_match_score?: number | null;
+          template_suggestion_deferred_at?: string | null;
           timezone?: string | null;
           total_reps?: number | null;
           total_sets?: number | null;
@@ -5073,6 +5076,7 @@ export type Database = {
           surface: string | null;
           template_match_method: Database['public']['Enums']['import_match_method_enum'] | null;
           template_match_score: number | null;
+          template_suggestion_deferred_at: string | null;
           timezone: string | null;
           total_reps: number | null;
           total_sets: number | null;

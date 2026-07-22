@@ -243,6 +243,80 @@ async function main(): Promise<void> {
       pass('endurance do-nothing: both survive, stays pending');
     }
 
+    // --- Endurance DEFER SUGGESTION: preserve, reset on change/link, never duplicate ---
+    {
+      const firstTemplateId = randomUUID();
+      const secondTemplateId = randomUUID();
+      createdTemplateIds.add(firstTemplateId);
+      createdTemplateIds.add(secondTemplateId);
+      const { error: templateError } = await client.from('endurance_workout_templates').insert([
+        {
+          id: firstTemplateId,
+          user_id: userId,
+          base_name: 'Deferred suggestion A',
+          sport_type: 'running',
+        },
+        {
+          id: secondTemplateId,
+          user_id: userId,
+          base_name: 'Deferred suggestion B',
+          sport_type: 'running',
+        },
+      ]);
+      if (templateError) throw new Error(`insert deferred templates failed: ${templateError.message}`);
+      const sessionId = await insertSession({
+        sport_type: 'running',
+        suggested_endurance_template_id: firstTemplateId,
+        template_match_score: 79,
+        template_match_method: 'structural',
+      });
+      const { count: sessionsBefore } = await client
+        .from('activity_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      await review.deferSuggestion(userId, sessionId);
+      const deferred = await getSession(sessionId);
+      assert.equal(deferred.suggested_endurance_template_id, firstTemplateId, 'defer keeps the suggestion');
+      assert.equal(deferred.template_match_score, 79, 'defer keeps the score');
+      assert.equal(typeof deferred.template_suggestion_deferred_at, 'string', 'defer stores a timestamp');
+      const deferredAt = deferred.template_suggestion_deferred_at;
+
+      const { error: sameSuggestionError } = await client
+        .from('activity_sessions')
+        .update({ suggested_endurance_template_id: firstTemplateId, template_match_score: 78 })
+        .eq('id', sessionId);
+      if (sameSuggestionError) throw new Error(`refresh same suggestion failed: ${sameSuggestionError.message}`);
+      assert.equal(
+        (await getSession(sessionId)).template_suggestion_deferred_at,
+        deferredAt,
+        'recalculating the same suggestion preserves the defer state',
+      );
+
+      const { error: changedSuggestionError } = await client
+        .from('activity_sessions')
+        .update({ suggested_endurance_template_id: secondTemplateId })
+        .eq('id', sessionId);
+      if (changedSuggestionError) throw new Error(`change suggestion failed: ${changedSuggestionError.message}`);
+      assert.equal(
+        (await getSession(sessionId)).template_suggestion_deferred_at,
+        null,
+        'a different suggestion becomes prominent again',
+      );
+
+      await review.deferSuggestion(userId, sessionId);
+      await review.associateTemplate(userId, sessionId, { enduranceTemplateId: secondTemplateId });
+      const associated = await getSession(sessionId);
+      assert.equal(associated.endurance_template_id, secondTemplateId, 'the selected template is associated');
+      assert.equal(associated.template_suggestion_deferred_at, null, 'association clears the defer state');
+      const { count: sessionsAfter } = await client
+        .from('activity_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      assert.equal(sessionsAfter, sessionsBefore, 'defer and association do not create another session');
+      pass('endurance deferred suggestion: persistent, reset safely, no duplicate session');
+    }
+
     // --- Endurance SERIES MATCH: exact ordered phases auto-link one existing session ---
     {
       const templateId = randomUUID();

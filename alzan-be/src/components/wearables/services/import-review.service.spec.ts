@@ -413,10 +413,59 @@ async function assertReviewNoOpsAreIdempotentOnResolvedState(): Promise<void> {
   const service = createService(client, reconciliation);
 
   assert.equal(await service.dismissSuggestion('user-1', 'resolved-session'), 'resolved-session');
+  assert.equal(await service.deferSuggestion('user-1', 'resolved-session'), 'resolved-session');
   assert.equal(await service.keepWatchMetrics('user-1', 'resolved-session'), 'resolved-session');
   assert.equal(await service.revertWatchMetrics('user-1', 'resolved-session'), 'resolved-session');
   assert.equal(await service.keepBothDuplicates('user-1', 'resolved-session'), 'resolved-session');
   assert.deepEqual(reconciliation.templateMatches, []);
+}
+
+async function assertDeferSuggestionPreservesSuggestionAndIsIdempotent(): Promise<void> {
+  const client = createFakeSupabaseClient({
+    activity_sessions: [
+      baseSession({
+        id: 'suggested-session',
+        suggested_endurance_template_id: 'template-1',
+        template_match_score: 79,
+        template_match_method: 'structure',
+        template_suggestion_deferred_at: null,
+      }),
+    ],
+  });
+  const service = createService(client);
+
+  const sessionId = await service.deferSuggestion('user-1', 'suggested-session');
+  const deferredAt = client.rows.activity_sessions[0].template_suggestion_deferred_at;
+
+  assert.equal(sessionId, 'suggested-session');
+  assert.equal(client.rows.activity_sessions[0].suggested_endurance_template_id, 'template-1');
+  assert.equal(client.rows.activity_sessions[0].template_match_score, 79);
+  assert.equal(client.rows.activity_sessions[0].template_match_method, 'structure');
+  assert.equal(typeof deferredAt, 'string');
+  assert.equal(Number.isNaN(Date.parse(deferredAt as string)), false);
+
+  assert.equal(await service.deferSuggestion('user-1', 'suggested-session'), 'suggested-session');
+  assert.equal(client.updates.length, 1);
+  assert.equal(client.rows.activity_sessions[0].template_suggestion_deferred_at, deferredAt);
+}
+
+async function assertDeferSuggestionRejectsUnownedSession(): Promise<void> {
+  const service = createService(
+    createFakeSupabaseClient({
+      activity_sessions: [
+        baseSession({
+          id: 'another-users-session',
+          user_id: 'user-2',
+          suggested_endurance_template_id: 'template-1',
+        }),
+      ],
+    }),
+  );
+
+  await assert.rejects(
+    () => service.deferSuggestion('user-1', 'another-users-session'),
+    (error: unknown) => error instanceof NotFoundException,
+  );
 }
 
 async function assertExpiredWatchMetricsCleanupKeepsCurrentWatchValues(): Promise<void> {
@@ -484,6 +533,8 @@ async function run(): Promise<void> {
   await assertAssociateEnduranceTemplateDoesNotReplaceAmbiguousSameSportPlans();
   await assertAssignStrengthIsIdempotentWhenSourceWasDeleted();
   await assertReviewNoOpsAreIdempotentOnResolvedState();
+  await assertDeferSuggestionPreservesSuggestionAndIsIdempotent();
+  await assertDeferSuggestionRejectsUnownedSession();
   await assertExpiredWatchMetricsCleanupKeepsCurrentWatchValues();
   await assertExpiredWatchMetricsRevertKeepsWatchValues();
 }

@@ -584,6 +584,31 @@
         "tags": ["Activity import review"]
       }
     },
+    "/activity-sessions/{id}/template-suggestion/defer": {
+      "post": {
+        "operationId": "deferSuggestion",
+        "parameters": [{ "name": "id", "required": true, "in": "path", "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewTargetInputDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ImportReviewSessionOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Activity import review"]
+      }
+    },
     "/activity-sessions/{id}/duplicate/merge": {
       "post": {
         "operationId": "mergeDuplicate",

@@ -52,12 +52,16 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   const [templatePickerVisible, setTemplatePickerVisible] = useState(false);
   const [plannedRoutineDismissed, setPlannedRoutineDismissed] = useState(false);
   const [reviewActionCompleted, setReviewActionCompleted] = useState(false);
+  const [suggestionDeferredLocally, setSuggestionDeferredLocally] = useState(
+    session.template_suggestion_deferred_at != null,
+  );
 
   const isStrength = session.sport_type === 'strength';
   const sportLabel = t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype));
   const reviewActionPending =
     review.associateTemplate.isPending ||
     review.dismissSuggestion.isPending ||
+    review.deferSuggestion.isPending ||
     review.mergeDuplicate.isPending ||
     review.keepBothDuplicates.isPending ||
     review.revertWatchMetrics.isPending ||
@@ -76,7 +80,12 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
     session.needs_strength_review,
     session.pending_watch_metrics,
     session.suggested_endurance_template_id,
+    session.template_suggestion_deferred_at,
   ]);
+
+  useEffect(() => {
+    setSuggestionDeferredLocally(session.template_suggestion_deferred_at != null);
+  }, [session.id, session.suggested_endurance_template_id, session.template_suggestion_deferred_at]);
 
   const showError = (err: unknown) => {
     console.error('Import review action error:', err);
@@ -312,11 +321,11 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
     );
   };
 
-  const handleDismissSuggestion = () => {
-    review.dismissSuggestion.mutate(
+  const handleDeferSuggestion = () => {
+    review.deferSuggestion.mutate(
       {},
       {
-        onSuccess: handleReviewActionSuccess,
+        onSuccess: () => setSuggestionDeferredLocally(true),
         onError: showError,
       },
     );
@@ -468,7 +477,10 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
   const showWeakDuplicateNotice = reviewState.hasWeakDuplicateNotice;
   const showNeedsReview = reviewState.mainStep === 'strength_assignment';
   const showConflict = reviewState.mainStep === 'watch_metrics';
-  const showSuggestedTemplate = reviewState.mainStep === 'suggested_template';
+  const showSuggestedTemplate = reviewState.mainStep === 'suggested_template' && !suggestionDeferredLocally;
+  const showDeferredTemplate =
+    reviewState.mainStep === 'deferred_template' ||
+    (reviewState.mainStep === 'suggested_template' && suggestionDeferredLocally);
   const showPlannedRoutine = reviewState.mainStep === 'planned_routine';
   const showTemplateBlock = reviewState.mainStep === 'template_management';
 
@@ -795,26 +807,64 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
               <Text style={[styles.bulletDot, { color: themeColors.textSecondary }]}>•</Text>
               <Text style={[styles.bulletText, { color: themeColors.textPrimary }]}>
                 <Text style={{ fontWeight: '700' }}>{t('training.importKeepGeneric')}:</Text>{' '}
-                {t('training.importDismissSuggestionHint')}
+                {t('training.importKeepGenericHint')}
               </Text>
             </View>
           </View>
 
-          <View style={styles.buttonRow}>
+          <View style={styles.actionStack}>
             <PrimaryButton
               title={t('training.importAssociateToTemplate')}
               onPress={() => handleAssociateTemplate(suggestedTemplate.id)}
               loading={review.associateTemplate.isPending}
               disabled={reviewActionPending || reviewActionCompleted}
-              style={styles.rowButton}
+              style={styles.fullWidthButton}
+            />
+            <PrimaryButton
+              title={t('training.importChooseAnotherTemplate')}
+              onPress={handleOpenTemplatePicker}
+              disabled={reviewActionPending || reviewActionCompleted}
+              variant="outline"
+              style={styles.fullWidthButton}
             />
             <PrimaryButton
               title={t('training.importKeepGeneric')}
-              onPress={handleDismissSuggestion}
-              loading={review.dismissSuggestion.isPending}
+              onPress={handleDeferSuggestion}
+              loading={review.deferSuggestion.isPending}
               disabled={reviewActionPending || reviewActionCompleted}
               variant="outline"
-              style={styles.rowButton}
+              style={styles.fullWidthButton}
+              textStyle={{ color: themeColors.textSecondary }}
+            />
+          </View>
+        </GlassCard>
+      )}
+
+      {showDeferredTemplate && suggestedTemplate && (
+        <GlassCard style={styles.blockCard}>
+          {renderHeader(
+            <Sparkles size={18} color={themeColors.textSecondary} />,
+            themeColors.textSecondary,
+            t('training.importDeferredTemplateTitle'),
+            t('training.importDeferredTemplateHint', { templateName: suggestedTemplate.name }),
+            session.template_match_score != null ? `${Math.round(session.template_match_score)}%` : undefined,
+          )}
+          <View style={styles.actionStack}>
+            <PrimaryButton
+              title={t('training.importLinkSuggestedTemplate')}
+              onPress={() => handleAssociateTemplate(suggestedTemplate.id)}
+              loading={review.associateTemplate.isPending}
+              disabled={reviewActionPending || reviewActionCompleted}
+              variant="outline"
+              style={styles.fullWidthButton}
+            />
+            <PrimaryButton
+              title={t('training.importChooseAnotherTemplate')}
+              onPress={handleOpenTemplatePicker}
+              disabled={reviewActionPending || reviewActionCompleted}
+              variant="outline"
+              style={styles.fullWidthButton}
+              textStyle={{ color: themeColors.textSecondary }}
             />
           </View>
         </GlassCard>
@@ -967,6 +1017,10 @@ const styles = StyleSheet.create({
   },
   actionStack: {
     gap: spacing.s,
+  },
+  fullWidthButton: {
+    width: '100%',
+    borderRadius: borderRadius.m,
   },
   actionTile: {
     minHeight: 62,

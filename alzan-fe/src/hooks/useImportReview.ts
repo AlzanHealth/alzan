@@ -78,6 +78,19 @@ export const useImportReview = (sessionId?: string) => {
     onSuccess: invalidate,
   });
 
+  const deferSuggestion = useMutation({
+    mutationFn: ({ targetSessionId }: ReviewActionTarget = {}) => {
+      if (!sessionId) throw new Error('SESSION_REQUIRED');
+      return run(
+        ActivityImportReview.deferSuggestion({
+          path: { id: sessionId },
+          body: { target_session_id: targetSessionId },
+        }),
+      );
+    },
+    onSuccess: invalidate,
+  });
+
   const mergeDuplicate = useMutation({
     mutationFn: ({ targetSessionId }: { targetSessionId?: string } = {}) => {
       if (!sessionId) throw new Error('SESSION_REQUIRED');
@@ -148,6 +161,7 @@ export const useImportReview = (sessionId?: string) => {
   return {
     associateTemplate,
     dismissSuggestion,
+    deferSuggestion,
     mergeDuplicate,
     keepBothDuplicates,
     revertWatchMetrics,

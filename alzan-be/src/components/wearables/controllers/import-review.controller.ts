@@ -49,6 +49,18 @@ export class ImportReviewController {
     };
   }
 
+  @Post(':id/template-suggestion/defer')
+  @ApiOkResponse({ type: ImportReviewSessionOutputDto })
+  public async deferSuggestion(
+    @UserContext() ctx: UserCtx,
+    @Param('id', ParseUUIDPipe) sessionId: string,
+    @Body() body: ImportReviewTargetInputDto = {},
+  ): Promise<ImportReviewSessionOutputDto> {
+    return {
+      session_id: await this.importReviewService.deferSuggestion(ctx.user.id, sessionId, body.target_session_id),
+    };
+  }
+
   @Post(':id/duplicate/merge')
   @ApiOkResponse({ type: ImportReviewSessionOutputDto })
   public async mergeDuplicate(

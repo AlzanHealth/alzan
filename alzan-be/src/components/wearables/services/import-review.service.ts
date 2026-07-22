@@ -121,6 +121,16 @@ export class ImportReviewService {
     return session.id;
   }
 
+  /** Keeps the current suggestion available while lowering its review priority. */
+  public async deferSuggestion(userId: string, sessionId: string, targetSessionId?: string): Promise<string> {
+    const session = await this.getCanonicalActionSession(userId, sessionId, targetSessionId);
+    if (session.suggested_endurance_template_id == null || session.template_suggestion_deferred_at != null) {
+      return session.id;
+    }
+    await this.updateSession(session.id, { template_suggestion_deferred_at: new Date().toISOString() });
+    return session.id;
+  }
+
   /**
    * Merges the imported session into the existing one. The existing session
    * survives (keeping its template/plan and, for strength, its sets); watch

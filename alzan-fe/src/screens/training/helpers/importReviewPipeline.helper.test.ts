@@ -128,6 +128,31 @@ assert.equal(
 
 assert.equal(
   getImportReviewDetailState({
+    session: session({ template_suggestion_deferred_at: '2026-07-22T13:00:00.000Z' }),
+    reviewActionCompleted: false,
+    hasSuggestedTemplate: true,
+    hasPlannedRoutine: false,
+    associatedTemplateId: null,
+  }).mainStep,
+  'deferred_template',
+);
+
+assert.equal(
+  getImportReviewDetailState({
+    session: session({
+      endurance_template_id: 'template-1',
+      template_suggestion_deferred_at: '2026-07-22T13:00:00.000Z',
+    }),
+    reviewActionCompleted: false,
+    hasSuggestedTemplate: true,
+    hasPlannedRoutine: false,
+    associatedTemplateId: 'template-1',
+  }).mainStep,
+  'template_management',
+);
+
+assert.equal(
+  getImportReviewDetailState({
     session: session({ duplicate_resolution: 'pending', duplicate_of_session_id: 'existing', duplicate_score: 25 }),
     reviewActionCompleted: false,
     hasSuggestedTemplate: true,
