@@ -7,6 +7,8 @@ const SUMMARY_LAP_DURATION_TOLERANCE_S = 5;
 const MIN_DEMONSTRABLE_OVERLAP_SECONDS = 1;
 const MIN_INTERVAL_SIGNAL_LAPS = 4;
 const MIN_INTERVAL_PACE_SPREAD = 0.25;
+const MIN_PACE_CLUSTER_LAPS = 3;
+const MIN_PACE_CLUSTER_SEPARATION = 0.1;
 
 function valuesAreClose(value: number, target: number, tolerance: number): boolean {
   return Math.abs(value - target) <= tolerance;
@@ -128,24 +130,52 @@ function hasNonStandardIntervalSignal(laps: CanonicalActivityLap[]): boolean {
   return (maxPace - minPace) / medianPace >= MIN_INTERVAL_PACE_SPREAD;
 }
 
-function hasRepeatedWorkLaps(laps: CanonicalActivityLap[]): boolean {
+function findFastPaceCluster(laps: CanonicalActivityLap[], minimumLaps: number): Set<CanonicalActivityLap> | null {
   const paced = laps
     .map(lap => ({ lap, pace: lapPaceSecondsPerKm(lap) }))
     .filter((entry): entry is { lap: CanonicalActivityLap; pace: number } => entry.pace != null && entry.pace > 0);
-  if (paced.length < MIN_INTERVAL_SIGNAL_LAPS) return false;
+  if (paced.length < minimumLaps + 1) return null;
 
-  const minPace = Math.min(...paced.map(entry => entry.pace));
-  const maxPace = Math.max(...paced.map(entry => entry.pace));
-  const paceThreshold = (minPace + maxPace) / 2;
-  const work = paced.filter(entry => entry.pace <= paceThreshold);
-  if (work.length < 3) return false;
+  const ordered = [...paced].sort((left, right) => left.pace - right.pace);
+  let splitIndex = -1;
+  let largestRelativeGap = 0;
+  for (let index = 0; index < ordered.length - 1; index += 1) {
+    const leftPace = ordered[index]?.pace ?? 0;
+    const rightPace = ordered[index + 1]?.pace ?? 0;
+    if (leftPace <= 0) continue;
+    const relativeGap = (rightPace - leftPace) / leftPace;
+    if (relativeGap > largestRelativeGap) {
+      largestRelativeGap = relativeGap;
+      splitIndex = index;
+    }
+  }
 
-  const values = work
-    .map(entry => entry.lap.distanceM ?? entry.lap.durationSeconds)
+  if (
+    splitIndex < minimumLaps - 1 ||
+    splitIndex >= ordered.length - 1 ||
+    largestRelativeGap < MIN_PACE_CLUSTER_SEPARATION
+  )
+    return null;
+  const work = ordered.slice(0, splitIndex + 1);
+  const workPaces = work.map(entry => entry.pace);
+  const medianPace = workPaces.slice().sort((left, right) => left - right)[Math.floor(workPaces.length / 2)];
+  if (medianPace == null || medianPace <= 0) return null;
+
+  return new Set(work.map(entry => entry.lap));
+}
+
+function hasRepeatedWorkLaps(laps: CanonicalActivityLap[]): boolean {
+  const work = findFastPaceCluster(laps, MIN_PACE_CLUSTER_LAPS);
+  if (work == null) return false;
+
+  const values = [...work]
+    .map(lap => lap.distanceM ?? lap.durationSeconds)
     .filter((value): value is number => value != null && value > 0);
-  if (values.length < 3) return false;
+  if (values.length < MIN_PACE_CLUSTER_LAPS) return false;
 
-  return values.some(target => values.filter(value => relativeDistance(value, target) <= 0.2).length >= 3);
+  return values.some(
+    target => values.filter(value => relativeDistance(value, target) <= 0.2).length >= MIN_PACE_CLUSTER_LAPS,
+  );
 }
 
 function relativeDistance(value: number, target: number): number {
@@ -176,20 +206,33 @@ export function normaliseCanonicalActivityLaps(
   }
 
   const standardDistanceMarkerMask = workingLaps.map(isStandardDistanceMarker);
+  const standardLaps = workingLaps.filter((_, index) => standardDistanceMarkerMask[index]);
   const nonStandardLaps = workingLaps.filter((_, index) => !standardDistanceMarkerMask[index]);
   const hasStructuredNonStandardPartials = hasNonStandardIntervalSignal(nonStandardLaps);
   const hasRepeatedNonStandardWork = hasStructuredNonStandardPartials && hasRepeatedWorkLaps(nonStandardLaps);
+  const fastStandardWork = hasStructuredNonStandardPartials ? findFastPaceCluster(standardLaps, 2) : null;
+  const hasSlowStandardLaps = fastStandardWork != null && fastStandardWork.size < standardLaps.length;
   const hasManualStandardWork =
     workingLaps.filter((lap, index) => standardDistanceMarkerMask[index] && lap.lapType === 'manual').length >= 2;
   const overlappedStandardMarkerMask = workingLaps.map(
     (lap, index) =>
       standardDistanceMarkerMask[index] && nonStandardLaps.some(nonStandardLap => lapsOverlap(lap, nonStandardLap)),
   );
-
   if (overlappedStandardMarkerMask.some(Boolean)) {
     workingLaps = workingLaps.filter((_, index) => !overlappedStandardMarkerMask[index]);
-  } else if (hasRepeatedNonStandardWork || (hasStructuredNonStandardPartials && hasManualStandardWork)) {
-    workingLaps = workingLaps.filter(lap => !isAutolapDistanceMarker(lap));
+  } else if (hasRepeatedNonStandardWork) {
+    workingLaps = workingLaps.filter(lap => {
+      if (!isStandardDistanceMarker(lap)) return true;
+      if (hasSlowStandardLaps && fastStandardWork?.has(lap)) return true;
+      return false;
+    });
+  } else if (hasStructuredNonStandardPartials && (hasManualStandardWork || hasSlowStandardLaps)) {
+    workingLaps = workingLaps.filter(lap => {
+      if (!isStandardDistanceMarker(lap)) return true;
+      if (fastStandardWork?.has(lap)) return true;
+      if (hasSlowStandardLaps) return false;
+      return !isAutolapDistanceMarker(lap);
+    });
   }
 
   const aggregateLapMask = workingLaps.map(lap => isAggregateLap(lap, workingLaps));

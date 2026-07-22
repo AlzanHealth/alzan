@@ -479,22 +479,23 @@ export class CanonicalActivityWriterService {
       raw_payload_id: input.provenance.rawPayloadId ?? null,
     }));
     const providerFields = this.buildProviderFieldsPayload(sessionId, input.userId, input.activity, input.provenance);
-    const { error } = await this.supabaseAdminService.client.rpc('persist_wearable_activity_bundle', {
+    const lapRows = this.buildLapRows(sessionId, input.userId, input.activity);
+    const heartRateZones = input.activity.heartRateZones.map(zone => ({
+      session_id: sessionId,
+      zone: zone.zone,
+      duration_s: zone.durationSeconds,
+      percentage: Number.parseFloat(Math.max(0, Math.min(100, zone.percentage)).toFixed(2)),
+    }));
+    const streams = this.buildStreamRows(sessionId, input.userId, input.activity, input.provenance);
+    const baseBundle = {
       p_user_id: input.userId,
       p_session_id: sessionId,
       p_session_payload: this.toJson(params.sessionPayload),
       p_clear_provenance_session_id: (params.clearProvenanceSessionId ?? null) as string,
       p_replace_laps: params.replaceLaps,
-      p_laps: this.toJson(this.buildLapRows(sessionId, input.userId, input.activity)),
-      p_heart_rate_zones: this.toJson(
-        input.activity.heartRateZones.map(zone => ({
-          session_id: sessionId,
-          zone: zone.zone,
-          duration_s: zone.durationSeconds,
-          percentage: Number.parseFloat(Math.max(0, Math.min(100, zone.percentage)).toFixed(2)),
-        })),
-      ),
-      p_streams: this.toJson(this.buildStreamRows(sessionId, input.userId, input.activity, input.provenance)),
+      p_laps: this.toJson(lapRows),
+      p_heart_rate_zones: this.toJson(heartRateZones),
+      p_streams: this.toJson(streams),
       p_stream_samples: [],
       p_route_points: [],
       p_route_polyline:
@@ -506,10 +507,40 @@ export class CanonicalActivityWriterService {
       p_import_id: (input.lifecycleImportId ?? null) as string,
       p_job_id: (input.lifecycleJobId ?? null) as string,
       p_canonical_version: input.canonicalVersion ?? input.activity.hydrationVersion ?? 1,
-    });
-    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_BUNDLE_PERSIST_FAILED');
+    };
+    let usedGenericFallback = false;
+    let { error } = await this.supabaseAdminService.client.rpc('persist_wearable_activity_bundle', baseBundle);
+    if (error) {
+      this.logBundlePersistError('full', sessionId, error);
+      const genericBundle = {
+        ...baseBundle,
+        p_heart_rate_zones: [],
+        p_streams: [],
+        p_route_polyline: null as unknown as string,
+        p_laps: this.toJson(lapRows),
+      };
+      ({ error } = await this.supabaseAdminService.client.rpc('persist_wearable_activity_bundle', genericBundle));
+      usedGenericFallback = !error;
+      if (error) {
+        this.logBundlePersistError('laps', sessionId, error);
+        ({ error } = await this.supabaseAdminService.client.rpc('persist_wearable_activity_bundle', {
+          ...genericBundle,
+          p_laps: [],
+        }));
+        usedGenericFallback = !error;
+      }
+      if (usedGenericFallback) {
+        this.logger.warn(`Persisted generic wearable activity fallback for session ${sessionId}`);
+      }
+    }
+    if (error) {
+      this.logBundlePersistError('summary', sessionId, error);
+      throw new InternalServerErrorException('WEARABLE_ACTIVITY_BUNDLE_PERSIST_FAILED');
+    }
 
-    const sampleRows = this.buildStreamSampleRows(sessionId, input.userId, input.activity, input.provenance);
+    const sampleRows = usedGenericFallback
+      ? []
+      : this.buildStreamSampleRows(sessionId, input.userId, input.activity, input.provenance);
     if (sampleRows.length > 0) {
       await this.insertInChunks(
         'activity_stream_samples',
@@ -518,9 +549,21 @@ export class CanonicalActivityWriterService {
       );
     }
 
-    if (routePoints.length > 0) {
+    if (!usedGenericFallback && routePoints.length > 0) {
       await this.insertInChunks('activity_route_points', routePoints, 'WEARABLE_ACTIVITY_ROUTE_INSERT_FAILED');
     }
+  }
+
+  private logBundlePersistError(
+    phase: 'full' | 'laps' | 'summary',
+    sessionId: string,
+    error: { code?: string | null; details?: string | null; hint?: string | null; message?: string | null },
+  ): void {
+    this.logger.error(
+      `WEARABLE_ACTIVITY_BUNDLE_PERSIST_FAILED phase=${phase} session=${sessionId} ` +
+        `code=${error.code ?? 'n/a'} message="${error.message ?? ''}" ` +
+        `details="${error.details ?? ''}" hint="${error.hint ?? ''}"`,
+    );
   }
 
   private async insertSession(payload: ActivitySessionInsert): Promise<string> {

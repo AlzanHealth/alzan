@@ -161,6 +161,66 @@ function assertStructuredWorkoutDropsAutolapsButKeepsManualSeries(): void {
   );
 }
 
+function assertStructuredWorkoutDropsUntypedAutolapsButKeepsNativeSeries(): void {
+  const normalised = normaliseCanonicalActivityLaps(
+    [
+      lap({ lapIndex: 1, distanceM: 1000, durationSeconds: 397 }),
+      lap({ lapIndex: 2, distanceM: 1480, durationSeconds: 600 }),
+      lap({ lapIndex: 3, distanceM: 1000, durationSeconds: 363 }),
+      lap({ lapIndex: 4, distanceM: 1000, durationSeconds: 294.4 }),
+      lap({ lapIndex: 5, distanceM: 190, durationSeconds: 120 }),
+      lap({ lapIndex: 6, distanceM: 1000, durationSeconds: 352.1 }),
+      lap({ lapIndex: 7, distanceM: 1000, durationSeconds: 284.4 }),
+      lap({ lapIndex: 8, distanceM: 163, durationSeconds: 120 }),
+      lap({ lapIndex: 9, distanceM: 1000, durationSeconds: 361.2 }),
+      lap({ lapIndex: 10, distanceM: 1000, durationSeconds: 286.7 }),
+      lap({ lapIndex: 11, distanceM: 173, durationSeconds: 120 }),
+      lap({ lapIndex: 12, distanceM: 1000, durationSeconds: 346.8 }),
+      lap({ lapIndex: 13, distanceM: 1000, durationSeconds: 289.6 }),
+      lap({ lapIndex: 14, distanceM: 171, durationSeconds: 120 }),
+      lap({ lapIndex: 15, distanceM: 1530, durationSeconds: 600 }),
+      lap({ lapIndex: 16, distanceM: 36, durationSeconds: 13.6 }),
+    ],
+    summary({ distanceM: 7740, durationSeconds: 2849.6 }),
+  );
+
+  assert.deepEqual(
+    normalised.map(item => Math.round(item.distanceM ?? 0)),
+    [1480, 1000, 190, 1000, 163, 1000, 173, 1000, 171, 1530, 36],
+  );
+}
+
+function assertStructuredWorkoutDropsUntypedAutolapsForAnySeriesDistance(): void {
+  for (const seriesDistanceM of [400, 800, 1200, 1500, 2000]) {
+    const workDurationSeconds = (seriesDistanceM / 1000) * 270;
+    const laps: CanonicalActivityLap[] = [
+      lap({ lapIndex: 1, distanceM: 1000, durationSeconds: 390 }),
+      lap({ lapIndex: 2, distanceM: 1500, durationSeconds: 600 }),
+      lap({ lapIndex: 3, distanceM: 1000, durationSeconds: 360 }),
+    ];
+
+    for (let repetition = 0; repetition < 4; repetition += 1) {
+      laps.push(lap({ lapIndex: laps.length + 1, distanceM: seriesDistanceM, durationSeconds: workDurationSeconds }));
+      if (repetition < 3) {
+        laps.push(lap({ lapIndex: laps.length + 1, distanceM: 200, durationSeconds: 120 }));
+      }
+    }
+
+    const normalised = normaliseCanonicalActivityLaps(
+      laps,
+      summary({
+        distanceM: 1500 + seriesDistanceM * 4 + 200 * 3,
+        durationSeconds: 600 + workDurationSeconds * 4 + 120 * 3,
+      }),
+    );
+
+    assert.deepEqual(
+      normalised.map(item => Math.round(item.distanceM ?? 0)),
+      [1500, seriesDistanceM, 200, seriesDistanceM, 200, seriesDistanceM, 200, seriesDistanceM],
+    );
+  }
+}
+
 function assertOneKilometerLapsRemainWhenThereAreNoStructuredPartials(): void {
   const normalised = normaliseCanonicalActivityLaps(
     [
@@ -222,6 +282,8 @@ assertUntimedAutolapsAreDroppedWhenStructured();
 assertStructuredWorkoutKeepsNativeSeriesAndRecoveries();
 assertOverlappingKilometerMarkersDoNotHideOtherSeries();
 assertStructuredWorkoutDropsAutolapsButKeepsManualSeries();
+assertStructuredWorkoutDropsUntypedAutolapsButKeepsNativeSeries();
+assertStructuredWorkoutDropsUntypedAutolapsForAnySeriesDistance();
 assertOneKilometerLapsRemainWhenThereAreNoStructuredPartials();
 assertRealOneKilometerSeriesRemainWhenAutolapTyped();
 assertRepeatedUntimedRecoveriesRemain();

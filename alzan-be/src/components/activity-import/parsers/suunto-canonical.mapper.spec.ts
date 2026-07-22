@@ -560,6 +560,117 @@ function assertSuuntoFitKeepsNativeKilometersAndRecoveries(): void {
   );
 }
 
+function assertSuuntoExactWorkoutFitKeepsElevenNativeLapsWithoutTriggers(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 7739,
+    durationSeconds: 2850,
+    laps: [
+      {
+        startOffsetSeconds: 0,
+        durationSeconds: 600,
+        distanceM: 1477.4,
+        avgHeartRate: 141,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 600,
+        durationSeconds: 294.4,
+        distanceM: 1000,
+        avgHeartRate: 157,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 894.4,
+        durationSeconds: 120,
+        distanceM: 190.1,
+        avgHeartRate: 142,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 1014.4,
+        durationSeconds: 284.4,
+        distanceM: 1000,
+        avgHeartRate: 160,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 1298.8,
+        durationSeconds: 120,
+        distanceM: 163.1,
+        avgHeartRate: 150,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 1418.8,
+        durationSeconds: 286.7,
+        distanceM: 1000,
+        avgHeartRate: 166,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 1705.5,
+        durationSeconds: 120,
+        distanceM: 173.1,
+        avgHeartRate: 154,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 1825.5,
+        durationSeconds: 289.6,
+        distanceM: 1000,
+        avgHeartRate: 169,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 2115.1,
+        durationSeconds: 120,
+        distanceM: 171,
+        avgHeartRate: 152,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 2235.1,
+        durationSeconds: 600,
+        distanceM: 1525.9,
+        avgHeartRate: 161,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+      {
+        startOffsetSeconds: 2835.1,
+        durationSeconds: 13.6,
+        distanceM: 36,
+        avgHeartRate: 165,
+        lapTrigger: 255,
+        omitStartTimestamp: true,
+      },
+    ],
+  });
+
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-6a5fc13f4fd25d7c1b84b81c.fit');
+
+  assert.equal(canonical.summary.distanceM, 7739);
+  assert.equal(canonical.summary.durationSeconds, 2850);
+  assert.equal(canonical.laps.length, 11);
+  assert.ok(canonical.laps.every(lap => lap.lapType === 'unknown'));
+  assert.ok(canonical.laps.every(lap => lap.startOffsetSeconds == null && lap.endOffsetSeconds == null));
+  assert.deepEqual(
+    canonical.laps.map(lap => Math.round(lap.distanceM ?? 0)),
+    [1477, 1000, 190, 1000, 163, 1000, 173, 1000, 171, 1526, 36],
+  );
+}
+
 function assertSuuntoFitKeepsOneKilometerAutolapsWhenNoStructuredPartialsExist(): void {
   const fit = buildTestFit({
     sport: 1,
@@ -791,6 +902,7 @@ assertSuuntoFitKeepsFifteenStructuredIntervals();
 assertSuuntoFitKeepsRepeatedUntimedRecoveries();
 assertSuuntoFitKeepsRealOneKilometerIntervals();
 assertSuuntoFitKeepsNativeKilometersAndRecoveries();
+assertSuuntoExactWorkoutFitKeepsElevenNativeLapsWithoutTriggers();
 assertSuuntoFitKeepsOneKilometerAutolapsWhenNoStructuredPartialsExist();
 assertSuuntoFitAcceptsLeadingBytesBeforeHeader();
 assertSuuntoFitCanonicalParsesWithoutGps();
