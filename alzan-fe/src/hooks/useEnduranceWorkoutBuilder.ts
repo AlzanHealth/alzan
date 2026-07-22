@@ -260,11 +260,13 @@ export const useEnduranceWorkoutBuilder = () => {
 
       queryClient.invalidateQueries({ queryKey: ['enduranceWorkouts'] });
       queryClient.invalidateQueries({ queryKey: ['enduranceTemplate'] });
+      queryClient.invalidateQueries({ queryKey: ['enduranceTemplateProgressions'] });
 
       // Fix keys to match TrainingHomeScreen
       queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
       queryClient.invalidateQueries({ queryKey: ['weekDots'] });
       queryClient.invalidateQueries({ queryKey: ['scheduledTemplates'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduledWorkoutPreview'] });
     },
   });
 

@@ -375,6 +375,43 @@ async function main(): Promise<void> {
     ).error,
   );
   fail(
+    'endurance step progressions',
+    (
+      await db.from('endurance_workout_step_progressions').insert([
+        {
+          template_id: ID.tplSeriesExample,
+          progression_key: ID.stepSeriesGroup,
+          week_index: 1,
+          repetitions: 6,
+        },
+        {
+          template_id: ID.tplSeriesExample,
+          progression_key: ID.stepSeriesWork,
+          week_index: 1,
+          distance_m: 400,
+          target_type: 'pace',
+          target_min: 240,
+          target_max: 240,
+        },
+        {
+          template_id: ID.tplSeriesExample,
+          progression_key: ID.stepSeriesGroup,
+          week_index: 2,
+          repetitions: 4,
+        },
+        {
+          template_id: ID.tplSeriesExample,
+          progression_key: ID.stepSeriesWork,
+          week_index: 2,
+          distance_m: 1000,
+          target_type: 'pace',
+          target_min: 280,
+          target_max: 280,
+        },
+      ])
+    ).error,
+  );
+  fail(
     'gym template',
     (
       await db
