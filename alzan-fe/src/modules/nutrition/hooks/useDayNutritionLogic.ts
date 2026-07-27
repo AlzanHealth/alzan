@@ -96,7 +96,7 @@ export function useDayNutrition(date: Date) {
           importedState === 'planned'
             ? 'pending'
             : importedState === 'assumed_eaten'
-              ? 'extra_meal'
+              ? 'done_as_planned'
               : (log.adherence_status as AdherenceStatus),
         mealType: plan.meal_type,
         displayName: log.name || plan.base_name, // Log name overrides if done_with_changes
@@ -156,7 +156,13 @@ export function useDayNutrition(date: Date) {
     const logMacros = getDailyMealMacros(log);
     const item: DailyMealItem = {
       log,
-      status: isImportedPlanned ? 'pending' : isSkipped ? 'skipped' : 'extra_meal',
+      status: isImportedPlanned
+        ? 'pending'
+        : isSkipped
+          ? 'skipped'
+          : importedState === 'assumed_eaten'
+            ? 'done_as_planned'
+            : 'extra_meal',
       mealType: log.meal_type,
       displayName: log.name || 'Extra Meal',
       orderIndex: 999, // Push to bottom

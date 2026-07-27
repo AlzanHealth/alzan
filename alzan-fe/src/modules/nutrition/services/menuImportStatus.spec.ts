@@ -23,6 +23,10 @@ function run() {
   assert.equal(getMenuImportMealState(createLog({ date: '2026-07-25' }), currentNutritionDate), 'planned');
   assert.equal(getMenuImportMealState(createLog({ date: '2026-07-23' }), currentNutritionDate), 'assumed_eaten');
   assert.equal(
+    getMenuImportMealState(createLog({ adherence_status: 'done_as_planned' }), currentNutritionDate),
+    'assumed_eaten',
+  );
+  assert.equal(
     getMenuImportMealState(createLog({ date: '2026-07-23', adherence_status: 'skipped' }), currentNutritionDate),
     'skipped',
   );

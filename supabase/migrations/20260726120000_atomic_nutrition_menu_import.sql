@@ -280,7 +280,7 @@ BEGIN
     meal.protein_g,
     meal.carbs_g,
     meal.fats_g,
-    'planned',
+    'done_as_planned',
     'menu_import_v1',
     'computed'::public.meal_logs_data_quality,
     'nutrition_v1',

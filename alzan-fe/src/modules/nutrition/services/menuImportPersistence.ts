@@ -70,7 +70,7 @@ const buildMealInsert = (userId: string, mealId: string, meal: MenuImportPreview
   protein_g: meal.macros.protein_g,
   carbs_g: meal.macros.carbs_g,
   fats_g: meal.macros.fats_g,
-  adherence_status: 'planned',
+  adherence_status: 'done_as_planned',
   source: 'menu_import_v1',
   data_quality: 'computed',
   calc_version: 'nutrition_v1',

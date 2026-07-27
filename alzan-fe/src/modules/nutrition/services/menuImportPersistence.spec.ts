@@ -130,7 +130,7 @@ async function testBuildsImportedRowsAndSkipsIgnoredMeals() {
       protein_g: 15,
       carbs_g: 30,
       fats_g: 7.5,
-      adherence_status: 'planned',
+      adherence_status: 'done_as_planned',
       source: 'menu_import_v1',
       data_quality: 'computed',
       calc_version: 'nutrition_v1',

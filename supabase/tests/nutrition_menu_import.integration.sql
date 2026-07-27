@@ -92,7 +92,7 @@ BEGIN
       AND user_id = v_user_id
       AND origin = 'imported'
       AND source = 'menu_import_v1'
-      AND adherence_status = 'planned'
+      AND adherence_status = 'done_as_planned'
       AND source_recipe_id IS NULL
   ) THEN
     RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_MEAL_NOT_CREATED';
@@ -328,6 +328,16 @@ BEGIN
       AND name LIKE 'SQL four-week day %'
   ) <> 168 THEN
     RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_FOUR_WEEK_MEAL_COUNT_INCORRECT';
+  END IF;
+  IF (
+    SELECT count(*)
+    FROM public.meal_logs
+    WHERE user_id = v_user_id
+      AND date = ANY(v_dates)
+      AND name LIKE 'SQL four-week day %'
+      AND adherence_status = 'done_as_planned'
+  ) <> 168 THEN
+    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_FOUR_WEEK_MEAL_STATUS_INCORRECT';
   END IF;
   IF (
     SELECT count(*)

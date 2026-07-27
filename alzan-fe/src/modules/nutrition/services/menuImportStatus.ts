@@ -33,6 +33,9 @@ export const getDailyMealMacros = (log: DailyMealMacroLog): Macros => {
 export const getMenuImportMealState = (log: MenuImportStatusLog, currentNutritionDate: string): MenuImportMealState => {
   if (!isImportedMenuLog(log)) return 'not_imported';
   if (log.adherence_status === 'skipped') return 'skipped';
+  if (log.adherence_status === 'done_as_planned' || log.adherence_status === 'done_with_changes') {
+    return 'assumed_eaten';
+  }
   return log.date >= currentNutritionDate ? 'planned' : 'assumed_eaten';
 };
 
