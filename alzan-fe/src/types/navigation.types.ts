@@ -144,6 +144,7 @@ export type NutritionStackParamList = {
   NutritionHome: { date?: string } | undefined;
   NutritionSettings: undefined;
   MenuImport: undefined;
+  ShoppingList: { date?: string } | undefined;
   RecipeLibrary: { date: string; mealType?: MealType } | undefined;
   MealLogForm: {
     date: string;

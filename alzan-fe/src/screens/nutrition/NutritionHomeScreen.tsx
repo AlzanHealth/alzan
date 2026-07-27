@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, Plus, BookOpen, CalendarCheck, FileInput } from 'lucide-react-native';
+import { Settings, Plus, BookOpen, CalendarCheck, ShoppingBasket } from 'lucide-react-native';
 import { addDays, format, isValid, parseISO, subDays } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -278,11 +278,11 @@ export const NutritionHomeScreen = () => {
           <View style={styles.topActions}>
             <TouchableOpacity
               style={styles.topAction}
-              onPress={() => navigation.navigate('MenuImport')}
+              onPress={() => navigation.navigate('ShoppingList', { date: formattedDate })}
               accessibilityRole="button"
-              accessibilityLabel={t('nutrition.menuImportOpenAccessibility')}
+              accessibilityLabel={t('nutrition.shoppingListAccessibility')}
             >
-              <FileInput color={themeColors.textPrimary} size={24} />
+              <ShoppingBasket color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.topAction}

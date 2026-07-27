@@ -22,7 +22,7 @@ import {
 } from '../services/menuImportPlanner';
 import { isMenuImportOperationBlocked } from '../services/menuImportOperationGuard';
 
-const NUTRITION_QUERY_KEYS = ['mealLogs', 'mealItems', 'dayNutrition', 'personalFoodTrends'] as const;
+const NUTRITION_QUERY_KEYS = ['mealLogs', 'mealItems', 'dayNutrition', 'personalFoodTrends', 'shoppingList'] as const;
 
 export type MenuImportFailureKind = 'generic';
 

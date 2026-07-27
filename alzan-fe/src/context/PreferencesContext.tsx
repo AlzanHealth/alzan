@@ -80,6 +80,7 @@ const DEFAULT_NUTRITION_PREFS: NutritionSettingsJson = {
   default_recipe_visibility: 'private',
   recipe_search_scope: 'source',
   nutrition_day_rollover_time: DEFAULT_NUTRITION_DAY_ROLLOVER_TIME,
+  shopping_list_start_day: 1,
 };
 
 const DEFAULT_PRIVACY_SETTINGS: PrivacySettingsJson = {

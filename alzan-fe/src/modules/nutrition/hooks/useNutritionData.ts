@@ -183,6 +183,7 @@ export function useUpsertMealLog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
       queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
     },
   });
 }
@@ -194,6 +195,7 @@ export function useDeleteMealLog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
       queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
     },
   });
 }
@@ -207,6 +209,7 @@ export function useSaveMealWithIngredients() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
       queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
     },
   });
 }
