@@ -1,5 +1,6 @@
 import { getLocalizedIngredientName, getCurrentAppLocale } from '../../../services/localization';
 import { supabase } from '../../../lib/supabaseClient';
+import type { IngredientsCategory } from '../../../types/requests.types';
 import type { ShoppingIngredientInput, ShoppingListDateRange, ShoppingListIngredient } from './shoppingListPlanner';
 import {
   aggregateShoppingIngredients,
@@ -18,6 +19,7 @@ type IngredientNameLookupRow = {
   id: string;
   name_es: string;
   name_en: string;
+  category: IngredientsCategory | null;
 };
 
 export async function getShoppingList(
@@ -60,11 +62,12 @@ export async function getShoppingList(
     ),
   );
   const localizedNamesById = new Map<string, string>();
+  const categoriesById = new Map<string, IngredientsCategory>();
 
   if (databaseIngredientIds.length > 0) {
     const { data: ingredients, error: ingredientsError } = await supabase
       .from('ingredients')
-      .select('id, name_es, name_en')
+      .select('id, name_es, name_en, category')
       .in('id', databaseIngredientIds)
       .returns<IngredientNameLookupRow[]>();
 
@@ -72,12 +75,13 @@ export async function getShoppingList(
       const locale = getCurrentAppLocale();
       ingredients.forEach(ingredient => {
         localizedNamesById.set(ingredient.id, getLocalizedIngredientName(ingredient, locale));
+        if (ingredient.category) categoriesById.set(ingredient.id, ingredient.category);
       });
     }
   }
 
   return {
     range,
-    ingredients: aggregateShoppingIngredients(items || [], localizedNamesById),
+    ingredients: aggregateShoppingIngredients(items || [], localizedNamesById, categoriesById),
   };
 }

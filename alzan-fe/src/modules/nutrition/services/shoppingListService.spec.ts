@@ -4,15 +4,18 @@ import {
   formatShoppingQuantity,
   getActiveShoppingMealLogIds,
   getShoppingCycleRange,
+  groupShoppingIngredientsByCategory,
   type ShoppingMealLogInput,
   type ShoppingIngredientInput,
 } from './shoppingListPlanner';
+import type { IngredientsCategory } from '../../../types/requests.types';
 
 function run() {
   testSupportsEveryCycleStartDay();
   testHandlesMonthAndYearBoundaries();
   testAggregatesCanonicalAndNormalizedIngredients();
   testFormatsShoppingQuantities();
+  testGroupsIngredientsByDatabaseCategory();
   testExcludesSkippedMealsAndScalesToLargeMenus();
   console.log('shoppingListService: all assertions passed');
 }
@@ -70,6 +73,33 @@ function testFormatsShoppingQuantities() {
   assert.equal(formatShoppingQuantity(850), '850 g');
   assert.equal(formatShoppingQuantity(1000), '1 kg');
   assert.equal(formatShoppingQuantity(1250), '1.25 kg');
+}
+
+function testGroupsIngredientsByDatabaseCategory() {
+  const ingredients = aggregateShoppingIngredients(
+    [
+      { name: 'Arroz', quantity_g: 100, source: 'database', source_ref: 'rice-id' },
+      { name: 'Pollo', quantity_g: 200, source: 'database', source_ref: 'chicken-id' },
+      { name: 'Aceite casero', quantity_g: 10, source: 'manual', source_ref: null },
+    ],
+    new Map(),
+    new Map<string, IngredientsCategory>([
+      ['rice-id', 'cereal'],
+      ['chicken-id', 'proteina_animal'],
+    ]),
+  );
+
+  assert.deepEqual(
+    groupShoppingIngredientsByCategory(ingredients).map(group => ({
+      category: group.category,
+      names: group.ingredients.map(item => item.name),
+    })),
+    [
+      { category: 'proteina_animal', names: ['Pollo'] },
+      { category: 'cereal', names: ['Arroz'] },
+      { category: 'otro', names: ['Aceite casero'] },
+    ],
+  );
 }
 
 function testExcludesSkippedMealsAndScalesToLargeMenus() {

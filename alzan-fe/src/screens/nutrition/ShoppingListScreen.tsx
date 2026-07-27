@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,8 +11,11 @@ import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { useShoppingList } from '../../modules/nutrition/hooks/useShoppingList';
 import {
   formatShoppingQuantity,
+  groupShoppingIngredientsByCategory,
+  type ShoppingListCategoryGroup,
   type ShoppingListIngredient,
 } from '../../modules/nutrition/services/shoppingListPlanner';
+import { CATEGORY_LABELS } from '../../modules/nutrition/components/IngredientCategoryFilter';
 import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import type { NutritionScreenNavigationProp, NutritionStackParamList } from '../../types/navigation.types';
@@ -32,6 +35,15 @@ export const ShoppingListScreen = () => {
   const initialDate = route.params?.date || format(new Date(), 'yyyy-MM-dd');
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const { error, isLoading, isFetching, refetch, range, ingredients } = useShoppingList(selectedDate);
+  const sections = useMemo(
+    () =>
+      groupShoppingIngredientsByCategory(ingredients).map((group: ShoppingListCategoryGroup) => ({
+        ...group,
+        title: String(t(CATEGORY_LABELS[group.category])),
+        data: group.ingredients,
+      })),
+    [ingredients, t],
+  );
 
   const periodLabel = useMemo(
     () =>
@@ -52,19 +64,42 @@ export const ShoppingListScreen = () => {
   );
 
   const renderIngredient = useCallback(
-    ({ item }: { item: ShoppingListIngredient }) => (
-      <View style={[styles.ingredientRow, dynamicStyles.glassCard]}>
-        <View style={[styles.ingredientIcon, { backgroundColor: colors.primary + '14' }]}>
-          <ShoppingBasket size={18} color={colors.primary} strokeWidth={2.2} />
-        </View>
+    ({
+      item,
+      index,
+      section,
+    }: {
+      item: ShoppingListIngredient;
+      index: number;
+      section: { data: ShoppingListIngredient[] };
+    }) => (
+      <View
+        style={[
+          styles.ingredientRow,
+          index === section.data.length - 1 && styles.ingredientLastRow,
+          { backgroundColor: colors.surfaceSolid, borderBottomColor: colors.border },
+        ]}
+      >
+        <View style={[styles.ingredientBullet, { backgroundColor: colors.primary }]} />
         <Text style={[styles.ingredientName, { color: colors.textPrimary }]}>{item.name}</Text>
         <Text style={[styles.ingredientQuantity, { color: colors.primary }]}>
-          {' '}
           {formatShoppingQuantity(item.quantity_g)}
         </Text>
       </View>
     ),
-    [colors.primary, colors.textPrimary, dynamicStyles.glassCard],
+    [colors.border, colors.primary, colors.surfaceSolid, colors.textPrimary],
+  );
+
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: ShoppingListCategoryGroup & { title: string; data: ShoppingListIngredient[] } }) => (
+      <View style={[styles.categoryHeader, { backgroundColor: colors.surfaceSolid }]}>
+        <Text style={[styles.categoryTitle, { color: colors.primary }]}>{section.title}</Text>
+        <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>
+          {t('nutrition.shoppingListIngredientCount', { count: section.data.length })}
+        </Text>
+      </View>
+    ),
+    [colors.primary, colors.surfaceSolid, colors.textSecondary, t],
   );
 
   const keyExtractor = useCallback((item: ShoppingListIngredient) => item.key, []);
@@ -136,9 +171,10 @@ export const ShoppingListScreen = () => {
             <Text style={[styles.stateText, { color: colors.textSecondary }]}>{t('nutrition.shoppingListEmpty')}</Text>
           </View>
         ) : (
-          <FlatList
-            data={ingredients}
+          <SectionList
+            sections={sections}
             renderItem={renderIngredient}
+            renderSectionHeader={renderSectionHeader}
             keyExtractor={keyExtractor}
             contentContainerStyle={[styles.listContent, { paddingBottom: topFromScreenBottom + 32 }]}
             showsVerticalScrollIndicator={false}
@@ -185,22 +221,35 @@ const styles = StyleSheet.create({
   periodCopy: { flex: 1, alignItems: 'center' },
   periodLabel: { fontSize: 15, fontWeight: '700' },
   periodCount: { fontSize: 13, marginTop: 3 },
-  listContent: { paddingHorizontal: 16, gap: 8 },
+  listContent: { paddingHorizontal: 16, paddingTop: 2 },
+  categoryHeader: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 13,
+    paddingBottom: 8,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  categoryTitle: { fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  categoryCount: { fontSize: 12, marginTop: 3 },
   ingredientRow: {
-    minHeight: 58,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     flexDirection: 'row',
     alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  ingredientIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
+  ingredientLastRow: {
+    borderBottomWidth: 0,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+  },
+  ingredientBullet: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 12,
   },
   ingredientName: { flex: 1, fontSize: 16, fontWeight: '600' },
   ingredientQuantity: { fontSize: 15, fontWeight: '800' },

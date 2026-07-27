@@ -149,14 +149,22 @@ type NutritionSectionInfoKey =
   | 'data'
   | 'shoppingList';
 
-const SHOPPING_LIST_DAYS: Array<{ value: ShoppingListStartDay; labelKey: TranslationKey }> = [
-  { value: 1, labelKey: 'nutrition.shoppingListDayMonday' },
-  { value: 2, labelKey: 'nutrition.shoppingListDayTuesday' },
-  { value: 3, labelKey: 'nutrition.shoppingListDayWednesday' },
-  { value: 4, labelKey: 'nutrition.shoppingListDayThursday' },
-  { value: 5, labelKey: 'nutrition.shoppingListDayFriday' },
-  { value: 6, labelKey: 'nutrition.shoppingListDaySaturday' },
-  { value: 7, labelKey: 'nutrition.shoppingListDaySunday' },
+const SHOPPING_LIST_DAYS: Array<{
+  value: ShoppingListStartDay;
+  labelKey: TranslationKey;
+  shortLabelKey: TranslationKey;
+}> = [
+  { value: 1, labelKey: 'nutrition.shoppingListDayMonday', shortLabelKey: 'nutrition.shoppingListDayMondayShort' },
+  { value: 2, labelKey: 'nutrition.shoppingListDayTuesday', shortLabelKey: 'nutrition.shoppingListDayTuesdayShort' },
+  {
+    value: 3,
+    labelKey: 'nutrition.shoppingListDayWednesday',
+    shortLabelKey: 'nutrition.shoppingListDayWednesdayShort',
+  },
+  { value: 4, labelKey: 'nutrition.shoppingListDayThursday', shortLabelKey: 'nutrition.shoppingListDayThursdayShort' },
+  { value: 5, labelKey: 'nutrition.shoppingListDayFriday', shortLabelKey: 'nutrition.shoppingListDayFridayShort' },
+  { value: 6, labelKey: 'nutrition.shoppingListDaySaturday', shortLabelKey: 'nutrition.shoppingListDaySaturdayShort' },
+  { value: 7, labelKey: 'nutrition.shoppingListDaySunday', shortLabelKey: 'nutrition.shoppingListDaySundayShort' },
 ];
 
 // Radio Option Component
@@ -1112,6 +1120,7 @@ export const NutritionSettingsScreen = () => {
                       onPress={() => updateNutritionPrefs({ shopping_list_start_day: day.value })}
                       activeOpacity={0.75}
                       accessibilityRole="button"
+                      accessibilityLabel={t(day.labelKey)}
                       accessibilityState={{ selected: isSelected }}
                     >
                       <Text
@@ -1120,7 +1129,7 @@ export const NutritionSettingsScreen = () => {
                           { color: isSelected ? themeColors.primary : themeColors.textSecondary },
                         ]}
                       >
-                        {t(day.labelKey)}
+                        {t(day.shortLabelKey)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -2883,17 +2892,16 @@ const styles = StyleSheet.create({
   },
   shoppingDayGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.s,
+    gap: 4,
     marginTop: spacing.m,
   },
   shoppingDayButton: {
-    minHeight: 44,
-    minWidth: 88,
-    paddingHorizontal: spacing.s,
+    flex: 1,
+    minHeight: 40,
+    paddingHorizontal: 0,
     paddingVertical: spacing.xs,
     borderWidth: 1,
-    borderRadius: borderRadius.m,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2901,6 +2909,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '700',
     textAlign: 'center',
+    fontSize: 13,
   },
   infoButton: {
     padding: spacing.xs,
