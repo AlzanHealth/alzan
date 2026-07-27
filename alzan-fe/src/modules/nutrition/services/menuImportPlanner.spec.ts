@@ -194,6 +194,23 @@ async function testBoundedSearchConcurrency() {
   assert.ok(maximumActiveSearches <= 4);
 }
 
+async function testReportsIngredientProgress() {
+  const document = createDocument(['Uno', 'Dos', 'Tres', 'Cuatro', 'Cinco']);
+  const progress: Array<{ completed: number; total: number }> = [];
+
+  await resolveMenuImportIngredients(document, async name => [{ ...rice, id: name, name }], {
+    onProgress: value => progress.push(value),
+  });
+
+  assert.deepEqual(progress[0], { completed: 0, total: 5 });
+  assert.equal(progress.at(-1)?.completed, 5);
+  assert.equal(progress.at(-1)?.total, 5);
+  assert.deepEqual(
+    progress.map(value => value.completed),
+    [0, 1, 2, 3, 4, 5],
+  );
+}
+
 async function testNonTrivialMacroRounding() {
   const preciseCandidate: MenuImportIngredientCandidate = {
     id: 'ingredient-precise',
@@ -349,6 +366,7 @@ async function main() {
   await testRejectsMalformedNutritionCandidates();
   await testUniqueSearchAcrossDaysAndMeals();
   await testBoundedSearchConcurrency();
+  await testReportsIngredientProgress();
   await testNonTrivialMacroRounding();
   await testMacrosAndConflictDetection();
   await testReadinessRequiresResolutionAndConflictDecision();

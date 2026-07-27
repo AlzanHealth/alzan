@@ -9,6 +9,7 @@ import {
   type MenuImportValidationError,
   type MenuImportValidationErrorCode,
 } from '../services/menuImportContract';
+import type { MenuImportAnalysisProgress } from '../hooks/useMenuImport';
 
 type Translate = (key: TranslationKey, options?: Record<string, unknown>) => string;
 
@@ -32,6 +33,7 @@ interface MenuImportEditorProps {
   rawJson: string;
   errors: MenuImportValidationError[];
   isAnalyzing: boolean;
+  analysisProgress: MenuImportAnalysisProgress | null;
   isInputDisabled: boolean;
   isAnalyzeDisabled: boolean;
   onChangeText: (value: string) => void;
@@ -43,6 +45,7 @@ export const MenuImportEditor = memo(function MenuImportEditor({
   rawJson,
   errors,
   isAnalyzing,
+  analysisProgress,
   isInputDisabled,
   isAnalyzeDisabled,
   onChangeText,
@@ -84,20 +87,59 @@ export const MenuImportEditor = memo(function MenuImportEditor({
         </View>
       ) : null}
 
-      <TouchableOpacity
-        style={[styles.analyzeButton, { backgroundColor: isAnalyzeDisabled ? colors.disabledButton : colors.primary }]}
-        onPress={onAnalyze}
-        disabled={isAnalyzeDisabled}
-        activeOpacity={0.85}
-        accessibilityRole="button"
-        accessibilityLabel={translate('nutrition.menuImportAnalyzeAccessibility')}
-        accessibilityState={{ busy: isAnalyzing, disabled: isAnalyzeDisabled }}
-      >
-        {isAnalyzing ? <ActivityIndicator color={colors.white} /> : null}
-        <Text style={[styles.analyzeButtonText, { color: colors.white }]}>
-          {translate(isAnalyzing ? 'nutrition.menuImportAnalyzing' : 'nutrition.menuImportAnalyze')}
-        </Text>
-      </TouchableOpacity>
+      {isAnalyzing ? (
+        <View
+          style={[styles.analyzeButton, styles.progressButton, { backgroundColor: colors.disabledButton }]}
+          accessibilityRole="progressbar"
+          accessibilityLabel={translate('nutrition.menuImportAnalyzeAccessibility')}
+          accessibilityValue={{
+            min: 0,
+            max: 100,
+            now: analysisProgress?.percentage ?? 0,
+          }}
+        >
+          <View
+            style={[
+              styles.progressButtonFill,
+              {
+                width: `${Math.max(3, Math.min(100, analysisProgress?.percentage ?? 0))}%`,
+                backgroundColor: colors.primary,
+              },
+            ]}
+          />
+          <View style={styles.progressButtonContent}>
+            <ActivityIndicator color={colors.white} />
+            <Text style={[styles.analyzeButtonText, styles.progressButtonLabel, { color: colors.white }]}>
+              {analysisProgress?.phase === 'preparing'
+                ? translate('nutrition.menuImportProgressPreparing')
+                : translate('nutrition.menuImportProgressIngredients', {
+                    completed: analysisProgress?.completed ?? 0,
+                    total: analysisProgress?.total ?? 0,
+                  })}
+            </Text>
+            <Text style={[styles.analyzeButtonText, { color: colors.white }]}>
+              {analysisProgress?.percentage ?? 0}%
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[
+            styles.analyzeButton,
+            { backgroundColor: isAnalyzeDisabled ? colors.disabledButton : colors.primary },
+          ]}
+          onPress={onAnalyze}
+          disabled={isAnalyzeDisabled}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={translate('nutrition.menuImportAnalyzeAccessibility')}
+          accessibilityState={{ disabled: isAnalyzeDisabled }}
+        >
+          <Text style={[styles.analyzeButtonText, { color: colors.white }]}>
+            {translate('nutrition.menuImportAnalyze')}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 });
@@ -155,5 +197,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  progressButton: {
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  progressButtonFill: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  progressButtonContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  progressButtonLabel: {
+    flex: 1,
+    textAlign: 'left',
   },
 });

@@ -1,7 +1,14 @@
 import React, { useCallback, useMemo } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft } from 'lucide-react-native';
@@ -13,6 +20,7 @@ import type { TranslationKey } from '../../i18n/locales/en';
 import { MenuImportEditor } from '../../modules/nutrition/components/MenuImportEditor';
 import { MenuImportPreview } from '../../modules/nutrition/components/MenuImportPreview';
 import { useMenuImport } from '../../modules/nutrition/hooks/useMenuImport';
+import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import type { NutritionScreenNavigationProp } from '../../types/navigation.types';
 
 type TranslationOptions = Record<string, unknown>;
@@ -20,7 +28,7 @@ type TranslationOptions = Record<string, unknown>;
 export const MenuImportScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { topFromScreenBottom } = useTabBarLayout();
   const { styles: dynamicStyles, colors } = useNutritionStyles();
   const {
     rawJson,
@@ -28,6 +36,7 @@ export const MenuImportScreen = () => {
     validationErrors,
     preview,
     isAnalyzing,
+    analysisProgress,
     isImporting,
     isLoading,
     requiresReanalysis,
@@ -85,6 +94,7 @@ export const MenuImportScreen = () => {
         rawJson={rawJson}
         errors={validationErrors}
         isAnalyzing={isAnalyzing}
+        analysisProgress={analysisProgress}
         isInputDisabled={isLoading}
         isAnalyzeDisabled={isLoading || rawJson.length === 0}
         onChangeText={setRawJson}
@@ -92,7 +102,7 @@ export const MenuImportScreen = () => {
         translate={translate}
       />
     ),
-    [handleAnalyzePress, isAnalyzing, isLoading, rawJson, setRawJson, translate, validationErrors],
+    [analysisProgress, handleAnalyzePress, isAnalyzing, isLoading, rawJson, setRawJson, translate, validationErrors],
   );
 
   return (
@@ -111,7 +121,27 @@ export const MenuImportScreen = () => {
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
             {translate('nutrition.menuImportTitle')}
           </Text>
-          <View style={styles.headerSpacer} />
+          {preview !== null ? (
+            <TouchableOpacity
+              style={[
+                styles.headerImportButton,
+                { backgroundColor: canImport ? colors.primary : colors.disabledButton },
+              ]}
+              onPress={handleImportPress}
+              disabled={!canImport}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={translate('nutrition.menuImportSubmitAccessibility')}
+              accessibilityState={{ busy: isImporting, disabled: !canImport }}
+            >
+              {isImporting ? <ActivityIndicator color={colors.white} /> : null}
+              <Text style={[styles.headerImportText, { color: colors.white }]}>
+                {translate('nutrition.menuImportSubmitShort')}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
 
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -121,7 +151,7 @@ export const MenuImportScreen = () => {
             requiresReanalysis={requiresReanalysis}
             canImport={canImport}
             isImporting={isImporting}
-            bottomInset={tabBarHeight}
+            bottomInset={topFromScreenBottom}
             onImport={handleImportPress}
             onSelectIngredient={selectIngredient}
             onSetConflictDecision={setConflictDecision}
@@ -159,5 +189,19 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 44,
     height: 44,
+  },
+  headerImportButton: {
+    minWidth: 76,
+    minHeight: 44,
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  headerImportText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

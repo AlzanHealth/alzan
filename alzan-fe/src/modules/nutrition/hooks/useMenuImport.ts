@@ -17,6 +17,7 @@ import {
   selectMenuImportIngredient,
   setMenuImportConflictDecision,
   type MenuImportConflictDecision,
+  type MenuImportIngredientProgress,
   type MenuImportPreview,
 } from '../services/menuImportPlanner';
 import { isMenuImportOperationBlocked } from '../services/menuImportOperationGuard';
@@ -31,6 +32,11 @@ export type MenuImportResult =
 
 export type MenuImportAnalysisResult = 'invalid' | 'error' | 'success';
 
+export type MenuImportAnalysisProgress = MenuImportIngredientProgress & {
+  phase: 'ingredients' | 'preparing';
+  percentage: number;
+};
+
 export function useMenuImport() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -44,6 +50,7 @@ export function useMenuImport() {
   const [preview, setPreview] = useState<MenuImportPreview | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<MenuImportAnalysisProgress | null>(null);
   const [requiresReanalysis, setRequiresReanalysis] = useState(false);
 
   const refreshNutritionQueries = useCallback(async () => {
@@ -78,26 +85,45 @@ export function useMenuImport() {
 
     analyzeInFlightRef.current = true;
     setIsAnalyzing(true);
+    setAnalysisProgress({ completed: 0, total: 0, phase: 'ingredients', percentage: 0 });
     setValidationErrors([]);
 
     try {
       const dates = Array.from(new Set(parsed.value.days.map(day => day.date))).sort();
       const [resolutions, calendarSnapshot] = await Promise.all([
-        resolveMenuImportIngredients(parsed.value, async ingredientName => {
-          const results = await searchIngredients(ingredientName, undefined, 5);
+        resolveMenuImportIngredients(
+          parsed.value,
+          async ingredientName => {
+            const results = await searchIngredients(ingredientName, undefined, 5);
 
-          return results.map(result => ({
-            id: result.id,
-            name: result.name,
-            kcal_100: Number(result.kcal_100 ?? 0),
-            protein_g_100: Number(result.protein_g_100 ?? 0),
-            carbs_g_100: Number(result.carbs_g_100 ?? 0),
-            fat_g_100: Number(result.fat_g_100 ?? 0),
-          }));
-        }),
+            return results.map(result => ({
+              id: result.id,
+              name: result.name,
+              kcal_100: Number(result.kcal_100 ?? 0),
+              protein_g_100: Number(result.protein_g_100 ?? 0),
+              carbs_g_100: Number(result.carbs_g_100 ?? 0),
+              fat_g_100: Number(result.fat_g_100 ?? 0),
+            }));
+          },
+          {
+            onProgress: progress => {
+              setAnalysisProgress({
+                ...progress,
+                phase: 'ingredients',
+                percentage: progress.total === 0 ? 0 : Math.round((progress.completed / progress.total) * 90),
+              });
+            },
+          },
+        ),
         fetchMenuImportCalendarSnapshot(dates),
       ]);
 
+      setAnalysisProgress({
+        completed: resolutions.length,
+        total: resolutions.length,
+        phase: 'preparing',
+        percentage: 95,
+      });
       const nextPreview = buildMenuImportPreview(parsed.value, resolutions, calendarSnapshot.logs, calendarSnapshot);
 
       setPreview(nextPreview);
@@ -109,6 +135,7 @@ export function useMenuImport() {
     } finally {
       analyzeInFlightRef.current = false;
       setIsAnalyzing(false);
+      setAnalysisProgress(null);
     }
   }, [user]);
 
@@ -174,6 +201,7 @@ export function useMenuImport() {
     validationErrors,
     preview,
     isAnalyzing,
+    analysisProgress,
     isImporting,
     isLoading: isAnalyzing || isImporting,
     requiresReanalysis,

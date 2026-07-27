@@ -67,6 +67,15 @@ export type MenuImportPreview = {
   meals: MenuImportPreviewMeal[];
 };
 
+export type MenuImportIngredientProgress = {
+  completed: number;
+  total: number;
+};
+
+export type ResolveMenuImportIngredientsOptions = {
+  onProgress?: (progress: MenuImportIngredientProgress) => void;
+};
+
 const MAX_CANDIDATES = 5;
 const SEARCH_CONCURRENCY = 4;
 
@@ -142,25 +151,33 @@ const prepareCandidates = (
 export async function resolveMenuImportIngredients(
   document: MenuImportDocument,
   search: (name: string) => Promise<MenuImportIngredientCandidate[]>,
+  options: ResolveMenuImportIngredientsOptions = {},
 ): Promise<MenuImportIngredientResolution[]> {
   const ingredientNames = Array.from(getUniqueIngredientNames(document).entries());
+  let completed = 0;
+  options.onProgress?.({ completed, total: ingredientNames.length });
   let resolutions: MenuImportIngredientResolution[] = [];
 
   for (let index = 0; index < ingredientNames.length; index += SEARCH_CONCURRENCY) {
     const batch = ingredientNames.slice(index, index + SEARCH_CONCURRENCY);
     const batchResolutions = await Promise.all(
       batch.map(async ([ingredientKey, sourceName]) => {
-        const searchResults = await search(ingredientKey);
-        const candidates = prepareCandidates(searchResults, ingredientKey);
-        const selectedCandidate =
-          candidates.find(candidate => normalizeIngredientName(candidate.name) === ingredientKey) ?? null;
+        try {
+          const searchResults = await search(ingredientKey);
+          const candidates = prepareCandidates(searchResults, ingredientKey);
+          const selectedCandidate =
+            candidates.find(candidate => normalizeIngredientName(candidate.name) === ingredientKey) ?? null;
 
-        return {
-          ingredientKey,
-          sourceName,
-          candidates,
-          selectedCandidate,
-        };
+          return {
+            ingredientKey,
+            sourceName,
+            candidates,
+            selectedCandidate,
+          };
+        } finally {
+          completed += 1;
+          options.onProgress?.({ completed, total: ingredientNames.length });
+        }
       }),
     );
     resolutions = [...resolutions, ...batchResolutions];

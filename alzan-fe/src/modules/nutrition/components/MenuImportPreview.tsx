@@ -135,15 +135,17 @@ export const MenuImportPreview = memo(function MenuImportPreview({
 
   return (
     <FlatList
+      style={styles.list}
       data={preview?.meals ?? []}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       ListHeaderComponent={listHeader}
       ListFooterComponent={listFooter}
-      contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset + 24 }]}
+      contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset + 96 }]}
       ItemSeparatorComponent={MealSeparator}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      nestedScrollEnabled
       initialNumToRender={5}
       maxToRenderPerBatch={6}
       windowSize={7}
@@ -154,6 +156,9 @@ export const MenuImportPreview = memo(function MenuImportPreview({
 const MealSeparator = () => <View style={styles.separator} />;
 
 const styles = StyleSheet.create({
+  list: {
+    flex: 1,
+  },
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
