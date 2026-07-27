@@ -1098,42 +1098,46 @@ export const NutritionSettingsScreen = () => {
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.shoppingListStartDayTitle'), 'shoppingList')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
-              <Text style={[styles.toggleLabel, { color: themeColors.textPrimary }]}>
-                {t('nutrition.shoppingListStartDayLabel')}
-              </Text>
-              <Text style={[styles.toggleDesc, { color: themeColors.textSecondary }]}>
-                {t('nutrition.shoppingListStartDayHint')}
-              </Text>
-              <View style={styles.shoppingDayGrid}>
-                {SHOPPING_LIST_DAYS.map(day => {
-                  const isSelected = day.value === shoppingListStartDay;
-                  return (
-                    <TouchableOpacity
-                      key={day.value}
-                      style={[
-                        styles.shoppingDayButton,
-                        {
-                          borderColor: isSelected ? themeColors.primary : themeColors.border,
-                          backgroundColor: isSelected ? themeColors.primary + '14' : 'transparent',
-                        },
-                      ]}
-                      onPress={() => updateNutritionPrefs({ shopping_list_start_day: day.value })}
-                      activeOpacity={0.75}
-                      accessibilityRole="button"
-                      accessibilityLabel={t(day.labelKey)}
-                      accessibilityState={{ selected: isSelected }}
-                    >
-                      <Text
+              <View style={styles.shoppingListSettingContent}>
+                <View>
+                  <Text style={[styles.toggleLabel, { color: themeColors.textPrimary }]}>
+                    {t('nutrition.shoppingListStartDayLabel')}
+                  </Text>
+                  <Text style={[styles.toggleDesc, { color: themeColors.textSecondary }]}>
+                    {t('nutrition.shoppingListStartDayHint')}
+                  </Text>
+                </View>
+                <View style={styles.shoppingDayGrid}>
+                  {SHOPPING_LIST_DAYS.map(day => {
+                    const isSelected = day.value === shoppingListStartDay;
+                    return (
+                      <TouchableOpacity
+                        key={day.value}
                         style={[
-                          styles.shoppingDayButtonText,
-                          { color: isSelected ? themeColors.primary : themeColors.textSecondary },
+                          styles.shoppingDayButton,
+                          {
+                            borderColor: isSelected ? themeColors.primary : themeColors.border,
+                            backgroundColor: isSelected ? themeColors.primary + '14' : 'transparent',
+                          },
                         ]}
+                        onPress={() => updateNutritionPrefs({ shopping_list_start_day: day.value })}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={t(day.labelKey)}
+                        accessibilityState={{ selected: isSelected }}
                       >
-                        {t(day.shortLabelKey)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                        <Text
+                          style={[
+                            styles.shoppingDayButtonText,
+                            { color: isSelected ? themeColors.primary : themeColors.textSecondary },
+                          ]}
+                        >
+                          {t(day.shortLabelKey)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             </View>
           </View>
@@ -2892,16 +2896,19 @@ const styles = StyleSheet.create({
   },
   shoppingDayGrid: {
     flexDirection: 'row',
-    gap: 4,
-    marginTop: spacing.m,
+    gap: spacing.s,
+  },
+  shoppingListSettingContent: {
+    padding: spacing.m,
+    gap: spacing.m,
   },
   shoppingDayButton: {
     flex: 1,
     minHeight: 40,
-    paddingHorizontal: 0,
+    paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xs,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
