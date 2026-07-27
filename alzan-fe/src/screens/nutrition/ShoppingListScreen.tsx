@@ -41,6 +41,26 @@ const formatPeriodDate = (date: string) =>
     es: 'EEE d MMM',
   });
 
+const copyTextToClipboard = async (text: string): Promise<void> => {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document === 'undefined') throw new Error('Clipboard is unavailable');
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textArea);
+  if (!copied) throw new Error('Clipboard copy failed');
+};
+
 export const ShoppingListScreen = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -132,23 +152,7 @@ export const ShoppingListScreen = () => {
     if (!exportText || Platform.OS !== 'web') return;
 
     try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(exportText);
-      } else if (typeof document !== 'undefined') {
-        const textArea = document.createElement('textarea');
-        textArea.value = exportText;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        const copied = document.execCommand('copy');
-        document.body.removeChild(textArea);
-        if (!copied) throw new Error('Clipboard copy failed');
-      } else {
-        throw new Error('Clipboard is unavailable');
-      }
-
+      await copyTextToClipboard(exportText);
       Alert.alert(t('common.done'), t('nutrition.shoppingListCopied'));
     } catch {
       Alert.alert(t('common.error'), t('nutrition.shoppingListCopyError'));

@@ -11,7 +11,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Copy } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Alert } from '../../components/common/Alert';
@@ -20,10 +20,31 @@ import type { TranslationKey } from '../../i18n/locales/en';
 import { MenuImportEditor } from '../../modules/nutrition/components/MenuImportEditor';
 import { MenuImportPreview } from '../../modules/nutrition/components/MenuImportPreview';
 import { useMenuImport } from '../../modules/nutrition/hooks/useMenuImport';
+import { MENU_IMPORT_TEMPLATE } from '../../modules/nutrition/services/menuImportTemplate';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import type { NutritionScreenNavigationProp } from '../../types/navigation.types';
 
 type TranslationOptions = Record<string, unknown>;
+
+const copyTextToClipboard = async (text: string): Promise<void> => {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document === 'undefined') throw new Error('Clipboard is unavailable');
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textArea);
+  if (!copied) throw new Error('Clipboard copy failed');
+};
 
 export const MenuImportScreen = () => {
   const { t } = useTranslation();
@@ -88,6 +109,17 @@ export const MenuImportScreen = () => {
     void handleImport();
   }, [handleImport]);
 
+  const handleCopyTemplate = useCallback(async () => {
+    if (Platform.OS !== 'web') return;
+
+    try {
+      await copyTextToClipboard(MENU_IMPORT_TEMPLATE);
+      Alert.alert(translate('common.done'), translate('nutrition.menuImportTemplateCopied'));
+    } catch {
+      Alert.alert(translate('common.error'), translate('nutrition.menuImportTemplateCopyError'));
+    }
+  }, [translate]);
+
   const editor = useMemo(
     () => (
       <MenuImportEditor
@@ -121,27 +153,45 @@ export const MenuImportScreen = () => {
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
             {translate('nutrition.menuImportTitle')}
           </Text>
-          {preview !== null ? (
-            <TouchableOpacity
-              style={[
-                styles.headerImportButton,
-                { backgroundColor: canImport ? colors.primary : colors.disabledButton },
-              ]}
-              onPress={handleImportPress}
-              disabled={!canImport}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel={translate('nutrition.menuImportSubmitAccessibility')}
-              accessibilityState={{ busy: isImporting, disabled: !canImport }}
-            >
-              {isImporting ? <ActivityIndicator color={colors.white} /> : null}
-              <Text style={[styles.headerImportText, { color: colors.white }]}>
-                {translate('nutrition.menuImportSubmitShort')}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.headerSpacer} />
-          )}
+          <View style={styles.headerActions}>
+            {Platform.OS === 'web' && (
+              <TouchableOpacity
+                style={[
+                  styles.headerTemplateButton,
+                  { borderColor: colors.border, backgroundColor: colors.surfaceSolid },
+                ]}
+                onPress={() => void handleCopyTemplate()}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={translate('nutrition.menuImportCopyTemplateAccessibility')}
+              >
+                <Copy size={17} color={colors.primary} strokeWidth={2.2} />
+                <Text style={[styles.headerTemplateText, { color: colors.primary }]}>
+                  {translate('nutrition.menuImportCopyTemplateShort')}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {preview !== null ? (
+              <TouchableOpacity
+                style={[
+                  styles.headerImportButton,
+                  { backgroundColor: canImport ? colors.primary : colors.disabledButton },
+                ]}
+                onPress={handleImportPress}
+                disabled={!canImport}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={translate('nutrition.menuImportSubmitAccessibility')}
+                accessibilityState={{ busy: isImporting, disabled: !canImport }}
+              >
+                {isImporting ? <ActivityIndicator color={colors.white} /> : null}
+                <Text style={[styles.headerImportText, { color: colors.white }]}>
+                  {translate('nutrition.menuImportSubmitShort')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {preview === null && Platform.OS !== 'web' ? <View style={styles.headerSpacer} /> : null}
+          </View>
         </View>
 
         <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -186,6 +236,13 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: 'center',
   },
+  headerActions: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
   headerSpacer: {
     width: 44,
     height: 44,
@@ -202,6 +259,20 @@ const styles = StyleSheet.create({
   },
   headerImportText: {
     fontSize: 13,
+    fontWeight: '700',
+  },
+  headerTemplateButton: {
+    minHeight: 44,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  headerTemplateText: {
+    fontSize: 12,
     fontWeight: '700',
   },
 });

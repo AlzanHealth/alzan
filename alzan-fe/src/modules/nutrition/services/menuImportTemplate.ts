@@ -1,0 +1,23 @@
+export const MENU_IMPORT_TEMPLATE = `{
+  "format": "alzan-menu-plan",
+  "version": 1,
+  "menu_name": "{{NOMBRE_DEL_MENU}}",
+  "days": [
+    {
+      "date": "YYYY-MM-DD",
+      "meals": [
+        {
+          "meal_type": "breakfast",
+          "name": "{{NOMBRE_DE_LA_COMIDA}}",
+          "ingredients": [
+            {
+              "name": "{{NOMBRE_DEL_INGREDIENTE}}",
+              "quantity_g": 100
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+`;
