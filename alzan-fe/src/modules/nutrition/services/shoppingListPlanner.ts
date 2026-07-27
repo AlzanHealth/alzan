@@ -153,3 +153,6 @@ export const formatShoppingQuantity = (quantityGrams: number): string => {
 
   return `${roundedGrams} g`;
 };
+
+export const formatShoppingListForExport = (ingredients: ShoppingListIngredient[]): string =>
+  ingredients.map(ingredient => `${ingredient.name} - ${formatShoppingQuantity(ingredient.quantity_g)}`).join('\n');

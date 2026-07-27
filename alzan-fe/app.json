@@ -66,6 +66,7 @@
       ],
       "./plugins/withOptimizedR8",
       "./plugins/withAlzanAppleHealth",
+      "./plugins/withAlzanAppleReminders",
       "./plugins/withAlzanHealthConnect",
       "expo-video",
       "@maplibre/maplibre-react-native"

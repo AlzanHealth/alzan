@@ -2,12 +2,18 @@ import assert from 'node:assert/strict';
 import {
   aggregateShoppingIngredients,
   formatShoppingQuantity,
+  formatShoppingListForExport,
   getActiveShoppingMealLogIds,
   getShoppingCycleRange,
   groupShoppingIngredientsByCategory,
   type ShoppingMealLogInput,
   type ShoppingIngredientInput,
 } from './shoppingListPlanner';
+import {
+  getShoppingListCompletionStorageKey,
+  parseShoppingListCompletionKeys,
+  serializeShoppingListCompletionKeys,
+} from './shoppingListCompletion';
 import type { IngredientsCategory } from '../../../types/requests.types';
 
 function run() {
@@ -15,6 +21,8 @@ function run() {
   testHandlesMonthAndYearBoundaries();
   testAggregatesCanonicalAndNormalizedIngredients();
   testFormatsShoppingQuantities();
+  testFormatsShoppingListForExport();
+  testPersistsShoppingListCompletionKeys();
   testGroupsIngredientsByDatabaseCategory();
   testExcludesSkippedMealsAndScalesToLargeMenus();
   console.log('shoppingListService: all assertions passed');
@@ -73,6 +81,27 @@ function testFormatsShoppingQuantities() {
   assert.equal(formatShoppingQuantity(850), '850 g');
   assert.equal(formatShoppingQuantity(1000), '1 kg');
   assert.equal(formatShoppingQuantity(1250), '1.25 kg');
+}
+
+function testFormatsShoppingListForExport() {
+  assert.equal(
+    formatShoppingListForExport([
+      { key: 'id:chicken', name: 'Pechuga de pollo', quantity_g: 400, category: 'proteina_animal' },
+      { key: 'id:oil', name: 'Aceite de oliva', quantity_g: 1250, category: 'grasa' },
+    ]),
+    'Pechuga de pollo - 400 g\nAceite de oliva - 1.25 kg',
+  );
+}
+
+function testPersistsShoppingListCompletionKeys() {
+  assert.equal(
+    getShoppingListCompletionStorageKey('user-1', '2026-07-27'),
+    'alzan.shopping-list.completed.user-1.2026-07-27',
+  );
+  const serialized = serializeShoppingListCompletionKeys(new Set(['id:tomato', 'id:chicken', 'id:tomato']));
+  assert.equal(serialized, '["id:chicken","id:tomato"]');
+  assert.deepEqual(parseShoppingListCompletionKeys(serialized), new Set(['id:chicken', 'id:tomato']));
+  assert.deepEqual(parseShoppingListCompletionKeys('not-json'), new Set());
 }
 
 function testGroupsIngredientsByDatabaseCategory() {
