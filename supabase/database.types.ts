@@ -5186,6 +5186,10 @@ export type Database = {
           weight_trend: number
         }[]
       }
+      get_nutrition_menu_import_snapshot: {
+        Args: { p_dates: string[] }
+        Returns: Json
+      }
       get_training_calendar_marks: {
         Args: {
           p_end_date: string
@@ -5202,6 +5206,16 @@ export type Database = {
         }[]
       }
       import_ingredients_batch: { Args: { payload: Json }; Returns: number }
+      import_nutrition_menu: {
+        Args: {
+          p_dates: string[]
+          p_expected_snapshot_token: string
+          p_items: Json
+          p_meals: Json
+          p_replacement_ids: string[]
+        }
+        Returns: Json
+      }
       import_recipes_batch: { Args: { payload: Json }; Returns: number }
       log_recipe_usage: {
         Args: {
@@ -5209,6 +5223,10 @@ export type Database = {
           p_recipe_id: string
         }
         Returns: undefined
+      }
+      nutrition_menu_snapshot_token: {
+        Args: { p_dates: string[]; p_user_id: string }
+        Returns: string
       }
       persist_wearable_activity_bundle: {
         Args: {

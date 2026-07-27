@@ -260,7 +260,7 @@ export const nutritionService = {
       carbs_g: finalTotals.carbs_g,
       fats_g: finalTotals.fats_g,
       data_quality: dataQuality,
-      origin: 'user',
+      origin: logData.origin ?? 'user',
       calc_version: 'nutrition_v1',
       source: logData.source || 'manual',
     };
@@ -313,7 +313,7 @@ export const nutritionService = {
           carbs_g: itemCarbs,
           fats_g: itemFats,
           data_quality: ing.source === 'manual' ? 'manual' : 'automatic',
-          origin: 'user',
+          origin: logData.origin ?? 'user',
         };
       });
 

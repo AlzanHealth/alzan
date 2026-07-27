@@ -20,7 +20,8 @@
     "eas-build-post-install": "pnpm openapi:generate",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\" --fix",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\"",
-    "verify:diet-copy": "tsx src/modules/nutrition/services/dietCopyPlanner.spec.ts"
+    "verify:diet-copy": "tsx src/modules/nutrition/services/dietCopyPlanner.spec.ts",
+    "verify:menu-import": "tsx src/modules/nutrition/services/menuImportContract.spec.ts && tsx src/modules/nutrition/services/menuImportPlanner.spec.ts && tsx src/modules/nutrition/services/menuImportPersistence.spec.ts && tsx src/modules/nutrition/services/menuImportFourWeek.spec.ts && tsx src/modules/nutrition/services/menuImportStatus.spec.ts && tsx src/modules/nutrition/services/menuImportOperationGuard.spec.ts"
   },
   "dependencies": {
     "@callstack/liquid-glass": "^0.7.0",

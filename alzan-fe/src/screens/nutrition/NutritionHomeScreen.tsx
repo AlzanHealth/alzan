@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, Plus, BookOpen, CalendarCheck } from 'lucide-react-native';
+import { Settings, Plus, BookOpen, CalendarCheck, FileInput } from 'lucide-react-native';
 import { addDays, format, isValid, parseISO, subDays } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -276,10 +276,28 @@ export const NutritionHomeScreen = () => {
         <View style={styles.topBar}>
           <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>{t('tabs.nutrition')}</Text>
           <View style={styles.topActions}>
-            <TouchableOpacity onPress={() => navigation.navigate('RecipeLibrary', { date: formattedDate })}>
+            <TouchableOpacity
+              style={styles.topAction}
+              onPress={() => navigation.navigate('MenuImport')}
+              accessibilityRole="button"
+              accessibilityLabel={t('nutrition.menuImportOpenAccessibility')}
+            >
+              <FileInput color={themeColors.textPrimary} size={24} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.topAction}
+              onPress={() => navigation.navigate('RecipeLibrary', { date: formattedDate })}
+              accessibilityRole="button"
+              accessibilityLabel={t('nutrition.recipeLibraryTitle')}
+            >
               <BookOpen color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+            <TouchableOpacity
+              style={styles.topAction}
+              onPress={() => navigation.navigate('Settings')}
+              accessibilityRole="button"
+              accessibilityLabel={t('tabs.settings')}
+            >
               <Settings color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
           </View>
@@ -384,23 +402,27 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'center', // Center title
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    position: 'relative',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 8,
   },
   headerTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '700',
   },
   topActions: {
-    position: 'absolute',
-    right: 16,
-    top: 12,
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 2,
+  },
+  topAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dateSection: {
     // marginBottom: 8 // Removed since DaySwitcher has its own spacing

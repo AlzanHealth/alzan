@@ -8,14 +8,19 @@ import {
 import { DailyMealItem, AdherenceStatus, Macros } from '../types';
 import { format } from 'date-fns';
 import { DEFAULT_MACROS } from '../constants';
+import { getDailyMealMacros, getMenuImportMealState } from '../services/menuImportStatus';
 import { shouldShowPendingPlannedMeals } from '../services/nutritionVacation';
 import { useAuth } from '../../../context/AuthContext';
+import { usePreferences } from '../../../hooks/settings/usePreferences';
 import { supabase } from '../../../lib/supabaseClient';
 import { DietTemplateMeal, MealLog } from '../../../types/requests.types';
+import { useCurrentNutritionDate } from './useCurrentNutritionDate';
 
 export function useDayNutrition(date: Date) {
   const { user } = useAuth();
+  const { preferences } = usePreferences();
   const dateStr = format(date, 'yyyy-MM-dd');
+  const currentNutritionDate = useCurrentNutritionDate(preferences?.nutrition_prefs?.nutrition_day_rollover_time);
   const { data: activeTemplateId } = useActiveDietTemplateId();
 
   // 1. Get Logged Meals for this day
@@ -81,32 +86,35 @@ export function useDayNutrition(date: Date) {
     if (log) {
       // It's done (or skipped)
       const isSkipped = log.adherence_status === 'skipped';
+      const importedState = getMenuImportMealState(log, currentNutritionDate);
+      const isImportedPlanned = importedState === 'planned';
+      const logMacros = getDailyMealMacros(log);
       dailyMeals.push({
         templateMeal: plan,
         log,
-        status: log.adherence_status as AdherenceStatus,
+        status:
+          importedState === 'planned'
+            ? 'pending'
+            : importedState === 'assumed_eaten'
+              ? 'extra_meal'
+              : (log.adherence_status as AdherenceStatus),
         mealType: plan.meal_type,
         displayName: log.name || plan.base_name, // Log name overrides if done_with_changes
         orderIndex: plan.order_index,
-        macros: isSkipped
-          ? { ...DEFAULT_MACROS }
+        macros: logMacros,
+        targetMacros: isImportedPlanned
+          ? logMacros
           : {
-              kcal: log.kcal || 0,
-              protein_g: log.protein_g || 0,
-              carbs_g: log.carbs_g || 0,
-              fats_g: log.fats_g || 0,
+              kcal: plan.target_kcal || 0,
+              protein_g: plan.target_protein_g || 0,
+              carbs_g: plan.target_carbs_g || 0,
+              fats_g: plan.target_fats_g || 0,
             },
-        targetMacros: {
-          kcal: plan.target_kcal || 0,
-          protein_g: plan.target_protein_g || 0,
-          carbs_g: plan.target_carbs_g || 0,
-          fats_g: plan.target_fats_g || 0,
-        },
         templateMealId: plan.id,
         logId: log.id,
       });
 
-      if (!isSkipped) {
+      if (!isSkipped && !isImportedPlanned) {
         totals.kcal += log.kcal || 0;
         totals.protein_g += log.protein_g || 0;
         totals.carbs_g += log.carbs_g || 0;
@@ -142,27 +150,29 @@ export function useDayNutrition(date: Date) {
   const extraLogs = logs?.filter(l => !l.diet_template_meal_id || l.adherence_status === 'extra_meal') || [];
 
   extraLogs.forEach((log: MealLog) => {
+    const importedState = getMenuImportMealState(log, currentNutritionDate);
+    const isImportedPlanned = importedState === 'planned';
+    const isSkipped = log.adherence_status === 'skipped';
+    const logMacros = getDailyMealMacros(log);
     const item: DailyMealItem = {
       log,
-      status: 'extra_meal',
+      status: isImportedPlanned ? 'pending' : isSkipped ? 'skipped' : 'extra_meal',
       mealType: log.meal_type,
       displayName: log.name || 'Extra Meal',
       orderIndex: 999, // Push to bottom
-      macros: {
-        kcal: log.kcal || 0,
-        protein_g: log.protein_g || 0,
-        carbs_g: log.carbs_g || 0,
-        fats_g: log.fats_g || 0,
-      },
+      macros: logMacros,
+      targetMacros: isImportedPlanned ? logMacros : undefined,
       logId: log.id,
     };
 
     dailyMeals.push(item);
 
-    totals.kcal += log.kcal || 0;
-    totals.protein_g += log.protein_g || 0;
-    totals.carbs_g += log.carbs_g || 0;
-    totals.fats_g += log.fats_g || 0;
+    if (!isImportedPlanned && !isSkipped) {
+      totals.kcal += log.kcal || 0;
+      totals.protein_g += log.protein_g || 0;
+      totals.carbs_g += log.carbs_g || 0;
+      totals.fats_g += log.fats_g || 0;
+    }
   });
 
   // Sort by order

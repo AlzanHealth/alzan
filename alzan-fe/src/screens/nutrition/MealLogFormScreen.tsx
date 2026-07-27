@@ -68,6 +68,7 @@ import {
   formatNutritionDayDate,
   normalizeNutritionDayRolloverTime,
 } from '../../modules/nutrition/services/nutritionDay';
+import { getMealSaveProvenance } from '../../modules/nutrition/services/menuImportStatus';
 
 type RecipeIngredientItem = Awaited<ReturnType<typeof getRecipeIngredients>>[number];
 type EditableUserRecipeForBuilder = NonNullable<Awaited<ReturnType<typeof getEditableUserRecipe>>>;
@@ -1409,6 +1410,7 @@ export const MealLogFormScreen = () => {
 
     setIsSaving(true);
     try {
+      const existingProvenance = mealItem?.log ? getMealSaveProvenance(mealItem.log) : null;
       const logData = {
         id: mealItem?.log?.id,
         meal_type: mealType,
@@ -1418,7 +1420,9 @@ export const MealLogFormScreen = () => {
         protein_g: finalMacros.protein_g,
         carbs_g: finalMacros.carbs_g,
         fats_g: finalMacros.fats_g,
-        source: 'manual',
+        source: existingProvenance?.source ?? 'manual',
+        origin: existingProvenance?.origin,
+        adherence_status: existingProvenance?.adherence_status,
         source_recipe_id: mealSourceRecipeId,
       };
 

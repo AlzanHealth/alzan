@@ -1,0 +1,97 @@
+{
+  "format": "alzan-menu-plan",
+  "version": 1,
+  "menu_name": "Menú mediterráneo de dos días",
+  "days": [
+    {
+      "date": "2026-08-03",
+      "meals": [
+        {
+          "meal_type": "breakfast",
+          "name": "Avena con plátano",
+          "ingredients": [
+            {
+              "name": "Copos de avena",
+              "quantity_g": 60
+            },
+            {
+              "name": "Leche semidesnatada",
+              "quantity_g": 200
+            },
+            {
+              "name": "Plátano",
+              "quantity_g": 120
+            }
+          ]
+        },
+        {
+          "meal_type": "lunch",
+          "name": "Arroz con pollo y verduras",
+          "ingredients": [
+            {
+              "name": "Arroz integral cocido",
+              "quantity_g": 180
+            },
+            {
+              "name": "Pechuga de pollo",
+              "quantity_g": 160
+            },
+            {
+              "name": "Calabacín",
+              "quantity_g": 120
+            },
+            {
+              "name": "Aceite de oliva virgen extra",
+              "quantity_g": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "date": "2026-08-04",
+      "meals": [
+        {
+          "meal_type": "breakfast",
+          "name": "Yogur con frutos rojos y nueces",
+          "ingredients": [
+            {
+              "name": "Yogur natural",
+              "quantity_g": 200
+            },
+            {
+              "name": "Frutos rojos",
+              "quantity_g": 100
+            },
+            {
+              "name": "Nueces",
+              "quantity_g": 20
+            }
+          ]
+        },
+        {
+          "meal_type": "dinner",
+          "name": "Salmón con patata y espinacas",
+          "ingredients": [
+            {
+              "name": "Salmón",
+              "quantity_g": 170
+            },
+            {
+              "name": "Patata cocida",
+              "quantity_g": 220
+            },
+            {
+              "name": "Espinacas",
+              "quantity_g": 120
+            },
+            {
+              "name": "Aceite de oliva virgen extra",
+              "quantity_g": 8
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
