@@ -8,7 +8,13 @@ import { Home, Dumbbell, Apple, Heart, PlayCircle, MessageCircle, User } from 'l
 import { useTheme } from '../context/ThemeContext';
 import { LiquidGlassFooter } from '../components/common/LiquidGlassFooter';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getTabBarTopFromScreenBottom, TAB_BAR_HEIGHT, TabBarLayoutProvider, useTabBarLayout } from './tabBarLayout';
+import {
+  getTabBarTopFromScreenBottom,
+  TAB_BAR_FLOATING_GAP,
+  TAB_BAR_HEIGHT,
+  TabBarLayoutProvider,
+  useTabBarLayout,
+} from './tabBarLayout';
 
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { TrainingStack } from './TrainingStack';
@@ -190,7 +196,7 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
     <View
       ref={containerRef}
       testID="floating-tab-bar"
-      style={[styles.container, { bottom: safeAreaBottom }]}
+      style={[styles.container, { bottom: safeAreaBottom + TAB_BAR_FLOATING_GAP }]}
       onLayout={measureTabBarPosition}
     >
       <LiquidGlassFooter borderRadius={40} style={{ ...styles.blurContainer, height: TAB_BAR_HEIGHT }}>

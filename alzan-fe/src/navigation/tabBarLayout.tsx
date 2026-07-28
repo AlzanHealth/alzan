@@ -3,13 +3,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getInitialTabBarTopFromScreenBottom,
   getTabBarBottomInset,
+  getTabBarBottomOffset,
   getTabBarTopFromScreenBottom,
 } from './tabBarLayoutGeometry';
 
 export const TAB_BAR_HEIGHT = 75;
 export const TAB_BAR_CLEARANCE = 12;
+export const TAB_BAR_FLOATING_GAP = 20;
 
-export { getInitialTabBarTopFromScreenBottom, getTabBarBottomInset, getTabBarTopFromScreenBottom };
+export {
+  getInitialTabBarTopFromScreenBottom,
+  getTabBarBottomInset,
+  getTabBarBottomOffset,
+  getTabBarTopFromScreenBottom,
+};
 
 // Shares the measured position of the floating tab bar so footers/overlays
 // (e.g. the nutrition summary card) can sit above it on ANY device, web or
@@ -34,12 +41,12 @@ const TabBarLayoutContext = createContext<TabBarLayout>({
 export const TabBarLayoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { bottom: safeAreaBottom } = useSafeAreaInsets();
   const [topFromScreenBottom, setValue] = useState(() =>
-    getInitialTabBarTopFromScreenBottom(safeAreaBottom, TAB_BAR_HEIGHT),
+    getInitialTabBarTopFromScreenBottom(safeAreaBottom, TAB_BAR_HEIGHT, TAB_BAR_FLOATING_GAP),
   );
   const [summaryOverlayHeight, setSummaryOverlayHeight] = useState(0);
 
   useEffect(() => {
-    setValue(getInitialTabBarTopFromScreenBottom(safeAreaBottom, TAB_BAR_HEIGHT));
+    setValue(getInitialTabBarTopFromScreenBottom(safeAreaBottom, TAB_BAR_HEIGHT, TAB_BAR_FLOATING_GAP));
   }, [safeAreaBottom]);
 
   // Ignore sub-pixel noise to avoid render loops from repeated onLayout calls.
