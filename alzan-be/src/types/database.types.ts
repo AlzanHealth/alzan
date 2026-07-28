@@ -1672,6 +1672,7 @@ export type Database = {
       };
       endurance_workout_templates: {
         Row: {
+          auto_delete_after_end: boolean;
           base_load: string | null;
           base_name: string;
           board: string | null;
@@ -1696,9 +1697,11 @@ export type Database = {
           ski_type: string | null;
           slope_type: string | null;
           snowboard_type: string | null;
+          source: string;
           sport_type: Database['public']['Enums']['sport_type_enum'];
           stroke: string | null;
           surface: string | null;
+          template_family_key: string | null;
           total_distance_m: number | null;
           total_duration_s: number | null;
           updated_at: string;
@@ -1707,6 +1710,7 @@ export type Database = {
           workout_goal: string | null;
         };
         Insert: {
+          auto_delete_after_end?: boolean;
           base_load?: string | null;
           base_name: string;
           board?: string | null;
@@ -1731,9 +1735,11 @@ export type Database = {
           ski_type?: string | null;
           slope_type?: string | null;
           snowboard_type?: string | null;
+          source?: string;
           sport_type: Database['public']['Enums']['sport_type_enum'];
           stroke?: string | null;
           surface?: string | null;
+          template_family_key?: string | null;
           total_distance_m?: number | null;
           total_duration_s?: number | null;
           updated_at?: string;
@@ -1742,6 +1748,7 @@ export type Database = {
           workout_goal?: string | null;
         };
         Update: {
+          auto_delete_after_end?: boolean;
           base_load?: string | null;
           base_name?: string;
           board?: string | null;
@@ -1766,9 +1773,11 @@ export type Database = {
           ski_type?: string | null;
           slope_type?: string | null;
           snowboard_type?: string | null;
+          source?: string;
           sport_type?: Database['public']['Enums']['sport_type_enum'];
           stroke?: string | null;
           surface?: string | null;
+          template_family_key?: string | null;
           total_distance_m?: number | null;
           total_duration_s?: number | null;
           updated_at?: string;
@@ -4227,6 +4236,7 @@ export type Database = {
           privacy_settings: Json | null;
           temperature_unit: string;
           timezone: string | null;
+          training_settings: Json;
           user_id: string;
           weight_unit: Database['public']['Enums']['user_preferences_weight_unit'];
         };
@@ -4245,6 +4255,7 @@ export type Database = {
           privacy_settings?: Json | null;
           temperature_unit?: string;
           timezone?: string | null;
+          training_settings?: Json;
           user_id: string;
           weight_unit?: Database['public']['Enums']['user_preferences_weight_unit'];
         };
@@ -4263,6 +4274,7 @@ export type Database = {
           privacy_settings?: Json | null;
           temperature_unit?: string;
           timezone?: string | null;
+          training_settings?: Json;
           user_id?: string;
           weight_unit?: Database['public']['Enums']['user_preferences_weight_unit'];
         };
@@ -4757,6 +4769,66 @@ export type Database = {
           },
         ];
       };
+      workout_template_exercise_progressions: {
+        Row: {
+          created_at: string;
+          id: string;
+          rest_seconds: number | null;
+          target_reps_max: number | null;
+          target_reps_min: number | null;
+          target_rpe: number | null;
+          target_sets: number | null;
+          target_weight_kg: number | null;
+          updated_at: string;
+          week_index: number;
+          workout_template_exercise_id: string;
+          workout_template_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          rest_seconds?: number | null;
+          target_reps_max?: number | null;
+          target_reps_min?: number | null;
+          target_rpe?: number | null;
+          target_sets?: number | null;
+          target_weight_kg?: number | null;
+          updated_at?: string;
+          week_index: number;
+          workout_template_exercise_id: string;
+          workout_template_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          rest_seconds?: number | null;
+          target_reps_max?: number | null;
+          target_reps_min?: number | null;
+          target_rpe?: number | null;
+          target_sets?: number | null;
+          target_weight_kg?: number | null;
+          updated_at?: string;
+          week_index?: number;
+          workout_template_exercise_id?: string;
+          workout_template_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'workout_template_exercise_progressions_exercise_fkey';
+            columns: ['workout_template_exercise_id'];
+            isOneToOne: false;
+            referencedRelation: 'workout_template_exercises';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'workout_template_exercise_progressions_template_fkey';
+            columns: ['workout_template_id'];
+            isOneToOne: false;
+            referencedRelation: 'workout_templates';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       workout_template_exercises: {
         Row: {
           drop_set_mode: string;
@@ -4867,37 +4939,49 @@ export type Database = {
       };
       workout_templates: {
         Row: {
+          auto_delete_after_end: boolean;
           base_name: string;
           created_at: string;
           description: string | null;
           id: string;
           modality: string | null;
+          recurrence_end_date: string | null;
+          recurrence_start_date: string | null;
           source: string;
           suggested_day_of_week: number | null;
+          template_family_key: string | null;
           updated_at: string;
           user_id: string;
           workout_goal: string | null;
         };
         Insert: {
+          auto_delete_after_end?: boolean;
           base_name: string;
           created_at?: string;
           description?: string | null;
           id?: string;
           modality?: string | null;
+          recurrence_end_date?: string | null;
+          recurrence_start_date?: string | null;
           source?: string;
           suggested_day_of_week?: number | null;
+          template_family_key?: string | null;
           updated_at?: string;
           user_id: string;
           workout_goal?: string | null;
         };
         Update: {
+          auto_delete_after_end?: boolean;
           base_name?: string;
           created_at?: string;
           description?: string | null;
           id?: string;
           modality?: string | null;
+          recurrence_end_date?: string | null;
+          recurrence_start_date?: string | null;
           source?: string;
           suggested_day_of_week?: number | null;
+          template_family_key?: string | null;
           updated_at?: string;
           user_id?: string;
           workout_goal?: string | null;

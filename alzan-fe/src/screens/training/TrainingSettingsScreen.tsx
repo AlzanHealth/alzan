@@ -48,7 +48,13 @@ const TrainingSettingsScreen = () => {
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { settings, toggleSetting, isLoading: isLoadingSettings } = useTrainingSettings();
+  const {
+    settings,
+    toggleSetting,
+    setAutoDeleteExpiredTemplates,
+    isLoading: isLoadingSettings,
+    isSavingAutoDelete,
+  } = useTrainingSettings();
 
   // Toggle Row Component
   const ToggleRow = ({
@@ -318,6 +324,14 @@ const TrainingSettingsScreen = () => {
                 value={settings.hapticsEnabled}
                 onValueChange={() => toggleSetting('hapticsEnabled')}
                 disabled={isLoadingSettings}
+              />
+              <View style={[styles.separator, dynamicStyles.divider]} />
+              <ToggleRow
+                label={t('training.autoDeleteExpiredTemplates')}
+                description={t('training.autoDeleteExpiredTemplatesDesc')}
+                value={settings.autoDeleteExpiredTemplates}
+                onValueChange={value => void setAutoDeleteExpiredTemplates(value)}
+                disabled={isLoadingSettings || isSavingAutoDelete}
               />
             </View>
           </View>

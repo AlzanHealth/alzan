@@ -1,0 +1,39 @@
+export const TRAINING_PLAN_IMPORT_TEMPLATE = `{
+  "format": "alzan-training-plan",
+  "version": 1,
+  "plan_name": "Plan de 4 semanas",
+  "start_date": "2026-08-03",
+  "end_date": "2026-08-30",
+  "weeks": [
+    {
+      "week_number": 1,
+      "sessions": [
+        {
+          "date": "2026-08-03",
+          "sport": "running",
+          "name": "Series 6 x 800 m",
+          "template_key": "series-800",
+          "workout_goal": "intervals",
+          "modality": "outdoor",
+          "distance_km": 8.5,
+          "duration_min": 50,
+          "running_steps": [
+            { "phase_type": "warmup", "duration_type": "time", "duration_s": 600 },
+            { "phase_type": "interval", "duration_type": "distance", "distance_m": 800, "repetitions": 6, "target_type": "pace", "target_min": 300, "progression_key": "work" },
+            { "phase_type": "cooldown", "duration_type": "time", "duration_s": 600 }
+          ]
+        },
+        {
+          "date": "2026-08-04",
+          "sport": "strength",
+          "name": "Fuerza tren inferior",
+          "template_key": "lower-body",
+          "workout_goal": "strength",
+          "exercises": [
+            { "exercise_id": "REEMPLAZAR_UUID", "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rest_seconds": 150 }
+          ]
+        }
+      ]
+    }
+  ]
+}`;

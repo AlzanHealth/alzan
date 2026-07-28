@@ -18,6 +18,7 @@ import { ExercisePrValuesScreen } from '../screens/training/ExercisePrValuesScre
 import { ExerciseSearchScreen } from '../screens/training/ExerciseSearchScreen';
 import { SportTemplatesListScreen } from '../screens/training/SportTemplatesListScreen';
 import { ActivityTypeSelectorScreen } from '../screens/training/ActivityTypeSelectorScreen';
+import { TrainingPlanImportScreen } from '../screens/training/TrainingPlanImportScreen';
 import { TrainingStackParamList } from '../types/navigation.types';
 
 const Stack = createStackNavigator<TrainingStackParamList>();
@@ -50,6 +51,7 @@ export const TrainingStack = () => {
       <Stack.Screen name="EnduranceWorkoutBuilder" component={EnduranceWorkoutBuilderScreen} />
       <Stack.Screen name="SportTemplatesList" component={SportTemplatesListScreen} />
       <Stack.Screen name="WeeklyPlan" component={WeeklyPlanScreen} />
+      <Stack.Screen name="TrainingPlanImport" component={TrainingPlanImportScreen} />
 
       {/* Planning & Integrations */}
       <Stack.Screen name="ExternalActivityLinking" component={ExternalActivityLinkingScreen} />

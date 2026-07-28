@@ -1,0 +1,65 @@
+{
+  "format": "alzan-training-plan",
+  "version": 1,
+  "plan_name": "Base running y fuerza",
+  "start_date": "2026-08-03",
+  "end_date": "2026-08-16",
+  "weeks": [
+    {
+      "week_number": 1,
+      "sessions": [
+        {
+          "date": "2026-08-03",
+          "sport": "running",
+          "name": "Series 5 x 800 m",
+          "template_key": "series-800",
+          "workout_goal": "intervals",
+          "modality": "outdoor",
+          "running_steps": [
+            { "phase_type": "warmup", "duration_type": "time", "duration_s": 600 },
+            { "phase_type": "interval", "duration_type": "distance", "distance_m": 800, "repetitions": 5, "target_type": "pace", "target_min": 300, "progression_key": "work" },
+            { "phase_type": "cooldown", "duration_type": "time", "duration_s": 600 }
+          ]
+        },
+        {
+          "date": "2026-08-04",
+          "sport": "strength",
+          "name": "Fuerza tren inferior",
+          "template_key": "lower-body",
+          "workout_goal": "strength",
+          "exercises": [
+            { "exercise_id": "UUID_SENTADILLA", "exercise_name": "Sentadilla", "order_index": 0, "sets": 3, "reps": 8, "weight_kg": 70, "rest_seconds": 120 }
+          ]
+        }
+      ]
+    },
+    {
+      "week_number": 2,
+      "sessions": [
+        {
+          "date": "2026-08-10",
+          "sport": "running",
+          "name": "Series 8 x 800 m",
+          "template_key": "series-800",
+          "workout_goal": "intervals",
+          "modality": "outdoor",
+          "running_steps": [
+            { "phase_type": "warmup", "duration_type": "time", "duration_s": 600 },
+            { "phase_type": "interval", "duration_type": "distance", "distance_m": 800, "repetitions": 8, "target_type": "pace", "target_min": 295, "progression_key": "work" },
+            { "phase_type": "cooldown", "duration_type": "time", "duration_s": 600 }
+          ]
+        },
+        {
+          "date": "2026-08-11",
+          "sport": "strength",
+          "name": "Fuerza tren inferior",
+          "template_key": "lower-body",
+          "workout_goal": "strength",
+          "exercises": [
+            { "exercise_id": "UUID_SENTADILLA", "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rest_seconds": 150 }
+          ]
+        }
+      ]
+    }
+  ]
+}

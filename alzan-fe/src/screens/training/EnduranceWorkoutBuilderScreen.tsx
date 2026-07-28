@@ -51,10 +51,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
+import { useTrainingSettings } from '../../hooks/useTrainingSettings';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { DurationType, PhaseType, SportType, TargetType } from '../../types/requests.types';
 import { Nullable } from '../../types/common.types';
 import { Alert } from '../../components/common/Alert';
+import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
@@ -71,6 +73,7 @@ import {
   StepProgressionOverride,
 } from '../../modules/training/helpers/enduranceProgression.helper';
 import { fetchEnduranceStepProgressions } from '../../modules/training/services/enduranceProgressionService';
+import { buildEnduranceTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
 
 interface Step {
   id: string; // temp id
@@ -140,6 +143,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const { saveWorkout } = useEnduranceWorkoutBuilder();
   const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
   const { preferences } = useUserPreferences();
+  const { settings: trainingSettings } = useTrainingSettings();
   const { options: sportCatalogOptions, getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const insets = useSafeAreaInsets();
@@ -187,6 +191,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [recurrenceStartDate, setRecurrenceStartDate] = useState<string | null>(null);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<string>('');
   const [recurrenceWeeks, setRecurrenceWeeks] = useState<string>('');
+  const [autoDeleteAfterEnd, setAutoDeleteAfterEnd] = useState(true);
   const [showRecurrenceStartPicker, setShowRecurrenceStartPicker] = useState(false);
 
   useEffect(() => {
@@ -217,6 +222,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
       setRecurrenceEndDate('');
     }
   }, [isRecurring, recurrenceWeeks, recurrenceStartDate, scheduledDays]);
+
+  useEffect(() => {
+    if (!isEditMode) setAutoDeleteAfterEnd(trainingSettings.autoDeleteExpiredTemplates);
+  }, [isEditMode, trainingSettings.autoDeleteExpiredTemplates]);
   const [stepProgressions, setStepProgressions] = useState<StepProgressionOverride[]>([]);
   const [progressionPicker, setProgressionPicker] = useState<ProgressionPickerState | null>(null);
   const hydratedTemplateIdRef = useRef<string | null>(null);
@@ -414,6 +423,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
       setIsRecurring(!!existingTemplate.scheduled_day);
       setRecurrenceStartDate(existingTemplate.recurrence_start_date || null);
       setRecurrenceEndDate(existingTemplate.recurrence_end_date || '');
+      const lifecycleData = existingTemplate as unknown as {
+        auto_delete_after_end?: boolean | null;
+      };
+      setAutoDeleteAfterEnd(lifecycleData.auto_delete_after_end ?? trainingSettings.autoDeleteExpiredTemplates);
       const weeks = calculateProgressionWeeks(
         existingTemplate.recurrence_start_date,
         existingTemplate.recurrence_end_date,
@@ -483,7 +496,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
         setSteps(ensureStepProgressionKeys(uiSteps));
       }
     }
-  }, [existingProgressions, existingTemplate, isExistingProgressionsLoading]);
+  }, [
+    existingProgressions,
+    existingTemplate,
+    isExistingProgressionsLoading,
+    trainingSettings.autoDeleteExpiredTemplates,
+  ]);
 
   const poolTypeOptions = sportType ? getOptions(sportType, 'pool_type') : [];
   const strokeOptions = sportType ? getOptions(sportType, 'stroke') : [];
@@ -736,6 +754,26 @@ export const EnduranceWorkoutBuilderScreen = () => {
           scheduled_day: templateScheduledDay,
           recurrence_start_date: recurrenceStartDateForSave,
           recurrence_end_date: recurrenceEndDateForSave,
+          auto_delete_after_end: autoDeleteAfterEnd,
+          template_family_key: buildEnduranceTemplateFamilySignature({
+            sportType: sportType || 'running',
+            workoutGoal: finalGoal,
+            modality: environmentType,
+            steps: stepsWithProgressionKeys.map(step => ({
+              phaseType: step.phase_type,
+              durationType: step.duration_type,
+              isGroup: step.is_group,
+              repetitions: step.repetitions,
+              hyroxStepType: step.hyrox_step_type,
+              children: step.children?.map(child => ({
+                phaseType: child.phase_type,
+                durationType: child.duration_type,
+                isGroup: child.is_group,
+                repetitions: child.repetitions,
+                hyroxStepType: child.hyrox_step_type,
+              })),
+            })),
+          }),
           environment_type: environmentType,
           surface: surface,
           pool_type: poolType,
@@ -3267,6 +3305,17 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           </Text>
                         </View>
                       )}
+                      <View style={styles.lifecycleToggleRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.lifecycleToggleLabel, { color: themeColors.textPrimary }]}>
+                            {t('training.autoDeleteExpiredTemplates')}
+                          </Text>
+                          <Text style={[styles.lifecycleToggleDescription, { color: themeColors.textSecondary }]}>
+                            {t('training.autoDeleteExpiredTemplatesDesc')}
+                          </Text>
+                        </View>
+                        <AlzanSwitch value={autoDeleteAfterEnd} onValueChange={setAutoDeleteAfterEnd} />
+                      </View>
                     </>
                   )}
                 </View>
@@ -4858,6 +4907,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  lifecycleToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.m,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.m,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.18)',
+  },
+  lifecycleToggleLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  lifecycleToggleDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 3,
   },
   rowValueText: {
     fontSize: 15,

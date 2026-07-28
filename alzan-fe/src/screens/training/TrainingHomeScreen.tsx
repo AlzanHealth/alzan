@@ -17,7 +17,18 @@ import { GlassCard } from '../../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { spacing } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
-import { ChevronLeft, ChevronRight, Dumbbell, Calendar, Play, List, Plus, Settings, Trash2 } from 'lucide-react-native';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Dumbbell,
+  Calendar,
+  Play,
+  List,
+  Plus,
+  Settings,
+  Trash2,
+  Upload,
+} from 'lucide-react-native';
 import { SportIcon } from '../../components/icons/SportIcon';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { SPORTS_CONFIG, getSportDefaultTitleKey } from '../../constants/sports';
@@ -1125,6 +1136,17 @@ export const TrainingHomeScreen = () => {
                 <View style={styles.toolContent}>
                   <Dumbbell size={24} color={colors.primary} />
                   <Text style={[styles.toolTitle, { color: colors.textPrimary }]}>{t('training.gymRoutines')}</Text>
+                </View>
+              </GlassCard>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.toolCard} onPress={() => navigation.navigate('TrainingPlanImport')}>
+              <GlassCard style={styles.toolGlass}>
+                <View style={styles.toolContent}>
+                  <Upload size={24} color={colors.primary} />
+                  <Text style={[styles.toolTitle, { color: colors.textPrimary }]}>
+                    {t('training.importTrainingPlan')}
+                  </Text>
                 </View>
               </GlassCard>
             </TouchableOpacity>

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { expireTrainingTemplates } from '../modules/training/services/templateLifecycleService';
 
 export interface EnduranceTemplate {
   id: string;
@@ -23,6 +24,7 @@ export const useEnduranceTemplates = () => {
     console.log('[useEnduranceTemplates.fetch] Iniciando');
     try {
       if (!user) return [];
+      await expireTrainingTemplates(user.id);
       const { data, error } = await supabase
         .from('endurance_workout_templates')
         .select('*')

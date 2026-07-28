@@ -6,6 +6,7 @@ import {
   isDateWithinEnduranceRecurrence,
   RecurringEnduranceTemplate,
 } from './enduranceProgressionService';
+import { expireTrainingTemplates } from './templateLifecycleService';
 
 /**
  * Get ISO week string in format "YYYY-WXX"
@@ -63,6 +64,8 @@ export const checkAndPlanNewWeeks = async (
   console.log('┌─────────────────────────────────────────────────┐');
   console.log('│ [trainingPlanService] 🏋️ VERIFICANDO PLANES    │');
   console.log('└─────────────────────────────────────────────────┘');
+
+  await expireTrainingTemplates(userId, format(new Date(), 'yyyy-MM-dd'));
 
   const horizonDate = getTrainingHorizonWeek();
   const horizonISO = getISOWeekString(horizonDate);

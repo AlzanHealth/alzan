@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { expireTrainingTemplates } from '../modules/training/services/templateLifecycleService';
 
 export const useGymRoutines = () => {
   const { user } = useAuth();
@@ -10,6 +11,7 @@ export const useGymRoutines = () => {
     console.log('[useGymRoutines.fetch] Iniciando');
     try {
       if (!user) return [];
+      await expireTrainingTemplates(user.id);
       const { data, error } = await supabase
         .from('workout_templates')
         .select('*')

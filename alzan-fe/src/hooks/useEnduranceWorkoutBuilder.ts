@@ -40,6 +40,8 @@ export interface BuilderTemplateData {
   scheduled_day?: number | null; // 0 = Sunday, 1 = Monday, etc.
   recurrence_start_date?: string | null;
   recurrence_end_date?: string | null;
+  auto_delete_after_end?: boolean;
+  template_family_key?: string | null;
   environment_type?: string | null;
   surface?: string | null;
   pool_type?: string | null;
@@ -106,6 +108,8 @@ export const useEnduranceWorkoutBuilder = () => {
             scheduled_day: data.scheduled_day,
             recurrence_start_date: data.recurrence_start_date,
             recurrence_end_date: data.recurrence_end_date,
+            auto_delete_after_end: data.auto_delete_after_end ?? true,
+            template_family_key: data.template_family_key ?? null,
             environment_type: data.environment_type,
             surface: data.surface,
             pool_type: data.pool_type,
@@ -156,6 +160,8 @@ export const useEnduranceWorkoutBuilder = () => {
             scheduled_day: data.scheduled_day,
             recurrence_start_date: data.recurrence_start_date,
             recurrence_end_date: data.recurrence_end_date,
+            auto_delete_after_end: data.auto_delete_after_end ?? true,
+            template_family_key: data.template_family_key ?? null,
             environment_type: data.environment_type,
             surface: data.surface,
             pool_type: data.pool_type,

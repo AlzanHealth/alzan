@@ -2,6 +2,7 @@ import { supabase } from '../../../lib/supabaseClient';
 import { addDays, format, startOfWeek, getDay } from 'date-fns';
 import { WorkoutPlanInsert } from '../../../types/requests.types';
 import { expireEndedEnduranceRecurrences, isDateWithinEnduranceRecurrence } from './enduranceProgressionService';
+import { expireTrainingTemplates } from './templateLifecycleService';
 
 interface RecurringGym {
   id: string;
@@ -32,6 +33,8 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
   isPropagating = true;
 
   try {
+    await expireTrainingTemplates(userId, format(new Date(), 'yyyy-MM-dd'));
+
     console.log('┌─────────────────────────────────────────────────┐');
     console.log('│ 🏋️ [CALENDARIO ENTRENAMIENTO] Verificando...   │');
     console.log('└─────────────────────────────────────────────────┘');

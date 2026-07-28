@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { propagateTrainingPlans } from '../modules/training/services/trainingCopyService';
+import { deleteFuturePlansOutsideGymRecurrence } from '../modules/training/services/templateLifecycleService';
 import {
   getCurrentAppLocale,
   getLocalizedExerciseDescription,
@@ -18,6 +19,10 @@ export type RoutineEditorData = {
   workout_goal?: string | null;
   modality?: string | null;
   suggested_day_of_week?: number | null;
+  recurrence_start_date?: string | null;
+  recurrence_end_date?: string | null;
+  auto_delete_after_end?: boolean;
+  template_family_key?: string | null;
   exercises: RoutineDataExercise[];
   supersetLinks?: number[];
 };
@@ -154,8 +159,12 @@ export const useGymRoutineEditor = (routineId?: string) => {
           workout_goal: data.workout_goal,
           modality: data.modality,
           suggested_day_of_week: data.suggested_day_of_week,
+          recurrence_start_date: data.recurrence_start_date ?? null,
+          recurrence_end_date: data.recurrence_end_date ?? null,
+          auto_delete_after_end: data.auto_delete_after_end ?? true,
+          template_family_key: data.template_family_key ?? null,
           updated_at: new Date().toISOString(),
-        })
+        } as never)
         .select()
         .single();
 
@@ -234,6 +243,12 @@ export const useGymRoutineEditor = (routineId?: string) => {
           }
         }
       }
+
+      await deleteFuturePlansOutsideGymRecurrence({
+        userId: user.id,
+        templateId: template.id,
+        recurrenceEndDate: data.recurrence_end_date,
+      });
 
       return template;
     },

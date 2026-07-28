@@ -131,6 +131,7 @@ export type TrainingStackParamList = {
   EnduranceWorkoutBuilder: { templateId?: string; sportType?: SportType } | undefined;
   SportTemplatesList: { assignToDate?: string } | undefined;
   WeeklyPlan: { date?: string } | undefined;
+  TrainingPlanImport: undefined;
 
   // Planning & Integrations
   ExternalActivityLinking: undefined;

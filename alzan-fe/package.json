@@ -21,7 +21,8 @@
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\" --fix",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\"",
     "verify:diet-copy": "tsx src/modules/nutrition/services/dietCopyPlanner.spec.ts",
-    "verify:menu-import": "tsx src/modules/nutrition/services/menuImportContract.spec.ts && tsx src/modules/nutrition/services/menuImportPlanner.spec.ts && tsx src/modules/nutrition/services/menuImportPersistence.spec.ts && tsx src/modules/nutrition/services/menuImportFourWeek.spec.ts && tsx src/modules/nutrition/services/menuImportStatus.spec.ts && tsx src/modules/nutrition/services/menuImportOperationGuard.spec.ts && tsx src/modules/nutrition/services/menuImportTemplate.spec.ts && tsx src/modules/nutrition/services/shoppingListService.spec.ts"
+    "verify:menu-import": "tsx src/modules/nutrition/services/menuImportContract.spec.ts && tsx src/modules/nutrition/services/menuImportPlanner.spec.ts && tsx src/modules/nutrition/services/menuImportPersistence.spec.ts && tsx src/modules/nutrition/services/menuImportFourWeek.spec.ts && tsx src/modules/nutrition/services/menuImportStatus.spec.ts && tsx src/modules/nutrition/services/menuImportOperationGuard.spec.ts && tsx src/modules/nutrition/services/menuImportTemplate.spec.ts && tsx src/modules/nutrition/services/shoppingListService.spec.ts",
+    "verify:training-plan-import": "tsx src/modules/training/helpers/templateFamilySignature.spec.ts && tsx src/modules/training/services/templateLifecycleService.spec.ts && tsx src/modules/training/services/trainingPlanImportContract.spec.ts && tsx src/modules/training/services/trainingPlanImportPlanner.spec.ts"
   },
   "dependencies": {
     "@callstack/liquid-glass": "^0.7.0",
