@@ -5,6 +5,8 @@ import type { StepProgressionOverride } from '../helpers/enduranceProgression.he
 import { replaceEnduranceStepProgressions } from './enduranceProgressionService';
 import { expireTrainingTemplates } from './templateLifecycleService';
 import { groupTrainingPlanSessions, ImportedTemplateFamily } from './trainingPlanImportPlanner';
+import { logTrainingPlanImport, logTrainingPlanImportError } from './trainingPlanImportLogger';
+import { toImportedProgressionKey } from './trainingPlanImportProgressionKey';
 import type {
   TrainingPlanImportDocument,
   TrainingPlanRunningStep,
@@ -72,7 +74,7 @@ const buildProgressions = (family: ImportedTemplateFamily, startDate: string): S
     if (weekIndex < 1) continue;
     for (const { step, key } of flattenSteps(session.running_steps)) {
       overrides.push({
-        progression_key: key,
+        progression_key: toImportedProgressionKey(family.familyKey, key),
         week_index: weekIndex,
         duration_s: step.duration_s,
         distance_m: step.distance_m,
@@ -87,10 +89,29 @@ const buildProgressions = (family: ImportedTemplateFamily, startDate: string): S
 };
 
 const resolveExercises = async (exercises: TrainingPlanStrengthExercise[]): Promise<Map<string, string>> => {
-  const { data, error } = await supabase.from('exercises').select('id, base_name_es, base_name_en');
-  if (error) throw error;
+  logTrainingPlanImport('resolve-exercises:start', { requested: exercises.length });
+  const catalog: Array<{ id: string; base_name_es: string | null; base_name_en: string | null }> = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('exercises')
+      .select('id, base_name_es, base_name_en')
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      logTrainingPlanImportError('resolve-exercises:query-failed', error, { offset, pageSize });
+      throw error;
+    }
+    catalog.push(...(data ?? []));
+    logTrainingPlanImport('resolve-exercises:page-loaded', {
+      offset,
+      rows: data?.length ?? 0,
+    });
+    if (!data || data.length < pageSize) break;
+  }
+  logTrainingPlanImport('resolve-exercises:catalog-loaded', { catalogSize: catalog.length });
+  const knownIds = new Set(catalog.map(exercise => exercise.id));
   const byName = new Map(
-    (data ?? []).flatMap(exercise =>
+    catalog.flatMap(exercise =>
       [exercise.base_name_es, exercise.base_name_en]
         .filter((name): name is string => Boolean(name))
         .map(name => [normalizeName(name), exercise.id] as const),
@@ -98,12 +119,32 @@ const resolveExercises = async (exercises: TrainingPlanStrengthExercise[]): Prom
   );
   const resolved = new Map<string, string>();
   for (const exercise of exercises) {
-    const id =
-      exercise.exercise_id ?? (exercise.exercise_name ? byName.get(normalizeName(exercise.exercise_name)) : undefined);
-    if (!id)
-      throw new Error(`No se ha encontrado el ejercicio "${exercise.exercise_name ?? exercise.exercise_id ?? ''}"`);
+    const explicitId = exercise.exercise_id;
+    const id = explicitId ?? (exercise.exercise_name ? byName.get(normalizeName(exercise.exercise_name)) : undefined);
+    if (explicitId && !knownIds.has(explicitId)) {
+      const error = new Error(`No se ha encontrado el ejercicio "${explicitId}"`);
+      logTrainingPlanImportError('resolve-exercises:missing-id', error, {
+        orderIndex: exercise.order_index,
+        identifier: explicitId,
+      });
+      throw error;
+    }
+    if (!id) {
+      const identifier = exercise.exercise_name ?? exercise.exercise_id ?? '';
+      const error = new Error(`No se ha encontrado el ejercicio "${identifier}"`);
+      logTrainingPlanImportError('resolve-exercises:missing', error, {
+        orderIndex: exercise.order_index,
+        identifier,
+      });
+      throw error;
+    }
+    logTrainingPlanImport('resolve-exercises:matched', {
+      orderIndex: exercise.order_index,
+      source: exercise.exercise_id ? 'id' : 'name',
+    });
     resolved.set(`${exercise.order_index}:${normalizeName(exercise.exercise_name ?? id)}`, id);
   }
+  logTrainingPlanImport('resolve-exercises:complete', { resolved: resolved.size });
   return resolved;
 };
 
@@ -114,6 +155,11 @@ const createEnduranceTemplate = async (
   options: TrainingPlanImportOptions,
 ) => {
   const first = family.sessions[0];
+  logTrainingPlanImport('running-template:create:start', {
+    familyKey: family.familyKey,
+    sessions: family.sessions.length,
+    steps: first.running_steps?.length ?? 0,
+  });
   const { data: template, error } = await supabase
     .from('endurance_workout_templates')
     .insert({
@@ -136,7 +182,17 @@ const createEnduranceTemplate = async (
     } as never)
     .select('id')
     .single();
-  if (error || !template) throw error ?? new Error('No se ha creado la plantilla de running');
+  if (error || !template) {
+    logTrainingPlanImportError(
+      'running-template:create:failed',
+      error ?? new Error('No se ha creado la plantilla de running'),
+      {
+        familyKey: family.familyKey,
+      },
+    );
+    throw error ?? new Error('No se ha creado la plantilla de running');
+  }
+  logTrainingPlanImport('running-template:created', { familyKey: family.familyKey, templateId: template.id });
   const firstSteps = first.running_steps ?? [];
   const insertSteps = async (
     steps: TrainingPlanRunningStep[],
@@ -147,19 +203,46 @@ const createEnduranceTemplate = async (
     let orderIndex = orderStart;
     for (const [index, step] of steps.entries()) {
       const path = pathPrefix ? `${pathPrefix}.${index}` : `${index}`;
-      const progressionKey = step.progression_key ?? `step_${path.replace(/\./g, '_')}`;
+      const rawProgressionKey = step.progression_key ?? `step_${path.replace(/\./g, '_')}`;
+      const progressionKey = toImportedProgressionKey(family.familyKey, rawProgressionKey);
       const { data: inserted, error: stepError } = await supabase
         .from('endurance_workout_steps')
         .insert(toRunningStepRow(step, template.id, orderIndex, parentId, progressionKey))
         .select('id')
         .single();
-      if (stepError || !inserted) throw stepError ?? new Error('No se ha creado un paso de running');
+      if (stepError || !inserted) {
+        logTrainingPlanImportError(
+          'running-step:create:failed',
+          stepError ?? new Error('No se ha creado un paso de running'),
+          {
+            familyKey: family.familyKey,
+            orderIndex,
+            phaseType: step.phase_type,
+          },
+        );
+        throw stepError ?? new Error('No se ha creado un paso de running');
+      }
+      logTrainingPlanImport('running-step:created', {
+        familyKey: family.familyKey,
+        orderIndex,
+        phaseType: step.phase_type,
+      });
       if (step.children?.length) await insertSteps(step.children, inserted.id, 0, path);
       orderIndex += 1;
     }
   };
   await insertSteps(firstSteps);
-  await replaceEnduranceStepProgressions(template.id, buildProgressions(family, range.start));
+  const progressions = buildProgressions(family, range.start);
+  logTrainingPlanImport('running-progressions:replace', { templateId: template.id, rows: progressions.length });
+  try {
+    await replaceEnduranceStepProgressions(template.id, progressions);
+  } catch (progressionError) {
+    logTrainingPlanImportError('running-progressions:replace-failed', progressionError, {
+      templateId: template.id,
+      rows: progressions.length,
+    });
+    throw progressionError;
+  }
   return template.id;
 };
 
@@ -171,6 +254,11 @@ const createStrengthTemplate = async (
 ) => {
   const first = family.sessions[0];
   const baseExercises = first.exercises ?? [];
+  logTrainingPlanImport('strength-template:create:start', {
+    familyKey: family.familyKey,
+    sessions: family.sessions.length,
+    exercises: baseExercises.length,
+  });
   const resolvedByKey = await resolveExercises(family.sessions.flatMap(session => session.exercises ?? []));
   const { data: template, error } = await supabase
     .from('workout_templates')
@@ -189,13 +277,30 @@ const createStrengthTemplate = async (
     } as never)
     .select('id')
     .single();
-  if (error || !template) throw error ?? new Error('No se ha creado la plantilla de fuerza');
+  if (error || !template) {
+    logTrainingPlanImportError(
+      'strength-template:create:failed',
+      error ?? new Error('No se ha creado la plantilla de fuerza'),
+      {
+        familyKey: family.familyKey,
+      },
+    );
+    throw error ?? new Error('No se ha creado la plantilla de fuerza');
+  }
+  logTrainingPlanImport('strength-template:created', { familyKey: family.familyKey, templateId: template.id });
   const exerciseRows = baseExercises.map(exercise => {
     const exerciseId = resolvedByKey.get(
       `${exercise.order_index}:${normalizeName(exercise.exercise_name ?? exercise.exercise_id ?? '')}`,
     );
     if (!exerciseId) {
-      throw new Error(`No se ha encontrado el ejercicio "${exercise.exercise_name ?? exercise.exercise_id ?? ''}"`);
+      const identifier = exercise.exercise_name ?? exercise.exercise_id ?? '';
+      const error = new Error(`No se ha encontrado el ejercicio "${identifier}"`);
+      logTrainingPlanImportError('strength-exercise:missing', error, {
+        familyKey: family.familyKey,
+        orderIndex: exercise.order_index,
+        identifier,
+      });
+      throw error;
     }
     return {
       workout_template_id: template.id,
@@ -215,8 +320,18 @@ const createStrengthTemplate = async (
     .from('workout_template_exercises')
     .insert(exerciseRows)
     .select('id, exercise_id, order_index');
-  if (exercisesError || !insertedExercises)
+  if (exercisesError || !insertedExercises) {
+    logTrainingPlanImportError(
+      'strength-exercises:create:failed',
+      exercisesError ?? new Error('No se han creado los ejercicios de fuerza'),
+      { familyKey: family.familyKey, rows: exerciseRows.length },
+    );
     throw exercisesError ?? new Error('No se han creado los ejercicios de fuerza');
+  }
+  logTrainingPlanImport('strength-exercises:created', {
+    familyKey: family.familyKey,
+    rows: insertedExercises.length,
+  });
   const progressionRows = family.sessions.flatMap(session => {
     const weekIndex = differenceInCalendarWeeks(parseISO(session.date), parseISO(range.start), { weekStartsOn: 1 }) + 1;
     return (session.exercises ?? []).flatMap(exercise => {
@@ -238,10 +353,20 @@ const createStrengthTemplate = async (
     });
   });
   if (progressionRows.length > 0) {
+    logTrainingPlanImport('strength-progressions:create', {
+      familyKey: family.familyKey,
+      rows: progressionRows.length,
+    });
     const { error: progressionError } = await supabase
       .from('workout_template_exercise_progressions')
       .insert(progressionRows as never);
-    if (progressionError) throw progressionError;
+    if (progressionError) {
+      logTrainingPlanImportError('strength-progressions:create-failed', progressionError, {
+        familyKey: family.familyKey,
+        rows: progressionRows.length,
+      });
+      throw progressionError;
+    }
   }
   return template.id;
 };
@@ -253,6 +378,7 @@ const refreshExistingEnduranceTemplate = async (
   range: { start: string; end: string | null },
   options: TrainingPlanImportOptions,
 ): Promise<void> => {
+  logTrainingPlanImport('running-template:refresh:start', { templateId, familyKey: family.familyKey });
   const { error } = await supabase
     .from('endurance_workout_templates')
     .update({
@@ -263,8 +389,19 @@ const refreshExistingEnduranceTemplate = async (
     } as never)
     .eq('id', templateId)
     .eq('user_id', userId);
-  if (error) throw error;
-  await replaceEnduranceStepProgressions(templateId, buildProgressions(family, range.start));
+  if (error) {
+    logTrainingPlanImportError('running-template:refresh:failed', error, { templateId, familyKey: family.familyKey });
+    throw error;
+  }
+  const progressions = buildProgressions(family, range.start);
+  logTrainingPlanImport('running-template:refresh:progressions', { templateId, rows: progressions.length });
+  try {
+    await replaceEnduranceStepProgressions(templateId, progressions);
+  } catch (progressionError) {
+    logTrainingPlanImportError('running-template:refresh:progressions-failed', progressionError, { templateId });
+    throw progressionError;
+  }
+  logTrainingPlanImport('running-template:refresh:complete', { templateId });
 };
 
 const refreshExistingStrengthTemplate = async (
@@ -274,6 +411,7 @@ const refreshExistingStrengthTemplate = async (
   range: { start: string; end: string | null },
   options: TrainingPlanImportOptions,
 ): Promise<void> => {
+  logTrainingPlanImport('strength-template:refresh:start', { templateId, familyKey: family.familyKey });
   const { error: templateError } = await supabase
     .from('workout_templates')
     .update({
@@ -284,17 +422,29 @@ const refreshExistingStrengthTemplate = async (
     } as never)
     .eq('id', templateId)
     .eq('user_id', userId);
-  if (templateError) throw templateError;
+  if (templateError) {
+    logTrainingPlanImportError('strength-template:refresh:failed', templateError, {
+      templateId,
+      familyKey: family.familyKey,
+    });
+    throw templateError;
+  }
   const { data: existingExercises, error: exercisesError } = await supabase
     .from('workout_template_exercises')
     .select('id, order_index')
     .eq('workout_template_id', templateId);
-  if (exercisesError) throw exercisesError;
+  if (exercisesError) {
+    logTrainingPlanImportError('strength-template:refresh:exercises-query-failed', exercisesError, { templateId });
+    throw exercisesError;
+  }
   const { error: deleteError } = await supabase
     .from('workout_template_exercise_progressions')
     .delete()
     .eq('workout_template_id', templateId);
-  if (deleteError) throw deleteError;
+  if (deleteError) {
+    logTrainingPlanImportError('strength-template:refresh:progressions-delete-failed', deleteError, { templateId });
+    throw deleteError;
+  }
   const progressionRows = family.sessions.flatMap(session => {
     const weekIndex = differenceInCalendarWeeks(parseISO(session.date), parseISO(range.start), { weekStartsOn: 1 }) + 1;
     return (session.exercises ?? []).flatMap(exercise => {
@@ -319,8 +469,15 @@ const refreshExistingStrengthTemplate = async (
     const { error: progressionError } = await supabase
       .from('workout_template_exercise_progressions')
       .insert(progressionRows as never);
-    if (progressionError) throw progressionError;
+    if (progressionError) {
+      logTrainingPlanImportError('strength-template:refresh:progressions-failed', progressionError, {
+        templateId,
+        rows: progressionRows.length,
+      });
+      throw progressionError;
+    }
   }
+  logTrainingPlanImport('strength-template:refresh:complete', { templateId, rows: progressionRows.length });
 };
 
 export const importTrainingPlan = async (
@@ -329,9 +486,25 @@ export const importTrainingPlan = async (
   options: TrainingPlanImportOptions = {},
 ): Promise<{ createdTemplateIds: string[]; createdPlanCount: number }> => {
   if (!userId) throw new Error('Authenticated user is required');
+  const sessionCount = document.weeks.reduce((count, week) => count + week.sessions.length, 0);
+  logTrainingPlanImport('service:start', {
+    planName: document.plan_name,
+    weeks: document.weeks.length,
+    sessions: sessionCount,
+    startDate: document.start_date,
+    endDate: document.end_date ?? null,
+  });
   await expireTrainingTemplates(userId);
   const range = getDateRange(document);
   const families = groupTrainingPlanSessions(document);
+  logTrainingPlanImport('families:grouped', {
+    count: families.length,
+    families: families.map(family => ({
+      key: family.familyKey,
+      sport: family.sport,
+      sessions: family.sessions.length,
+    })),
+  });
   const created: CreatedTemplate[] = [];
   const existingTemplateIds = new Map<string, string>();
   const familyKeys = families.map(family => family.familyKey);
@@ -348,8 +521,19 @@ export const importTrainingPlan = async (
         .eq('user_id', userId)
         .in('template_family_key', familyKeys),
     ]);
-    if (existingRunning.error) throw existingRunning.error;
-    if (existingStrength.error) throw existingStrength.error;
+    if (existingRunning.error) {
+      logTrainingPlanImportError('templates:lookup:running-failed', existingRunning.error, { familyKeys });
+      throw existingRunning.error;
+    }
+    if (existingStrength.error) {
+      logTrainingPlanImportError('templates:lookup:strength-failed', existingStrength.error, { familyKeys });
+      throw existingStrength.error;
+    }
+    logTrainingPlanImport('templates:lookup:complete', {
+      requestedFamilies: familyKeys.length,
+      runningMatches: existingRunning.data?.length ?? 0,
+      strengthMatches: existingStrength.data?.length ?? 0,
+    });
     for (const template of [...(existingRunning.data ?? []), ...(existingStrength.data ?? [])]) {
       if (template.template_family_key) existingTemplateIds.set(template.template_family_key, template.id);
     }
@@ -358,6 +542,12 @@ export const importTrainingPlan = async (
     const templateIdsByFamily = new Map<string, string>();
     for (const family of families) {
       const existingId = existingTemplateIds.get(family.familyKey);
+      logTrainingPlanImport('family:process', {
+        familyKey: family.familyKey,
+        sport: family.sport,
+        sessions: family.sessions.length,
+        mode: existingId ? 'refresh' : 'create',
+      });
       if (existingId) {
         if (family.sport === 'running') {
           await refreshExistingEnduranceTemplate(userId, family, existingId, range, options);
@@ -393,7 +583,10 @@ export const importTrainingPlan = async (
       .eq('user_id', userId)
       .in('planned_date', dates)
       .or(`gym_template_id.in.(${templateIds.join(',')}),endurance_template_id.in.(${templateIds.join(',')})`);
-    if (existingPlansError) throw existingPlansError;
+    if (existingPlansError) {
+      logTrainingPlanImportError('plans:lookup:failed', existingPlansError, { dates, templateIds });
+      throw existingPlansError;
+    }
     const existingPlanKeys = new Set(
       (existingPlans ?? []).map(plan => `${plan.planned_date}:${plan.gym_template_id ?? plan.endurance_template_id}`),
     );
@@ -401,12 +594,26 @@ export const importTrainingPlan = async (
       const templateId = plan.gym_template_id ?? plan.endurance_template_id;
       return templateId ? !existingPlanKeys.has(`${plan.planned_date}:${templateId}`) : false;
     });
+    logTrainingPlanImport('plans:deduplicated', {
+      requested: requestedPlans.length,
+      existing: existingPlans?.length ?? 0,
+      toInsert: plans.length,
+    });
     if (plans.length > 0) {
       const { error } = await supabase.from('workout_plans').insert(plans);
-      if (error) throw error;
+      if (error) {
+        logTrainingPlanImportError('plans:create:failed', error, { rows: plans.length });
+        throw error;
+      }
+      logTrainingPlanImport('plans:created', { rows: plans.length });
     }
+    logTrainingPlanImport('service:complete', {
+      createdTemplates: created.length,
+      createdPlans: plans.length,
+    });
     return { createdTemplateIds: created.map(item => item.id), createdPlanCount: plans.length };
   } catch (error) {
+    logTrainingPlanImportError('service:failed', error, { createdTemplates: created.length });
     // Roll back only templates created by this import. Existing templates and
     // completed history are never targeted here.
     for (const item of created) {
@@ -421,6 +628,7 @@ export const importTrainingPlan = async (
         .delete()
         .eq('id', item.id)
         .eq('user_id', userId);
+      logTrainingPlanImport('rollback:template-removed', { templateId: item.id, sport: item.family.sport });
     }
     throw error;
   }
