@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { groupTrainingPlanSessions } from './trainingPlanImportPlanner';
+import { getImportedTemplateScheduledDay, groupTrainingPlanSessions } from './trainingPlanImportPlanner';
 import type { TrainingPlanImportDocument } from './trainingPlanImportContract';
 
 const document: TrainingPlanImportDocument = {
@@ -53,6 +53,8 @@ const groups = groupTrainingPlanSessions(document);
 assert.equal(groups.length, 2);
 assert.equal(groups.find(group => group.sport === 'running')?.sessions.length, 2);
 assert.equal(groups.find(group => group.sport === 'strength')?.sessions.length, 2);
+assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'running')!), 1);
+assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'strength')!), 2);
 
 const structuralDocument: TrainingPlanImportDocument = {
   ...document,
@@ -82,3 +84,44 @@ const structuralDocument: TrainingPlanImportDocument = {
   ],
 };
 assert.equal(groupTrainingPlanSessions(structuralDocument).length, 1);
+assert.equal(getImportedTemplateScheduledDay(groupTrainingPlanSessions(structuralDocument)[0]), 1);
+
+const weekdayDates = [
+  ['2026-08-02', 0],
+  ['2026-08-03', 1],
+  ['2026-08-04', 2],
+  ['2026-08-05', 3],
+  ['2026-08-06', 4],
+  ['2026-08-07', 5],
+  ['2026-08-08', 6],
+] as const;
+for (const [date, expectedDay] of weekdayDates) {
+  assert.equal(
+    getImportedTemplateScheduledDay({
+      familyKey: 'test',
+      sport: 'running',
+      name: 'Test',
+      workoutGoal: null,
+      modality: null,
+      sessions: [{ date, sport: 'running', name: 'Test' }],
+      signature: 'test',
+    }),
+    expectedDay,
+  );
+}
+
+assert.equal(
+  getImportedTemplateScheduledDay({
+    familyKey: 'mixed',
+    sport: 'running',
+    name: 'Mixed',
+    workoutGoal: null,
+    modality: null,
+    sessions: [
+      { date: '2026-08-03', sport: 'running', name: 'Mixed' },
+      { date: '2026-08-04', sport: 'running', name: 'Mixed' },
+    ],
+    signature: 'mixed',
+  }),
+  null,
+);

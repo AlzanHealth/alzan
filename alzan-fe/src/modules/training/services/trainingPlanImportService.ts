@@ -4,7 +4,11 @@ import type { WorkoutPlanInsert } from '../../../types/requests.types';
 import type { StepProgressionOverride } from '../helpers/enduranceProgression.helper';
 import { replaceEnduranceStepProgressions } from './enduranceProgressionService';
 import { expireTrainingTemplates } from './templateLifecycleService';
-import { groupTrainingPlanSessions, ImportedTemplateFamily } from './trainingPlanImportPlanner';
+import {
+  getImportedTemplateScheduledDay,
+  groupTrainingPlanSessions,
+  ImportedTemplateFamily,
+} from './trainingPlanImportPlanner';
 import { logTrainingPlanImport, logTrainingPlanImportError } from './trainingPlanImportLogger';
 import { toImportedProgressionKey } from './trainingPlanImportProgressionKey';
 import type {
@@ -168,10 +172,10 @@ const createEnduranceTemplate = async (
       base_name: family.name,
       description: first.notes ?? null,
       workout_goal: family.workoutGoal,
-      // Imported plans already contain their exact dates. Leaving the
-      // weekday unset prevents the recurring-plan propagator from inventing
-      // workouts outside the JSON document.
-      scheduled_day: null,
+      // A single weekday can be represented by the recurring template and
+      // keeps the weekday selected in the editor. Mixed-weekday families stay
+      // date-driven so propagation cannot invent sessions.
+      scheduled_day: getImportedTemplateScheduledDay(family),
       recurrence_start_date: range.start,
       recurrence_end_date: range.end,
       auto_delete_after_end: options.autoDeleteExpiredTemplates ?? true,
@@ -268,7 +272,7 @@ const createStrengthTemplate = async (
       description: first.notes ?? null,
       workout_goal: family.workoutGoal,
       modality: family.modality,
-      suggested_day_of_week: null,
+      suggested_day_of_week: getImportedTemplateScheduledDay(family),
       recurrence_start_date: range.start,
       recurrence_end_date: range.end,
       auto_delete_after_end: options.autoDeleteExpiredTemplates ?? true,
@@ -382,6 +386,7 @@ const refreshExistingEnduranceTemplate = async (
   const { error } = await supabase
     .from('endurance_workout_templates')
     .update({
+      scheduled_day: getImportedTemplateScheduledDay(family),
       recurrence_start_date: range.start,
       recurrence_end_date: range.end,
       auto_delete_after_end: options.autoDeleteExpiredTemplates ?? true,
@@ -415,6 +420,7 @@ const refreshExistingStrengthTemplate = async (
   const { error: templateError } = await supabase
     .from('workout_templates')
     .update({
+      suggested_day_of_week: getImportedTemplateScheduledDay(family),
       recurrence_start_date: range.start,
       recurrence_end_date: range.end,
       auto_delete_after_end: options.autoDeleteExpiredTemplates ?? true,
@@ -503,6 +509,7 @@ export const importTrainingPlan = async (
       key: family.familyKey,
       sport: family.sport,
       sessions: family.sessions.length,
+      scheduledDay: getImportedTemplateScheduledDay(family),
     })),
   });
   const created: CreatedTemplate[] = [];
@@ -546,6 +553,7 @@ export const importTrainingPlan = async (
         familyKey: family.familyKey,
         sport: family.sport,
         sessions: family.sessions.length,
+        scheduledDay: getImportedTemplateScheduledDay(family),
         mode: existingId ? 'refresh' : 'create',
       });
       if (existingId) {

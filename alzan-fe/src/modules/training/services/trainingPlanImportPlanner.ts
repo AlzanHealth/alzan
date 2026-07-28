@@ -83,3 +83,13 @@ export const groupTrainingPlanSessions = (document: TrainingPlanImportDocument):
   }
   return [...grouped.values()];
 };
+
+/**
+ * Templates currently support one recurring weekday. Only expose it when the
+ * imported sessions in the family are consistent; mixed weekdays remain
+ * date-driven and must not generate invented calendar entries.
+ */
+export const getImportedTemplateScheduledDay = (family: ImportedTemplateFamily): number | null => {
+  const days = new Set(family.sessions.map(session => new Date(`${session.date}T00:00:00.000Z`).getUTCDay()));
+  return days.size === 1 ? [...days][0] : null;
+};
