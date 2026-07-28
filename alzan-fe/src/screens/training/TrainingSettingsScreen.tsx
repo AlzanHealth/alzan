@@ -10,9 +10,10 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Download, Trash2, Calendar, AlertTriangle } from 'lucide-react-native';
+import { Download, Trash2, Calendar, AlertTriangle, Upload } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -26,6 +27,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
+import type { TrainingScreenNavigationProp } from '../../types/navigation.types';
 
 type TrainingSectionInfoKey = 'general' | 'data' | 'danger';
 
@@ -45,6 +47,7 @@ const getMinExportStartDate = (endDate: Date) => {
 
 const TrainingSettingsScreen = () => {
   const { t } = useTranslation();
+  const navigation = useNavigation<TrainingScreenNavigationProp>();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -340,6 +343,17 @@ const TrainingSettingsScreen = () => {
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.dataAllCaps'), 'data')}
             <View style={[styles.card, dynamicStyles.card]}>
+              <TouchableOpacity
+                style={styles.actionRow}
+                onPress={() => navigation.navigate('Training', { screen: 'TrainingPlanImport' })}
+                activeOpacity={0.7}
+              >
+                <Upload size={20} color={themeColors.primary} />
+                <Text style={[styles.actionText, { color: themeColors.primary }]}>
+                  {t('training.importTrainingPlan')}
+                </Text>
+              </TouchableOpacity>
+              <View style={[styles.separator, dynamicStyles.divider]} />
               <TouchableOpacity style={styles.actionRow} onPress={openExportModal} activeOpacity={0.7}>
                 <Download size={20} color={themeColors.primary} />
                 <Text style={[styles.actionText, { color: themeColors.primary }]}>

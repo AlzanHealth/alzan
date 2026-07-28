@@ -1094,11 +1094,26 @@ export const TrainingHomeScreen = () => {
       <SafeAreaView style={{ flex: 1, paddingBottom: 0 }}>
         {/* Top Bar */}
         <View style={styles.topBar}>
-          <View style={{ width: 24 }} />
+          <View style={styles.topBarActionsPlaceholder} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('home.training')}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={{ padding: 4 }}>
-            <Settings size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
+          <View style={styles.topBarActions}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('TrainingPlanImport')}
+              style={styles.topBarAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.importTrainingPlan')}
+            >
+              <Upload size={23} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Settings')}
+              style={styles.topBarAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('navigation.workoutSettings')}
+            >
+              <Settings size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <DaySwitcher
@@ -1136,17 +1151,6 @@ export const TrainingHomeScreen = () => {
                 <View style={styles.toolContent}>
                   <Dumbbell size={24} color={colors.primary} />
                   <Text style={[styles.toolTitle, { color: colors.textPrimary }]}>{t('training.gymRoutines')}</Text>
-                </View>
-              </GlassCard>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.toolCard} onPress={() => navigation.navigate('TrainingPlanImport')}>
-              <GlassCard style={styles.toolGlass}>
-                <View style={styles.toolContent}>
-                  <Upload size={24} color={colors.primary} />
-                  <Text style={[styles.toolTitle, { color: colors.textPrimary }]}>
-                    {t('training.importTrainingPlan')}
-                  </Text>
                 </View>
               </GlassCard>
             </TouchableOpacity>
@@ -1317,6 +1321,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     position: 'relative',
+  },
+  topBarActionsPlaceholder: {
+    width: 72,
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topBarAction: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,

@@ -66,7 +66,7 @@ export const GymRoutineEditorScreen = () => {
   const { routineId } = route.params || {};
   const inputAccessoryViewID = 'uniqueID'; // Defined for iOS Keyboard button
   const { preferences, toDisplayWeight } = useUserPreferences();
-  const { settings: trainingSettings, setAutoDeleteExpiredTemplates } = useTrainingSettings();
+  const { settings: trainingSettings } = useTrainingSettings();
 
   const { routineData, saveRoutine } = useGymRoutineEditor(routineId);
   const { getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();

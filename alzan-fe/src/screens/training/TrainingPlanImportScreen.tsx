@@ -18,7 +18,10 @@ import { Alert } from '../../components/common/Alert';
 import { GlassCard } from '../../components/GlassCard';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTrainingPlanImport } from '../../hooks/useTrainingPlanImport';
-import { TRAINING_PLAN_IMPORT_TEMPLATE } from '../../modules/training/services/trainingPlanImportTemplate';
+import {
+  TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT,
+  TRAINING_PLAN_IMPORT_TEMPLATE,
+} from '../../modules/training/services/trainingPlanImportTemplate';
 import type { TrainingScreenNavigationProp } from '../../types/navigation.types';
 
 const copyText = async (text: string): Promise<void> => {
@@ -58,10 +61,10 @@ export const TrainingPlanImportScreen = () => {
 
   const handleCopyTemplate = useCallback(async () => {
     try {
-      await copyText(TRAINING_PLAN_IMPORT_TEMPLATE);
-      Alert.alert(t('common.done'), t('training.trainingPlanTemplateCopied'));
+      await copyText(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT);
+      Alert.alert(t('common.done'), t('training.trainingPlanInstructionsCopied'));
     } catch {
-      Alert.alert(t('common.error'), t('training.trainingPlanImportError'));
+      Alert.alert(t('common.error'), t('training.trainingPlanInstructionsCopyError'));
     }
   }, [t]);
 
@@ -104,7 +107,7 @@ export const TrainingPlanImportScreen = () => {
           <TouchableOpacity onPress={handleCopyTemplate} style={styles.copyButton} accessibilityRole="button">
             <Copy size={18} color={colors.primary} />
             <Text style={[styles.copyButtonText, { color: colors.primary }]}>
-              {t('training.copyTrainingPlanTemplate')}
+              {t('training.copyTrainingPlanInstructions')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -175,8 +178,14 @@ export const TrainingPlanImportScreen = () => {
             <GlassCard style={[styles.previewCard, dynamicStyles.glassCard]}>
               <Text style={[styles.previewTitle, { color: colors.textPrimary }]}>{document.plan_name}</Text>
               <Text style={[styles.previewMeta, { color: colors.textSecondary }]}>
-                {document.weeks.length} {document.weeks.length === 1 ? 'semana' : 'semanas'} ·{' '}
-                {document.weeks.flatMap(week => week.sessions).length} entrenamientos
+                {t('training.trainingPlanPreviewMeta', {
+                  weeks: document.weeks.length,
+                  weekLabel: t(
+                    document.weeks.length === 1 ? 'training.trainingPlanWeek' : 'training.trainingPlanWeeks',
+                  ),
+                  sessions: document.weeks.flatMap(week => week.sessions).length,
+                  workoutLabel: t('training.trainingPlanWorkouts'),
+                })}
               </Text>
               <TouchableOpacity
                 onPress={handleImport}

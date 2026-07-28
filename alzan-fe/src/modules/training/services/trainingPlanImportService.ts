@@ -8,7 +8,6 @@ import { groupTrainingPlanSessions, ImportedTemplateFamily } from './trainingPla
 import type {
   TrainingPlanImportDocument,
   TrainingPlanRunningStep,
-  TrainingPlanSession,
   TrainingPlanStrengthExercise,
 } from './trainingPlanImportContract';
 
@@ -88,9 +87,15 @@ const buildProgressions = (family: ImportedTemplateFamily, startDate: string): S
 };
 
 const resolveExercises = async (exercises: TrainingPlanStrengthExercise[]): Promise<Map<string, string>> => {
-  const { data, error } = await supabase.from('exercises').select('id, base_name');
+  const { data, error } = await supabase.from('exercises').select('id, base_name_es, base_name_en');
   if (error) throw error;
-  const byName = new Map((data ?? []).map(exercise => [normalizeName(exercise.base_name), exercise.id]));
+  const byName = new Map(
+    (data ?? []).flatMap(exercise =>
+      [exercise.base_name_es, exercise.base_name_en]
+        .filter((name): name is string => Boolean(name))
+        .map(name => [normalizeName(name), exercise.id] as const),
+    ),
+  );
   const resolved = new Map<string, string>();
   for (const exercise of exercises) {
     const id =
@@ -185,21 +190,27 @@ const createStrengthTemplate = async (
     .select('id')
     .single();
   if (error || !template) throw error ?? new Error('No se ha creado la plantilla de fuerza');
-  const exerciseRows = baseExercises.map(exercise => ({
-    workout_template_id: template.id,
-    exercise_id: resolvedByKey.get(
+  const exerciseRows = baseExercises.map(exercise => {
+    const exerciseId = resolvedByKey.get(
       `${exercise.order_index}:${normalizeName(exercise.exercise_name ?? exercise.exercise_id ?? '')}`,
-    ),
-    order_index: exercise.order_index,
-    is_warmup: exercise.is_warmup ?? false,
-    target_sets: exercise.sets,
-    target_reps_min: exercise.reps_min ?? exercise.reps ?? 8,
-    target_reps_max: exercise.reps_max ?? exercise.reps ?? 8,
-    target_weight_kg: exercise.weight_kg ?? null,
-    target_rpe: exercise.rpe ?? null,
-    rest_seconds: exercise.rest_seconds ?? null,
-    notes: exercise.notes ?? null,
-  }));
+    );
+    if (!exerciseId) {
+      throw new Error(`No se ha encontrado el ejercicio "${exercise.exercise_name ?? exercise.exercise_id ?? ''}"`);
+    }
+    return {
+      workout_template_id: template.id,
+      exercise_id: exerciseId,
+      order_index: exercise.order_index,
+      is_warmup: exercise.is_warmup ?? false,
+      target_sets: exercise.sets,
+      target_reps_min: exercise.reps_min ?? exercise.reps ?? 8,
+      target_reps_max: exercise.reps_max ?? exercise.reps ?? 8,
+      target_weight_kg: exercise.weight_kg ?? null,
+      target_rpe: exercise.rpe ?? null,
+      rest_seconds: exercise.rest_seconds ?? null,
+      notes: exercise.notes ?? null,
+    };
+  });
   const { data: insertedExercises, error: exercisesError } = await supabase
     .from('workout_template_exercises')
     .insert(exerciseRows)

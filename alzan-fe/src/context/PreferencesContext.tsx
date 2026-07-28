@@ -127,6 +127,7 @@ const buildOptimisticPreferences = (
     nutrition_prefs: DEFAULT_NUTRITION_PREFS,
     pace_unit: 'min_km',
     privacy_settings: DEFAULT_PRIVACY_SETTINGS,
+    training_settings: { auto_delete_expired_templates: true },
     temperature_unit: 'celsius',
     timezone: null,
     user_id: userId,

@@ -37,3 +37,34 @@ export const TRAINING_PLAN_IMPORT_TEMPLATE = `{
     }
   ]
 }`;
+
+export const TRAINING_PLAN_IMPORT_PROMPT = `Crea un plan de entrenamiento semanal para importar en Alzan.
+
+Devuelve únicamente un JSON válido, sin markdown ni comentarios, siguiendo exactamente el formato alzan-training-plan v1.
+
+REGLAS GENERALES
+- Usa fechas reales en formato YYYY-MM-DD.
+- Organiza todas las sesiones dentro de weeks y añade una sesión por fecha.
+- Usa solo sport: "running" o sport: "strength".
+- Mantén el mismo template_key cuando la estructura sea la misma y solo cambien ritmos, repeticiones, pesos, RPE o descansos entre semanas.
+- Usa progression_key en los pasos de running que cambien entre semanas.
+
+RUNNING
+- Define running_steps con fases warmup, interval, recovery, cooldown o relax.
+- Usa duration_type time, distance o lap_button.
+- Expresa el ritmo de running en target_type pace y segundos por kilómetro cuando corresponda.
+- No crees una plantilla diferente solo porque cambien los kilómetros, el ritmo o las repeticiones.
+
+FUERZA / GIMNASIO
+- Usa exclusivamente ejercicios que existan en el catálogo de ejercicios de Alzan.
+- Reutiliza el exercise_id y el exercise_name exactos del catálogo proporcionado.
+- No inventes ejercicios, UUID, nombres alternativos ni variantes que no aparezcan en el catálogo.
+- Si no tienes el catálogo, pide primero que te lo proporcione; no generes identificadores ficticios.
+- Mantén el mismo template_key para la misma rutina aunque cambien sets, repeticiones, peso, RPE o descanso.
+
+Antes de responder, comprueba que todas las sesiones están dentro de start_date y end_date y que el JSON cumple el esquema de la plantilla siguiente.
+
+PLANTILLA JSON
+${TRAINING_PLAN_IMPORT_TEMPLATE}`;
+
+export const TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT = `${TRAINING_PLAN_IMPORT_PROMPT}\n`;

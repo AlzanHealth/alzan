@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {
+  TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT,
+  TRAINING_PLAN_IMPORT_PROMPT,
+  TRAINING_PLAN_IMPORT_TEMPLATE,
+} from './trainingPlanImportTemplate';
+
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('running'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No inventes ejercicios'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('exercise_id'));
+assert.ok(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT.includes(TRAINING_PLAN_IMPORT_TEMPLATE));
