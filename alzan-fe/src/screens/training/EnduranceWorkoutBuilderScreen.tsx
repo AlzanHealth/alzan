@@ -196,7 +196,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   useEffect(() => {
     if (!isRecurring) {
-      setRecurrenceEndDate('');
+      // Imported one-off plans can still have a lifecycle end date. Keep it
+      // visible and persisted even though they do not repeat by weekday.
+      if (!isEditMode) setRecurrenceEndDate('');
       return;
     }
     const weeks = parseInt(recurrenceWeeks, 10);
@@ -221,7 +223,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       console.error('[EnduranceWorkoutBuilderScreen] error calculating end date:', err);
       setRecurrenceEndDate('');
     }
-  }, [isRecurring, recurrenceWeeks, recurrenceStartDate, scheduledDays]);
+  }, [isEditMode, isRecurring, recurrenceWeeks, recurrenceStartDate, scheduledDays]);
 
   useEffect(() => {
     if (!isEditMode) setAutoDeleteAfterEnd(trainingSettings.autoDeleteExpiredTemplates);
@@ -710,7 +712,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const getRecurrenceStartDateForSave = (scheduledDay: number | null): string | null => {
-    if (!isRecurring || scheduledDay === null) return null;
+    if (!isRecurring) return recurrenceStartDate || null;
+    if (scheduledDay === null) return null;
     if (recurrenceStartDate) {
       return recurrenceStartDate;
     }
@@ -723,7 +726,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const getValidatedRecurrenceEndDate = (): string | null => {
-    if (!isRecurring) return null;
     const trimmedEndDate = recurrenceEndDate.trim();
     return trimmedEndDate.length > 0 ? trimmedEndDate : null;
   };
@@ -901,7 +903,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
 
-    if (isRecurring && recurrenceEndDate.trim()) {
+    if (recurrenceEndDate.trim()) {
       const recurrenceStart = getRecurrenceStartDateForSave(scheduledDays[0] ?? null);
       const recurrenceWeeks = calculateProgressionWeeks(recurrenceStart, recurrenceEndDate.trim());
       if (recurrenceWeeks < 1) {
@@ -3218,10 +3220,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       const nextRecurring = !isRecurring;
                       setIsRecurring(nextRecurring);
                       if (!nextRecurring) {
-                        setRecurrenceEndDate('');
                         setRecurrenceWeeks('');
-                        setRecurrenceStartDate(null);
-                        setStepProgressions([]);
+                        if (!isEditMode) {
+                          setRecurrenceEndDate('');
+                          setRecurrenceStartDate(null);
+                          setStepProgressions([]);
+                        }
                         setProgressionPicker(null);
                       } else if (!recurrenceWeeks) {
                         setRecurrenceWeeks('2');
@@ -3305,6 +3309,37 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           </Text>
                         </View>
                       )}
+                      <View style={styles.lifecycleToggleRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.lifecycleToggleLabel, { color: themeColors.textPrimary }]}>
+                            {t('training.autoDeleteExpiredTemplates')}
+                          </Text>
+                          <Text style={[styles.lifecycleToggleDescription, { color: themeColors.textSecondary }]}>
+                            {t('training.autoDeleteExpiredTemplatesDesc')}
+                          </Text>
+                        </View>
+                        <AlzanSwitch value={autoDeleteAfterEnd} onValueChange={setAutoDeleteAfterEnd} />
+                      </View>
+                    </>
+                  )}
+                  {!isRecurring && recurrenceEndDate.trim() && (
+                    <>
+                      <View style={styles.formRow}>
+                        <View style={styles.recurrenceEndLabel}>
+                          <Calendar size={16} color={themeColors.textSecondary} />
+                          <Text style={[styles.rowLabel, { color: themeColors.textPrimary }]}>
+                            {t('training.templateEndDate')}
+                          </Text>
+                        </View>
+                        <TextInput
+                          style={[styles.rowInput, { color: themeColors.textPrimary }]}
+                          value={recurrenceEndDate}
+                          onChangeText={setRecurrenceEndDate}
+                          placeholder="YYYY-MM-DD"
+                          placeholderTextColor={themeColors.textSecondary}
+                          textAlign="right"
+                        />
+                      </View>
                       <View style={styles.lifecycleToggleRow}>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.lifecycleToggleLabel, { color: themeColors.textPrimary }]}>

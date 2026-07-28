@@ -594,9 +594,12 @@ export const GymRoutineEditorScreen = () => {
         workout_goal: workoutGoal || null,
         modality: modality || null,
         suggested_day_of_week: isRecurring && selectedDays.length > 0 ? selectedDays[0] : null,
-        recurrence_start_date:
-          isRecurring && selectedDays.length > 0 ? recurrenceStartDate || format(new Date(), 'yyyy-MM-dd') : null,
-        recurrence_end_date: isRecurring && recurrenceEndDate.trim() ? recurrenceEndDate.trim() : null,
+        recurrence_start_date: isRecurring
+          ? selectedDays.length > 0
+            ? recurrenceStartDate || format(new Date(), 'yyyy-MM-dd')
+            : null
+          : recurrenceStartDate || null,
+        recurrence_end_date: recurrenceEndDate.trim() ? recurrenceEndDate.trim() : null,
         auto_delete_after_end: autoDeleteAfterEnd,
         template_family_key: templateFamilyKey,
         exercises,
@@ -933,7 +936,7 @@ export const GymRoutineEditorScreen = () => {
                     onToggleRecurring={() => setIsRecurring(!isRecurring)}
                     singleSelect={true}
                   />
-                  {isRecurring && (
+                  {(isRecurring || recurrenceEndDate.trim()) && (
                     <View style={styles.templateLifecycleCard}>
                       <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.templateEndDate')}</Text>
                       <TextInput

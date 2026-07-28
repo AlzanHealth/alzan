@@ -10,6 +10,7 @@ export const TRAINING_PLAN_IMPORT_TEMPLATE = `{
       "sessions": [
         {
           "date": "2026-08-03",
+          "weekday": "lunes",
           "sport": "running",
           "name": "Series 6 x 800 m",
           "template_key": "series-800",
@@ -25,6 +26,7 @@ export const TRAINING_PLAN_IMPORT_TEMPLATE = `{
         },
         {
           "date": "2026-08-04",
+          "weekday": "martes",
           "sport": "strength",
           "name": "Fuerza tren inferior",
           "template_key": "lower-body",
@@ -44,6 +46,8 @@ Devuelve únicamente un JSON válido, sin markdown ni comentarios, siguiendo exa
 
 REGLAS GENERALES
 - Usa fechas reales en formato YYYY-MM-DD.
+- Incluye weekday en cada sesión usando el nombre en español: lunes, martes, miércoles, jueves, viernes, sábado o domingo.
+- weekday debe coincidir exactamente con date; la aplicación lo comprobará antes de importar.
 - Organiza todas las sesiones dentro de weeks y añade una sesión por fecha.
 - Usa solo sport: "running" o sport: "strength".
 - Mantén el mismo template_key cuando la estructura sea la misma y solo cambien ritmos, repeticiones, pesos, RPE o descansos entre semanas.

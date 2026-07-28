@@ -36,6 +36,7 @@ export type TrainingPlanStrengthExercise = {
 
 export type TrainingPlanSession = {
   date: string;
+  weekday?: string;
   sport: TrainingPlanSport;
   name: string;
   template_key?: string;
@@ -76,6 +77,7 @@ export type TrainingPlanValidationErrorCode =
   | 'unsupported_sport'
   | 'invalid_range'
   | 'invalid_session_shape'
+  | 'weekday_mismatch'
   | 'too_many_sessions';
 
 export type TrainingPlanValidationError = {
@@ -93,6 +95,7 @@ const ROOT_KEYS = ['format', 'version', 'plan_name', 'start_date', 'end_date', '
 const WEEK_KEYS = ['week_number', 'sessions'];
 const SESSION_KEYS = [
   'date',
+  'weekday',
   'sport',
   'name',
   'template_key',
@@ -139,6 +142,37 @@ const isRealDate = (value: unknown): value is string => {
   const date = new Date(`${value}T00:00:00.000Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 };
+
+const WEEKDAY_ALIASES: Record<string, string> = {
+  domingo: 'domingo',
+  sunday: 'domingo',
+  lunes: 'lunes',
+  monday: 'lunes',
+  martes: 'martes',
+  tuesday: 'martes',
+  miercoles: 'miércoles',
+  miércoles: 'miércoles',
+  wednesday: 'miércoles',
+  jueves: 'jueves',
+  thursday: 'jueves',
+  viernes: 'viernes',
+  friday: 'viernes',
+  sabado: 'sábado',
+  sábado: 'sábado',
+  saturday: 'sábado',
+};
+
+const normalizeWeekday = (value: string): string =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const getWeekdayForDate = (date: string): string =>
+  ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][
+    new Date(`${date}T00:00:00.000Z`).getUTCDay()
+  ];
 
 const addError = (
   errors: TrainingPlanValidationError[],
@@ -313,6 +347,17 @@ const parseSession = (
   addUnknownKeys(value, SESSION_KEYS, path, errors);
   const date = value.date;
   if (!isRealDate(date)) addError(errors, 'invalid_date', `${path}.date`, 'Expected YYYY-MM-DD');
+  const weekdayValue = readString(value.weekday, `${path}.weekday`, errors);
+  const normalizedWeekday = weekdayValue ? WEEKDAY_ALIASES[normalizeWeekday(weekdayValue)] : undefined;
+  if (weekdayValue && !normalizedWeekday)
+    addError(errors, 'invalid_session_shape', `${path}.weekday`, 'Unsupported weekday');
+  if (normalizedWeekday && isRealDate(date) && normalizedWeekday !== getWeekdayForDate(date))
+    addError(
+      errors,
+      'weekday_mismatch',
+      `${path}.weekday`,
+      `Weekday does not match ${date}; expected ${getWeekdayForDate(date)}`,
+    );
   const sport = value.sport;
   if (typeof sport !== 'string' || !TRAINING_PLAN_SPORTS.includes(sport as TrainingPlanSport))
     addError(errors, 'unsupported_sport', `${path}.sport`, 'Only running and strength are supported');
@@ -344,6 +389,7 @@ const parseSession = (
     addError(errors, 'invalid_session_shape', `${path}.exercises`, 'Strength sessions need at least one exercise');
   return {
     date,
+    ...(normalizedWeekday ? { weekday: normalizedWeekday } : {}),
     sport: sport as TrainingPlanSport,
     name,
     ...(readString(value.template_key, `${path}.template_key`, errors)
