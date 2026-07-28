@@ -24,7 +24,8 @@ import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { DaySwitcher, DaySwitcherRef } from '../../components/common/DaySwitcher';
 import { NutritionScreenNavigationProp, NutritionStackParamList, TabParamList } from '../../types/navigation.types';
 import { MealType } from '../../types/requests.types';
-import { BottomTabNavigationProp, useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
 import { getNutritionDayDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
@@ -59,7 +60,7 @@ export const NutritionHomeScreen = () => {
   const route = useRoute<RouteProp<NutritionStackParamList, 'NutritionHome'>>();
   const { convertEnergyToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors } = useNutritionStyles();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { topFromScreenBottom } = useTabBarLayout();
   const { preferences, refetch: refetchPreferences, loading: prefsLoading } = usePreferences();
   const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
     preferences?.nutrition_prefs?.nutrition_day_rollover_time,
@@ -316,7 +317,7 @@ export const NutritionHomeScreen = () => {
 
         <ScrollView
           ref={scrollViewRef}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarHeight + 96 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: topFromScreenBottom + 96 }]}
         >
           {/* Calorie Summary Header */}
           <CalorieEquationHeader
@@ -385,7 +386,7 @@ export const NutritionHomeScreen = () => {
 
         {/* Quick-add FAB: opens the quick-add sheet on the meal slot matching the time of day */}
         <TouchableOpacity
-          style={[styles.fab, { bottom: tabBarHeight + 28, backgroundColor: themeColors.primary }]}
+          style={[styles.fab, { bottom: topFromScreenBottom + 28, backgroundColor: themeColors.primary }]}
           onPress={() => handleAddFood(pickDefaultMealType())}
           activeOpacity={0.85}
           accessibilityRole="button"

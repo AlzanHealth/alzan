@@ -3,12 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Activity
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ChevronLeft, Search, Star, Plus, Info, Flame, Pencil, Trash2 } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
+import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import { useAuth } from '../../context/AuthContext';
 import { borderRadius } from '../../theme';
 import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../types/navigation.types';
@@ -79,7 +79,7 @@ export const RecipeLibraryScreen = () => {
   const route = useRoute<RouteProp<NutritionStackParamList, 'RecipeLibrary'>>();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
   const { preferences } = usePreferences();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { topFromScreenBottom } = useTabBarLayout();
   const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
     preferences?.nutrition_prefs?.nutrition_day_rollover_time,
   );
@@ -505,7 +505,7 @@ export const RecipeLibraryScreen = () => {
             data={listData}
             keyExtractor={item => item.id}
             renderItem={renderCard}
-            contentContainerStyle={[styles.listContent, { paddingBottom: tabBarHeight + 24 }]}
+            contentContainerStyle={[styles.listContent, { paddingBottom: topFromScreenBottom + 24 }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={

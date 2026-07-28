@@ -15,11 +15,10 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { NutritionScreenNavigationProp, NutritionStackParamList } from '../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { X, Search, ScanBarcode, Plus, Trash2, ChevronLeft, Check, Info, Bookmark, Eraser } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
+import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../navigation/tabBarLayout';
 
 import { IngredientSearchPanel } from '../../modules/nutrition/components/IngredientSearchPanel';
 import { PersonalFoodTrends } from '../../modules/nutrition/components/PersonalFoodTrends';
@@ -216,18 +215,8 @@ export const MealLogFormScreen = () => {
     preferences?.nutrition_prefs?.default_recipe_visibility === 'public' ? 'public' : 'private';
   const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
 
-  // Dynamic bottom padding calculation
-  // MacrosSummaryCard height estimate: ~120px content + padding
-  const footerHeight = 140;
-  const insets = useSafeAreaInsets();
-  let tabBarHeight = 50;
-  try {
-    const tbHeight = useBottomTabBarHeight();
-    tabBarHeight = tbHeight;
-  } catch (_error) {
-    tabBarHeight = 50 + insets.bottom;
-  }
-  const contentBottomPadding = tabBarHeight + footerHeight + 20;
+  const { topFromScreenBottom, summaryOverlayHeight } = useTabBarLayout();
+  const contentBottomPadding = topFromScreenBottom + summaryOverlayHeight + TAB_BAR_CLEARANCE + 20;
 
   // API Hooks
   const saveMeal = useSaveMealWithIngredients();

@@ -2,7 +2,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LiquidGlassFooter } from '../../../components/common/LiquidGlassFooter';
-import { useTabBarLayout } from '../../../navigation/tabBarLayout';
+import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../../navigation/tabBarLayout';
 import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +26,7 @@ export const MacrosSummaryCard: React.FC<MacrosSummaryCardProps> = ({
   const { t } = useTranslation();
   const { convertEnergyToUi } = useUnitConversion();
   const { colors, isDark } = useNutritionStyles();
-  const { topFromScreenBottom } = useTabBarLayout();
+  const { topFromScreenBottom, setSummaryOverlayHeight } = useTabBarLayout();
   const ingredientLabel = itemCount === 1 ? t('nutrition.ingredientSingular') : `${t('nutrition.ingredientSingular')}s`;
   const titleText = `${t('nutrition.mealWith')} ${itemCount} ${ingredientLabel}`;
 
@@ -34,11 +34,17 @@ export const MacrosSummaryCard: React.FC<MacrosSummaryCardProps> = ({
   // TabBarLayoutProvider). This adapts to any device/orientation/web/tablet
   // without hardcoding the bar height or margin, so the summary never enters
   // the tab bar zone.
-  const clearanceGap = 12;
-  const bottomPosition = topFromScreenBottom + clearanceGap;
+  const bottomPosition = topFromScreenBottom + TAB_BAR_CLEARANCE;
 
   return (
-    <View style={[styles.summaryFooterContainer, { bottom: bottomPosition }]}>
+    <View
+      testID="nutrition-macros-summary"
+      onLayout={event => {
+        const { height } = event.nativeEvent.layout;
+        setSummaryOverlayHeight(height);
+      }}
+      style={[styles.summaryFooterContainer, { bottom: bottomPosition }]}
+    >
       <LiquidGlassFooter style={styles.summaryGlass} borderRadius={30}>
         <View style={styles.summaryContent}>
           <Text style={[styles.title, { color: colors.textPrimary }]}>{titleText}</Text>

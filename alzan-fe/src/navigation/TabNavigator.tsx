@@ -1,13 +1,14 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Image, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Dumbbell, Apple, Heart, PlayCircle, MessageCircle, User } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { LiquidGlassFooter } from '../components/common/LiquidGlassFooter';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TabBarLayoutProvider, useTabBarLayout } from './tabBarLayout';
+import { getTabBarTopFromScreenBottom, TAB_BAR_HEIGHT, TabBarLayoutProvider, useTabBarLayout } from './tabBarLayout';
 
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { TrainingStack } from './TrainingStack';
@@ -74,18 +75,40 @@ const socialTabsConfig: TabConfig[] = [
 const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: CustomTabBarProps) => {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
+  const { bottom: safeAreaBottom } = useSafeAreaInsets();
   const { setTopFromScreenBottom } = useTabBarLayout();
   const containerRef = useRef<View>(null);
 
   // Measure the floating bar's real on-screen position so overlays can sit above
   // it on any device/orientation/platform (no hardcoded height or margin).
-  const measureTabBarPosition = () => {
+  const measureTabBarPosition = useCallback(() => {
     containerRef.current?.measureInWindow((_x, y, _w, height) => {
       if (height <= 0) return;
-      const screenHeight = Dimensions.get('window').height;
-      setTopFromScreenBottom(Math.round(screenHeight - y));
+      const browserViewportHeight = typeof window !== 'undefined' ? window.visualViewport?.height : undefined;
+      setTopFromScreenBottom(
+        getTabBarTopFromScreenBottom({
+          viewportHeight: browserViewportHeight ?? Dimensions.get('window').height,
+          y,
+        }),
+      );
     });
-  };
+  }, [setTopFromScreenBottom]);
+
+  useEffect(() => {
+    measureTabBarPosition();
+    const dimensionsSubscription = Dimensions.addEventListener('change', measureTabBarPosition);
+    const browserWindow = typeof window !== 'undefined' ? window : undefined;
+    const visualViewport = browserWindow?.visualViewport;
+
+    visualViewport?.addEventListener('resize', measureTabBarPosition);
+    browserWindow?.addEventListener('resize', measureTabBarPosition);
+
+    return () => {
+      dimensionsSubscription.remove();
+      visualViewport?.removeEventListener('resize', measureTabBarPosition);
+      browserWindow?.removeEventListener('resize', measureTabBarPosition);
+    };
+  }, [measureTabBarPosition, safeAreaBottom]);
 
   const tabsConfig = isAlzanMode ? socialTabsConfig : mainTabsConfig;
   const totalTabs = tabsConfig.length;
@@ -164,8 +187,13 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
   };
 
   return (
-    <View ref={containerRef} style={styles.container} onLayout={measureTabBarPosition}>
-      <LiquidGlassFooter borderRadius={40} style={{ ...styles.blurContainer, height: 75 }}>
+    <View
+      ref={containerRef}
+      testID="floating-tab-bar"
+      style={[styles.container, { bottom: safeAreaBottom }]}
+      onLayout={measureTabBarPosition}
+    >
+      <LiquidGlassFooter borderRadius={40} style={{ ...styles.blurContainer, height: TAB_BAR_HEIGHT }}>
         <View
           style={styles.contentContainer}
           onLayout={e => {
@@ -332,10 +360,9 @@ export const TabNavigator = () => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 30,
     left: 20,
     right: 20,
-    height: 75,
+    height: TAB_BAR_HEIGHT,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.15,
