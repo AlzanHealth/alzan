@@ -11,6 +11,7 @@ assert.ok(Array.isArray(template.days));
 assert.equal((template.days as Array<Record<string, unknown>>)[0]?.weekday, 'lunes');
 assert.ok(MENU_IMPORT_PROMPT.includes('45 días'));
 assert.ok(MENU_IMPORT_PROMPT.includes('weekday'));
+assert.ok(MENU_IMPORT_PROMPT.includes('160–190 g/día'));
 assert.ok(MENU_IMPORT_CLIPBOARD_TEXT.includes(MENU_IMPORT_PROMPT));
 assert.equal(
   MENU_IMPORT_TEMPLATE,

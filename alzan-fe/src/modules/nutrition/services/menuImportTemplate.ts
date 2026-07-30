@@ -41,7 +41,7 @@ REGLAS NUTRICIONALES
 - Usa nombres de ingredientes sencillos y reales que puedan existir en el catálogo de Alzan; evita marcas, recetas generales y cantidades vagas como “al gusto”.
 - No inventes calorías, proteínas, hidratos ni grasas en el JSON.
 - Reparte la proteína en 4 tomas principales y ajusta los hidratos: más alrededor de series, sesiones controladas y tiradas largas; algo menos en descanso o rodajes suaves.
-- Si el objetivo indicado es recomposición corporal, prioriza un déficit semanal pequeño y una proteína aproximada de 145–180 g/día, sin recortar hidratos en los días de calidad.
+- Si el objetivo indicado es recomposición corporal, prioriza un déficit semanal pequeño y una proteína aproximada de 160–190 g/día cuando el perfil del usuario coincida con el caso real, sin recortar hidratos en los días de calidad, pierna o tirada larga.
 - No conviertas hidratación, suplementos o recomendaciones médicas en ingredientes salvo que el usuario lo pida explícitamente.
 
 VALIDACIÓN FINAL

@@ -67,7 +67,7 @@ RUNNING
 - Representa las recuperaciones como pasos recovery, no como texto ambiguo en notes.
 - Usa distance_km y duration_min como resumen aproximado; la sesión ejecutable debe estar en running_steps.
 - Mantén la progresión fisiológica del plan: rodaje suave, calidad, controlado y tirada larga no son intercambiables.
-- En un bloque como el caso real de 23/06 a 02/08, conserva la distribución: lunes suave + Push, martes calidad + Pull, miércoles Leg, jueves controlado, viernes Full torso y sábado tirada larga.
+- Si el usuario proporciona una distribución semanal, respétala. En el caso real más reciente (23/06–02/08), la referencia es: martes running fácil + Torso A, miércoles Torso B, jueves running de calidad + Torso C ligero, viernes pierna orientada a running y domingo tirada larga; el lunes y sábado quedan para recuperación salvo que el usuario indique otra cosa.
 - No conviertas un cambio de ritmo o de kilómetros en una plantilla nueva si la estructura sigue siendo la misma.
 
 FUERZA / GIMNASIO
