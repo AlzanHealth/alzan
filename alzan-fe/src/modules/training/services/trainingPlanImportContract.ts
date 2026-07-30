@@ -2,6 +2,7 @@ export const TRAINING_PLAN_IMPORT_FORMAT = 'alzan-training-plan';
 export const TRAINING_PLAN_IMPORT_VERSION = 1;
 export const TRAINING_PLAN_IMPORT_MAX_TEXT_LENGTH = 300_000;
 export const TRAINING_PLAN_IMPORT_MAX_SESSIONS = 500;
+export const TRAINING_PLAN_IMPORT_MAX_DAYS = 45;
 
 export const TRAINING_PLAN_SPORTS = ['running', 'strength'] as const;
 export type TrainingPlanSport = (typeof TRAINING_PLAN_SPORTS)[number];
@@ -440,6 +441,13 @@ export const parseTrainingPlanJson = (rawText: string): TrainingPlanParseResult 
     addError(errors, 'invalid_date', 'end_date', 'Expected YYYY-MM-DD');
   if (endDate && isRealDate(startDate) && endDate < startDate)
     addError(errors, 'invalid_range', 'end_date', 'End date must not precede start date');
+  if (endDate && isRealDate(startDate) && endDate >= startDate) {
+    const rangeDays =
+      (new Date(`${endDate}T00:00:00.000Z`).getTime() - new Date(`${startDate}T00:00:00.000Z`).getTime()) / 86_400_000 +
+      1;
+    if (rangeDays > TRAINING_PLAN_IMPORT_MAX_DAYS)
+      addError(errors, 'invalid_range', 'end_date', `Plan cannot exceed ${TRAINING_PLAN_IMPORT_MAX_DAYS} days`);
+  }
   if (!Array.isArray(parsed.weeks) || parsed.weeks.length < 1)
     addError(errors, 'invalid_length', 'weeks', 'At least one week is required');
   const weeks: TrainingPlanWeek[] = [];

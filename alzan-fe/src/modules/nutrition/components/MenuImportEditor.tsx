@@ -24,6 +24,8 @@ const MENU_IMPORT_VALIDATION_ERROR_KEYS: Record<MenuImportValidationErrorCode, T
   invalid_length: 'nutrition.menuImportValidation.invalidLength',
   invalid_date: 'nutrition.menuImportValidation.invalidDate',
   duplicate_date: 'nutrition.menuImportValidation.duplicateDate',
+  invalid_weekday: 'nutrition.menuImportValidation.invalidWeekday',
+  weekday_mismatch: 'nutrition.menuImportValidation.weekdayMismatch',
   invalid_meal_type: 'nutrition.menuImportValidation.invalidMealType',
   out_of_range: 'nutrition.menuImportValidation.outOfRange',
   too_many_ingredients: 'nutrition.menuImportValidation.tooManyIngredients',

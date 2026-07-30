@@ -5,6 +5,7 @@
   "days": [
     {
       "date": "2026-08-03",
+      "weekday": "lunes",
       "meals": [
         {
           "meal_type": "breakfast",
@@ -50,6 +51,7 @@
     },
     {
       "date": "2026-08-04",
+      "weekday": "martes",
       "meals": [
         {
           "meal_type": "breakfast",

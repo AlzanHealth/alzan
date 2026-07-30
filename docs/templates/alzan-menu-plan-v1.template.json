@@ -5,6 +5,7 @@
   "days": [
     {
       "date": "YYYY-MM-DD",
+      "weekday": "lunes",
       "meals": [
         {
           "meal_type": "breakfast",

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { parseTrainingPlanJson } from './trainingPlanImportContract';
+import { parseTrainingPlanJson, TRAINING_PLAN_IMPORT_MAX_DAYS } from './trainingPlanImportContract';
 
 const weekdayForDate = (date: string) =>
   ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][
@@ -55,6 +55,23 @@ const duplicate = parseTrainingPlanJson(
 );
 assert.equal(duplicate.ok, false);
 if (!duplicate.ok) assert.ok(duplicate.errors.some(error => error.code === 'duplicate_date'));
+
+const maxRange = parseTrainingPlanJson(
+  JSON.stringify({
+    ...validDocument,
+    end_date: '2026-09-16',
+  }),
+);
+assert.equal(maxRange.ok, true);
+
+const tooLongRange = parseTrainingPlanJson(
+  JSON.stringify({
+    ...validDocument,
+    end_date: '2026-09-17',
+  }),
+);
+assert.equal(tooLongRange.ok, false);
+if (!tooLongRange.ok) assert.ok(tooLongRange.errors.some(error => error.code === 'invalid_range'));
 
 const unsupportedSport = parseTrainingPlanJson(
   JSON.stringify({

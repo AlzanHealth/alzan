@@ -1,5 +1,6 @@
 export const MENU_IMPORT_FORMAT = 'alzan-menu-plan';
 export const MENU_IMPORT_VERSION = 1;
+export const MENU_IMPORT_MAX_DAYS = 45;
 export const MENU_IMPORT_MAX_TEXT_LENGTH = 250_000;
 export const MENU_IMPORT_MAX_TOTAL_INGREDIENTS = 1_500;
 export const MENU_IMPORT_MEAL_TYPES = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'] as const;
@@ -19,6 +20,7 @@ export type MenuImportMeal = {
 
 export type MenuImportDay = {
   date: string;
+  weekday?: string;
   meals: MenuImportMeal[];
 };
 
@@ -40,6 +42,8 @@ export type MenuImportValidationErrorCode =
   | 'invalid_length'
   | 'invalid_date'
   | 'duplicate_date'
+  | 'invalid_weekday'
+  | 'weekday_mismatch'
   | 'invalid_meal_type'
   | 'out_of_range'
   | 'too_many_ingredients';
@@ -60,11 +64,41 @@ type ValidationContext = {
 };
 
 const ROOT_KEYS = ['format', 'version', 'menu_name', 'days'];
-const DAY_KEYS = ['date', 'meals'];
+const DAY_KEYS = ['date', 'weekday', 'meals'];
 const MEAL_KEYS = ['meal_type', 'name', 'ingredients'];
 const INGREDIENT_KEYS = ['name', 'quantity_g'];
 const MEAL_TYPE_VALUES: ReadonlySet<string> = new Set(MENU_IMPORT_MEAL_TYPES);
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const WEEKDAY_ALIASES: Record<string, string> = {
+  domingo: 'domingo',
+  sunday: 'domingo',
+  lunes: 'lunes',
+  monday: 'lunes',
+  martes: 'martes',
+  tuesday: 'martes',
+  miercoles: 'miércoles',
+  miércoles: 'miércoles',
+  wednesday: 'miércoles',
+  jueves: 'jueves',
+  thursday: 'jueves',
+  viernes: 'viernes',
+  friday: 'viernes',
+  sabado: 'sábado',
+  sábado: 'sábado',
+  saturday: 'sábado',
+};
+
+const normalizeWeekday = (value: string): string =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const getWeekdayForDate = (date: string): string =>
+  ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][
+    new Date(`${date}T00:00:00.000Z`).getUTCDay()
+  ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -213,6 +247,29 @@ const parseDay = (value: unknown, path: string, context: ValidationContext): Men
     date = rawDate;
   }
 
+  const rawWeekday = value.weekday;
+  let weekday: string | undefined;
+  if (rawWeekday !== undefined) {
+    if (typeof rawWeekday !== 'string') {
+      addError(context, 'invalid_type', `${path}.weekday`, 'Expected a string');
+    } else {
+      const normalizedWeekday = WEEKDAY_ALIASES[normalizeWeekday(rawWeekday)];
+      if (!normalizedWeekday) {
+        addError(context, 'invalid_weekday', `${path}.weekday`, 'Unsupported weekday');
+      } else {
+        weekday = normalizedWeekday;
+        if (date !== null && weekday !== getWeekdayForDate(date)) {
+          addError(
+            context,
+            'weekday_mismatch',
+            `${path}.weekday`,
+            `Weekday does not match ${date}; expected ${getWeekdayForDate(date)}`,
+          );
+        }
+      }
+    }
+  }
+
   const rawMeals = value.meals;
   const meals: MenuImportMeal[] = [];
   let hasValidMealsArray = false;
@@ -237,7 +294,7 @@ const parseDay = (value: unknown, path: string, context: ValidationContext): Men
   if (date === null || !hasValidMealsArray) {
     return null;
   }
-  return { date, meals };
+  return { date, ...(weekday ? { weekday } : {}), meals };
 };
 
 const parseDocument = (value: unknown, context: ValidationContext): MenuImportDocument | null => {
@@ -284,8 +341,8 @@ const parseDocument = (value: unknown, context: ValidationContext): MenuImportDo
   } else {
     hasValidDaysArray = true;
     const seenDates = new Set<string>();
-    if (rawDays.length < 1 || rawDays.length > 31) {
-      addError(context, 'invalid_length', 'days', 'Expected between 1 and 31 days');
+    if (rawDays.length < 1 || rawDays.length > MENU_IMPORT_MAX_DAYS) {
+      addError(context, 'invalid_length', 'days', `Expected between 1 and ${MENU_IMPORT_MAX_DAYS} days`);
     }
     rawDays.forEach((day, index) => {
       const parsedDay = parseDay(day, `days[${index}]`, context);

@@ -20,7 +20,7 @@ import type { TranslationKey } from '../../i18n/locales/en';
 import { MenuImportEditor } from '../../modules/nutrition/components/MenuImportEditor';
 import { MenuImportPreview } from '../../modules/nutrition/components/MenuImportPreview';
 import { useMenuImport } from '../../modules/nutrition/hooks/useMenuImport';
-import { MENU_IMPORT_TEMPLATE } from '../../modules/nutrition/services/menuImportTemplate';
+import { MENU_IMPORT_CLIPBOARD_TEXT } from '../../modules/nutrition/services/menuImportTemplate';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import type { NutritionScreenNavigationProp } from '../../types/navigation.types';
 
@@ -113,7 +113,7 @@ export const MenuImportScreen = () => {
     if (Platform.OS !== 'web') return;
 
     try {
-      await copyTextToClipboard(MENU_IMPORT_TEMPLATE);
+      await copyTextToClipboard(MENU_IMPORT_CLIPBOARD_TEXT);
       Alert.alert(translate('common.done'), translate('nutrition.menuImportTemplateCopied'));
     } catch {
       Alert.alert(translate('common.error'), translate('nutrition.menuImportTemplateCopyError'));
