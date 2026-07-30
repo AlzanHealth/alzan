@@ -155,11 +155,16 @@ export const ImportReviewBlocks: React.FC<ImportReviewBlocksProps> = ({
     queryFn: async (): Promise<TemplateOption[]> => {
       if (!user) return [];
       const query = isStrength
-        ? supabase.from('workout_templates').select('id, base_name, description').eq('user_id', user.id)
+        ? supabase
+            .from('workout_templates')
+            .select('id, base_name, description')
+            .eq('user_id', user.id)
+            .or('source.is.null,source.neq.importing')
         : supabase
             .from('endurance_workout_templates')
             .select('id, base_name, description')
             .eq('user_id', user.id)
+            .or('source.is.null,source.neq.importing')
             .eq('sport_type', session.sport_type);
       const { data, error } = await query.order('base_name');
       if (error) throw error;

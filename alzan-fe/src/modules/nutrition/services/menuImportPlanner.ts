@@ -339,7 +339,9 @@ export function setMenuImportConflictDecision(
 
 export function isMenuImportPreviewReady(preview: MenuImportPreview): boolean {
   const everyIngredientIsResolved = preview.meals.every(meal =>
-    meal.ingredients.every(ingredient => ingredient.selectedCandidate !== null),
+    meal.conflict?.decision === 'ignore'
+      ? true
+      : meal.ingredients.every(ingredient => ingredient.selectedCandidate !== null),
   );
   const everyConflictHasDecision = preview.meals.every(
     meal => meal.conflict === null || meal.conflict.decision !== null,

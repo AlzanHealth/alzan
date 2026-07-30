@@ -1502,6 +1502,13 @@ export type EnduranceWorkoutTemplateInsert =
 export type EnduranceWorkoutTemplateUpdate =
   Update<"endurance_workout_templates">;
 
+export type EnduranceWorkoutTemplateProgression =
+  Row<"endurance_workout_template_progressions">;
+export type EnduranceWorkoutTemplateProgressionInsert =
+  Insert<"endurance_workout_template_progressions">;
+export type EnduranceWorkoutTemplateProgressionUpdate =
+  Update<"endurance_workout_template_progressions">;
+
 export type EnduranceWorkoutStep = Row<"endurance_workout_steps">;
 export type EnduranceWorkoutStepInsert = Insert<"endurance_workout_steps">;
 export type EnduranceWorkoutStepUpdate = Update<"endurance_workout_steps">;

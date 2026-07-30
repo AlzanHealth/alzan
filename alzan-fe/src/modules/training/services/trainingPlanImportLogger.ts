@@ -1,6 +1,6 @@
 type ImportLogDetails = Record<string, unknown>;
 
-const DEBUG_ENABLED = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
+const DEBUG_ENABLED = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 
 const getErrorDetails = (error: unknown): ImportLogDetails => {
   if (error instanceof Error) return { name: error.name, message: error.message };

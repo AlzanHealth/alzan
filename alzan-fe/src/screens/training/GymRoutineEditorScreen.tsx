@@ -56,6 +56,7 @@ import { calculateRoutineTotalSets, normalizeTargetSetsInput } from './helpers/g
 import { getDefaultGymExerciseTargets } from '../../modules/training/helpers/gymExerciseDefaults.helper';
 import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { buildGymTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
+import { isScheduledWeekday } from '../../modules/training/helpers/templateScheduling.helper';
 
 export const GymRoutineEditorScreen = () => {
   const { t } = useTranslation();
@@ -197,13 +198,14 @@ export const GymRoutineEditorScreen = () => {
       setName(routineData.base_name);
       setDescription(routineData.description || '');
 
-      if (routineData.suggested_day_of_week !== null && routineData.suggested_day_of_week !== undefined) {
+      if (isScheduledWeekday(routineData.suggested_day_of_week)) {
         setSelectedDays([routineData.suggested_day_of_week]);
         setOriginalSuggestedDay(routineData.suggested_day_of_week); // Store original for comparison
       } else {
+        setSelectedDays([]);
         setOriginalSuggestedDay(null);
       }
-      setIsRecurring(!!routineData.suggested_day_of_week);
+      setIsRecurring(isScheduledWeekday(routineData.suggested_day_of_week));
       setRecurrenceStartDate(lifecycleData.recurrence_start_date || null);
       setExercises(routineData.exercises || []);
       setSupersetLinks(buildSupersetLinksFromExercises(routineData.exercises || []));
@@ -573,9 +575,21 @@ export const GymRoutineEditorScreen = () => {
     }
   }, [exercises.length, supersetLinks]);
 
-  const executeSave = async () => {
+  const executeSave = async (detachFromImport = false) => {
     try {
       const supersetIndexes = Array.from(supersetLinks).sort((a, b) => a - b);
+      const suggestedDayForSave = isRecurring && selectedDays.length > 0 ? selectedDays[0] : null;
+      const recurrenceStartDateForSave = isRecurring
+        ? selectedDays.length > 0
+          ? recurrenceStartDate || format(new Date(), 'yyyy-MM-dd')
+          : null
+        : recurrenceStartDate || null;
+      const recurrenceEndDateForSave = recurrenceEndDate.trim() ? recurrenceEndDate.trim() : null;
+      const importedLifecycleChanged =
+        routineData?.source === 'imported' &&
+        (suggestedDayForSave !== routineData.suggested_day_of_week ||
+          recurrenceStartDateForSave !== routineData.recurrence_start_date ||
+          recurrenceEndDateForSave !== routineData.recurrence_end_date);
       const templateFamilyKey = buildGymTemplateFamilySignature({
         workoutGoal,
         modality,
@@ -584,7 +598,9 @@ export const GymRoutineEditorScreen = () => {
           exerciseName: exercise.exercise?.base_name,
           orderIndex: index,
           isWarmup: exercise.is_warmup,
-          supersetNextExerciseId: exercise.superset_next_exercise_id,
+          supersetNextExerciseId: supersetLinks.has(index)
+            ? exercises[index + 1]?.exercise_id || exercises[index + 1]?.exercise?.base_name || null
+            : null,
         })),
       });
       await saveRoutine.mutateAsync({
@@ -593,15 +609,13 @@ export const GymRoutineEditorScreen = () => {
         description,
         workout_goal: workoutGoal || null,
         modality: modality || null,
-        suggested_day_of_week: isRecurring && selectedDays.length > 0 ? selectedDays[0] : null,
-        recurrence_start_date: isRecurring
-          ? selectedDays.length > 0
-            ? recurrenceStartDate || format(new Date(), 'yyyy-MM-dd')
-            : null
-          : recurrenceStartDate || null,
-        recurrence_end_date: recurrenceEndDate.trim() ? recurrenceEndDate.trim() : null,
+        suggested_day_of_week: suggestedDayForSave,
+        recurrence_start_date: recurrenceStartDateForSave,
+        recurrence_end_date: recurrenceEndDateForSave,
         auto_delete_after_end: autoDeleteAfterEnd,
         template_family_key: templateFamilyKey,
+        original_template_family_key: routineData?.template_family_key,
+        source: detachFromImport || importedLifecycleChanged ? 'user' : routineData?.source,
         exercises,
         supersetLinks: supersetIndexes,
       });
@@ -681,7 +695,7 @@ export const GymRoutineEditorScreen = () => {
                   }
                 }
               }
-              await executeSave();
+              await executeSave(true);
             },
           },
         ],
@@ -936,31 +950,29 @@ export const GymRoutineEditorScreen = () => {
                     onToggleRecurring={() => setIsRecurring(!isRecurring)}
                     singleSelect={true}
                   />
-                  {(isRecurring || recurrenceEndDate.trim()) && (
-                    <View style={styles.templateLifecycleCard}>
-                      <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.templateEndDate')}</Text>
-                      <TextInput
-                        style={[styles.lifecycleInput, dynamicStyles.input]}
-                        value={recurrenceEndDate}
-                        onChangeText={setRecurrenceEndDate}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor={themeColors.textSecondary}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                      <View style={styles.lifecycleToggleRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.lifecycleToggleLabel, dynamicStyles.label]}>
-                            {t('training.autoDeleteExpiredTemplates')}
-                          </Text>
-                          <Text style={[styles.lifecycleToggleDescription, dynamicStyles.sublabel]}>
-                            {t('training.autoDeleteExpiredTemplatesDesc')}
-                          </Text>
-                        </View>
-                        <AlzanSwitch value={autoDeleteAfterEnd} onValueChange={setAutoDeleteAfterEnd} />
+                  <View style={styles.templateLifecycleCard}>
+                    <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.templateEndDate')}</Text>
+                    <TextInput
+                      style={[styles.lifecycleInput, dynamicStyles.input]}
+                      value={recurrenceEndDate}
+                      onChangeText={setRecurrenceEndDate}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={themeColors.textSecondary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <View style={styles.lifecycleToggleRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.lifecycleToggleLabel, dynamicStyles.label]}>
+                          {t('training.autoDeleteExpiredTemplates')}
+                        </Text>
+                        <Text style={[styles.lifecycleToggleDescription, dynamicStyles.sublabel]}>
+                          {t('training.autoDeleteExpiredTemplatesDesc')}
+                        </Text>
                       </View>
+                      <AlzanSwitch value={autoDeleteAfterEnd} onValueChange={setAutoDeleteAfterEnd} />
                     </View>
-                  )}
+                  </View>
                 </View>
               </>
             ) : (

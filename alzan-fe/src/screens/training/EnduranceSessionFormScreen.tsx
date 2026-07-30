@@ -316,7 +316,7 @@ export const EnduranceSessionFormScreen = () => {
         try {
           const data = await fetchTemplateWithProgressedSteps(template.id, plannedDate);
           if (data) {
-            setFetchedTemplate({ ...template, steps: data.steps });
+            setFetchedTemplate({ ...template, ...data, steps: data.steps });
           }
         } catch (error) {
           console.error('[EnduranceSessionForm] Failed to load progressed template steps:', error);

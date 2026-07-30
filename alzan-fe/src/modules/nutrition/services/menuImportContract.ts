@@ -3,6 +3,7 @@ export const MENU_IMPORT_VERSION = 1;
 export const MENU_IMPORT_MAX_DAYS = 45;
 export const MENU_IMPORT_MAX_TEXT_LENGTH = 250_000;
 export const MENU_IMPORT_MAX_TOTAL_INGREDIENTS = 1_500;
+export const MENU_IMPORT_MAX_UNIQUE_INGREDIENTS = 200;
 export const MENU_IMPORT_MEAL_TYPES = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'] as const;
 
 export type MenuImportMealType = (typeof MENU_IMPORT_MEAL_TYPES)[number];
@@ -46,7 +47,8 @@ export type MenuImportValidationErrorCode =
   | 'weekday_mismatch'
   | 'invalid_meal_type'
   | 'out_of_range'
-  | 'too_many_ingredients';
+  | 'too_many_ingredients'
+  | 'too_many_unique_ingredients';
 
 export type MenuImportValidationError = {
   code: MenuImportValidationErrorCode;
@@ -61,6 +63,7 @@ export type MenuImportParseResult =
 type ValidationContext = {
   errors: MenuImportValidationError[];
   totalIngredientCount: number;
+  uniqueIngredientKeys: Set<string>;
 };
 
 const ROOT_KEYS = ['format', 'version', 'menu_name', 'days'];
@@ -94,6 +97,14 @@ const normalizeWeekday = (value: string): string =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase();
+
+const normalizeIngredientName = (value: string): string =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
 
 const getWeekdayForDate = (date: string): string =>
   ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][
@@ -162,6 +173,9 @@ const parseIngredient = (value: unknown, path: string, context: ValidationContex
 
   addUnknownPropertyErrors(value, INGREDIENT_KEYS, path, context);
   const name = readTrimmedString(value.name, `${path}.name`, 160, context);
+  if (name !== null) {
+    context.uniqueIngredientKeys.add(normalizeIngredientName(name));
+  }
   const rawQuantity = value.quantity_g;
   let quantity: number | null = null;
 
@@ -354,6 +368,15 @@ const parseDocument = (value: unknown, context: ValidationContext): MenuImportDo
         days.push(parsedDay);
       }
     });
+    if (days.length > 1) {
+      const sortedDates = days.map(day => day.date).sort();
+      const firstDate = new Date(`${sortedDates[0]}T00:00:00.000Z`).getTime();
+      const lastDate = new Date(`${sortedDates.at(-1)}T00:00:00.000Z`).getTime();
+      const inclusiveRangeDays = (lastDate - firstDate) / 86_400_000 + 1;
+      if (inclusiveRangeDays > MENU_IMPORT_MAX_DAYS) {
+        addError(context, 'out_of_range', 'days', `Menu date range must not exceed ${MENU_IMPORT_MAX_DAYS} days`);
+      }
+    }
   }
 
   if (!hasValidFormat || !hasValidVersion || menuName === null || !hasValidDaysArray) {
@@ -391,7 +414,11 @@ export function parseMenuImportJson(rawText: string): MenuImportParseResult {
     };
   }
 
-  const context: ValidationContext = { errors: [], totalIngredientCount: 0 };
+  const context: ValidationContext = {
+    errors: [],
+    totalIngredientCount: 0,
+    uniqueIngredientKeys: new Set<string>(),
+  };
   const document = parseDocument(value, context);
   if (context.totalIngredientCount > MENU_IMPORT_MAX_TOTAL_INGREDIENTS) {
     addError(
@@ -399,6 +426,14 @@ export function parseMenuImportJson(rawText: string): MenuImportParseResult {
       'too_many_ingredients',
       'days',
       `Menu contains more than ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} ingredients`,
+    );
+  }
+  if (context.uniqueIngredientKeys.size > MENU_IMPORT_MAX_UNIQUE_INGREDIENTS) {
+    addError(
+      context,
+      'too_many_unique_ingredients',
+      'days',
+      `Menu contains more than ${MENU_IMPORT_MAX_UNIQUE_INGREDIENTS} unique ingredients`,
     );
   }
 

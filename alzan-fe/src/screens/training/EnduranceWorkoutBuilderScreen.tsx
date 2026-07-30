@@ -74,6 +74,7 @@ import {
 } from '../../modules/training/helpers/enduranceProgression.helper';
 import { fetchEnduranceStepProgressions } from '../../modules/training/services/enduranceProgressionService';
 import { buildEnduranceTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
+import { isScheduledWeekday } from '../../modules/training/helpers/templateScheduling.helper';
 
 interface Step {
   id: string; // temp id
@@ -198,7 +199,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
     if (!isRecurring) {
       // Imported one-off plans can still have a lifecycle end date. Keep it
       // visible and persisted even though they do not repeat by weekday.
-      if (!isEditMode) setRecurrenceEndDate('');
       return;
     }
     const weeks = parseInt(recurrenceWeeks, 10);
@@ -415,14 +415,14 @@ export const EnduranceWorkoutBuilderScreen = () => {
       // Tennis hydration
       setRacketUsed(existingTemplate.racket_used || null);
 
-      if (existingTemplate.scheduled_day !== null && existingTemplate.scheduled_day !== undefined) {
+      if (isScheduledWeekday(existingTemplate.scheduled_day)) {
         setScheduledDays([existingTemplate.scheduled_day]);
         setOriginalScheduledDay(existingTemplate.scheduled_day);
       } else {
         setScheduledDays([]);
         setOriginalScheduledDay(null);
       }
-      setIsRecurring(!!existingTemplate.scheduled_day);
+      setIsRecurring(isScheduledWeekday(existingTemplate.scheduled_day));
       setRecurrenceStartDate(existingTemplate.recurrence_start_date || null);
       setRecurrenceEndDate(existingTemplate.recurrence_end_date || '');
       const lifecycleData = existingTemplate as unknown as {
@@ -730,12 +730,17 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return trimmedEndDate.length > 0 ? trimmedEndDate : null;
   };
 
-  const executeSave = async () => {
+  const executeSave = async (detachFromImport = false) => {
     try {
       const isOneOff = !isRecurring && scheduledDays.length > 0;
       const templateScheduledDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
       const recurrenceStartDateForSave = getRecurrenceStartDateForSave(templateScheduledDay);
       const recurrenceEndDateForSave = getValidatedRecurrenceEndDate();
+      const importedLifecycleChanged =
+        existingTemplate?.source === 'imported' &&
+        (templateScheduledDay !== existingTemplate.scheduled_day ||
+          recurrenceStartDateForSave !== existingTemplate.recurrence_start_date ||
+          recurrenceEndDateForSave !== existingTemplate.recurrence_end_date);
       const stepsWithProgressionKeys = ensureStepProgressionKeys(steps);
 
       const finalGoal = trainingGoal;
@@ -776,6 +781,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
               })),
             })),
           }),
+          original_template_family_key: existingTemplate?.template_family_key,
+          source: detachFromImport || importedLifecycleChanged ? 'user' : existingTemplate?.source,
           environment_type: environmentType,
           surface: surface,
           pool_type: poolType,
@@ -903,7 +910,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
 
-    if (recurrenceEndDate.trim()) {
+    if (recurrenceEndDate.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(recurrenceEndDate.trim())) {
+      Alert.alert(t('common.error'), t('training.recurrenceEndDateInvalid'));
+      return;
+    }
+
+    if (isRecurring && recurrenceEndDate.trim()) {
       const recurrenceStart = getRecurrenceStartDateForSave(scheduledDays[0] ?? null);
       const recurrenceWeeks = calculateProgressionWeeks(recurrenceStart, recurrenceEndDate.trim());
       if (recurrenceWeeks < 1) {
@@ -979,7 +991,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   }
                 }
               }
-              await executeSave();
+              await executeSave(true);
             },
           },
         ],
@@ -3222,7 +3234,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       if (!nextRecurring) {
                         setRecurrenceWeeks('');
                         if (!isEditMode) {
-                          setRecurrenceEndDate('');
                           setRecurrenceStartDate(null);
                           setStepProgressions([]);
                         }
@@ -3322,7 +3333,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       </View>
                     </>
                   )}
-                  {!isRecurring && recurrenceEndDate.trim() && (
+                  {!isRecurring && (
                     <>
                       <View style={styles.formRow}>
                         <View style={styles.recurrenceEndLabel}>

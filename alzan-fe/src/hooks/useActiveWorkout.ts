@@ -15,6 +15,9 @@ import {
   getLocalizedExerciseName,
 } from '../services/localization';
 import { getDefaultGymExerciseTargets } from '../modules/training/helpers/gymExerciseDefaults.helper';
+import { getStrengthProgressionDate } from '../modules/training/helpers/strengthProgression.helper';
+import { applyStrengthProgressionsForPlannedDate } from '../modules/training/services/strengthProgressionService';
+import { format } from 'date-fns';
 
 export type FinishSession = {
   id: string;
@@ -96,10 +99,12 @@ export const useActiveWorkout = (sessionId?: string) => {
     mutationFn: async ({
       templateId,
       customStartTime,
+      plannedDate,
       planId,
     }: {
       templateId: string;
       customStartTime?: string;
+      plannedDate?: string;
       planId?: string;
     }) => {
       console.log(
@@ -107,6 +112,8 @@ export const useActiveWorkout = (sessionId?: string) => {
         templateId,
         'date:',
         customStartTime,
+        'plannedDate:',
+        plannedDate,
         'planId:',
         planId,
       );
@@ -136,6 +143,17 @@ export const useActiveWorkout = (sessionId?: string) => {
         const { data: template } = await supabase.from('workout_templates').select('*').eq('id', templateId).single();
         console.log('[useActiveWorkout.startSession] Template obtenido:', template?.id);
 
+        const startTime = customStartTime || new Date().toISOString();
+        const startInstant = new Date(startTime);
+        const localDate = plannedDate || format(startInstant, 'yyyy-MM-dd');
+        const startedAtLocal = `${localDate}T${format(startInstant, 'HH:mm:ss')}`;
+        let timezone: string | null = null;
+        try {
+          timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+        } catch {
+          timezone = null;
+        }
+
         // 2. Create activity_session
         const { data: session, error } = await supabase
           .from('activity_sessions')
@@ -143,7 +161,9 @@ export const useActiveWorkout = (sessionId?: string) => {
             user_id: user.id,
             sport_type: 'strength',
             workout_template_id: templateId,
-            start_time: customStartTime || new Date().toISOString(), // Use custom time or now
+            start_time: startTime,
+            started_at_local: startedAtLocal,
+            timezone,
             source: 'manual',
             name: template?.base_name || 'Entreno de Fuerza',
           })
@@ -255,6 +275,26 @@ export const useActiveWorkout = (sessionId?: string) => {
                 }
               : null,
           })) as WorkoutTemplateExerciseWithExercise[];
+
+          const { data: linkedPlan, error: linkedPlanError } = await supabase
+            .from('workout_plans')
+            .select('planned_date')
+            .eq('activity_session_id', session.id)
+            .maybeSingle();
+          if (linkedPlanError) {
+            console.warn('[useActiveWorkout.fetchSession] Could not load linked plan date:', linkedPlanError);
+          }
+
+          const progressionDate = getStrengthProgressionDate({
+            linkedPlannedDate: linkedPlan?.planned_date,
+            startedAtLocal: session.started_at_local,
+            startTime: session.start_time,
+          });
+          exercises = await applyStrengthProgressionsForPlannedDate(
+            session.workout_template_id,
+            progressionDate,
+            exercises,
+          );
           console.log('[useActiveWorkout.fetchSession] Ejercicios:', exercises.length);
         }
 

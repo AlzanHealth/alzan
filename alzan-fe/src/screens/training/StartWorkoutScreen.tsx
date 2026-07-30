@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
@@ -15,12 +15,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../i18n/dateLocale';
+import { format, parseISO } from 'date-fns';
 import {
   getCurrentAppLocale,
   getLocalizedExerciseDescription,
   getLocalizedExerciseName,
 } from '../../services/localization';
 import { Exercise, WorkoutTemplate, WorkoutTemplateExercise } from '../../types/requests.types';
+import { applyStrengthProgressionsForPlannedDate } from '../../modules/training/services/strengthProgressionService';
 
 interface TemplateExerciseRow extends WorkoutTemplateExercise {
   exercise:
@@ -59,8 +61,10 @@ export const StartWorkoutScreen = () => {
   const { startSession } = useActiveWorkout();
   const [isLoading, setIsLoading] = useState(true);
   const [template, setTemplate] = useState<WorkoutTemplateWithExercises | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date>(date ? new Date(date) : new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(date ? parseISO(date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
+  const fetchRequestId = useRef(0);
 
   // Custom Floating Tab Bar Dimensions (from TabNavigator.tsx)
   const FLOATING_TAB_BAR_HEIGHT = 75;
@@ -72,10 +76,14 @@ export const StartWorkoutScreen = () => {
   const contentBottomPadding = totalTabBarHeight + footerHeight + spacing.m;
 
   useEffect(() => {
-    fetchTemplate();
-  }, [templateId, languageCode]);
+    void fetchTemplate();
+    return () => {
+      fetchRequestId.current += 1;
+    };
+  }, [templateId, languageCode, selectedDateKey]);
 
   const fetchTemplate = async (): Promise<WorkoutTemplateWithExercises | null> => {
+    const requestId = ++fetchRequestId.current;
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -110,14 +118,26 @@ export const StartWorkoutScreen = () => {
             })),
           }
         : null;
-      if (localizedTemplate) setTemplate(localizedTemplate);
-      return localizedTemplate;
+      if (!localizedTemplate) return null;
+
+      const progressedTemplate = {
+        ...localizedTemplate,
+        exercises: await applyStrengthProgressionsForPlannedDate(
+          localizedTemplate.id,
+          selectedDateKey,
+          localizedTemplate.exercises,
+        ),
+      };
+      if (requestId !== fetchRequestId.current) return progressedTemplate;
+      setTemplate(progressedTemplate);
+      return progressedTemplate;
     } catch (error) {
+      if (requestId !== fetchRequestId.current) return null;
       console.error('Error fetching template:', error);
       Alert.alert(t('common.error'), t('training.loadRoutineError'));
       return null;
     } finally {
-      setIsLoading(false);
+      if (requestId === fetchRequestId.current) setIsLoading(false);
     }
   };
 
@@ -128,12 +148,14 @@ export const StartWorkoutScreen = () => {
       let customStartTime = undefined;
       // Use selectedDate instead of route param
       const now = new Date();
-      selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-      customStartTime = selectedDate.toISOString();
+      const sessionDate = new Date(selectedDate);
+      sessionDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+      customStartTime = sessionDate.toISOString();
 
       const session = await startSession.mutateAsync({
         templateId: template.id,
         customStartTime,
+        plannedDate: selectedDateKey,
         planId, // ✅ Pass planId to link with workout_plan
       });
       navigation.replace('ActiveWorkout', { sessionId: session.id });

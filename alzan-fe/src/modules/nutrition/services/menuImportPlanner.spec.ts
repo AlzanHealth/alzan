@@ -361,6 +361,41 @@ async function testConflictDecisionAppliesToEveryMealInTheSameSlot() {
   );
 }
 
+async function testIgnoredMealsDoNotRequireIngredientResolution() {
+  const document = createDocument(['Ingrediente ambiguo']);
+  document.days[0].meals.push({
+    meal_type: 'dinner',
+    name: 'Cena resoluble',
+    ingredients: [{ name: 'Arroz integral', quantity_g: 100 }],
+  });
+  const resolutions = await resolveMenuImportIngredients(document, async normalizedName =>
+    normalizedName === 'arroz integral'
+      ? [rice]
+      : [
+          { ...rice, id: 'ambiguous-one', name: 'Ingrediente ambiguo uno' },
+          { ...rice, id: 'ambiguous-two', name: 'Ingrediente ambiguo dos' },
+        ],
+  );
+  const preview = buildMenuImportPreview(
+    document,
+    resolutions,
+    [
+      {
+        id: 'same-slot',
+        date: '2026-08-03',
+        meal_type: 'lunch',
+        name: 'Comida existente',
+      },
+    ],
+    calendarSnapshot,
+  );
+
+  assert.equal(isMenuImportPreviewReady(preview), false);
+  const ignored = setMenuImportConflictDecision(preview, preview.meals[0].key, 'ignore');
+  assert.equal(ignored.meals[0].ingredients[0].selectedCandidate, null);
+  assert.equal(isMenuImportPreviewReady(ignored), true);
+}
+
 async function main() {
   await testUniqueSearchAndExactSelection();
   await testRejectsMalformedNutritionCandidates();
@@ -371,6 +406,7 @@ async function main() {
   await testMacrosAndConflictDetection();
   await testReadinessRequiresResolutionAndConflictDecision();
   await testConflictDecisionAppliesToEveryMealInTheSameSlot();
+  await testIgnoredMealsDoNotRequireIngredientResolution();
   console.log('menuImportPlanner: all assertions passed');
 }
 

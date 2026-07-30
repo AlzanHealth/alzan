@@ -19,6 +19,7 @@ export const useRoutines = () => {
         .from('workout_templates')
         .select('*')
         .eq('user_id', user.id)
+        .or('source.is.null,source.neq.importing')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -29,7 +30,11 @@ export const useRoutines = () => {
 
   const deleteRoutineMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('workout_templates').delete().eq('id', id);
+      if (!user) throw new Error('No user');
+      const { error } = await supabase.rpc('delete_training_template', {
+        p_template_kind: 'gym',
+        p_template_id: id,
+      });
       if (error) throw error;
     },
     onSuccess: () => {

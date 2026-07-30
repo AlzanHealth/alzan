@@ -20,6 +20,27 @@ export type ImportedTemplateFamily = {
   signature: string;
 };
 
+export type ImportedTemplateCandidate = {
+  id: string;
+  template_family_key: string | null;
+  source: string | null;
+  recurrence_start_date: string | null;
+  recurrence_end_date: string | null;
+};
+
+export const findReusableImportedTemplate = (
+  candidates: ImportedTemplateCandidate[],
+  familyKey: string,
+  range: { start: string; end: string },
+): ImportedTemplateCandidate | undefined =>
+  candidates.find(
+    candidate =>
+      candidate.source === 'imported' &&
+      candidate.template_family_key === familyKey &&
+      candidate.recurrence_start_date === range.start &&
+      candidate.recurrence_end_date === range.end,
+  );
+
 const toEnduranceSignatureStep = (step: TrainingPlanRunningStep): EnduranceSignatureStep => ({
   phaseType: step.phase_type,
   durationType: step.duration_type,
@@ -28,7 +49,7 @@ const toEnduranceSignatureStep = (step: TrainingPlanRunningStep): EnduranceSigna
   children: step.children?.map(toEnduranceSignatureStep),
 });
 
-const sessionSignature = (session: TrainingPlanSession): string => {
+export const getTrainingPlanSessionSignature = (session: TrainingPlanSession): string => {
   if (session.sport === 'running') {
     return buildEnduranceTemplateFamilySignature({
       sportType: 'running',
@@ -57,7 +78,7 @@ const stableHash = (value: string): string => {
 
 export const getImportedTemplateFamilyKey = (session: TrainingPlanSession): string => {
   const explicit = normalizeTemplateKey(session.template_key);
-  return `${session.sport}:${explicit || `signature_${stableHash(sessionSignature(session))}`}`;
+  return `${session.sport}:${explicit || `signature_${stableHash(getTrainingPlanSessionSignature(session))}`}`;
 };
 
 export const groupTrainingPlanSessions = (document: TrainingPlanImportDocument): ImportedTemplateFamily[] => {
@@ -77,7 +98,7 @@ export const groupTrainingPlanSessions = (document: TrainingPlanImportDocument):
         workoutGoal: session.workout_goal ?? null,
         modality: session.modality ?? null,
         sessions: [session],
-        signature: sessionSignature(session),
+        signature: getTrainingPlanSessionSignature(session),
       });
     }
   }

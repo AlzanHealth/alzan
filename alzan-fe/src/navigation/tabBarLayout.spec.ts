@@ -4,6 +4,7 @@ import {
   getInitialTabBarTopFromScreenBottom,
   getTabBarBottomInset,
   getTabBarTopFromScreenBottom,
+  isResizeEventTarget,
 } from './tabBarLayoutGeometry';
 
 assert.equal(getTabBarBottomInset(0), 0);
@@ -33,6 +34,18 @@ assert.equal(
     y: 900,
   }),
   0,
+);
+
+assert.equal(isResizeEventTarget(undefined), false);
+assert.equal(isResizeEventTarget(null), false);
+assert.equal(isResizeEventTarget({}), false);
+assert.equal(isResizeEventTarget({ addEventListener: () => {} }), false);
+assert.equal(
+  isResizeEventTarget({
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }),
+  true,
 );
 
 console.log('tab bar layout tests passed');

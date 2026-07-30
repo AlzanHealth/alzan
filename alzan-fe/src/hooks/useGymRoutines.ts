@@ -16,6 +16,7 @@ export const useGymRoutines = () => {
         .from('workout_templates')
         .select('*')
         .eq('user_id', user.id)
+        .or('source.is.null,source.neq.importing')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -44,41 +45,11 @@ export const useGymRoutines = () => {
     mutationFn: async (id: string) => {
       console.log('[useGymRoutines.delete] Iniciando - id:', id);
       try {
-        // 1. Delete only NON-COMPLETED workout_plans that reference this template
-        const { error: plansError } = await supabase
-          .from('workout_plans')
-          .delete()
-          .eq('gym_template_id', id)
-          .is('completed_at', null);
-
-        if (plansError) {
-          console.error('[useGymRoutines.delete] Error deleting plans:', plansError);
-          // Continue anyway
-        }
-
-        // 1.5 Unlink COMPLETED workout_plans (keep history but remove reference)
-        const { error: unlinkPlansError } = await supabase
-          .from('workout_plans')
-          .update({ gym_template_id: null })
-          .eq('gym_template_id', id);
-
-        if (unlinkPlansError) {
-          console.error('[useGymRoutines.delete] Error unlinking completed plans:', unlinkPlansError);
-        }
-
-        // 2. Unlink activity_sessions (set workout_template_id to null instead of deleting)
-        const { error: sessionsError } = await supabase
-          .from('activity_sessions')
-          .update({ workout_template_id: null })
-          .eq('workout_template_id', id);
-
-        if (sessionsError) {
-          console.error('[useGymRoutines.delete] Error unlinking sessions:', sessionsError);
-          // Continue anyway, might be no sessions
-        }
-
-        // 3. Now delete the template itself
-        const { error } = await supabase.from('workout_templates').delete().eq('id', id);
+        if (!user) throw new Error('No user');
+        const { error } = await supabase.rpc('delete_training_template', {
+          p_template_kind: 'gym',
+          p_template_id: id,
+        });
         if (error) {
           console.error('[useGymRoutines.delete] Error:', error);
           throw error;

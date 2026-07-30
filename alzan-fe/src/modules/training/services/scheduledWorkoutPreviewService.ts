@@ -6,6 +6,7 @@ import {
   WorkoutTemplateExercise,
 } from '../../../types/requests.types';
 import { fetchTemplateWithProgressedSteps } from './enduranceProgressionService';
+import { applyStrengthProgressionsForPlannedDate } from './strengthProgressionService';
 
 export type PreviewExercise = {
   id: string;
@@ -26,7 +27,10 @@ export type EndurancePreviewTemplate = EnduranceWorkoutTemplate & {
   steps: EnduranceWorkoutStep[];
 };
 
-export const fetchGymPreviewTemplate = async (templateId: string): Promise<GymPreviewTemplate | null> => {
+export const fetchGymPreviewTemplate = async (
+  templateId: string,
+  plannedDate: string,
+): Promise<GymPreviewTemplate | null> => {
   const { data, error } = await supabase
     .from('workout_templates')
     .select(
@@ -45,9 +49,10 @@ export const fetchGymPreviewTemplate = async (templateId: string): Promise<GymPr
   if (!data) return null;
 
   const template = data as unknown as GymPreviewTemplate;
+  const exercises = [...(template.exercises || [])].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
   return {
     ...template,
-    exercises: [...(template.exercises || [])].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)),
+    exercises: await applyStrengthProgressionsForPlannedDate(templateId, plannedDate, exercises),
   };
 };
 

@@ -46,6 +46,17 @@ BEGIN
   END;
   PERFORM set_config('request.jwt.claim.sub', v_user_id::text, true);
 
+  BEGIN
+    PERFORM public.get_nutrition_menu_import_snapshot(
+      ARRAY['2026-08-01'::date, '2026-09-15'::date]
+    );
+    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_EXPECTED_RANGE_FAILURE_NOT_RAISED';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'MENU_IMPORT_DATES_INVALID' THEN
+      RAISE;
+    END IF;
+  END;
+
   INSERT INTO public.meal_logs (id, user_id, date, meal_type, name)
   VALUES (v_existing_id, v_user_id, '2026-08-03', 'lunch', 'Existing SQL fixture');
 
@@ -273,25 +284,25 @@ BEGIN
 
   v_dates := ARRAY(
     SELECT '2026-09-01'::date + day_offset
-    FROM generate_series(0, 27) AS day_offset
+    FROM generate_series(0, 44) AS day_offset
   );
 
-  FOR v_day_index IN 0..27 LOOP
-    FOR v_meal_index IN 1..6 LOOP
+  FOR v_day_index IN 0..44 LOOP
+    FOR v_meal_index IN 1..5 LOOP
       v_meal_id := gen_random_uuid();
       v_meals := v_meals || jsonb_build_array(jsonb_build_object(
         'id', v_meal_id,
         'user_id', v_user_id,
         'date', ('2026-09-01'::date + v_day_index),
         'meal_type', v_meal_types[v_meal_index],
-        'name', format('SQL four-week day %s meal %s', v_day_index + 1, v_meal_index),
+        'name', format('SQL max-range day %s meal %s', v_day_index + 1, v_meal_index),
         'kcal', 800,
         'protein_g', 80,
         'carbs_g', 160,
         'fats_g', 40
       ));
 
-      FOR v_ingredient_index IN 1..8 LOOP
+      FOR v_ingredient_index IN 1..6 LOOP
         v_items := v_items || jsonb_build_array(jsonb_build_object(
           'meal_log_id', v_meal_id,
           'user_id', v_user_id,
@@ -325,19 +336,19 @@ BEGIN
     FROM public.meal_logs
     WHERE user_id = v_user_id
       AND date = ANY(v_dates)
-      AND name LIKE 'SQL four-week day %'
-  ) <> 168 THEN
-    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_FOUR_WEEK_MEAL_COUNT_INCORRECT';
+      AND name LIKE 'SQL max-range day %'
+  ) <> 225 THEN
+    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_MAX_RANGE_MEAL_COUNT_INCORRECT';
   END IF;
   IF (
     SELECT count(*)
     FROM public.meal_logs
     WHERE user_id = v_user_id
       AND date = ANY(v_dates)
-      AND name LIKE 'SQL four-week day %'
+      AND name LIKE 'SQL max-range day %'
       AND adherence_status = 'done_as_planned'
-  ) <> 168 THEN
-    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_FOUR_WEEK_MEAL_STATUS_INCORRECT';
+  ) <> 225 THEN
+    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_MAX_RANGE_MEAL_STATUS_INCORRECT';
   END IF;
   IF (
     SELECT count(*)
@@ -345,18 +356,18 @@ BEGIN
     JOIN public.meal_logs AS meal ON meal.id = item.meal_log_id
     WHERE meal.user_id = v_user_id
       AND meal.date = ANY(v_dates)
-      AND meal.name LIKE 'SQL four-week day %'
-  ) <> 1344 THEN
-    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_FOUR_WEEK_ITEM_COUNT_INCORRECT';
+      AND meal.name LIKE 'SQL max-range day %'
+  ) <> 1350 THEN
+    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_MAX_RANGE_ITEM_COUNT_INCORRECT';
   END IF;
   IF (
     SELECT count(DISTINCT meal_type)
     FROM public.meal_logs
     WHERE user_id = v_user_id
       AND date = ANY(v_dates)
-      AND name LIKE 'SQL four-week day %'
-  ) <> 6 THEN
-    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_FOUR_WEEK_MEAL_TYPES_INCOMPLETE';
+      AND name LIKE 'SQL max-range day %'
+  ) <> 5 THEN
+    RAISE EXCEPTION 'NUTRITION_MENU_IMPORT_MAX_RANGE_MEAL_TYPES_INCOMPLETE';
   END IF;
 END;
 $$;

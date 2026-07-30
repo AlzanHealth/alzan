@@ -1,13 +1,14 @@
-import { format } from 'date-fns';
 import { supabase } from '../../../lib/supabaseClient';
 import {
   EnduranceWorkoutStep,
   EnduranceWorkoutStepProgression,
   EnduranceWorkoutStepProgressionInsert,
   EnduranceWorkoutTemplate,
+  EnduranceWorkoutTemplateProgression,
 } from '../../../types/requests.types';
 import {
   applyProgressionsToSteps,
+  applyTemplateSummaryProgression,
   getProgressionWeekIndex,
   normalizeStepProgressions,
   StepProgressionOverride,
@@ -31,50 +32,6 @@ export const isDateWithinEnduranceRecurrence = (
   if (template.recurrence_start_date && plannedDate < template.recurrence_start_date) return false;
   if (template.recurrence_end_date && plannedDate > template.recurrence_end_date) return false;
   return true;
-};
-
-export const expireEndedEnduranceRecurrences = async (
-  userId: string,
-  todayStr: string = format(new Date(), 'yyyy-MM-dd'),
-) => {
-  const { data: expiredTemplates, error: selectError } = await supabase
-    .from('endurance_workout_templates')
-    .select('id')
-    .eq('user_id', userId)
-    .not('scheduled_day', 'is', null)
-    .not('recurrence_end_date', 'is', null)
-    .lt('recurrence_end_date', todayStr);
-
-  if (selectError) {
-    console.error('[enduranceProgressionService.expireEndedEnduranceRecurrences] select error:', selectError);
-    return;
-  }
-
-  const templateIds = (expiredTemplates || []).map(template => template.id);
-  if (templateIds.length === 0) return;
-
-  const { error: updateError } = await supabase
-    .from('endurance_workout_templates')
-    .update({ scheduled_day: null, updated_at: new Date().toISOString() })
-    .eq('user_id', userId)
-    .in('id', templateIds);
-
-  if (updateError) {
-    console.error('[enduranceProgressionService.expireEndedEnduranceRecurrences] update error:', updateError);
-  }
-
-  const { error: deleteError } = await supabase
-    .from('workout_plans')
-    .delete()
-    .eq('user_id', userId)
-    .in('endurance_template_id', templateIds)
-    .gte('planned_date', todayStr)
-    .is('completed_at', null)
-    .neq('status', 'completed');
-
-  if (deleteError) {
-    console.error('[enduranceProgressionService.expireEndedEnduranceRecurrences] delete error:', deleteError);
-  }
 };
 
 export const deleteFuturePlansOutsideEnduranceRecurrence = async ({
@@ -115,6 +72,19 @@ export const fetchEnduranceStepProgressions = async (
   return data || [];
 };
 
+export const fetchEnduranceTemplateProgressions = async (
+  templateId: string,
+): Promise<EnduranceWorkoutTemplateProgression[]> => {
+  const { data, error } = await supabase
+    .from('endurance_workout_template_progressions')
+    .select('*')
+    .eq('template_id', templateId)
+    .order('week_index', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+};
+
 export const replaceEnduranceStepProgressions = async (templateId: string, progressions: StepProgressionOverride[]) => {
   const normalizedProgressions = normalizeStepProgressions(progressions);
 
@@ -146,17 +116,32 @@ export const replaceEnduranceStepProgressions = async (templateId: string, progr
 };
 
 export const applyProgressionsForPlannedDate = (
-  template: Pick<EnduranceWorkoutTemplate, 'recurrence_start_date'>,
+  template: Pick<EnduranceWorkoutTemplate, 'recurrence_start_date' | 'recurrence_end_date'>,
   steps: EnduranceWorkoutStep[],
   progressions: StepProgressionOverride[],
   plannedDate?: string | null,
 ): EnduranceWorkoutStep[] => {
-  if (!plannedDate || !template.recurrence_start_date) return steps;
+  if (!plannedDate || !template.recurrence_start_date || !isDateWithinEnduranceRecurrence(plannedDate, template)) {
+    return steps;
+  }
 
   const weekIndex = getProgressionWeekIndex(template.recurrence_start_date, plannedDate);
   if (weekIndex < 1) return steps;
 
   return applyProgressionsToSteps(steps, weekIndex, progressions);
+};
+
+export const applyTemplateProgressionForPlannedDate = <TTemplate extends EnduranceWorkoutTemplate>(
+  template: TTemplate,
+  progressions: EnduranceWorkoutTemplateProgression[],
+  plannedDate?: string | null,
+): TTemplate => {
+  if (!plannedDate || !template.recurrence_start_date || !isDateWithinEnduranceRecurrence(plannedDate, template)) {
+    return template;
+  }
+
+  const weekIndex = getProgressionWeekIndex(template.recurrence_start_date, plannedDate);
+  return applyTemplateSummaryProgression(template, weekIndex, progressions);
 };
 
 export const fetchTemplateWithProgressedSteps = async (
@@ -172,9 +157,13 @@ export const fetchTemplateWithProgressedSteps = async (
   if (error) throw error;
   if (!data) return null;
 
-  const progressions = await fetchEnduranceStepProgressions(templateId);
+  const [stepProgressions, templateProgressions] = await Promise.all([
+    fetchEnduranceStepProgressions(templateId),
+    fetchEnduranceTemplateProgressions(templateId),
+  ]);
+  const progressedTemplate = applyTemplateProgressionForPlannedDate(data, templateProgressions, plannedDate);
   return {
-    ...data,
-    steps: applyProgressionsForPlannedDate(data, data.steps || [], progressions, plannedDate),
+    ...progressedTemplate,
+    steps: applyProgressionsForPlannedDate(data, data.steps || [], stepProgressions, plannedDate),
   };
 };

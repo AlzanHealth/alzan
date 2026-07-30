@@ -1,12 +1,9 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { startOfWeek, addWeeks, getISOWeek, getYear, format, addDays } from 'date-fns';
 import { WorkoutPlanInsert } from '../../../types/requests.types';
-import {
-  expireEndedEnduranceRecurrences,
-  isDateWithinEnduranceRecurrence,
-  RecurringEnduranceTemplate,
-} from './enduranceProgressionService';
+import { RecurringEnduranceTemplate } from './enduranceProgressionService';
 import { expireTrainingTemplates } from './templateLifecycleService';
+import { isDateWithinTemplateRecurrence, shouldAutoPropagateTemplate } from '../helpers/trainingPropagation.helper';
 
 /**
  * Get ISO week string in format "YYYY-WXX"
@@ -73,8 +70,6 @@ export const checkAndPlanNewWeeks = async (
   console.log(`[trainingPlanService] Última planificada: ${lastPlannedWeek || 'ninguna'}`);
   console.log(`[trainingPlanService] Horizonte actual: ${horizonISO}`);
 
-  await expireEndedEnduranceRecurrences(userId, format(new Date(), 'yyyy-MM-dd'));
-
   // Determine start week for checking
   let startCheckDate: Date;
   if (!lastPlannedWeek) {
@@ -98,7 +93,7 @@ export const checkAndPlanNewWeeks = async (
   // 1. Gym Templates
   const { data: gymTemplates, error: gymError } = await supabase
     .from('workout_templates')
-    .select('id, base_name, suggested_day_of_week')
+    .select('id, base_name, suggested_day_of_week, recurrence_start_date, recurrence_end_date, source')
     .eq('user_id', userId)
     .not('suggested_day_of_week', 'is', null);
 
@@ -110,18 +105,18 @@ export const checkAndPlanNewWeeks = async (
   // 2. Endurance Templates
   const { data: enduranceTemplates, error: cardioError } = await supabase
     .from('endurance_workout_templates')
-    .select('id, base_name, scheduled_day, recurrence_start_date, recurrence_end_date')
+    .select('id, base_name, scheduled_day, recurrence_start_date, recurrence_end_date, source')
     .eq('user_id', userId)
     .not('scheduled_day', 'is', null)
-    .returns<Array<RecurringEnduranceTemplate & { base_name: string }>>();
+    .returns<Array<RecurringEnduranceTemplate & { base_name: string; source: string | null }>>();
 
   if (cardioError) {
     console.error('[trainingPlanService] Error fetching endurance templates:', cardioError);
     return { planned: false, newLastPlannedWeek: lastPlannedWeek || '', createdCount: 0 };
   }
 
-  const allRecurringGym = gymTemplates || [];
-  const allRecurringEndurance = enduranceTemplates || [];
+  const allRecurringGym = (gymTemplates || []).filter(shouldAutoPropagateTemplate);
+  const allRecurringEndurance = (enduranceTemplates || []).filter(shouldAutoPropagateTemplate);
   console.log(
     `[trainingPlanService] Plantillas recurrentes encontradas: Gym=${allRecurringGym.length}, Cardio=${allRecurringEndurance.length}`,
   );
@@ -144,16 +139,17 @@ export const checkAndPlanNewWeeks = async (
     // Process Gym Templates
     for (const tpl of allRecurringGym) {
       if (tpl.suggested_day_of_week === null) continue;
-      await ensurePlanExists(userId, currentWeek, tpl.suggested_day_of_week, 'gym', tpl.id);
-      totalCreated++; // We count processed items, though they might be skipped if exist (ensurePlan checks inside)
-      // Actually tracking distinct created vs skipped is harder inside the helper. Let's assume helper returns boolean
+      const targetDateStr = format(getPlannedDateForWeekday(currentWeek, tpl.suggested_day_of_week), 'yyyy-MM-dd');
+      if (!isDateWithinTemplateRecurrence(targetDateStr, tpl)) continue;
+      const created = await ensurePlanExists(userId, currentWeek, tpl.suggested_day_of_week, 'gym', tpl.id);
+      if (created) totalCreated++;
     }
 
     // Process Endurance Templates
     for (const tpl of allRecurringEndurance) {
       if (tpl.scheduled_day === null) continue;
       const targetDateStr = format(getPlannedDateForWeekday(currentWeek, tpl.scheduled_day), 'yyyy-MM-dd');
-      if (!isDateWithinEnduranceRecurrence(targetDateStr, tpl)) continue;
+      if (!isDateWithinTemplateRecurrence(targetDateStr, tpl)) continue;
       const created = await ensurePlanExists(userId, currentWeek, tpl.scheduled_day, 'endurance', tpl.id);
       if (created) totalCreated++;
     }

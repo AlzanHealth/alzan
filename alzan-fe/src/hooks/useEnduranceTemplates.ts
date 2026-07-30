@@ -29,6 +29,7 @@ export const useEnduranceTemplates = () => {
         .from('endurance_workout_templates')
         .select('*')
         .eq('user_id', user.id)
+        .or('source.is.null,source.neq.importing')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -57,47 +58,11 @@ export const useEnduranceTemplates = () => {
     mutationFn: async (id: string) => {
       console.log('[useEnduranceTemplates.delete] Iniciando - id:', id);
       try {
-        // 1. Delete only NON-COMPLETED workout_plans that reference this template
-        const { error: plansError } = await supabase
-          .from('workout_plans')
-          .delete()
-          .eq('endurance_template_id', id)
-          .is('completed_at', null);
-
-        if (plansError) {
-          console.error('[useEnduranceTemplates.delete] Error deleting plans:', plansError);
-        }
-
-        // 2. Unlink COMPLETED workout_plans (keep history but remove reference)
-        const { error: unlinkPlansError } = await supabase
-          .from('workout_plans')
-          .update({ endurance_template_id: null })
-          .eq('endurance_template_id', id);
-
-        if (unlinkPlansError) {
-          console.error('[useEnduranceTemplates.delete] Error unlinking completed plans:', unlinkPlansError);
-        }
-
-        // 3. Unlink activity_sessions
-        const { error: sessionsError } = await supabase
-          .from('activity_sessions')
-          .update({ endurance_template_id: null })
-          .eq('endurance_template_id', id);
-
-        if (sessionsError) {
-          console.error('[useEnduranceTemplates.delete] Error unlinking sessions:', sessionsError);
-        }
-
-        // 4. Delete steps (cascade)
-        const { error: stepsError } = await supabase.from('endurance_workout_steps').delete().eq('template_id', id);
-
-        if (stepsError) {
-          console.error('[useEnduranceTemplates.delete] Error deleting steps:', stepsError);
-        }
-
-        // 5. Delete template
-        const { error } = await supabase.from('endurance_workout_templates').delete().eq('id', id);
-
+        if (!user) throw new Error('No user');
+        const { error } = await supabase.rpc('delete_training_template', {
+          p_template_kind: 'endurance',
+          p_template_id: id,
+        });
         if (error) {
           console.error('[useEnduranceTemplates.delete] Error:', error);
           throw error;

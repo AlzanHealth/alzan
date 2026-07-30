@@ -199,7 +199,7 @@ export const ShoppingListScreen = () => {
                     title: ingredient.name,
                     notes: formatShoppingQuantity(ingredient.quantity_g),
                   })),
-                  listName?.trim() || 'Compra Josep',
+                  listName?.trim() || t('nutrition.shoppingListAppleRemindersDefaultList'),
                 );
                 Alert.alert(
                   t('common.done'),
@@ -216,7 +216,7 @@ export const ShoppingListScreen = () => {
         },
       ],
       'plain-text',
-      'Compra Josep',
+      t('nutrition.shoppingListAppleRemindersDefaultList'),
     );
   }, [pendingIngredients, t]);
 

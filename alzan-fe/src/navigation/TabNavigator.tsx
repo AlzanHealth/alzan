@@ -10,6 +10,7 @@ import { LiquidGlassFooter } from '../components/common/LiquidGlassFooter';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   getTabBarTopFromScreenBottom,
+  isResizeEventTarget,
   TAB_BAR_FLOATING_GAP,
   TAB_BAR_HEIGHT,
   TabBarLayoutProvider,
@@ -106,13 +107,13 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
     const browserWindow = typeof window !== 'undefined' ? window : undefined;
     const visualViewport = browserWindow?.visualViewport;
 
-    visualViewport?.addEventListener('resize', measureTabBarPosition);
-    browserWindow?.addEventListener('resize', measureTabBarPosition);
+    if (isResizeEventTarget(visualViewport)) visualViewport.addEventListener('resize', measureTabBarPosition);
+    if (isResizeEventTarget(browserWindow)) browserWindow.addEventListener('resize', measureTabBarPosition);
 
     return () => {
       dimensionsSubscription.remove();
-      visualViewport?.removeEventListener('resize', measureTabBarPosition);
-      browserWindow?.removeEventListener('resize', measureTabBarPosition);
+      if (isResizeEventTarget(visualViewport)) visualViewport.removeEventListener('resize', measureTabBarPosition);
+      if (isResizeEventTarget(browserWindow)) browserWindow.removeEventListener('resize', measureTabBarPosition);
     };
   }, [measureTabBarPosition, safeAreaBottom]);
 

@@ -116,7 +116,7 @@ export const ScheduledWorkoutPreviewModal = ({
     queryKey: ['scheduledWorkoutPreview', plan?.type, plan?.templateId, plan?.plannedDate],
     queryFn: async (): Promise<PreviewData> => {
       if (!plan?.templateId) return null;
-      if (plan.type === 'gym') return fetchGymPreviewTemplate(plan.templateId);
+      if (plan.type === 'gym') return fetchGymPreviewTemplate(plan.templateId, plan.plannedDate);
       return fetchEndurancePreviewTemplate(plan.templateId, plan.plannedDate);
     },
     enabled: visible && !!plan?.templateId,

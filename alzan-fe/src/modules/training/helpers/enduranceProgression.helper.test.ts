@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   applyProgressionsToSteps,
+  applyTemplateSummaryProgression,
   calculateProgressionWeeks,
   createProgressionKey,
   getEligibleProgressionSteps,
@@ -57,6 +58,38 @@ assert.equal(getProgressionWeekIndex('2026-06-23', '2026-06-30'), 2);
 assert.equal(getProgressionWeekIndex('2026-06-23', '2026-07-06'), 2);
 assert.equal(getProgressionWeekIndex('2026-06-23', '2026-07-07'), 3);
 assert.equal(getProgressionWeekIndex('2026-06-23', '2026-06-22'), 0);
+
+const baseTemplateSummary = {
+  total_distance_m: 5000,
+  total_duration_s: 1800,
+};
+assert.deepEqual(
+  applyTemplateSummaryProgression(baseTemplateSummary, 2, [
+    {
+      week_index: 2,
+      total_distance_m: 8000,
+      total_duration_s: 2400,
+    },
+  ]),
+  {
+    total_distance_m: 8000,
+    total_duration_s: 2400,
+  },
+);
+assert.deepEqual(
+  applyTemplateSummaryProgression(baseTemplateSummary, 3, [
+    {
+      week_index: 3,
+      total_distance_m: 10000,
+      total_duration_s: null,
+    },
+  ]),
+  {
+    total_distance_m: 10000,
+    total_duration_s: 1800,
+  },
+);
+assert.deepEqual(applyTemplateSummaryProgression(baseTemplateSummary, 0, []), baseTemplateSummary);
 
 assert.deepEqual(
   getEligibleProgressionSteps(baseSteps, 'running').map(step => step.progression_key),

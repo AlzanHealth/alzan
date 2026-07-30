@@ -1,8 +1,14 @@
+import { getImportedTemplateFamilyKey, getTrainingPlanSessionSignature } from './trainingPlanImportPlanner';
+import { getProgressionWeekIndex } from '../helpers/enduranceProgression.helper';
+
 export const TRAINING_PLAN_IMPORT_FORMAT = 'alzan-training-plan';
 export const TRAINING_PLAN_IMPORT_VERSION = 1;
 export const TRAINING_PLAN_IMPORT_MAX_TEXT_LENGTH = 300_000;
 export const TRAINING_PLAN_IMPORT_MAX_SESSIONS = 500;
 export const TRAINING_PLAN_IMPORT_MAX_DAYS = 45;
+export const TRAINING_PLAN_IMPORT_MAX_STEPS_PER_LEVEL = 100;
+export const TRAINING_PLAN_IMPORT_MAX_STEP_DEPTH = 8;
+export const TRAINING_PLAN_IMPORT_MAX_EXERCISES_PER_SESSION = 100;
 
 export const TRAINING_PLAN_SPORTS = ['running', 'strength'] as const;
 export type TrainingPlanSport = (typeof TRAINING_PLAN_SPORTS)[number];
@@ -60,7 +66,7 @@ export type TrainingPlanImportDocument = {
   version: typeof TRAINING_PLAN_IMPORT_VERSION;
   plan_name: string;
   start_date: string;
-  end_date?: string;
+  end_date: string;
   weeks: TrainingPlanWeek[];
 };
 
@@ -79,6 +85,7 @@ export type TrainingPlanValidationErrorCode =
   | 'invalid_range'
   | 'invalid_session_shape'
   | 'weekday_mismatch'
+  | 'incompatible_template_family'
   | 'too_many_sessions';
 
 export type TrainingPlanValidationError = {
@@ -92,6 +99,7 @@ export type TrainingPlanParseResult =
   | { ok: false; errors: TrainingPlanValidationError[] };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ROOT_KEYS = ['format', 'version', 'plan_name', 'start_date', 'end_date', 'weeks'];
 const WEEK_KEYS = ['week_number', 'sessions'];
 const SESSION_KEYS = [
@@ -229,11 +237,36 @@ const readNumber = (
   return value;
 };
 
+const readInteger = (
+  value: unknown,
+  path: string,
+  errors: TrainingPlanValidationError[],
+  min = 0,
+  max = 100_000,
+): number | undefined => {
+  const parsed = readNumber(value, path, errors, min, max);
+  if (parsed !== undefined && !Number.isInteger(parsed)) {
+    addError(errors, 'invalid_range', path, `Expected an integer between ${min} and ${max}`);
+    return undefined;
+  }
+  return parsed;
+};
+
 const parseStep = (
   value: unknown,
   path: string,
   errors: TrainingPlanValidationError[],
+  depth = 0,
 ): TrainingPlanRunningStep | null => {
+  if (depth >= TRAINING_PLAN_IMPORT_MAX_STEP_DEPTH) {
+    addError(
+      errors,
+      'invalid_length',
+      path,
+      `Running steps cannot exceed ${TRAINING_PLAN_IMPORT_MAX_STEP_DEPTH} nested levels`,
+    );
+    return null;
+  }
   if (!isRecord(value)) {
     addError(errors, 'invalid_type', path, 'Expected an object');
     return null;
@@ -245,8 +278,8 @@ const parseStep = (
   const durationType = value.duration_type;
   if (typeof durationType !== 'string' || !['time', 'distance', 'lap_button'].includes(durationType))
     addError(errors, 'invalid_session_shape', `${path}.duration_type`, 'Unsupported duration type');
-  const duration = readNumber(value.duration_s, `${path}.duration_s`, errors, 0, 86_400);
-  const distance = readNumber(value.distance_m, `${path}.distance_m`, errors, 0, 500_000);
+  const duration = readInteger(value.duration_s, `${path}.duration_s`, errors, 0, 86_400);
+  const distance = readInteger(value.distance_m, `${path}.distance_m`, errors, 0, 500_000);
   const targetType = value.target_type;
   if (
     targetType !== undefined &&
@@ -258,11 +291,20 @@ const parseStep = (
   const children: TrainingPlanRunningStep[] = [];
   if (childrenRaw !== undefined) {
     if (!Array.isArray(childrenRaw)) addError(errors, 'invalid_type', `${path}.children`, 'Expected an array');
-    else
-      childrenRaw.forEach((child, index) => {
-        const parsed = parseStep(child, `${path}.children[${index}]`, errors);
+    else {
+      if (childrenRaw.length > TRAINING_PLAN_IMPORT_MAX_STEPS_PER_LEVEL) {
+        addError(
+          errors,
+          'invalid_length',
+          `${path}.children`,
+          `A running step cannot contain more than ${TRAINING_PLAN_IMPORT_MAX_STEPS_PER_LEVEL} children`,
+        );
+      }
+      childrenRaw.slice(0, TRAINING_PLAN_IMPORT_MAX_STEPS_PER_LEVEL).forEach((child, index) => {
+        const parsed = parseStep(child, `${path}.children[${index}]`, errors, depth + 1);
         if (parsed) children.push(parsed);
       });
+    }
   }
   if (
     !phase ||
@@ -271,24 +313,46 @@ const parseStep = (
     !['time', 'distance', 'lap_button'].includes(durationType)
   )
     return null;
+  if (children.length === 0 && durationType === 'time' && duration === undefined) {
+    addError(errors, 'invalid_session_shape', `${path}.duration_s`, 'A time step requires duration_s');
+  }
+  if (children.length === 0 && durationType === 'distance' && distance === undefined) {
+    addError(errors, 'invalid_session_shape', `${path}.distance_m`, 'A distance step requires distance_m');
+  }
+  const targetMin = readNumber(value.target_min, `${path}.target_min`, errors, 0, 100_000);
+  const targetMax = readNumber(value.target_max, `${path}.target_max`, errors, 0, 100_000);
+  const hasValidTargetType =
+    typeof targetType === 'string' &&
+    ['pace', 'speed', 'heart_rate', 'heart_rate_zone', 'power', 'rpe', 'none'].includes(targetType);
+  if ((targetMin !== undefined || targetMax !== undefined) && (!hasValidTargetType || targetType === 'none')) {
+    addError(
+      errors,
+      'invalid_session_shape',
+      `${path}.target_type`,
+      'A target range requires a target_type other than none',
+    );
+  }
+  if (hasValidTargetType && targetType !== 'none' && targetMin === undefined) {
+    addError(errors, 'missing_field', `${path}.target_min`, 'A target_type requires target_min');
+  }
+  if (targetMax !== undefined && targetMin === undefined) {
+    addError(errors, 'invalid_session_shape', `${path}.target_min`, 'target_max requires target_min');
+  }
+  if (targetMin !== undefined && targetMax !== undefined && targetMin > targetMax) {
+    addError(errors, 'invalid_range', `${path}.target_max`, 'target_max must be greater than or equal to target_min');
+  }
+  const repetitions = readInteger(value.repetitions, `${path}.repetitions`, errors, 1, 1000);
+  const progressionKey = readString(value.progression_key, `${path}.progression_key`, errors);
   return {
     phase_type: phase as TrainingPlanRunningStep['phase_type'],
     duration_type: durationType as TrainingPlanRunningStep['duration_type'],
     ...(duration === undefined ? {} : { duration_s: duration }),
     ...(distance === undefined ? {} : { distance_m: distance }),
     ...(typeof targetType === 'string' ? { target_type: targetType as TrainingPlanRunningStep['target_type'] } : {}),
-    ...(readNumber(value.target_min, `${path}.target_min`, errors, 0, 100_000) === undefined
-      ? {}
-      : { target_min: value.target_min as number }),
-    ...(readNumber(value.target_max, `${path}.target_max`, errors, 0, 100_000) === undefined
-      ? {}
-      : { target_max: value.target_max as number }),
-    ...(readNumber(value.repetitions, `${path}.repetitions`, errors, 1, 1000) === undefined
-      ? {}
-      : { repetitions: value.repetitions as number }),
-    ...(readString(value.progression_key, `${path}.progression_key`, errors)
-      ? { progression_key: readString(value.progression_key, `${path}.progression_key`, errors) }
-      : {}),
+    ...(targetMin === undefined ? {} : { target_min: targetMin }),
+    ...(targetMax === undefined ? {} : { target_max: targetMax }),
+    ...(repetitions === undefined ? {} : { repetitions }),
+    ...(progressionKey ? { progression_key: progressionKey } : {}),
     ...(children.length > 0 ? { children } : {}),
   };
 };
@@ -305,10 +369,31 @@ const parseExercise = (
   addUnknownKeys(value, EXERCISE_KEYS, path, errors);
   const exerciseId = readString(value.exercise_id, `${path}.exercise_id`, errors);
   const exerciseName = readString(value.exercise_name, `${path}.exercise_name`, errors);
+  if (exerciseId && !UUID.test(exerciseId))
+    addError(errors, 'invalid_session_shape', `${path}.exercise_id`, 'Expected a canonical UUID');
   if (!exerciseId && !exerciseName)
     addError(errors, 'missing_field', `${path}.exercise_id`, 'Provide exercise_id or exercise_name');
-  const order = readNumber(value.order_index, `${path}.order_index`, errors, 0, 1000);
-  const sets = readNumber(value.sets, `${path}.sets`, errors, 1, 100);
+  const order = readInteger(value.order_index, `${path}.order_index`, errors, 0, 1000);
+  const sets = readInteger(value.sets, `${path}.sets`, errors, 1, 100);
+  const reps = readInteger(value.reps, `${path}.reps`, errors, 1, 1000);
+  const repsMin = readInteger(value.reps_min, `${path}.reps_min`, errors, 1, 1000);
+  const repsMax = readInteger(value.reps_max, `${path}.reps_max`, errors, 1, 1000);
+  const restSeconds = readInteger(value.rest_seconds, `${path}.rest_seconds`, errors, 0, 3600);
+  if (reps !== undefined && (repsMin !== undefined || repsMax !== undefined)) {
+    addError(errors, 'invalid_session_shape', `${path}.reps`, 'Use reps or reps_min/reps_max, not both');
+  }
+  if ((repsMin === undefined) !== (repsMax === undefined)) {
+    addError(errors, 'invalid_session_shape', `${path}.reps_min`, 'Provide both reps_min and reps_max');
+  }
+  if (repsMin !== undefined && repsMax !== undefined && repsMin > repsMax) {
+    addError(errors, 'invalid_range', `${path}.reps_max`, 'reps_max must be greater than or equal to reps_min');
+  }
+  if (reps === undefined && repsMin === undefined && repsMax === undefined) {
+    addError(errors, 'missing_field', `${path}.reps`, 'Provide reps or reps_min and reps_max');
+  }
+  if (value.is_warmup !== undefined && typeof value.is_warmup !== 'boolean') {
+    addError(errors, 'invalid_type', `${path}.is_warmup`, 'Expected a boolean');
+  }
   if (order === undefined || sets === undefined || (!exerciseId && !exerciseName)) return null;
   return {
     ...(exerciseId ? { exercise_id: exerciseId } : {}),
@@ -316,24 +401,57 @@ const parseExercise = (
     order_index: order,
     is_warmup: value.is_warmup === true,
     sets,
-    ...(readNumber(value.reps, `${path}.reps`, errors, 1, 1000) === undefined ? {} : { reps: value.reps as number }),
-    ...(readNumber(value.reps_min, `${path}.reps_min`, errors, 1, 1000) === undefined
-      ? {}
-      : { reps_min: value.reps_min as number }),
-    ...(readNumber(value.reps_max, `${path}.reps_max`, errors, 1, 1000) === undefined
-      ? {}
-      : { reps_max: value.reps_max as number }),
+    ...(reps === undefined ? {} : { reps }),
+    ...(repsMin === undefined ? {} : { reps_min: repsMin }),
+    ...(repsMax === undefined ? {} : { reps_max: repsMax }),
     ...(readNumber(value.weight_kg, `${path}.weight_kg`, errors, 0, 1000) === undefined
       ? {}
       : { weight_kg: value.weight_kg as number }),
     ...(readNumber(value.rpe, `${path}.rpe`, errors, 1, 10) === undefined ? {} : { rpe: value.rpe as number }),
-    ...(readNumber(value.rest_seconds, `${path}.rest_seconds`, errors, 0, 3600) === undefined
-      ? {}
-      : { rest_seconds: value.rest_seconds as number }),
+    ...(restSeconds === undefined ? {} : { rest_seconds: restSeconds }),
     ...(readString(value.notes, `${path}.notes`, errors)
       ? { notes: readString(value.notes, `${path}.notes`, errors) }
       : {}),
   };
+};
+
+const hasDuplicateProgressionKey = (steps: TrainingPlanRunningStep[], seen = new Set<string>()): boolean => {
+  for (const step of steps) {
+    if (step.progression_key) {
+      if (seen.has(step.progression_key)) return true;
+      seen.add(step.progression_key);
+    }
+    if (step.children && hasDuplicateProgressionKey(step.children, seen)) return true;
+  }
+  return false;
+};
+
+const getSessionProgressionSignature = (session: TrainingPlanSession): string =>
+  JSON.stringify(
+    session.sport === 'running'
+      ? {
+          running_steps: session.running_steps ?? [],
+          distance_km: session.distance_km ?? null,
+          duration_min: session.duration_min ?? null,
+        }
+      : (session.exercises ?? []),
+  );
+
+const getRunningProgressionKeySignature = (session: TrainingPlanSession): string | null => {
+  if (session.sport !== 'running') return null;
+  const keys: Array<{ path: string; key: string }> = [];
+  const visit = (steps: TrainingPlanRunningStep[], parentPath = '') => {
+    steps.forEach((step, index) => {
+      const path = parentPath ? `${parentPath}.${index}` : `${index}`;
+      keys.push({
+        path,
+        key: step.progression_key ?? `step_${path.replace(/\./g, '_')}`,
+      });
+      if (step.children) visit(step.children, path);
+    });
+  };
+  visit(session.running_steps ?? []);
+  return JSON.stringify(keys);
 };
 
 const parseSession = (
@@ -370,15 +488,33 @@ const parseSession = (
     !name
   )
     return null;
+  if (Array.isArray(value.running_steps) && value.running_steps.length > TRAINING_PLAN_IMPORT_MAX_STEPS_PER_LEVEL) {
+    addError(
+      errors,
+      'invalid_length',
+      `${path}.running_steps`,
+      `A running session cannot contain more than ${TRAINING_PLAN_IMPORT_MAX_STEPS_PER_LEVEL} top-level steps`,
+    );
+  }
   const runningSteps = Array.isArray(value.running_steps)
     ? value.running_steps
+        .slice(0, TRAINING_PLAN_IMPORT_MAX_STEPS_PER_LEVEL)
         .map((step, index) => parseStep(step, `${path}.running_steps[${index}]`, errors))
         .filter((step): step is TrainingPlanRunningStep => step !== null)
     : undefined;
   if (value.running_steps !== undefined && !Array.isArray(value.running_steps))
     addError(errors, 'invalid_type', `${path}.running_steps`, 'Expected an array');
+  if (Array.isArray(value.exercises) && value.exercises.length > TRAINING_PLAN_IMPORT_MAX_EXERCISES_PER_SESSION) {
+    addError(
+      errors,
+      'invalid_length',
+      `${path}.exercises`,
+      `A strength session cannot contain more than ${TRAINING_PLAN_IMPORT_MAX_EXERCISES_PER_SESSION} exercises`,
+    );
+  }
   const exercises = Array.isArray(value.exercises)
     ? value.exercises
+        .slice(0, TRAINING_PLAN_IMPORT_MAX_EXERCISES_PER_SESSION)
         .map((exercise, index) => parseExercise(exercise, `${path}.exercises[${index}]`, errors))
         .filter((exercise): exercise is TrainingPlanStrengthExercise => exercise !== null)
     : undefined;
@@ -386,8 +522,38 @@ const parseSession = (
     addError(errors, 'invalid_type', `${path}.exercises`, 'Expected an array');
   if (sport === 'running' && (!runningSteps || runningSteps.length === 0))
     addError(errors, 'invalid_session_shape', `${path}.running_steps`, 'Running sessions need at least one step');
+  if (sport === 'running' && value.exercises !== undefined) {
+    addError(errors, 'invalid_session_shape', `${path}.exercises`, 'Running sessions cannot contain exercises');
+  }
+  if (sport === 'running' && runningSteps && hasDuplicateProgressionKey(runningSteps)) {
+    addError(
+      errors,
+      'invalid_session_shape',
+      `${path}.running_steps`,
+      'progression_key values must be unique within a running session',
+    );
+  }
   if (sport === 'strength' && (!exercises || exercises.length === 0))
     addError(errors, 'invalid_session_shape', `${path}.exercises`, 'Strength sessions need at least one exercise');
+  if (sport === 'strength' && value.running_steps !== undefined) {
+    addError(
+      errors,
+      'invalid_session_shape',
+      `${path}.running_steps`,
+      'Strength sessions cannot contain running_steps',
+    );
+  }
+  if (sport === 'strength' && exercises) {
+    const orderIndexes = exercises.map(exercise => exercise.order_index).sort((left, right) => left - right);
+    if (orderIndexes.some((orderIndex, index) => orderIndex !== index)) {
+      addError(
+        errors,
+        'invalid_session_shape',
+        `${path}.exercises`,
+        'Strength exercise order_index values must be unique and consecutive from 0',
+      );
+    }
+  }
   return {
     date,
     ...(normalizedWeekday ? { weekday: normalizedWeekday } : {}),
@@ -437,8 +603,8 @@ export const parseTrainingPlanJson = (rawText: string): TrainingPlanParseResult 
   const startDate = parsed.start_date;
   if (!isRealDate(startDate)) addError(errors, 'invalid_date', 'start_date', 'Expected YYYY-MM-DD');
   const endDate = parsed.end_date === undefined ? undefined : isRealDate(parsed.end_date) ? parsed.end_date : undefined;
-  if (parsed.end_date !== undefined && endDate === undefined)
-    addError(errors, 'invalid_date', 'end_date', 'Expected YYYY-MM-DD');
+  if (parsed.end_date === undefined) addError(errors, 'missing_field', 'end_date', 'Required field is missing');
+  else if (endDate === undefined) addError(errors, 'invalid_date', 'end_date', 'Expected YYYY-MM-DD');
   if (endDate && isRealDate(startDate) && endDate < startDate)
     addError(errors, 'invalid_range', 'end_date', 'End date must not precede start date');
   if (endDate && isRealDate(startDate) && endDate >= startDate) {
@@ -460,8 +626,8 @@ export const parseTrainingPlanJson = (rawText: string): TrainingPlanParseResult 
         return;
       }
       addUnknownKeys(rawWeek, WEEK_KEYS, `weeks[${weekIndex}]`, errors);
-      const weekNumber = readNumber(rawWeek.week_number, `weeks[${weekIndex}].week_number`, errors, 1, 104);
-      if (weekNumber === undefined || !Array.isArray(rawWeek.sessions)) {
+      const weekNumber = readInteger(rawWeek.week_number, `weeks[${weekIndex}].week_number`, errors, 1, 104);
+      if (!Array.isArray(rawWeek.sessions)) {
         addError(errors, 'invalid_type', `weeks[${weekIndex}].sessions`, 'Expected an array');
         return;
       }
@@ -471,7 +637,7 @@ export const parseTrainingPlanJson = (rawText: string): TrainingPlanParseResult 
       sessions.forEach(session => {
         // More than one workout can be planned on a day. Only the same sport
         // and template family is considered a duplicate slot.
-        const sessionKey = `${session.date}:${session.sport}:${session.template_key ?? session.name}`;
+        const sessionKey = `${session.date}:${getImportedTemplateFamilyKey(session)}`;
         if (sessionKeys.has(sessionKey))
           addError(errors, 'duplicate_date', `weeks[${weekIndex}].sessions`, `Duplicate session slot ${sessionKey}`);
         sessionKeys.add(sessionKey);
@@ -491,11 +657,64 @@ export const parseTrainingPlanJson = (rawText: string): TrainingPlanParseResult 
           );
       });
       sessionCount += sessions.length;
-      weeks.push({ week_number: weekNumber, sessions });
+      if (weekNumber !== undefined) weeks.push({ week_number: weekNumber, sessions });
     });
+  if (sessionCount < 1) addError(errors, 'invalid_length', 'weeks', 'At least one session is required');
   if (sessionCount > TRAINING_PLAN_IMPORT_MAX_SESSIONS)
     addError(errors, 'too_many_sessions', 'weeks', 'Too many sessions');
-  if (errors.length > 0 || !planName || !isRealDate(startDate)) return { ok: false, errors };
+  const signaturesByFamily = new Map<string, string>();
+  const progressionKeysByFamily = new Map<string, string>();
+  const progressionSignaturesByFamilyWeek = new Map<string, string>();
+  weeks.forEach((week, weekIndex) => {
+    week.sessions.forEach((session, sessionIndex) => {
+      const familyKey = getImportedTemplateFamilyKey(session);
+      const signature = getTrainingPlanSessionSignature(session);
+      const existingSignature = signaturesByFamily.get(familyKey);
+      if (existingSignature && existingSignature !== signature) {
+        addError(
+          errors,
+          'incompatible_template_family',
+          `weeks[${weekIndex}].sessions[${sessionIndex}].template_key`,
+          `Template family "${session.template_key}" contains incompatible workout structures`,
+        );
+      } else {
+        signaturesByFamily.set(familyKey, signature);
+      }
+      const progressionKeySignature = getRunningProgressionKeySignature(session);
+      const existingProgressionKeySignature = progressionKeysByFamily.get(familyKey);
+      if (
+        progressionKeySignature &&
+        existingProgressionKeySignature &&
+        progressionKeySignature !== existingProgressionKeySignature
+      ) {
+        addError(
+          errors,
+          'incompatible_template_family',
+          `weeks[${weekIndex}].sessions[${sessionIndex}].running_steps`,
+          `Template family "${session.template_key}" must keep progression_key values stable between sessions`,
+        );
+      } else if (progressionKeySignature) {
+        progressionKeysByFamily.set(familyKey, progressionKeySignature);
+      }
+      if (isRealDate(startDate)) {
+        const progressionWeekIndex = getProgressionWeekIndex(startDate, session.date);
+        const familyWeekKey = `${familyKey}:${progressionWeekIndex}`;
+        const progressionSignature = getSessionProgressionSignature(session);
+        const existingProgressionSignature = progressionSignaturesByFamilyWeek.get(familyWeekKey);
+        if (existingProgressionSignature && existingProgressionSignature !== progressionSignature) {
+          addError(
+            errors,
+            'incompatible_template_family',
+            `weeks[${weekIndex}].sessions[${sessionIndex}].template_key`,
+            `Template family "${session.template_key}" has different targets more than once in the same 7-day block; use distinct template_key values`,
+          );
+        } else {
+          progressionSignaturesByFamilyWeek.set(familyWeekKey, progressionSignature);
+        }
+      }
+    });
+  });
+  if (errors.length > 0 || !planName || !isRealDate(startDate) || !endDate) return { ok: false, errors };
   return {
     ok: true,
     value: {
@@ -503,7 +722,7 @@ export const parseTrainingPlanJson = (rawText: string): TrainingPlanParseResult 
       version: TRAINING_PLAN_IMPORT_VERSION,
       plan_name: planName,
       start_date: startDate,
-      ...(endDate ? { end_date: endDate } : {}),
+      end_date: endDate,
       weeks,
     },
   };

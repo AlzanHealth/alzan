@@ -149,6 +149,13 @@ assertFirstError(
   'duplicate_date',
   'days[1].date',
 );
+assertFirstError(
+  menu({
+    days: [day({ date: '2026-08-03' }), day({ date: '2026-09-17' })],
+  }),
+  'out_of_range',
+  'days',
+);
 
 assertValid(menu({ days: [day({ meals: Array.from({ length: 10 }, () => meal()) })] }));
 assertFirstError(menu({ days: [day({ meals: [] })] }), 'invalid_length', 'days[0].meals');
@@ -283,6 +290,33 @@ const menuWithFifteenHundredAndOneIngredients = menu({
   ],
 });
 assertFirstError(menuWithFifteenHundredAndOneIngredients, 'too_many_ingredients', 'days');
+
+const createDaysWithUniqueIngredients = (count: number): DayInput[] => {
+  const uniqueIngredients = Array.from({ length: count }, (_, index) =>
+    ingredient({ name: `Ingrediente único ${index + 1}` }),
+  );
+
+  return Array.from({ length: Math.ceil(uniqueIngredients.length / 30) }, (_, dayIndex) =>
+    day({
+      date: new Date(Date.UTC(2026, 7, 1 + dayIndex)).toISOString().slice(0, 10),
+      meals: [
+        meal({
+          name: `Comida única ${dayIndex + 1}`,
+          ingredients: uniqueIngredients.slice(dayIndex * 30, dayIndex * 30 + 30),
+        }),
+      ],
+    }),
+  );
+};
+
+assertValid(menu({ days: createDaysWithUniqueIngredients(200) }));
+const tooManyUniqueIngredientsResult = parseMenuImportJson(
+  JSON.stringify(menu({ days: createDaysWithUniqueIngredients(201) })),
+);
+assert.equal(tooManyUniqueIngredientsResult.ok, false);
+if (!tooManyUniqueIngredientsResult.ok) {
+  assert.ok(tooManyUniqueIngredientsResult.errors.some(error => error.code === 'too_many_unique_ingredients'));
+}
 
 // Trimmed string lengths and quantity range.
 assertValid(

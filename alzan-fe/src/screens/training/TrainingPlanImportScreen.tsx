@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -7,6 +7,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -19,9 +20,10 @@ import { GlassCard } from '../../components/GlassCard';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTrainingPlanImport } from '../../hooks/useTrainingPlanImport';
 import {
-  TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT,
+  buildTrainingPlanImportClipboardText,
   TRAINING_PLAN_IMPORT_TEMPLATE,
 } from '../../modules/training/services/trainingPlanImportTemplate';
+import { fetchTrainingExerciseCatalog } from '../../modules/training/services/trainingPlanImportService';
 import type { TrainingScreenNavigationProp } from '../../types/navigation.types';
 
 const copyText = async (text: string): Promise<void> => {
@@ -45,7 +47,11 @@ const copyText = async (text: string): Promise<void> => {
 export const TrainingPlanImportScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
+  const { width } = useWindowDimensions();
   const { styles: dynamicStyles, colors } = useTrainingStyles();
+  const showCopyLabel = width >= 720;
+  const [isCopyingTemplate, setIsCopyingTemplate] = useState(false);
+  const isCopyingTemplateRef = useRef(false);
   const {
     rawJson,
     setRawJson,
@@ -60,11 +66,20 @@ export const TrainingPlanImportScreen = () => {
   } = useTrainingPlanImport();
 
   const handleCopyTemplate = useCallback(async () => {
+    if (Platform.OS !== 'web') return;
+    if (isCopyingTemplateRef.current) return;
+    isCopyingTemplateRef.current = true;
+    setIsCopyingTemplate(true);
+
     try {
-      await copyText(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT);
+      const catalog = await fetchTrainingExerciseCatalog();
+      await copyText(buildTrainingPlanImportClipboardText(catalog));
       Alert.alert(t('common.done'), t('training.trainingPlanInstructionsCopied'));
     } catch {
       Alert.alert(t('common.error'), t('training.trainingPlanInstructionsCopyError'));
+    } finally {
+      isCopyingTemplateRef.current = false;
+      setIsCopyingTemplate(false);
     }
   }, [t]);
 
@@ -75,15 +90,20 @@ export const TrainingPlanImportScreen = () => {
   const handleImport = useCallback(async () => {
     const result = await importPlan();
     if (!result.ok) {
+      if (result.kind === 'busy') return;
       Alert.alert(t('common.error'), t('training.trainingPlanImportError'));
       return;
     }
+    const reusedMessage =
+      result.reusedTemplateCount > 0
+        ? `\n${t('training.trainingPlanImportReused', { templates: result.reusedTemplateCount })}`
+        : '';
     Alert.alert(
       t('common.done'),
-      t('training.trainingPlanImportSuccess', {
+      `${t('training.trainingPlanImportSuccess', {
         templates: result.createdTemplateIds.length,
         plans: result.createdPlanCount,
-      }),
+      })}${reusedMessage}`,
       [{ text: t('common.ok'), onPress: () => navigation.navigate('TrainingHome') }],
     );
   }, [importPlan, navigation, t]);
@@ -104,12 +124,27 @@ export const TrainingPlanImportScreen = () => {
               {t('training.importTrainingPlanSubtitle')}
             </Text>
           </View>
-          <TouchableOpacity onPress={handleCopyTemplate} style={styles.copyButton} accessibilityRole="button">
-            <Copy size={18} color={colors.primary} />
-            <Text style={[styles.copyButtonText, { color: colors.primary }]}>
-              {t('training.copyTrainingPlanInstructions')}
-            </Text>
-          </TouchableOpacity>
+          {Platform.OS === 'web' ? (
+            <TouchableOpacity
+              onPress={handleCopyTemplate}
+              disabled={isCopyingTemplate}
+              style={styles.copyButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.copyTrainingPlanInstructions')}
+              accessibilityState={{ disabled: isCopyingTemplate, busy: isCopyingTemplate }}
+            >
+              {isCopyingTemplate ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Copy size={18} color={colors.primary} />
+              )}
+              {showCopyLabel ? (
+                <Text style={[styles.copyButtonText, { color: colors.primary }]}>
+                  {t('training.copyTrainingPlanInstructions')}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

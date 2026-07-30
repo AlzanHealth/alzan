@@ -16,9 +16,20 @@
           "template_key": "series-800",
           "workout_goal": "intervals",
           "modality": "outdoor",
+          "distance_km": 7.5,
+          "duration_min": 45,
           "running_steps": [
             { "phase_type": "warmup", "duration_type": "time", "duration_s": 600 },
-            { "phase_type": "interval", "duration_type": "distance", "distance_m": 800, "repetitions": 5, "target_type": "pace", "target_min": 300, "progression_key": "work" },
+            {
+              "phase_type": "interval",
+              "duration_type": "lap_button",
+              "repetitions": 5,
+              "progression_key": "series",
+              "children": [
+                { "phase_type": "interval", "duration_type": "distance", "distance_m": 800, "target_type": "pace", "target_min": 300, "progression_key": "work" },
+                { "phase_type": "recovery", "duration_type": "time", "duration_s": 120, "progression_key": "recovery" }
+              ]
+            },
             { "phase_type": "cooldown", "duration_type": "time", "duration_s": 600 }
           ]
         },
@@ -30,7 +41,7 @@
           "template_key": "lower-body",
           "workout_goal": "strength",
           "exercises": [
-            { "exercise_id": "UUID_SENTADILLA", "exercise_name": "Sentadilla", "order_index": 0, "sets": 3, "reps": 8, "weight_kg": 70, "rest_seconds": 120 }
+            { "exercise_name": "Sentadilla", "order_index": 0, "sets": 3, "reps": 8, "weight_kg": 70, "rest_seconds": 120 }
           ]
         }
       ]
@@ -46,9 +57,20 @@
           "template_key": "series-800",
           "workout_goal": "intervals",
           "modality": "outdoor",
+          "distance_km": 10,
+          "duration_min": 55,
           "running_steps": [
             { "phase_type": "warmup", "duration_type": "time", "duration_s": 600 },
-            { "phase_type": "interval", "duration_type": "distance", "distance_m": 800, "repetitions": 8, "target_type": "pace", "target_min": 295, "progression_key": "work" },
+            {
+              "phase_type": "interval",
+              "duration_type": "lap_button",
+              "repetitions": 8,
+              "progression_key": "series",
+              "children": [
+                { "phase_type": "interval", "duration_type": "distance", "distance_m": 800, "target_type": "pace", "target_min": 295, "progression_key": "work" },
+                { "phase_type": "recovery", "duration_type": "time", "duration_s": 120, "progression_key": "recovery" }
+              ]
+            },
             { "phase_type": "cooldown", "duration_type": "time", "duration_s": 600 }
           ]
         },
@@ -60,7 +82,7 @@
           "template_key": "lower-body",
           "workout_goal": "strength",
           "exercises": [
-            { "exercise_id": "UUID_SENTADILLA", "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rest_seconds": 150 }
+            { "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rest_seconds": 150 }
           ]
         }
       ]

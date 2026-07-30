@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { getImportedTemplateScheduledDay, groupTrainingPlanSessions } from './trainingPlanImportPlanner';
+import {
+  findReusableImportedTemplate,
+  getImportedTemplateScheduledDay,
+  groupTrainingPlanSessions,
+} from './trainingPlanImportPlanner';
 import type { TrainingPlanImportDocument } from './trainingPlanImportContract';
 
 const document: TrainingPlanImportDocument = {
@@ -7,6 +11,7 @@ const document: TrainingPlanImportDocument = {
   version: 1,
   plan_name: 'Plan',
   start_date: '2026-08-03',
+  end_date: '2026-08-11',
   weeks: [
     {
       week_number: 1,
@@ -124,4 +129,43 @@ assert.equal(
     signature: 'mixed',
   }),
   null,
+);
+
+const candidates = [
+  {
+    id: 'same-range',
+    template_family_key: 'strength:gym',
+    source: 'imported',
+    recurrence_start_date: '2026-08-03',
+    recurrence_end_date: '2026-08-30',
+  },
+  {
+    id: 'other-range',
+    template_family_key: 'strength:gym',
+    source: 'imported',
+    recurrence_start_date: '2026-09-01',
+    recurrence_end_date: '2026-09-30',
+  },
+  {
+    id: 'manual',
+    template_family_key: 'strength:gym',
+    source: 'user',
+    recurrence_start_date: '2026-08-03',
+    recurrence_end_date: '2026-08-30',
+  },
+];
+
+assert.equal(
+  findReusableImportedTemplate(candidates, 'strength:gym', {
+    start: '2026-08-03',
+    end: '2026-08-30',
+  })?.id,
+  'same-range',
+);
+assert.equal(
+  findReusableImportedTemplate(candidates, 'strength:gym', {
+    start: '2026-10-01',
+    end: '2026-10-28',
+  }),
+  undefined,
 );

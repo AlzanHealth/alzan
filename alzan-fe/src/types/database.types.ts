@@ -1670,6 +1670,44 @@ export type Database = {
           },
         ];
       };
+      endurance_workout_template_progressions: {
+        Row: {
+          created_at: string;
+          id: string;
+          template_id: string;
+          total_distance_m: number | null;
+          total_duration_s: number | null;
+          updated_at: string;
+          week_index: number;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          template_id: string;
+          total_distance_m?: number | null;
+          total_duration_s?: number | null;
+          updated_at?: string;
+          week_index: number;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          template_id?: string;
+          total_distance_m?: number | null;
+          total_duration_s?: number | null;
+          updated_at?: string;
+          week_index?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'endurance_workout_template_progressions_template_fkey';
+            columns: ['template_id'];
+            isOneToOne: false;
+            referencedRelation: 'endurance_workout_templates';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       endurance_workout_templates: {
         Row: {
           auto_delete_after_end: boolean;
@@ -4612,6 +4650,7 @@ export type Database = {
           endurance_template_id: string | null;
           gym_template_id: string | null;
           id: string;
+          import_dedupe_key: string | null;
           notes: string | null;
           planned_date: string;
           status: Database['public']['Enums']['workout_plans_status'];
@@ -4625,6 +4664,7 @@ export type Database = {
           endurance_template_id?: string | null;
           gym_template_id?: string | null;
           id?: string;
+          import_dedupe_key?: string | null;
           notes?: string | null;
           planned_date: string;
           status?: Database['public']['Enums']['workout_plans_status'];
@@ -4638,6 +4678,7 @@ export type Database = {
           endurance_template_id?: string | null;
           gym_template_id?: string | null;
           id?: string;
+          import_dedupe_key?: string | null;
           notes?: string | null;
           planned_date?: string;
           status?: Database['public']['Enums']['workout_plans_status'];
@@ -5045,6 +5086,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      delete_training_template: {
+        Args: { p_template_id: string; p_template_kind: string };
+        Returns: boolean;
+      };
       delete_user_account: { Args: never; Returns: undefined };
       duplicate_recipe: { Args: { p_recipe_id: string }; Returns: string };
       ensure_recipe_ingredient: {
@@ -5065,6 +5110,10 @@ export type Database = {
       ensure_recipe_public_slug: {
         Args: { p_recipe_id: string };
         Returns: string;
+      };
+      expire_training_templates: {
+        Args: { p_local_date: string };
+        Returns: number;
       };
       fail_wearable_activity_import: {
         Args: {

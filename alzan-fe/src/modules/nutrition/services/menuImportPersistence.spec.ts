@@ -17,6 +17,8 @@ const selectedIngredient: MenuImportIngredientCandidate = {
   fat_g_100: 5,
 };
 
+const formatDate = (dayIndex: number): string => new Date(Date.UTC(2026, 7, 1 + dayIndex)).toISOString().slice(0, 10);
+
 const createMeal = (
   key: string,
   date: string,
@@ -192,16 +194,16 @@ async function testSupportsMaximumIngredientPayload() {
 
 async function testSupportsMaximumDayAndMealPayload() {
   const adapter = new InMemoryAdapter();
-  const meals = Array.from({ length: 310 }, (_, index) => {
-    const day = String(Math.floor(index / 10) + 1).padStart(2, '0');
-    return createMeal(`meal-${index}`, `2026-08-${day}`);
+  const meals = Array.from({ length: 450 }, (_, index) => {
+    const date = formatDate(Math.floor(index / 10));
+    return createMeal(`meal-${index}`, date);
   });
 
   await executeWithTestIds('user-1', createPreview(meals), adapter);
 
-  assert.equal(adapter.calls[0]?.meals.length, 310);
-  assert.equal(adapter.calls[0]?.items.length, 310);
-  assert.equal(adapter.calls[0]?.snapshot.dates.length, 31);
+  assert.equal(adapter.calls[0]?.meals.length, 450);
+  assert.equal(adapter.calls[0]?.items.length, 450);
+  assert.equal(adapter.calls[0]?.snapshot.dates.length, 45);
 }
 
 async function testReplacementTargetsAndStaleSnapshotAreAtomic() {

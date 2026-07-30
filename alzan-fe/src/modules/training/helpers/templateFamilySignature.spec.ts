@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildEnduranceTemplateFamilySignature,
   buildGymTemplateFamilySignature,
+  buildTemplateFamilyStorageKey,
   classifyTemplateFamilyMatch,
   normalizeTemplateKey,
   type EnduranceSignatureInput,
@@ -47,6 +48,10 @@ assert.notEqual(
 );
 
 assert.equal(normalizeTemplateKey('  Running Intervals 400m '), 'running_intervals_400m');
+const longSignature = JSON.stringify({ exercises: Array.from({ length: 100 }, (_, index) => ({ index })) });
+assert.equal(buildTemplateFamilyStorageKey(longSignature), buildTemplateFamilyStorageKey(longSignature));
+assert.notEqual(buildTemplateFamilyStorageKey(longSignature), buildTemplateFamilyStorageKey(`${longSignature}!`));
+assert.ok(buildTemplateFamilyStorageKey(longSignature).length < 64);
 assert.equal(buildGymTemplateFamilySignature(strengthBase), buildGymTemplateFamilySignature(strengthBase));
 assert.notEqual(
   buildGymTemplateFamilySignature(strengthBase),

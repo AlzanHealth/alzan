@@ -29,6 +29,7 @@ const MENU_IMPORT_VALIDATION_ERROR_KEYS: Record<MenuImportValidationErrorCode, T
   invalid_meal_type: 'nutrition.menuImportValidation.invalidMealType',
   out_of_range: 'nutrition.menuImportValidation.outOfRange',
   too_many_ingredients: 'nutrition.menuImportValidation.tooManyIngredients',
+  too_many_unique_ingredients: 'nutrition.menuImportValidation.tooManyUniqueIngredients',
 };
 
 interface MenuImportEditorProps {

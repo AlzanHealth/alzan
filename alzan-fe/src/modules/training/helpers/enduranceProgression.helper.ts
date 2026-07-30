@@ -34,6 +34,17 @@ export type StepProgressionOverride = {
   reps?: number | null;
 };
 
+export type TemplateSummaryProgression = {
+  week_index: number;
+  total_distance_m: number | null;
+  total_duration_s: number | null;
+};
+
+export type ProgressableEnduranceTemplate = {
+  total_distance_m: number | null;
+  total_duration_s: number | null;
+};
+
 export type EligibleProgressionStep = ProgressionBuilderStep & {
   progression_key: string;
   path: string;
@@ -252,4 +263,21 @@ export const applyProgressionsToSteps = <TStep extends ProgressionBuilderStep>(
       children: nextChildren,
     };
   });
+};
+
+export const applyTemplateSummaryProgression = <TTemplate extends ProgressableEnduranceTemplate>(
+  template: TTemplate,
+  weekIndex: number,
+  progressions: TemplateSummaryProgression[],
+): TTemplate => {
+  if (weekIndex < 1) return template;
+
+  const progression = progressions.find(item => item.week_index === weekIndex);
+  if (!progression) return template;
+
+  return {
+    ...template,
+    total_distance_m: progression.total_distance_m ?? template.total_distance_m,
+    total_duration_s: progression.total_duration_s ?? template.total_duration_s,
+  };
 };

@@ -5,6 +5,7 @@ import {
   getTabBarBottomInset,
   getTabBarBottomOffset,
   getTabBarTopFromScreenBottom,
+  isResizeEventTarget,
 } from './tabBarLayoutGeometry';
 
 export const TAB_BAR_HEIGHT = 75;
@@ -16,6 +17,7 @@ export {
   getTabBarBottomInset,
   getTabBarBottomOffset,
   getTabBarTopFromScreenBottom,
+  isResizeEventTarget,
 };
 
 // Shares the measured position of the floating tab bar so footers/overlays

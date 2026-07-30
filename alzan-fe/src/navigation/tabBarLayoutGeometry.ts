@@ -11,3 +11,18 @@ export const getInitialTabBarTopFromScreenBottom = (
 
 export const getTabBarTopFromScreenBottom = ({ viewportHeight, y }: { viewportHeight: number; y: number }): number =>
   Math.max(0, viewportHeight - y);
+
+export type ResizeEventTarget = {
+  addEventListener: (eventName: 'resize', listener: () => void) => void;
+  removeEventListener: (eventName: 'resize', listener: () => void) => void;
+};
+
+export const isResizeEventTarget = (value: unknown): value is ResizeEventTarget => {
+  if (typeof value !== 'object' || value === null) return false;
+  return (
+    'addEventListener' in value &&
+    typeof value.addEventListener === 'function' &&
+    'removeEventListener' in value &&
+    typeof value.removeEventListener === 'function'
+  );
+};

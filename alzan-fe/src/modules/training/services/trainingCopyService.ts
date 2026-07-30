@@ -1,12 +1,15 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { addDays, format, startOfWeek, getDay } from 'date-fns';
 import { WorkoutPlanInsert } from '../../../types/requests.types';
-import { expireEndedEnduranceRecurrences, isDateWithinEnduranceRecurrence } from './enduranceProgressionService';
 import { expireTrainingTemplates } from './templateLifecycleService';
+import { isDateWithinTemplateRecurrence, shouldAutoPropagateTemplate } from '../helpers/trainingPropagation.helper';
 
 interface RecurringGym {
   id: string;
   suggested_day_of_week: number;
+  recurrence_start_date: string | null;
+  recurrence_end_date: string | null;
+  source: string | null;
 }
 
 interface RecurringEndurance {
@@ -14,6 +17,7 @@ interface RecurringEndurance {
   scheduled_day: number | null;
   recurrence_start_date: string | null;
   recurrence_end_date: string | null;
+  source: string | null;
 }
 
 // Module-level lock to prevent concurrent propagation
@@ -52,12 +56,10 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
     const endDateStr = format(endOfWindow, 'yyyy-MM-dd');
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    await expireEndedEnduranceRecurrences(userId, todayStr);
-
     // Fetch recurring gym templates
     const { data: recurringGym, error: gymError } = await supabase
       .from('workout_templates')
-      .select('id, suggested_day_of_week')
+      .select('id, suggested_day_of_week, recurrence_start_date, recurrence_end_date, source')
       .eq('user_id', userId)
       .not('suggested_day_of_week', 'is', null)
       .returns<RecurringGym[]>();
@@ -70,7 +72,7 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
     // Fetch recurring endurance templates
     const { data: recurringEndurance, error: enduranceError } = await supabase
       .from('endurance_workout_templates')
-      .select('id, scheduled_day, recurrence_start_date, recurrence_end_date')
+      .select('id, scheduled_day, recurrence_start_date, recurrence_end_date, source')
       .eq('user_id', userId)
       .not('scheduled_day', 'is', null)
       .returns<RecurringEndurance[]>();
@@ -80,8 +82,11 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
       return;
     }
 
+    const automaticRecurringGym = (recurringGym ?? []).filter(shouldAutoPropagateTemplate);
+    const automaticRecurringEndurance = (recurringEndurance ?? []).filter(shouldAutoPropagateTemplate);
+
     console.log(
-      `🏋️ [CALENDARIO ENTRENAMIENTO] Encontradas: ${recurringGym?.length || 0} gimnasio + ${recurringEndurance?.length || 0} resistencia`,
+      `🏋️ [CALENDARIO ENTRENAMIENTO] Encontradas: ${automaticRecurringGym.length} gimnasio + ${automaticRecurringEndurance.length} resistencia`,
     );
 
     // 3. Fetch Existing Plans in Window
@@ -120,8 +125,8 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
       if (dateStr < todayStr) continue;
 
       // Check Gym Templates
-      recurringGym?.forEach((template: RecurringGym) => {
-        if (template.suggested_day_of_week === dayOfWeek) {
+      automaticRecurringGym.forEach((template: RecurringGym) => {
+        if (template.suggested_day_of_week === dayOfWeek && isDateWithinTemplateRecurrence(dateStr, template)) {
           const key = `${dateStr}_gym_${template.id}`;
           if (!existingSet.has(key)) {
             plansToInsert.push({
@@ -136,8 +141,8 @@ export const propagateTrainingPlans = async (userId: string, weeksToCheck: numbe
       });
 
       // Check Endurance Templates
-      recurringEndurance?.forEach((template: RecurringEndurance) => {
-        if (template.scheduled_day === dayOfWeek && isDateWithinEnduranceRecurrence(dateStr, template)) {
+      automaticRecurringEndurance.forEach((template: RecurringEndurance) => {
+        if (template.scheduled_day === dayOfWeek && isDateWithinTemplateRecurrence(dateStr, template)) {
           const key = `${dateStr}_end_${template.id}`;
           if (!existingSet.has(key)) {
             plansToInsert.push({
