@@ -57,6 +57,7 @@ La fuente de verdad de esta tabla son los tres `package.json` del repositorio. C
 | `pnpm verify:activity-import`       | Ejecuta la verificación de importación de actividades del backend.                                                                                                                          |
 | `pnpm verify:import-review`         | Comprueba el flujo de revisión de importaciones del backend. Se salta si el entorno Supabase configurado no es local.                                                                       |
 | `pnpm verify:steps-providers`       | Audita los proveedores de pasos del backend.                                                                                                                                                |
+| `pnpm verify:oauth-redirect`        | Comprueba que las redirecciones OAuth solo aceptan los deep links nativos de Alzan o el origen web configurado.                                                                             |
 | `pnpm verify:diet-copy`             | Ejecuta las pruebas del planificador de copia de dietas del frontend.                                                                                                                       |
 | `pnpm seed:training`                | Ejecuta el seed/demo de entrenamiento del backend. Úsalo solo en el entorno local previsto.                                                                                                 |
 | `pnpm install:all`                  | Instala las dependencias de BE y FE. Equivale a ejecutar `pnpm install` en ambos paquetes.                                                                                                  |
@@ -81,6 +82,7 @@ Ejecuta estos comandos con `pnpm --prefix alzan-be run <comando>`.
 | `verify:activity-import`  | Verifica los parsers y reglas de importación de actividades.                                            |
 | `verify:import-review`    | Ejecuta la comprobación de integración del flujo import-review.                                         |
 | `verify:steps-providers`  | Audita la sincronización de pasos de los proveedores.                                                   |
+| `verify:oauth-redirect`   | Verifica la lista blanca de redirecciones OAuth.                                                        |
 | `seed:training`           | Carga los datos demo de entrenamiento definidos por el backend.                                         |
 | `clear:sync-jobs`         | Limpia los trabajos de sincronización según la utilidad del backend. Revisa el entorno antes de usarlo. |
 | `lint:check` / `lint:fix` | Comprueban ESLint o aplican sus correcciones en el backend.                                             |

@@ -41,6 +41,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       stack = exception.stack;
     }
 
+    // Never expose infrastructure/provider/database details in 5xx responses.
+    // Keep the detailed message in the server log below for diagnosis.
+    const clientMessage = status >= HttpStatus.INTERNAL_SERVER_ERROR ? 'Internal Server Error' : message;
+
     const errorLog = {
       status,
       method: request.method,
@@ -58,7 +62,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     response.status(status).json({
       statusCode: status,
-      message,
+      message: clientMessage,
       timestamp: new Date().toISOString(),
       path: request.url,
     });
@@ -69,7 +73,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (request?.user) {
       meta.userId = request.user.id;
-      meta.email = request.user.email;
     }
 
     meta.targetUserId = meta.targetUserId ?? request?.params?.userId;

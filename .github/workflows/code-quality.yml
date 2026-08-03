@@ -5,14 +5,24 @@ on:
     paths:
       - "alzan-be/**"
       - "alzan-fe/**"
+      - "supabase/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/**"
   pull_request:
     paths:
       - "alzan-be/**"
       - "alzan-fe/**"
+      - "supabase/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/**"
 
 jobs:
   be-quality:
-    name: BE — Format & Lint
+    name: BE — Format, Lint, Typecheck & Verification
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -42,6 +52,21 @@ jobs:
 
       - name: Check linting
         run: pnpm run lint:check
+
+      - name: Check types
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Verify activity import
+        run: pnpm run verify:activity-import
+
+      - name: Verify import review safety
+        run: pnpm run verify:import-review
+
+      - name: Verify OAuth redirects
+        run: pnpm run verify:oauth-redirect
 
   fe-quality:
     name: FE — Format, Lint & Build
@@ -78,8 +103,26 @@ jobs:
       - name: Lint
         run: pnpm run lint:check
 
+      - name: Check types
+        run: pnpm run typecheck
+
       - name: Build app
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
         run: pnpm run build
+
+      - name: Build web export
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: pnpm run build:web
+
+      - name: Verify nutrition import
+        run: pnpm run verify:menu-import
+
+      - name: Verify training plan import
+        run: pnpm run verify:training-plan-import
+
+      - name: Verify diet copy
+        run: pnpm run verify:diet-copy

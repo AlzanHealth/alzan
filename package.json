@@ -29,6 +29,7 @@
     "verify:activity-import": "pnpm --prefix alzan-be run verify:activity-import",
     "verify:import-review": "pnpm --prefix alzan-be run verify:import-review",
     "verify:steps-providers": "pnpm --prefix alzan-be run verify:steps-providers",
+    "verify:oauth-redirect": "pnpm --prefix alzan-be run verify:oauth-redirect",
     "verify:diet-copy": "pnpm --prefix alzan-fe run verify:diet-copy",
     "seed:training": "pnpm --prefix alzan-be run seed:training",
     "install:all": "pnpm --prefix alzan-be install && pnpm --prefix alzan-fe install",

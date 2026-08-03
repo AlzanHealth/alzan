@@ -44,7 +44,7 @@ export class AuthGuard implements CanActivate {
 
       if (error || !data.user) {
         this.logger.error(
-          `Supabase Auth getUser validation failed. Error: ${error ? error.message : 'none'} (status: ${error ? error.status : 'n/a'}). User found: ${!!data.user}. Token prefix: ${token ? token.substring(0, 10) : 'none'}...`,
+          `Supabase Auth getUser validation failed. Error: ${error ? error.message : 'none'} (status: ${error ? error.status : 'n/a'}). User found: ${!!data.user}.`,
         );
         throw new UnauthorizedException('Unauthorized!');
       }
