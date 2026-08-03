@@ -1,9 +1,9 @@
 export const MENU_IMPORT_FORMAT = 'alzan-menu-plan';
 export const MENU_IMPORT_VERSION = 1;
 export const MENU_IMPORT_MAX_DAYS = 45;
-export const MENU_IMPORT_MAX_TEXT_LENGTH = 250_000;
-export const MENU_IMPORT_MAX_TOTAL_INGREDIENTS = 1_500;
-export const MENU_IMPORT_MAX_UNIQUE_INGREDIENTS = 200;
+export const MENU_IMPORT_MAX_TEXT_LENGTH = 500_000;
+export const MENU_IMPORT_MAX_TOTAL_INGREDIENTS = 3_000;
+export const MENU_IMPORT_MAX_UNIQUE_INGREDIENTS = 500;
 export const MENU_IMPORT_MEAL_TYPES = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'] as const;
 
 export type MenuImportMealType = (typeof MENU_IMPORT_MEAL_TYPES)[number];

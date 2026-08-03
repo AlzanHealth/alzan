@@ -1,6 +1,6 @@
 -- Generated from production by scripts/export-production-static-seeds.cjs.
 -- Read-only export: production is never modified by this process.
--- Source table: public.recipe_items; rows: 2898.
+-- Source table: public.recipe_items; rows: 2911.
 INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
 ('43818865-7996-4211-9f24-a9dc084bd95a', '0058b922-3156-4caf-b4e4-ab693cfa24e2', 'bdac5dd2-54fe-40e6-9295-aaaab1af7a8d', 1, 100, 'g', NULL, '2025-12-15T20:12:05.396619+00:00'),
 ('aa0ca5d6-0224-4bdc-ad51-9adf0f90db09', '0058b922-3156-4caf-b4e4-ab693cfa24e2', 'e616ab8f-2732-419b-aa41-7c25825400ac', 2, 100, 'g', NULL, '2025-12-15T20:12:05.396619+00:00'),
@@ -1960,6 +1960,16 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('1e981c68-48a5-4639-b88b-805d6042a0ff', 'a84b9dc4-037c-43bf-856b-3f8739ea74f8', '341fc2da-4f51-4c94-a508-d7ad5bf58201', 3, 33.3, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
 ('4ee53cc9-da0e-4369-ac22-970203fadcde', 'a84b9dc4-037c-43bf-856b-3f8739ea74f8', '5f2799db-91fd-47f7-85c6-ee20c38d6849', 4, 33.3, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
 ('654c5217-b1c7-4a23-bb28-6009e5078709', 'a84b9dc4-037c-43bf-856b-3f8739ea74f8', '37e3d3f0-2574-476f-9b3f-f34f8f01a3ad', 5, 16.7, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
+('94c234ff-af9a-46bd-af92-113f570a4c6e', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', '584b7f89-3fc4-4255-aa1c-27f23a11ee4b', 1, 100, 'g', 'Arroz bomba', '2026-08-03T08:40:30.697085+00:00'),
+('3b90357c-62c8-49de-bdc9-f2a2c6fb254a', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', '073994bc-08cb-4fb3-b7c7-6ea966b9fa3b', 10, 3, 'g', 'Sal y pimienta negra', '2026-08-03T08:40:30.697085+00:00'),
+('76ac97a6-7a1d-4fef-9b38-612ab09c29be', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', '482fcd88-bb24-44b3-8ac3-1401ba7b490b', 2, 100, 'g', 'Magret o confit de pato', '2026-08-03T08:40:30.697085+00:00'),
+('0972db2a-8d8d-40a7-afe7-586874e76235', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', '51d2b5f1-5eeb-4b62-b188-d437dacdba3d', 3, 40, 'g', 'Foie fresco en medallón', '2026-08-03T08:40:30.697085+00:00'),
+('7fc43cef-6703-40a0-b114-c09dce3ac596', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', 'ec4241ca-ef4c-4c30-b0ce-50ab6cfe31ab', 4, 30, 'g', 'Ajetes (ajos tiernos)', '2026-08-03T08:40:30.697085+00:00'),
+('d6451dd2-3dd3-4363-82fa-0b3f847d5bd7', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', '50632ebf-668d-4b43-81d8-ec5556bad77c', 5, 30, 'g', 'Cebolla picada fina', '2026-08-03T08:40:30.697085+00:00'),
+('a38a8373-37c2-4e9f-bab3-7e7bba5afb79', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', '15ccdd10-75a9-455b-869a-f91d4bd9b6cc', 6, 50, 'g', 'Tomate triturado natural', '2026-08-03T08:40:30.697085+00:00'),
+('e48f41f0-522e-45ee-9a8a-075cca3cfecd', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', 'f4cc80e8-799c-4e3c-9207-690a49c773a1', 7, 5, 'g', '1 diente de ajo', '2026-08-03T08:40:30.697085+00:00'),
+('1e9e4b85-9e1f-4808-9fb2-363077abf94d', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', 'e6336bc2-2246-421b-b5b5-054dd7cc6a36', 8, 250, 'g', 'Caldo de carne de calidad', '2026-08-03T08:40:30.697085+00:00'),
+('fd471bee-37b0-4702-a656-d23dbeea6497', 'a9b8c7d6-e5f4-3210-9876-543210fedcba', '9377b3a6-1d64-47aa-b412-7c4a8c86ab09', 9, 20, 'g', 'Aceite de oliva virgen extra', '2026-08-03T08:40:30.697085+00:00'),
 ('453cb76e-4818-4906-9979-e4787b6e7f5d', 'a9de7455-031b-401a-999e-6a2dd6188453', '52993018-5f93-418d-9e9e-44b45955eccc', 1, 150, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
 ('c750c11e-0987-489b-ab48-b477d2f1b466', 'a9de7455-031b-401a-999e-6a2dd6188453', '44b3aca3-94c5-48d3-a8ea-4d74cec214a2', 2, 80, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
 ('fbe274a3-6568-4b6c-bd95-33700ea6789c', 'a9de7455-031b-401a-999e-6a2dd6188453', '014172df-7e8f-45ff-b401-6314cc085239', 3, 30, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
@@ -2005,7 +2015,9 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('0cad899c-c283-465a-a379-c5a577d79556', 'af401153-d610-4399-a149-b43c1d612800', 'ea24ecb6-d052-46d9-a882-a8c00f177e4b', 1, 150, 'g', NULL, '2025-12-15T20:14:08.509728+00:00'),
 ('65671900-77d1-469c-8e37-ca43de7d037e', 'af401153-d610-4399-a149-b43c1d612800', 'bc1baea5-db04-4b4a-a83e-d29801b981b4', 2, 10, 'g', NULL, '2025-12-15T20:14:08.509728+00:00'),
 ('151ab208-ba9b-4eb3-b5f4-d59d60138827', 'af401153-d610-4399-a149-b43c1d612800', '59c7dbbc-d5a2-49b2-8dbd-42b3773ae45b', 3, 10, 'ml', NULL, '2025-12-15T20:14:08.509728+00:00'),
-('074783d3-18e1-4c3e-92f7-15c8912579e7', 'af401153-d610-4399-a149-b43c1d612800', 'f4cc80e8-799c-4e3c-9207-690a49c773a1', 4, 2, 'g', NULL, '2025-12-15T20:14:08.509728+00:00'),
+('074783d3-18e1-4c3e-92f7-15c8912579e7', 'af401153-d610-4399-a149-b43c1d612800', 'f4cc80e8-799c-4e3c-9207-690a49c773a1', 4, 2, 'g', NULL, '2025-12-15T20:14:08.509728+00:00');
+
+INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
 ('eba61de3-c64e-4c22-8e6f-e32e210fba24', 'af4698e7-a0a4-448f-a8fe-992ffe088ce9', '71a930e1-6a69-47bd-bca7-393bd6320421', 1, 125, 'g', NULL, '2025-12-14T17:27:31.996456+00:00'),
 ('49158ddc-ee45-4b6b-b918-d40a3481c6d5', 'af4698e7-a0a4-448f-a8fe-992ffe088ce9', '85a41984-f86e-475b-a675-24a6993cf305', 2, 15, 'g', NULL, '2025-12-14T17:27:31.996456+00:00'),
 ('0862f5d2-eaf7-4314-9783-4295e35ebbdb', 'af4698e7-a0a4-448f-a8fe-992ffe088ce9', 'efe75cbd-46f9-4c09-a464-21f454d57565', 3, 15, 'g', NULL, '2025-12-14T17:27:31.996456+00:00'),
@@ -2015,9 +2027,7 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('05b04f26-3500-44ed-9134-af364cd8a356', 'b0702726-06b5-41f5-9c58-b5f3402e0e9c', '9377b3a6-1d64-47aa-b412-7c4a8c86ab09', 4, 5, 'ml', NULL, '2025-12-15T20:12:05.396619+00:00'),
 ('f3a9b084-30dc-4bc9-9b40-fadc079500b4', 'b0702726-06b5-41f5-9c58-b5f3402e0e9c', 'a3c88aab-cf96-46aa-85bd-e9a99c5ed225', 5, 2.5, 'ml', NULL, '2025-12-15T20:12:05.396619+00:00'),
 ('b3ebf62d-8abe-46b3-b1f3-f537ffa97c69', 'b0702726-06b5-41f5-9c58-b5f3402e0e9c', '81690058-27a6-46b7-9153-158baaaf0d4d', 6, 1, 'g', NULL, '2026-01-05T16:22:42.62786+00:00'),
-('fc7bb173-cb74-4535-95ce-41130f9e7744', 'b0c195be-63ea-4a10-b183-f50fb8742bdb', '53be51de-54f7-4c95-a03e-a24ad79d9cc2', 1, 120, 'g', NULL, '2025-12-16T12:07:41.359956+00:00');
-
-INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
+('fc7bb173-cb74-4535-95ce-41130f9e7744', 'b0c195be-63ea-4a10-b183-f50fb8742bdb', '53be51de-54f7-4c95-a03e-a24ad79d9cc2', 1, 120, 'g', NULL, '2025-12-16T12:07:41.359956+00:00'),
 ('669eefc3-48ed-4384-af57-d6009bc10dc8', 'b0c195be-63ea-4a10-b183-f50fb8742bdb', 'c56228cf-3ce0-4dc9-b34e-73c3c6d0cfa6', 2, 80, 'g', NULL, '2025-12-16T12:07:41.359956+00:00'),
 ('b95ed11c-7aa7-410f-b143-08f69f54a93f', 'b0c195be-63ea-4a10-b183-f50fb8742bdb', '1cee0789-8891-4e6f-be59-c22e2626e7a1', 3, 30, 'g', NULL, '2025-12-16T12:07:41.359956+00:00'),
 ('6b7e0b60-c802-4daa-9a58-11dac034fccb', 'b0c195be-63ea-4a10-b183-f50fb8742bdb', '8b6e7c00-0e1b-46a1-a80a-8e11559fb182', 4, 40, 'g', NULL, '2025-12-16T12:07:41.359956+00:00'),
@@ -2257,7 +2267,9 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('a5e58fd0-2298-4876-9f7a-8adf6964d3d3', 'c4d84e8b-1749-4792-8ed2-df493a8f47bc', '9377b3a6-1d64-47aa-b412-7c4a8c86ab09', 4, 5, 'ml', NULL, '2025-12-14T17:23:57.031961+00:00'),
 ('eff0c43e-a939-4f5c-8d89-8f71d9f8c058', 'c51fb546-0490-4fa1-bb5f-f12287202493', 'e616ab8f-2732-419b-aa41-7c25825400ac', 1, 100, 'g', NULL, '2025-12-15T20:12:05.396619+00:00'),
 ('d8d6967b-302c-4bcc-8c6e-bdc11911bb9b', 'c51fb546-0490-4fa1-bb5f-f12287202493', '67571260-984a-4c14-b1bb-066a27de3501', 2, 50, 'g', NULL, '2025-12-15T20:12:05.396619+00:00'),
-('55e7a016-689e-43bb-bb1e-8204bb14f36d', 'c51fb546-0490-4fa1-bb5f-f12287202493', 'a287a4e0-eef2-4974-9b89-f64635c82590', 3, 30, 'g', NULL, '2025-12-15T20:12:05.396619+00:00'),
+('55e7a016-689e-43bb-bb1e-8204bb14f36d', 'c51fb546-0490-4fa1-bb5f-f12287202493', 'a287a4e0-eef2-4974-9b89-f64635c82590', 3, 30, 'g', NULL, '2025-12-15T20:12:05.396619+00:00');
+
+INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
 ('11af16d8-44b3-414a-a93c-562467d48275', 'c51fb546-0490-4fa1-bb5f-f12287202493', '1a6042e4-355e-482e-9793-f9640ef6b849', 4, 10, 'g', NULL, '2025-12-15T20:12:05.396619+00:00'),
 ('44c25d69-5f5f-4ba4-a22b-8d635391fdf2', 'c51fb546-0490-4fa1-bb5f-f12287202493', 'bd43890a-0d6b-4abe-9bc7-faa6c09882f9', 5, 10, 'ml', NULL, '2025-12-15T20:12:05.396619+00:00'),
 ('91502591-931f-44a6-916b-463e9152e1ff', 'c51fb546-0490-4fa1-bb5f-f12287202493', '81690058-27a6-46b7-9153-158baaaf0d4d', 6, 1, 'g', NULL, '2026-01-05T16:22:42.62786+00:00'),
@@ -2267,9 +2279,7 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('682674f2-8cc1-4277-bc1f-3fe1cdd12da4', 'c6499012-b2b8-4381-b6ed-b1498b333549', '50632ebf-668d-4b43-81d8-ec5556bad77c', 3, 50, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
 ('b32ebb8d-c2cd-4cfa-8d07-70612a99d695', 'c6ee3994-07c6-4725-9597-181b85ca2d43', '18883846-dc08-4317-a8b0-a5fb012f45d4', 1, 50, 'g', 'Masa de hojaldre estirada', '2026-06-22T08:52:55.941647+00:00'),
 ('ac4a8b45-4278-4250-a3d5-e0ba4cbb7829', 'c6ee3994-07c6-4725-9597-181b85ca2d43', '6781aa4a-8ef7-4ab3-b561-d53e5369b355', 2, 75, 'g', 'Manzana pelada y laminada', '2026-06-22T08:52:55.941647+00:00'),
-('f4f1b07c-981b-4a00-8414-a8ff84866d60', 'c6ee3994-07c6-4725-9597-181b85ca2d43', '1e52994d-ab5b-41e7-a9cf-afbc5a1f4428', 3, 10, 'g', 'Azúcar para espolvorear', '2026-06-22T08:52:55.941647+00:00');
-
-INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
+('f4f1b07c-981b-4a00-8414-a8ff84866d60', 'c6ee3994-07c6-4725-9597-181b85ca2d43', '1e52994d-ab5b-41e7-a9cf-afbc5a1f4428', 3, 10, 'g', 'Azúcar para espolvorear', '2026-06-22T08:52:55.941647+00:00'),
 ('cadb0cfe-d74f-44b6-a884-ab2e1d595c88', 'c6ee3994-07c6-4725-9597-181b85ca2d43', '15ad418e-8583-40e6-8edf-887b82a31da6', 4, 8, 'g', 'Mantequilla fundida para pintar', '2026-06-22T08:52:55.941647+00:00'),
 ('5fc0a19c-bfbb-4607-b967-c6a778706be5', 'c7099fc6-dd47-4948-bdb2-4da742ba5d70', 'e616ab8f-2732-419b-aa41-7c25825400ac', 1, 100, 'g', NULL, '2025-12-16T12:07:41.359956+00:00'),
 ('2684e850-7293-4646-a65b-1431f0036598', 'c7099fc6-dd47-4948-bdb2-4da742ba5d70', '6781aa4a-8ef7-4ab3-b561-d53e5369b355', 2, 80, 'g', NULL, '2025-12-16T12:07:41.359956+00:00'),
@@ -2377,6 +2387,9 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('969c1268-92e4-42e7-a4f3-ca186146fad7', 'd165b95a-c02e-43aa-81ab-79a67064e314', '8e32956c-d323-46ff-9045-f687211bcd79', 1, 60, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
 ('e4549029-da5b-4da2-9a43-a3a9558e7145', 'd165b95a-c02e-43aa-81ab-79a67064e314', '0c6792f0-907e-4d88-bed8-f09ba5fb35da', 2, 30, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
 ('c0fd8712-2563-4b93-bd02-656a5f819787', 'd165b95a-c02e-43aa-81ab-79a67064e314', '18c0443c-4716-4995-9943-9b4051ca09c3', 3, 80, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
+('3fb467fa-f74c-4517-8593-2e628593d774', 'd1e2f3a4-5b6c-7d8e-9f0a-1b2c3d4e5f6a', 'dc7be9b3-3673-472e-9645-c527f123ed63', 1, 250, 'g', 'Patata fresca en bastones', '2026-08-03T08:40:30.697085+00:00'),
+('5eec3987-1640-4b64-ba5d-5abbe9341e6b', 'd1e2f3a4-5b6c-7d8e-9f0a-1b2c3d4e5f6a', '9377b3a6-1d64-47aa-b412-7c4a8c86ab09', 2, 30, 'g', 'Aceite de oliva para freír', '2026-08-03T08:40:30.697085+00:00'),
+('a1268455-50b2-4a0d-b8ec-9a88b93ecfbd', 'd1e2f3a4-5b6c-7d8e-9f0a-1b2c3d4e5f6a', '073994bc-08cb-4fb3-b7c7-6ea966b9fa3b', 3, 2, 'g', 'Sal fina', '2026-08-03T08:40:30.697085+00:00'),
 ('fda511bc-f423-4ee9-972c-a2620f4a3a9b', 'd28295d2-85b3-48f0-ad02-3044fa0290ad', '4ca88e4f-da88-4683-bece-db14a1c7b3fc', 1, 100, 'g', NULL, '2026-01-05T11:02:37.382374+00:00'),
 ('39927e07-89d0-491e-a77e-08bc8be3b953', 'd28295d2-85b3-48f0-ad02-3044fa0290ad', '073994bc-08cb-4fb3-b7c7-6ea966b9fa3b', 10, 2, 'g', NULL, '2026-01-05T11:02:37.382374+00:00'),
 ('31b90b07-1dec-4f32-abc6-5aa9d3a268e9', 'd28295d2-85b3-48f0-ad02-3044fa0290ad', '094a8787-9ed3-4bde-9596-0208a00ce7f6', 2, 250, 'ml', NULL, '2026-01-05T11:02:37.382374+00:00'),
@@ -2506,7 +2519,9 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('afeca800-07f3-424e-8200-7d97e2c729be', 'db1d22a1-7500-4e91-a3e9-29d35759dd49', 'c56dcad4-9191-4677-81e5-e3e649897477', 2, 150, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
 ('d18df8ba-23ea-432b-9385-b675a338787b', 'db1d22a1-7500-4e91-a3e9-29d35759dd49', '50632ebf-668d-4b43-81d8-ec5556bad77c', 3, 50, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
 ('cf6d861c-ef5a-452f-a9c1-a417ac6d3282', 'db1d22a1-7500-4e91-a3e9-29d35759dd49', '3ef4ffe0-c3ae-4006-8daf-9674e9134a44', 4, 50, 'g', NULL, '2026-01-04T13:26:38.738339+00:00'),
-('cefc8418-cd10-4eb0-b193-a5a6037bcc62', 'db1d22a1-7500-4e91-a3e9-29d35759dd49', 'f5237c2e-1ca0-46a1-966c-8d5b8af8d2ab', 5, 20, 'ml', NULL, '2026-01-04T13:26:38.738339+00:00'),
+('cefc8418-cd10-4eb0-b193-a5a6037bcc62', 'db1d22a1-7500-4e91-a3e9-29d35759dd49', 'f5237c2e-1ca0-46a1-966c-8d5b8af8d2ab', 5, 20, 'ml', NULL, '2026-01-04T13:26:38.738339+00:00');
+
+INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
 ('7457371e-3db5-4730-bf93-88daf5afd2e4', 'db53fb42-efbf-42c2-ad42-119a667b0713', 'cc874f70-f9d9-4507-9cd3-6a80a74be1f3', 1, 150, 'g', NULL, '2025-12-15T20:12:05.396619+00:00'),
 ('b22f7ef6-bd09-4823-ba63-bb85c3437b27', 'db53fb42-efbf-42c2-ad42-119a667b0713', 'ea24ecb6-d052-46d9-a882-a8c00f177e4b', 2, 80, 'g', NULL, '2025-12-15T20:12:05.396619+00:00'),
 ('66218959-e015-4bdd-b542-d0a03695b58a', 'db53fb42-efbf-42c2-ad42-119a667b0713', '59c7dbbc-d5a2-49b2-8dbd-42b3773ae45b', 3, 5, 'ml', NULL, '2025-12-15T20:12:05.396619+00:00'),
@@ -2519,9 +2534,7 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('538b0d9c-5fe7-43af-aebf-6974123ba8e6', 'dce68d94-4b0f-49dc-a334-7cdd2c8c3ff2', '3eafa12f-d745-41be-90b4-25a7c90b2a82', 6, 5, 'ml', NULL, '2026-01-05T16:22:42.62786+00:00'),
 ('4c8eec9d-44e3-4a41-a19b-dbe7ad641166', 'dce68d94-4b0f-49dc-a334-7cdd2c8c3ff2', '81690058-27a6-46b7-9153-158baaaf0d4d', 7, 1, 'g', NULL, '2026-01-05T16:22:42.62786+00:00'),
 ('f33fc515-beef-4886-96a8-4ceb682a4043', 'dd87844d-a9b0-4dc7-a896-b068bb026e00', 'd06d2683-5100-404d-8049-d9493b695619', 1, 50, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
-('0fb95027-e35d-43bc-8c45-5e58e1a80698', 'dd87844d-a9b0-4dc7-a896-b068bb026e00', '45e5167a-fa9a-4aad-8c99-dc54cbe62927', 2, 50, 'g', NULL, '2025-12-14T17:27:07.990985+00:00');
-
-INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
+('0fb95027-e35d-43bc-8c45-5e58e1a80698', 'dd87844d-a9b0-4dc7-a896-b068bb026e00', '45e5167a-fa9a-4aad-8c99-dc54cbe62927', 2, 50, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
 ('8dd7bb4a-a84d-46ec-bb32-12151dd1ca24', 'dd87844d-a9b0-4dc7-a896-b068bb026e00', 'c56dcad4-9191-4677-81e5-e3e649897477', 3, 50, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
 ('08e1cbd7-5ea1-4805-8b49-49d0debef8e3', 'dd87844d-a9b0-4dc7-a896-b068bb026e00', '3ef4ffe0-c3ae-4006-8daf-9674e9134a44', 4, 30, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
 ('4bc80fdc-8c7a-46a5-bcb9-a9902f3f139b', 'dd87844d-a9b0-4dc7-a896-b068bb026e00', '50632ebf-668d-4b43-81d8-ec5556bad77c', 5, 30, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
@@ -2758,7 +2771,9 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('f4c5de65-c19e-42f1-b32f-8dd003f1b27a', 'f329dd71-d677-4b0f-bd38-5054a3cf410f', '53be51de-54f7-4c95-a03e-a24ad79d9cc2', 1, 120, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
 ('87a7a044-5da0-4ccc-9882-5883e1362a99', 'f329dd71-d677-4b0f-bd38-5054a3cf410f', 'c56228cf-3ce0-4dc9-b34e-73c3c6d0cfa6', 2, 100, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
 ('7ada01eb-8cac-4bcc-862b-63153187cfcd', 'f329dd71-d677-4b0f-bd38-5054a3cf410f', '7941ea0a-c002-46f6-bd5f-74ce3c05e35e', 3, 50, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
-('6283dd50-952b-48c5-9f17-69bbf02cab78', 'f329dd71-d677-4b0f-bd38-5054a3cf410f', '73d9c8c8-ff45-4443-af36-70401b843968', 4, 30, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
+('6283dd50-952b-48c5-9f17-69bbf02cab78', 'f329dd71-d677-4b0f-bd38-5054a3cf410f', '73d9c8c8-ff45-4443-af36-70401b843968', 4, 30, 'g', NULL, '2025-12-14T17:27:07.990985+00:00');
+
+INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
 ('6c0f5ed3-097e-4ceb-b3b7-9b1599d102f1', 'f329dd71-d677-4b0f-bd38-5054a3cf410f', 'da206b45-2a6a-4732-930b-7b3aaf2075ec', 5, 20, 'g', NULL, '2025-12-14T17:27:07.990985+00:00'),
 ('2955f8f1-6b8c-40be-87ef-a7e5856fdac4', 'f32c3178-ae10-43ad-a9a7-4b662981b810', 'cc874f70-f9d9-4507-9cd3-6a80a74be1f3', 1, 150, 'g', NULL, '2025-12-15T20:14:08.509728+00:00'),
 ('472cb4fe-8a77-4e3c-8384-d3b89d7eebde', 'f32c3178-ae10-43ad-a9a7-4b662981b810', '7166d35f-528a-4e59-b741-537d28cc4ca2', 2, 60, 'g', NULL, '2025-12-15T20:14:08.509728+00:00'),
@@ -2771,9 +2786,7 @@ INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_in
 ('706555a3-423c-4d22-a2a9-1c13c76ab68f', 'f345a715-8a20-4fa8-82e3-0ed3037dbde2', '50632ebf-668d-4b43-81d8-ec5556bad77c', 4, 30, 'g', NULL, '2025-12-14T17:27:31.996456+00:00'),
 ('05b86ca4-a9f5-4bec-89aa-4537d32e9e94', 'f345a715-8a20-4fa8-82e3-0ed3037dbde2', '5701ea0c-6148-4375-94e6-5581acb41e2d', 5, 10, 'ml', NULL, '2025-12-14T17:27:31.996456+00:00'),
 ('875f2f16-0606-4225-b57e-e5e19b9fde03', 'f345a715-8a20-4fa8-82e3-0ed3037dbde2', '9377b3a6-1d64-47aa-b412-7c4a8c86ab09', 6, 10, 'ml', NULL, '2025-12-14T17:27:31.996456+00:00'),
-('f08726d9-37f4-4927-932e-87bea7404b01', 'f345a715-8a20-4fa8-82e3-0ed3037dbde2', '81690058-27a6-46b7-9153-158baaaf0d4d', 7, 1, 'g', NULL, '2026-01-05T16:22:42.62786+00:00');
-
-INSERT INTO public."recipe_items" ("id", "recipe_id", "ingredient_id", "order_index", "quantity", "unit", "notes", "created_at") VALUES
+('f08726d9-37f4-4927-932e-87bea7404b01', 'f345a715-8a20-4fa8-82e3-0ed3037dbde2', '81690058-27a6-46b7-9153-158baaaf0d4d', 7, 1, 'g', NULL, '2026-01-05T16:22:42.62786+00:00'),
 ('75227075-5146-40e9-b5f0-d667af9a8b30', 'f39c63f2-ce0c-44c4-ab73-cb228e48af74', '8a84c445-c31d-412c-8ff2-63f1b82228fd', 1, 100, 'g', NULL, '2025-12-16T12:05:40.088257+00:00'),
 ('97cf8e54-72aa-4c6c-a431-7a9a3fde0e23', 'f39c63f2-ce0c-44c4-ab73-cb228e48af74', '45e5167a-fa9a-4aad-8c99-dc54cbe62927', 2, 80, 'g', NULL, '2025-12-16T12:05:40.088257+00:00'),
 ('dbf11eb3-a437-46d7-951d-2bd19d449b4f', 'f39c63f2-ce0c-44c4-ab73-cb228e48af74', 'ea24ecb6-d052-46d9-a882-a8c00f177e4b', 3, 80, 'g', NULL, '2025-12-16T12:05:40.088257+00:00'),

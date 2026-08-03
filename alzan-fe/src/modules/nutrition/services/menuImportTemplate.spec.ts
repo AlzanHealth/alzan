@@ -10,7 +10,7 @@ assert.equal(template.version, 1);
 assert.ok(Array.isArray(template.days));
 assert.equal((template.days as Array<Record<string, unknown>>)[0]?.weekday, 'lunes');
 assert.ok(MENU_IMPORT_PROMPT.includes('45 días'));
-assert.ok(MENU_IMPORT_PROMPT.includes('1500 entradas de ingredientes'));
+assert.ok(MENU_IMPORT_PROMPT.includes('3000 entradas de ingredientes'));
 assert.ok(MENU_IMPORT_PROMPT.includes('todos los días del periodo solicitado'));
 assert.ok(MENU_IMPORT_PROMPT.includes('Plan_Nutricion.docx'));
 assert.ok(MENU_IMPORT_PROMPT.includes('el nombre puede variar'));
@@ -30,7 +30,7 @@ assert.ok(MENU_IMPORT_PROMPT.includes('alias, marcas, recetas, calorías, macros
 assert.ok(MENU_IMPORT_PROMPT.includes('No recalcules ni ajustes las raciones'));
 assert.doesNotMatch(MENU_IMPORT_PROMPT, /Adapta el objetivo de proteína/);
 assert.doesNotMatch(MENU_IMPORT_PROMPT, /Genera 4–5 comidas/);
-assert.ok(MENU_IMPORT_PROMPT.includes('200 nombres de ingredientes distintos'));
+assert.ok(MENU_IMPORT_PROMPT.includes('500 nombres de ingredientes distintos'));
 assert.doesNotMatch(MENU_IMPORT_PROMPT, /\d+\s*[–-]\s*\d+\s*g\/día/);
 assert.ok(MENU_IMPORT_CLIPBOARD_TEXT.includes(MENU_IMPORT_PROMPT));
 assert.equal(

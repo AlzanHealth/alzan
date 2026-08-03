@@ -182,13 +182,13 @@ async function testSupportsMaximumIngredientPayload() {
   const adapter = new InMemoryAdapter();
   const meals = Array.from({ length: 300 }, (_, index) => {
     const day = String(Math.floor(index / 10) + 1).padStart(2, '0');
-    return createMeal(`meal-${index}`, `2026-08-${day}`, null, [], 5);
+    return createMeal(`meal-${index}`, `2026-08-${day}`, null, [], 10);
   });
 
   await executeWithTestIds('user-1', createPreview(meals), adapter);
 
   assert.equal(adapter.calls[0]?.meals.length, 300);
-  assert.equal(adapter.calls[0]?.items.length, 1500);
+  assert.equal(adapter.calls[0]?.items.length, 3000);
   assert.equal(adapter.calls[0]?.snapshot.dates.length, 30);
 }
 

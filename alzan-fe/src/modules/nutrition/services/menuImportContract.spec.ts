@@ -267,7 +267,7 @@ assertFirstError(
   'days[0].meals[0].ingredients[0].quantity_g',
 );
 
-const daysWithFifteenHundredIngredients = Array.from({ length: 5 }, (_, dayIndex) =>
+const daysWithThreeThousandIngredients = Array.from({ length: 10 }, (_, dayIndex) =>
   day({
     date: `2026-08-${String(dayIndex + 1).padStart(2, '0')}`,
     meals: Array.from({ length: 10 }, (_, mealIndex) =>
@@ -278,18 +278,18 @@ const daysWithFifteenHundredIngredients = Array.from({ length: 5 }, (_, dayIndex
     ),
   }),
 );
-assertValid(menu({ days: daysWithFifteenHundredIngredients }));
+assertValid(menu({ days: daysWithThreeThousandIngredients }));
 
-const menuWithFifteenHundredAndOneIngredients = menu({
+const menuWithThreeThousandAndOneIngredients = menu({
   days: [
-    ...daysWithFifteenHundredIngredients,
+    ...daysWithThreeThousandIngredients,
     day({
-      date: '2026-08-06',
+      date: '2026-08-11',
       meals: [meal({ ingredients: [ingredient()] })],
     }),
   ],
 });
-assertFirstError(menuWithFifteenHundredAndOneIngredients, 'too_many_ingredients', 'days');
+assertFirstError(menuWithThreeThousandAndOneIngredients, 'too_many_ingredients', 'days');
 
 const createDaysWithUniqueIngredients = (count: number): DayInput[] => {
   const uniqueIngredients = Array.from({ length: count }, (_, index) =>
@@ -309,9 +309,9 @@ const createDaysWithUniqueIngredients = (count: number): DayInput[] => {
   );
 };
 
-assertValid(menu({ days: createDaysWithUniqueIngredients(200) }));
+assertValid(menu({ days: createDaysWithUniqueIngredients(500) }));
 const tooManyUniqueIngredientsResult = parseMenuImportJson(
-  JSON.stringify(menu({ days: createDaysWithUniqueIngredients(201) })),
+  JSON.stringify(menu({ days: createDaysWithUniqueIngredients(501) })),
 );
 assert.equal(tooManyUniqueIngredientsResult.ok, false);
 if (!tooManyUniqueIngredientsResult.ok) {

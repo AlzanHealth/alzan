@@ -75,7 +75,53 @@ Flujo normal del día a día. Levanta una Supabase local en Docker y la app apun
 
 ---
 
-## 2. Regenerar código generado (tras cambiar esquema o API)
+## 2. Sincronizar seeds estáticos desde producción (solo lectura)
+
+Usa este flujo para actualizar en local los catálogos compartidos con producción: ingredientes, ejercicios, recetas, traducciones y opciones deportivas.
+
+> 🔒 El script solo hace peticiones `GET` contra Supabase. No ejecuta `INSERT`, `UPDATE`, `DELETE`, `UPSERT`, RPC ni SQL remoto. Nunca modifica producción y rechaza automáticamente una URL local.
+
+### Requisitos
+
+- Ejecuta el comando desde la raíz del repositorio.
+- Necesitas la URL remota y la `service_role key` de Supabase. No la guardes en Git ni la pegues en documentación.
+- Docker/Supabase local no es necesario para exportar; sí lo necesitarás después para cargar los seeds con `db reset`.
+
+### Exportar
+
+La forma más segura es pasar las credenciales solo para ese proceso:
+
+```bash
+PRODUCTION_SUPABASE_URL="https://<proyecto>.supabase.co" \
+PRODUCTION_SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" \
+EXPORT_PRODUCTION_STATIC_SEEDS=1 \
+pnpm supabase:export-static-seeds
+```
+
+El script también lee estas variables desde `.env` o `alzan-be/.env`, pero las variables escritas en la línea de comandos tienen prioridad. `EXPORT_PRODUCTION_STATIC_SEEDS=1` es obligatorio y evita ejecuciones accidentales.
+
+La exportación genera o reemplaza los SQL estáticos de `supabase/seeds/` (ejercicios, ingredientes, recetas, traducciones y opciones deportivas). No modifica `0_user.sql`, `9_health_data.sql` ni `10_training_templates.sql`.
+
+Comprueba los cambios antes de resetear la base local:
+
+```bash
+git status --short
+git diff --stat
+```
+
+Después, aplica los seeds únicamente en local:
+
+```bash
+pnpm supabase start       # si Supabase local no está levantada
+pnpm supabase db reset
+pnpm run supabase:types
+```
+
+Si aparece `Refusing to export from a local Supabase URL`, revisa que `PRODUCTION_SUPABASE_URL` apunte al proyecto remoto y no a `127.0.0.1` o `localhost`.
+
+---
+
+## 3. Regenerar código generado (tras cambiar esquema o API)
 
 > ⚠️ Nunca edites a mano los tipos generados ni el cliente OpenAPI.
 
@@ -109,7 +155,7 @@ Descarga el schema OpenAPI del backend y regenera el cliente tipado + hooks de T
 
 ---
 
-## 3. Desarrollo contra Supabase en la nube (cloud)
+## 4. Desarrollo contra Supabase en la nube (cloud)
 
 Levanta el BE + FE (web o simulador) apuntando a la **Supabase de producción/nube** en vez de la local. Útil para probar contra datos y esquema reales.
 
@@ -168,7 +214,7 @@ Cualquier comando local (`pnpm start`, `pnpm start:web`, `pnpm env:sync`) **rest
 
 ---
 
-## 4. Calidad y verificación (tras cualquier cambio de código)
+## 5. Calidad y verificación (tras cualquier cambio de código)
 
 | Comando                       | Qué hace                                                                            |
 | ----------------------------- | ----------------------------------------------------------------------------------- |
