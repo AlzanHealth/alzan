@@ -17,6 +17,7 @@ import {
   templateHasBoundaryPhases,
   templateHasRecoveryPhases,
   deriveActivityStructure,
+  deriveTemplateDistanceMatchedActivityCoreStructure,
   deriveTemplateDistanceMatchedActivityStructure,
   deriveTemplateStructure,
 } from '../../activity-import/matching/endurance-template-match';
@@ -441,7 +442,9 @@ export class ImportReconciliationService {
         steps = applyProgressionsToSteps(steps, weekIndex, progressionRows);
       }
 
-      const templateAwareStructure = deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps);
+      const templateAwareStructure =
+        deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps) ??
+        deriveTemplateDistanceMatchedActivityCoreStructure(lapLikes, steps);
       const activityStructure =
         templateAwareStructure ??
         (templateHasBoundaryPhases(steps) || templateHasRecoveryPhases(steps)

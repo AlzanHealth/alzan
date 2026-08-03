@@ -780,6 +780,24 @@ export function deriveTemplateDistanceMatchedActivityStructure(
 }
 
 /**
+ * Matches only the executable workout core. Boundary phases such as warmup
+ * and cooldown are intentionally excluded because wearable exports often do
+ * not record them as distinct laps, while the interval block is still the
+ * same planned workout.
+ */
+export function deriveTemplateDistanceMatchedActivityCoreStructure(
+  laps: ActivityLapLike[],
+  templateSteps: EnduranceStepLike[],
+): IntervalStructure | null {
+  const boundaryIds = new Set(templateSteps.filter(step => isBoundaryPhase(step.phaseType)).map(step => step.id));
+  const coreSteps = templateSteps.filter(
+    step => !isBoundaryPhase(step.phaseType) && (step.parentStepId == null || !boundaryIds.has(step.parentStepId)),
+  );
+  if (coreSteps.length === 0 || coreSteps.length === templateSteps.length) return null;
+  return deriveTemplateDistanceMatchedActivityStructure(laps, coreSteps);
+}
+
+/**
  * Structural match score (0-100). Ordered alignments use repetitions 25%,
  * work distance 25%, recovery 25%, boundaries 15% and pace 10%.
  */

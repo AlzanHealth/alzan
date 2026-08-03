@@ -7,6 +7,7 @@ import {
   countComparableStructuralSignals,
   deriveActivityStructure,
   deriveTemplateDistanceMatchedActivityStructure,
+  deriveTemplateDistanceMatchedActivityCoreStructure,
   deriveTemplateStructure,
   EnduranceStepLike,
   POSSIBLE_MATCH,
@@ -492,6 +493,21 @@ function assertTemplateDistanceMatchIgnoresWarmupAndCooldown(): void {
   assert.ok(score >= STRONG_MATCH, `expected strong distance-based structural match, got ${score}`);
 }
 
+function assertCoreIntervalsMatchWhenActivityOmitsBoundaryLaps(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  const activityStructure = deriveTemplateDistanceMatchedActivityCoreStructure(intervalLaps(4, 1000, 290, 120), steps);
+  assert.ok(activityStructure, 'expected interval core to match without warmup or cooldown laps');
+  assert.equal(activityStructure.repCount, 4);
+}
+
+function assertCoreIntervalsIgnoreDifferentBoundaryLaps(): void {
+  const steps = boundedTemplateSteps(4, 1000, 280, 120);
+  const laps = [lap(350, 140), ...intervalLaps(4, 1000, 290, 120), lap(2200, 780)];
+  const activityStructure = deriveTemplateDistanceMatchedActivityCoreStructure(laps, steps);
+  assert.ok(activityStructure, 'expected interval core to ignore different warmup and cooldown laps');
+  assert.equal(activityStructure.repCount, 4);
+}
+
 function assertRequiredBoundaryPhasesCannotBeSkipped(): void {
   const boundarySteps: EnduranceStepLike[] = [
     {
@@ -720,6 +736,8 @@ assertDistanceRecoveriesMatchWithExistingTolerance();
 assertExtraActivityIsOnlyAcceptedOutsideTheTemplate();
 assertTooFewLapsProduceNoStructure();
 assertTemplateDistanceMatchIgnoresWarmupAndCooldown();
+assertCoreIntervalsMatchWhenActivityOmitsBoundaryLaps();
+assertCoreIntervalsIgnoreDifferentBoundaryLaps();
 assertRequiredBoundaryPhasesCannotBeSkipped();
 assertBoundaryPhaseTargetsMustMatch();
 assertTemplateDistanceMatchWorksForMultipleDistances();
