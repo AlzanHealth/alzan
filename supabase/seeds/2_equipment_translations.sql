@@ -1,0 +1,30 @@
+-- Generated from production by scripts/export-production-static-seeds.cjs.
+-- Read-only export: production is never modified by this process.
+-- Source table: public.equipment_translations; rows: 26.
+INSERT INTO public."equipment_translations" ("id", "equipment_id", "language_code", "name") VALUES
+('1f15ef5f-3fe8-41b5-855e-93f31e059025', 1, 'en', 'Bodyweight'),
+('46eb8c1b-06e5-4bf7-8636-23f289b7f896', 1, 'es', 'Peso corporal'),
+('377ca029-62fd-4cb1-96ac-26670a2e01a4', 116, 'en', 'Barbell'),
+('f5a1e78b-392c-4346-9014-aae801956fd9', 116, 'es', 'Barra'),
+('8b905d6d-1877-4f1d-9fd9-7871ed8a9859', 151, 'en', 'Cable'),
+('ef594398-d63f-48d5-961a-f45d1dc03596', 151, 'es', 'Cable'),
+('9cd1d434-6c62-4b1b-a59f-3caedb3819a4', 186, 'en', 'Machine'),
+('dcf3ea83-8d67-4a9e-aeb6-2e53fe63a612', 186, 'es', 'Máquina'),
+('c3c62a46-47f0-475c-a2e0-d1b248f0c04f', 216, 'en', 'TRX'),
+('8f5df346-f057-4948-a9ca-e746a734c8c0', 216, 'es', 'TRX'),
+('77261494-2f26-4252-9727-89aab866ee69', 240, 'en', 'Medicine ball'),
+('cdd561a0-07ef-4839-aee8-a35f4abf255c', 240, 'es', 'Balón medicinal'),
+('9e1e9e88-021d-4121-949e-7520cb4a3c83', 256, 'en', 'Battle ropes'),
+('44ddf266-c40b-4e0a-baf3-ea8ab4597abd', 256, 'es', 'Battle ropes'),
+('048b52be-3718-4e49-b54f-89ca01f2d0a7', 271, 'en', 'Ab wheel'),
+('3d187874-e519-44a0-976b-c72aa1f69541', 271, 'es', 'Rueda abdominal'),
+('b0f2d96b-1e3e-4cf7-9071-53f151c5dad2', 281, 'en', 'Kettlebell'),
+('56be978a-823c-4ba1-926b-ed0a07962197', 281, 'es', 'Kettlebell'),
+('f6665f4e-9412-41ba-87d9-7623a620e7b6', 290, 'en', 'Fitball'),
+('c2582c4f-3d12-4433-8dfa-d044541935c5', 290, 'es', 'Fitball'),
+('a53878bd-7432-4439-bfb0-4c7c9171668c', 298, 'en', 'Bosu'),
+('2e0fca0d-05dd-48b3-a8bf-564dca3ec1ac', 298, 'es', 'Bosu'),
+('ee3e2a1f-7b51-4033-9adc-3cdc5c782dec', 61, 'en', 'Resistance band'),
+('0ca3fa50-1e53-436e-ab07-337bbe747c23', 61, 'es', 'Banda elástica'),
+('efa20460-023b-4bc8-81bd-42d7558024c3', 81, 'en', 'Dumbbells'),
+('6b0e09d1-e37a-405a-bf81-1b0b9c778a4c', 81, 'es', 'Mancuernas');
