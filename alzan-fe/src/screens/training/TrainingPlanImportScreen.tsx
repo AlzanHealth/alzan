@@ -20,10 +20,9 @@ import { GlassCard } from '../../components/GlassCard';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTrainingPlanImport } from '../../hooks/useTrainingPlanImport';
 import {
-  buildTrainingPlanImportClipboardText,
   TRAINING_PLAN_IMPORT_TEMPLATE,
+  TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT,
 } from '../../modules/training/services/trainingPlanImportTemplate';
-import { fetchTrainingExerciseCatalog } from '../../modules/training/services/trainingPlanImportService';
 import type { TrainingScreenNavigationProp } from '../../types/navigation.types';
 
 const copyText = async (text: string): Promise<void> => {
@@ -72,8 +71,7 @@ export const TrainingPlanImportScreen = () => {
     setIsCopyingTemplate(true);
 
     try {
-      const catalog = await fetchTrainingExerciseCatalog();
-      await copyText(buildTrainingPlanImportClipboardText(catalog));
+      await copyText(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT);
       Alert.alert(t('common.done'), t('training.trainingPlanInstructionsCopied'));
     } catch {
       Alert.alert(t('common.error'), t('training.trainingPlanInstructionsCopyError'));

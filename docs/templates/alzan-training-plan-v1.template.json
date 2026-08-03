@@ -1,9 +1,9 @@
 {
   "format": "alzan-training-plan",
   "version": 1,
-  "plan_name": "Plan de 4 semanas",
+  "plan_name": "Plan de entrenamiento de ejemplo",
   "start_date": "2026-08-03",
-  "end_date": "2026-08-30",
+  "end_date": "2026-08-09",
   "weeks": [
     {
       "week_number": 1,
@@ -14,7 +14,7 @@
           "sport": "running",
           "name": "Series 6 x 800 m",
           "template_key": "series-800",
-          "workout_goal": "intervals",
+          "workout_goal": "speed",
           "modality": "outdoor",
           "distance_km": 8.5,
           "duration_min": 50,

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
 import {
-  buildTrainingPlanImportClipboardText,
   buildTrainingPlanImportTemplate,
   TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT,
   TRAINING_PLAN_IMPORT_PROMPT,
@@ -11,12 +10,16 @@ import {
 import { parseTrainingPlanJson } from './trainingPlanImportContract';
 
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('running'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No inventes ejercicios'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Plan_Entrenamiento.docx'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('CSV adjunto'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('PROHIBICIÓN ABSOLUTA DE MODIFICAR EL ENTRENAMIENTO'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No cambies cargas, ritmos, kilómetros'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('detén la conversión y devuelve un informe de bloqueo'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('exercise_id'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('weekday'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('45 días'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Se permiten varias sesiones distintas en una misma fecha'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('respeta exactamente la distribución semanal'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Mantén literalmente la distribución'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No pongas repetitions en un intervalo plano'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('mismo bloque de 7 días'));
 assert.ok(!TRAINING_PLAN_IMPORT_PROMPT.includes('caso real'));
@@ -26,19 +29,13 @@ assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"phase_type": "recovery"'));
 assert.ok(!TRAINING_PLAN_IMPORT_TEMPLATE.includes('REEMPLAZAR_UUID'));
 assert.equal(parseTrainingPlanJson(TRAINING_PLAN_IMPORT_TEMPLATE).ok, true);
 assert.ok(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT.includes(TRAINING_PLAN_IMPORT_TEMPLATE));
-const clipboardWithCatalog = buildTrainingPlanImportClipboardText([
-  {
-    id: '11111111-1111-4111-8111-111111111111',
-    base_name_es: 'Sentadilla',
-    base_name_en: 'Squat',
-  },
-]);
-assert.ok(clipboardWithCatalog.includes('CATÁLOGO DE EJERCICIOS DE ALZAN'));
-assert.ok(clipboardWithCatalog.includes('11111111-1111-4111-8111-111111111111 | Sentadilla | Squat'));
+assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /CATÁLOGO DE EJERCICIOS DE ALZAN/);
+assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /11111111-1111-4111-8111-111111111111/);
+assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"workout_goal": "speed"'));
 
 const datedTemplate = buildTrainingPlanImportTemplate(new Date('2026-07-30T12:00:00+02:00'));
 assert.ok(datedTemplate.includes('"start_date": "2026-08-03"'));
-assert.ok(datedTemplate.includes('"end_date": "2026-08-30"'));
+assert.ok(datedTemplate.includes('"end_date": "2026-08-09"'));
 
 for (const fileName of ['alzan-training-plan-v1.template.json', 'alzan-training-plan-v1.example.json']) {
   const fileContent = readFileSync(new URL(`../../../../../docs/templates/${fileName}`, import.meta.url), 'utf8');

@@ -1,15 +1,14 @@
 import { addDays, format, startOfWeek } from 'date-fns';
-import type { TrainingExerciseCatalogRow } from './trainingPlanImportExerciseResolver';
 
 export const buildTrainingPlanImportTemplate = (referenceDate: Date = new Date()): string => {
   const startDate = startOfWeek(addDays(referenceDate, 7), { weekStartsOn: 1 });
   const strengthDate = addDays(startDate, 1);
-  const endDate = addDays(startDate, 27);
+  const endDate = addDays(startDate, 6);
 
   return `{
   "format": "alzan-training-plan",
   "version": 1,
-  "plan_name": "Plan de 4 semanas",
+  "plan_name": "Plan de entrenamiento de ejemplo",
   "start_date": "${format(startDate, 'yyyy-MM-dd')}",
   "end_date": "${format(endDate, 'yyyy-MM-dd')}",
   "weeks": [
@@ -22,7 +21,7 @@ export const buildTrainingPlanImportTemplate = (referenceDate: Date = new Date()
           "sport": "running",
           "name": "Series 6 x 800 m",
           "template_key": "series-800",
-          "workout_goal": "intervals",
+          "workout_goal": "speed",
           "modality": "outdoor",
           "distance_km": 8.5,
           "duration_min": 50,
@@ -60,19 +59,33 @@ export const buildTrainingPlanImportTemplate = (referenceDate: Date = new Date()
 
 export const TRAINING_PLAN_IMPORT_TEMPLATE = buildTrainingPlanImportTemplate();
 
-export const TRAINING_PLAN_IMPORT_PROMPT = `Crea un plan de entrenamiento para importar en Alzan.
+export const TRAINING_PLAN_IMPORT_PROMPT = `Convierte el documento de entrenamiento adjunto en un JSON para importarlo completo en Alzan.
 
-Devuelve únicamente un JSON válido, sin markdown ni comentarios, siguiendo exactamente el formato alzan-training-plan v1.
+Si la conversión puede completarse sin bloqueos, devuelve únicamente un JSON válido, sin markdown ni comentarios, siguiendo exactamente el formato alzan-training-plan v1.
+
+ARCHIVOS DE REFERENCIA
+- Plan_Entrenamiento.docx (Word) es la única fuente de verdad del entrenamiento. Léelo completo, incluidas sus tablas, semanas, sesiones, bloques y notas.
+- El CSV adjunto contiene el catálogo actualizado de ejercicios. Úsalo únicamente para resolver el exercise_id y el nombre canónico exacto de cada ejercicio de fuerza.
+- Si también está adjunto Plan_Nutricion(1).docx, ignóralo al construir este JSON: pertenece al importador de nutrición.
+
+PROHIBICIÓN ABSOLUTA DE MODIFICAR EL ENTRENAMIENTO
+- Adapta el contenido del Word al esquema JSON; no diseñes, optimices ni reescribas el plan.
+- Conserva exactamente todas las fechas, weekdays, semanas, días de descanso, sesiones dobles, orden de sesiones, nombres, calentamientos, fases, intervalos, recuperaciones, distancias, duraciones, ritmos, objetivos, series, repeticiones, pesos, RPE, descansos y notas.
+- No cambies cargas, ritmos, kilómetros, tiempos, repeticiones, series, ejercicios o días aunque parezcan incoherentes, difíciles o mejorables.
+- No corrijas, sustituyas, fusiones, dividas, resumas, omitas ni añadas entrenamientos. No traslades sesiones de día y no recalcules valores.
+- El template_key solo sirve para identificar una estructura repetible; nunca puede utilizarse para borrar una variación que figure en el Word. Si una agrupación hiciera perder información, usa otra clave.
+- Si un ejercicio no aparece con una coincidencia única en el CSV, detén la conversión y devuelve un informe de bloqueo con la sesión, el texto original y el motivo. No inventes UUID, nombres alternativos ni sustituciones.
+- Si una cifra, fecha, fase o relación de intervalos no puede leerse con seguridad, detén la conversión y pide aclaración. No la completes por intuición.
 
 REGLAS DEL CALENDARIO
 - Usa una sesión por cada fecha programada, en formato YYYY-MM-DD.
 - Incluye weekday en cada sesión: lunes, martes, miércoles, jueves, viernes, sábado o domingo.
 - weekday debe coincidir con date; la aplicación rechaza cualquier combinación incorrecta.
 - start_date y end_date son obligatorios: usa los límites reales del plan y no añadas sesiones fuera de ellos.
-- El formato admite un rango inclusivo de hasta 45 días por documento. Si necesitas más tiempo, divídelo en documentos consecutivos.
+- El formato admite un rango inclusivo de hasta 45 días por documento. Si el Word supera ese límite, divídelo en documentos consecutivos sin cambiar ninguna sesión.
 - Incluye week_number consecutivos y todas las sesiones del periodo solicitado; no dejes semanas del rango sin representar salvo que sean semanas completas de descanso.
 - Usa solo sport: "running" o sport: "strength".
-- El importador crea las sesiones exactas de cada fecha y también agrupa plantillas repetibles.
+- El importador crea las sesiones exactas de cada fecha y también agrupa plantillas repetibles sin alterar sus progresiones.
 
 CLAVES DE PLANTILLA Y PROGRESIÓN
 - Usa el mismo template_key cuando la estructura del entrenamiento es la misma y solo cambian distancia, duración, ritmo, repeticiones, peso, RPE o descanso.
@@ -90,18 +103,16 @@ RUNNING
 - Representa las recuperaciones como pasos recovery, no como texto ambiguo en notes.
 - Para series repetidas, crea un paso contenedor con repetitions y children; dentro incluye al menos el esfuerzo interval y su recovery. No pongas repetitions en un intervalo plano si cada repetición necesita recuperación.
 - Usa distance_km y duration_min como resumen aproximado; la sesión ejecutable debe estar en running_steps.
-- Mantén la progresión fisiológica del plan: rodaje suave, calidad, controlado y tirada larga no son intercambiables.
-- Si el usuario proporciona una distribución semanal, respeta exactamente la distribución semanal, los días de descanso, los dobles entrenamientos y el orden de las sesiones.
-- No inventes una distribución por defecto ni traslades sesiones a otros días cuando el texto de origen no lo indique.
-- No conviertas un cambio de ritmo o de kilómetros en una plantilla nueva si la estructura sigue siendo la misma.
+- Mantén literalmente la distribución y la progresión descritas en el Word; rodaje suave, calidad, controlado y tirada larga no son intercambiables.
+- Un cambio de ritmo, kilómetros, tiempo, repeticiones o carga es una progresión que debe conservarse en el JSON; no lo conviertas en un valor promedio.
 
 FUERZA / GIMNASIO
-- Usa exclusivamente el catálogo de ejercicios de Alzan que aparece después de la plantilla cuando incluya una sección CATÁLOGO.
-- Incluye exercise_id solo si conoces un UUID exacto del catálogo. Si no lo conoces, omítelo y usa exercise_name exacto para que el importador lo resuelva durante el análisis.
+- Usa exclusivamente el CSV adjunto como catálogo de ejercicios de fuerza.
+- Incluye exercise_id y exercise_name exactamente como aparecen en el CSV. No copies el catálogo dentro del JSON ni en el texto de salida.
 - No inventes ejercicios, UUID, nombres alternativos ni variantes que no existan.
 - Incluye order_index consecutivo, sets y reps o reps_min/reps_max, además de weight_kg, rpe, rest_seconds e is_warmup cuando estén definidos.
 - Conserva las rutinas, ejercicios y orden definidos por el plan original; usa la misma template_key dentro de cada rutina cuando solo progresen cargas, series o repeticiones.
-- Si el catálogo no contiene un ejercicio solicitado, elige solo una variante existente y documenta la sustitución en notes; nunca inventes el ejercicio.
+- Si el CSV no contiene un ejercicio solicitado, bloquea la conversión; nunca elijas una variante ni documentes una sustitución como si fuera el entrenamiento original.
 
 VALIDACIÓN FINAL
 - Comprueba que todas las fechas son reales y están dentro del rango.
@@ -109,30 +120,10 @@ VALIDACIÓN FINAL
 - Comprueba que cada weekday coincide con su fecha.
 - Comprueba que cada running tiene al menos un running_step y cada strength al menos un exercise.
 - Comprueba que no hay claves duplicadas con estructuras incompatibles.
-- Devuelve solo el JSON siguiendo esta plantilla:
+- Verifica el JSON comparándolo de nuevo con el Word: ninguna sesión, fecha, ejercicio, bloque o cifra puede faltar o cambiar.
+- Si no hay bloqueos, devuelve solo el JSON siguiendo esta plantilla. Si hay bloqueos, devuelve solo el informe de bloqueos y no un JSON incompleto:
 
 PLANTILLA JSON
 ${TRAINING_PLAN_IMPORT_TEMPLATE}`;
 
-export const buildTrainingPlanImportClipboardText = (catalog: TrainingExerciseCatalogRow[] = []): string => {
-  if (catalog.length === 0) return `${TRAINING_PLAN_IMPORT_PROMPT}\n`;
-
-  const rows = [...catalog]
-    .sort((left, right) =>
-      (left.base_name_es ?? left.base_name_en ?? left.id).localeCompare(
-        right.base_name_es ?? right.base_name_en ?? right.id,
-        'es',
-      ),
-    )
-    .map(exercise => `- ${exercise.id} | ${exercise.base_name_es ?? '-'} | ${exercise.base_name_en ?? '-'}`);
-
-  return `${TRAINING_PLAN_IMPORT_PROMPT}
-
-CATÁLOGO DE EJERCICIOS DE ALZAN
-Formato: exercise_id | nombre español | nombre inglés.
-Para fuerza, elige únicamente filas de esta lista y copia el UUID y uno de sus nombres exactamente.
-${rows.join('\n')}
-`;
-};
-
-export const TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT = buildTrainingPlanImportClipboardText();
+export const TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT = `${TRAINING_PLAN_IMPORT_PROMPT}\n`;
