@@ -34,9 +34,9 @@ export const MENU_IMPORT_PROMPT = `Convierte el documento de nutrición adjunto 
 Si la conversión puede completarse sin bloqueos, devuelve únicamente un JSON válido, sin markdown ni comentarios, siguiendo exactamente el formato alzan-menu-plan v1.
 
 ARCHIVOS DE REFERENCIA
-- Plan_Nutricion(1).docx es la fuente de verdad del menú. Léelo completo, incluidas sus tablas, recetas, cantidades, fechas y notas de contexto.
+- El documento adjunto que contiene el plan de nutrición es la fuente de verdad del menú (normalmente se llama Plan_Nutricion.docx, pero el nombre puede variar). Identifícalo por su contenido y léelo completo, incluidas sus tablas, recetas, cantidades, fechas y notas de contexto.
 - El CSV adjunto contiene el catálogo actualizado de ingredientes. Úsalo únicamente para resolver el nombre canónico del ingrediente y comprobar que existe; no lo uses para rediseñar el menú.
-- Si también está adjunto Plan_Entrenamiento.docx, ignóralo al construir este JSON: pertenece al importador de entrenamiento.
+- Si también hay un documento con un plan de entrenamiento, ignóralo al construir este JSON: pertenece al importador de entrenamiento.
 
 FIDELIDAD AL DOCUMENTO
 - Adapta el documento al esquema JSON; no diseñes otro menú.

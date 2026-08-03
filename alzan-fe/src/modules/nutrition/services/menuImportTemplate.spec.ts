@@ -12,7 +12,8 @@ assert.equal((template.days as Array<Record<string, unknown>>)[0]?.weekday, 'lun
 assert.ok(MENU_IMPORT_PROMPT.includes('45 días'));
 assert.ok(MENU_IMPORT_PROMPT.includes('1500 entradas de ingredientes'));
 assert.ok(MENU_IMPORT_PROMPT.includes('todos los días del periodo solicitado'));
-assert.ok(MENU_IMPORT_PROMPT.includes('Plan_Nutricion(1).docx'));
+assert.ok(MENU_IMPORT_PROMPT.includes('Plan_Nutricion.docx'));
+assert.ok(MENU_IMPORT_PROMPT.includes('el nombre puede variar'));
 assert.ok(MENU_IMPORT_PROMPT.includes('CSV adjunto'));
 assert.ok(MENU_IMPORT_PROMPT.includes('Conserva exactamente las fechas'));
 assert.ok(MENU_IMPORT_PROMPT.includes('no sustituyas alimentos'));

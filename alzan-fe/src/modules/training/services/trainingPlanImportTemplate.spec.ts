@@ -11,6 +11,7 @@ import { parseTrainingPlanJson } from './trainingPlanImportContract';
 
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('running'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Plan_Entrenamiento.docx'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('el nombre puede variar'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('CSV adjunto'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('PROHIBICIÓN ABSOLUTA DE MODIFICAR EL ENTRENAMIENTO'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No cambies cargas, ritmos, kilómetros'));
@@ -31,7 +32,7 @@ assert.equal(parseTrainingPlanJson(TRAINING_PLAN_IMPORT_TEMPLATE).ok, true);
 assert.ok(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT.includes(TRAINING_PLAN_IMPORT_TEMPLATE));
 assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /CATÁLOGO DE EJERCICIOS DE ALZAN/);
 assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /11111111-1111-4111-8111-111111111111/);
-assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"workout_goal": "speed"'));
+assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"workout_goal": "intervals"'));
 
 const datedTemplate = buildTrainingPlanImportTemplate(new Date('2026-07-30T12:00:00+02:00'));
 assert.ok(datedTemplate.includes('"start_date": "2026-08-03"'));

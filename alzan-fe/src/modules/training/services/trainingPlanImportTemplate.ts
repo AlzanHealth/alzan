@@ -21,7 +21,7 @@ export const buildTrainingPlanImportTemplate = (referenceDate: Date = new Date()
           "sport": "running",
           "name": "Series 6 x 800 m",
           "template_key": "series-800",
-          "workout_goal": "speed",
+          "workout_goal": "intervals",
           "modality": "outdoor",
           "distance_km": 8.5,
           "duration_min": 50,
@@ -64,9 +64,9 @@ export const TRAINING_PLAN_IMPORT_PROMPT = `Convierte el documento de entrenamie
 Si la conversión puede completarse sin bloqueos, devuelve únicamente un JSON válido, sin markdown ni comentarios, siguiendo exactamente el formato alzan-training-plan v1.
 
 ARCHIVOS DE REFERENCIA
-- Plan_Entrenamiento.docx (Word) es la única fuente de verdad del entrenamiento. Léelo completo, incluidas sus tablas, semanas, sesiones, bloques y notas.
+- El documento Word adjunto que contiene el plan de entrenamiento es la única fuente de verdad (normalmente se llama Plan_Entrenamiento.docx, pero el nombre puede variar). Identifícalo por su contenido y léelo completo, incluidas sus tablas, semanas, sesiones, bloques y notas.
 - El CSV adjunto contiene el catálogo actualizado de ejercicios. Úsalo únicamente para resolver el exercise_id y el nombre canónico exacto de cada ejercicio de fuerza.
-- Si también está adjunto Plan_Nutricion(1).docx, ignóralo al construir este JSON: pertenece al importador de nutrición.
+- Si también hay un documento con un plan de nutrición, ignóralo al construir este JSON: pertenece al importador de nutrición.
 
 PROHIBICIÓN ABSOLUTA DE MODIFICAR EL ENTRENAMIENTO
 - Adapta el contenido del Word al esquema JSON; no diseñes, optimices ni reescribas el plan.
