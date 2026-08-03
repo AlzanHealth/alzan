@@ -18,6 +18,7 @@ const ROOT = path.resolve(__dirname, "..");
 const SEEDS_DIR = path.join(ROOT, "supabase", "seeds");
 const PAGE_SIZE = 1000;
 const INSERT_CHUNK_SIZE = 250;
+const LEGACY_SEED_FILES = ["3_muscle_group_translations.sql"];
 
 const TABLE_SPECS = [
   {
@@ -45,7 +46,8 @@ const TABLE_SPECS = [
     orderBy: ["id"],
   },
   {
-    file: "3_muscle_group_translations.sql",
+    // Keep the parent table prefix so Supabase runs muscle_groups first.
+    file: "3_muscle_groups_translations.sql",
     table: "muscle_group_translations",
     columns: ["id", "muscle_group_id", "language_code", "name"],
     orderBy: ["muscle_group_id", "language_code", "id"],
@@ -264,6 +266,13 @@ function buildSeedSql(spec, rows) {
   return `${header.join("\n")}${buildInsertStatements(spec.table, spec.columns, sorted).join("\n\n")}\n`;
 }
 
+function removeLegacySeedFiles(seedsDir = SEEDS_DIR) {
+  for (const file of LEGACY_SEED_FILES) {
+    const filePath = path.join(seedsDir, file);
+    if (fs.existsSync(filePath)) fs.rmSync(filePath);
+  }
+}
+
 function parseEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return {};
   const values = {};
@@ -360,6 +369,10 @@ async function exportSeeds() {
     ),
   );
 
+  // Remove renamed generated files only after all remote reads succeeded. This
+  // prevents an old filename from being picked up before its parent seed.
+  removeLegacySeedFiles();
+
   for (const spec of TABLE_SPECS) {
     const rows = exported.get(spec.table);
     fs.writeFileSync(path.join(SEEDS_DIR, spec.file), buildSeedSql(spec, rows));
@@ -384,6 +397,7 @@ module.exports = {
     row.visibility === "public" &&
     row.deleted_at == null,
   filterRowsById,
+  removeLegacySeedFiles,
   sqlLiteral,
   sortRows,
 };

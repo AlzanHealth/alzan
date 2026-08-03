@@ -30,6 +30,7 @@
     "verify:import-review": "pnpm --prefix alzan-be run verify:import-review",
     "verify:steps-providers": "pnpm --prefix alzan-be run verify:steps-providers",
     "verify:oauth-redirect": "pnpm --prefix alzan-be run verify:oauth-redirect",
+    "verify:export-static-seeds": "node scripts/export-production-static-seeds.spec.cjs",
     "verify:diet-copy": "pnpm --prefix alzan-fe run verify:diet-copy",
     "seed:training": "pnpm --prefix alzan-be run seed:training",
     "install:all": "pnpm --prefix alzan-be install && pnpm --prefix alzan-fe install",

@@ -1,4 +1,7 @@
 const assert = require("assert/strict");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 const {
   buildSeedSql,
@@ -6,7 +9,30 @@ const {
   filterSystemRecipes,
   sqlLiteral,
   sortRows,
+  TABLE_SPECS,
+  removeLegacySeedFiles,
 } = require("./export-production-static-seeds.cjs");
+
+const seedFiles = TABLE_SPECS.map((spec) => spec.file).sort();
+assert.ok(
+  seedFiles.indexOf("3_muscle_groups.sql") <
+    seedFiles.indexOf("3_muscle_groups_translations.sql"),
+  "muscle groups must be seeded before their translations",
+);
+
+const tempSeedsDir = fs.mkdtempSync(path.join(os.tmpdir(), "alzan-seeds-"));
+fs.writeFileSync(
+  path.join(tempSeedsDir, "3_muscle_group_translations.sql"),
+  "legacy",
+);
+fs.writeFileSync(path.join(tempSeedsDir, "keep.sql"), "keep");
+removeLegacySeedFiles(tempSeedsDir);
+assert.equal(
+  fs.existsSync(path.join(tempSeedsDir, "3_muscle_group_translations.sql")),
+  false,
+);
+assert.equal(fs.existsSync(path.join(tempSeedsDir, "keep.sql")), true);
+fs.rmSync(tempSeedsDir, { recursive: true, force: true });
 
 assert.equal(sqlLiteral(null), "NULL");
 assert.equal(sqlLiteral(true), "TRUE");
