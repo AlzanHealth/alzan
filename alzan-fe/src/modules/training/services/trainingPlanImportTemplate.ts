@@ -63,6 +63,14 @@ export const TRAINING_PLAN_IMPORT_PROMPT = `Convierte el documento de entrenamie
 
 Si la conversión puede completarse sin bloqueos, devuelve únicamente un JSON válido, sin markdown ni comentarios, siguiendo exactamente el formato alzan-training-plan v1.
 
+CONTRATO JSON AUTÓNOMO (NO NECESITAS CONOCER LA APP)
+- La raíz solo puede contener format, version, plan_name, start_date, end_date y weeks. Usa exactamente format "alzan-training-plan" y version 1.
+- Cada week solo puede contener week_number y sessions. Cada session solo puede usar date, weekday, sport, name, template_key, workout_goal, modality, notes, distance_km, duration_min, running_steps y exercises.
+- Una sesión running usa running_steps y no exercises. Una sesión strength usa exercises y no running_steps. No mezcles ambos bloques ni añadas propiedades fuera del contrato.
+- date, start_date y end_date son fechas reales YYYY-MM-DD; weekday usa exactamente lunes, martes, miércoles, jueves, viernes, sábado o domingo y debe coincidir con date.
+- Todos los números son números JSON (nunca texto con unidades): week_number 1–104, distance_km 0–1000, duration_min 0–1440, duration_s 0–86400, distance_m 0–500000, repetitions 1–1000, order_index 0–1000, sets 1–100, reps/reps_min/reps_max 1–1000, weight_kg 0–1000, rpe 1–10 y rest_seconds 0–3600.
+- No incluyas comentarios, markdown, trailing commas ni texto fuera del JSON. No inventes UUID: si no hay coincidencia segura en el CSV, devuelve un informe de bloqueo y no un JSON parcial.
+
 ARCHIVOS DE REFERENCIA
 - El documento Word adjunto que contiene el plan de entrenamiento es la única fuente de verdad (normalmente se llama Plan_Entrenamiento.docx, pero el nombre puede variar). Identifícalo por su contenido y léelo completo, incluidas sus tablas, semanas, sesiones, bloques y notas.
 - El CSV adjunto contiene el catálogo actualizado de ejercicios. Úsalo únicamente para resolver el exercise_id y el nombre canónico exacto de cada ejercicio de fuerza.
@@ -87,6 +95,15 @@ REGLAS DEL CALENDARIO
 - Usa solo sport: "running" o sport: "strength".
 - El importador crea las sesiones exactas de cada fecha y también agrupa plantillas repetibles sin alterar sus progresiones.
 
+CATÁLOGO ESTÁTICO Y VALORES DE PRODUCCIÓN
+- El CSV adjunto es la autoridad del catálogo actual de ejercicios (aproximadamente 2005 ejercicios, con sus exercise_id y exercise_name). No necesitas conocer la base de datos: busca ahí cada ejercicio y copia exactamente ambos valores.
+- Los únicos sport válidos son running y strength.
+- Los valores catalogados de running son workout_goal: endurance, speed, tempo_threshold, long_run, recovery, test; modality: outdoor o treadmill; terrain: asphalt, track, dirt, grass o treadmill (terrain no es un campo del JSON, consérvalo solo si aparece en notes).
+- Los valores catalogados de strength son workout_goal: hypertrophy, strength, muscular_endurance, technique, mobility, recovery; modality: gym, free_weights, machines, calisthenics, core o mobility. No uses terrain para strength.
+- workout_goal y modality son cadenas y el Word es la fuente de verdad: conserva literalmente cualquier valor que figure en el Word, aunque no esté en el catálogo (por ejemplo, "intervals"); nunca lo sustituyas por otro objetivo ni lo traduzcas. Usa las claves anteriores solo cuando el documento las use o cuando su equivalencia sea inequívoca.
+- El CSV puede incluir traducciones, equipamiento, grupos musculares y otros metadatos del ejercicio; solo exercise_id y exercise_name se copian al JSON. No añadas esos metadatos como propiedades nuevas.
+- No copies el catálogo completo dentro del JSON; el CSV solo sirve para resolver referencias.
+
 CLAVES DE PLANTILLA Y PROGRESIÓN
 - Usa el mismo template_key cuando la estructura del entrenamiento es la misma y solo cambian distancia, duración, ritmo, repeticiones, peso, RPE o descanso.
 - Usa una template_key distinta cuando cambien las fases, el tipo de duración o la estructura de ejercicios.
@@ -105,6 +122,9 @@ RUNNING
 - Usa distance_km y duration_min como resumen aproximado; la sesión ejecutable debe estar en running_steps.
 - Mantén literalmente la distribución y la progresión descritas en el Word; rodaje suave, calidad, controlado y tirada larga no son intercambiables.
 - Un cambio de ritmo, kilómetros, tiempo, repeticiones o carga es una progresión que debe conservarse en el JSON; no lo conviertas en un valor promedio.
+- phase_type solo puede ser warmup, interval, recovery, cooldown o relax; duration_type solo time, distance o lap_button; target_type solo pace, speed, heart_rate, heart_rate_zone, power, rpe o none.
+- Un paso time sin children exige duration_s; un paso distance sin children exige distance_m. Si target_type no es none, exige target_min y target_max es opcional; target_min no puede superar target_max.
+- Los ritmos pace se expresan en segundos por kilómetro (285 = 4:45/km). No pongas "4:45/km" dentro de target_min/target_max.
 
 FUERZA / GIMNASIO
 - Usa exclusivamente el CSV adjunto como catálogo de ejercicios de fuerza.
@@ -113,6 +133,8 @@ FUERZA / GIMNASIO
 - Incluye order_index consecutivo, sets y reps o reps_min/reps_max, además de weight_kg, rpe, rest_seconds e is_warmup cuando estén definidos.
 - Conserva las rutinas, ejercicios y orden definidos por el plan original; usa la misma template_key dentro de cada rutina cuando solo progresen cargas, series o repeticiones.
 - Si el CSV no contiene un ejercicio solicitado, bloquea la conversión; nunca elijas una variante ni documentes una sustitución como si fuera el entrenamiento original.
+- Cada ejercicio debe tener order_index consecutivo desde 0 y sets. Usa reps o reps_min + reps_max, nunca ambos. No escribas rangos como texto ("8-10").
+- exercise_id debe ser un UUID válido del CSV y exercise_name debe ser su nombre canónico exacto; no generes UUID ficticios.
 
 VALIDACIÓN FINAL
 - Comprueba que todas las fechas son reales y están dentro del rango.
@@ -120,6 +142,7 @@ VALIDACIÓN FINAL
 - Comprueba que cada weekday coincide con su fecha.
 - Comprueba que cada running tiene al menos un running_step y cada strength al menos un exercise.
 - Comprueba que no hay claves duplicadas con estructuras incompatibles.
+- Comprueba que todas las propiedades pertenecen al contrato y que los ejercicios se resolvieron contra el CSV sin coincidencias ambiguas.
 - Verifica el JSON comparándolo de nuevo con el Word: ninguna sesión, fecha, ejercicio, bloque o cifra puede faltar o cambiar.
 - Si no hay bloqueos, devuelve solo el JSON siguiendo esta plantilla. Si hay bloqueos, devuelve solo el informe de bloqueos y no un JSON incompleto:
 

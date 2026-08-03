@@ -23,6 +23,18 @@ assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Se permiten varias sesiones dist
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Mantén literalmente la distribución'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No pongas repetitions en un intervalo plano'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('mismo bloque de 7 días'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('CONTRATO JSON AUTÓNOMO'));
+assert.ok(
+  TRAINING_PLAN_IMPORT_PROMPT.includes(
+    'La raíz solo puede contener format, version, plan_name, start_date, end_date y weeks',
+  ),
+);
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('2005 ejercicios'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('tempo_threshold'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('free_weights'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('phase_type solo puede ser warmup'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No inventes UUID'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('traducciones, equipamiento, grupos musculares'));
 assert.ok(!TRAINING_PLAN_IMPORT_PROMPT.includes('caso real'));
 assert.ok(!TRAINING_PLAN_IMPORT_PROMPT.includes('23/06'));
 assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"weekday": "lunes"'));

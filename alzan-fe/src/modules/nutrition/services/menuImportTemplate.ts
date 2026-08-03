@@ -33,6 +33,14 @@ export const MENU_IMPORT_PROMPT = `Convierte el documento de nutrición adjunto 
 
 Si la conversión puede completarse sin bloqueos, devuelve únicamente un JSON válido, sin markdown ni comentarios, siguiendo exactamente el formato alzan-menu-plan v1.
 
+CONTRATO JSON AUTÓNOMO (NO NECESITAS CONOCER LA APP)
+- La raíz solo puede contener format, version, menu_name y days. Usa exactamente format "alzan-menu-plan" y version 1.
+- Cada elemento de days solo puede contener date, weekday y meals. Cada elemento de meals solo puede contener meal_type, name e ingredients.
+- Cada ingrediente solo puede contener name y quantity_g. No añadas id, ingredient_id, category, unit, calories, protein, carbs, fat, recipe_id ni ningún otro campo.
+- date y weekday son coherentes: date usa YYYY-MM-DD real y weekday usa exactamente lunes, martes, miércoles, jueves, viernes, sábado o domingo.
+- quantity_g es un número JSON finito, positivo (0.1–10000), siempre en gramos; no escribas unidades dentro del número ni uses texto como "100g".
+- Cada comida tiene al menos un ingrediente y cada fecha debe aparecer una sola vez. No incluyas comentarios, markdown, trailing commas ni texto fuera del JSON.
+
 ARCHIVOS DE REFERENCIA
 - El documento adjunto que contiene el plan de nutrición es la fuente de verdad del menú (normalmente se llama Plan_Nutricion.docx, pero el nombre puede variar). Identifícalo por su contenido y léelo completo, incluidas sus tablas, recetas, cantidades, fechas y notas de contexto.
 - El CSV adjunto contiene el catálogo actualizado de ingredientes. Úsalo únicamente para resolver el nombre canónico del ingrediente y comprobar que existe; no lo uses para rediseñar el menú.
@@ -56,11 +64,15 @@ REGLAS DEL CALENDARIO
 
 REGLAS NUTRICIONALES
 - Mantén el número de comidas que aparece en el documento; no generes comidas adicionales por defecto.
-- Usa únicamente estos meal_type según corresponda: breakfast, almuerzo, lunch, merienda, dinner y snack. Almuerzo representa la media mañana; lunch representa la comida principal.
+- Usa únicamente estos meal_type: breakfast, almuerzo, lunch, merienda, dinner y snack. breakfast es desayuno, almuerzo es media mañana, lunch es la comida principal y dinner es la cena. No traduzcas esos valores ni inventes otros; si el documento usa otra etiqueta, mapea por significado a una de estas seis.
 - Incluye solo name y quantity_g en cada ingrediente; la aplicación calcula calorías y macronutrientes.
 - Expresa las cantidades en gramos. Aclara en el nombre si el alimento está cocido, en crudo, escurrido o listo para consumir.
 - Usa nombres de ingredientes sencillos y reales que puedan existir en el catálogo de Alzan; evita marcas, recetas generales y cantidades vagas como “al gusto”.
-- Reutiliza nombres cuando sea el mismo alimento y no superes ${MENU_IMPORT_MAX_UNIQUE_INGREDIENTS} nombres de ingredientes distintos por documento.
+- El CSV es la autoridad del catálogo estático de producción (actualmente contiene aproximadamente 1977 ingredientes). Busca una coincidencia exacta o inequívoca y copia el nombre canónico del CSV; no inventes nombres, IDs ni ingredientes nuevos. El CSV puede tener categoría y unit_basis, pero esos campos no se exportan al JSON.
+- Las categorías estáticas disponibles son bebida, cereal, condimento, dulce, fruta, fruto_seco, grasa, lacteo, legumbre, otro, precocinado, proteina_animal, proteina_vegetal, semilla, snack, tuberculo y verdura. No escribas la categoría en el JSON.
+- El catálogo usa principalmente unit_basis per_100g y los alimentos/recetas se expresan en g o ml; convierte ml a gramos solo con una equivalencia explícita del documento o del CSV.
+- Aunque el CSV o el documento incluyan alias, marcas, recetas, calorías, macros u otros metadatos, ninguno de esos datos tiene un campo en este contrato: no los exportes.
+- Reutiliza el mismo nombre canónico cuando sea el mismo alimento y no superes ${MENU_IMPORT_MAX_UNIQUE_INGREDIENTS} nombres de ingredientes distintos por documento.
 - No superes ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} entradas de ingredientes en total por documento.
 - No inventes calorías, proteínas, hidratos ni grasas en el JSON.
 - No recalcules ni ajustes las raciones para alcanzar un objetivo nutricional: conserva las cantidades del documento.
@@ -70,6 +82,7 @@ VALIDACIÓN FINAL
 - Comprueba que cada día está entre las fechas solicitadas.
 - Comprueba que weekday coincide con date.
 - Comprueba que cada comida tiene al menos un ingrediente y que cada quantity_g es un número positivo.
+- Comprueba que no hay propiedades adicionales y que todos los nombres usados existen de forma inequívoca en el CSV adjunto.
 - Si no hay bloqueos, devuelve solo el JSON siguiendo esta plantilla. Si hay bloqueos, devuelve solo el informe de bloqueos y no un JSON incompleto:
 
 PLANTILLA JSON
