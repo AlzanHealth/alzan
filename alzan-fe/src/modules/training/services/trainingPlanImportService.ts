@@ -25,7 +25,22 @@ import type {
 
 type CreatedTemplate = { family: ImportedTemplateFamily; id: string };
 type TemplateCreationResult = { id: string; created: boolean };
-type TrainingPlanImportOptions = { autoDeleteExpiredTemplates?: boolean };
+export type TrainingPlanImportProgress = {
+  phase: 'preparing' | 'exercises' | 'templates' | 'calendar' | 'complete';
+  percentage: number;
+};
+type TrainingPlanImportOptions = {
+  autoDeleteExpiredTemplates?: boolean;
+  onProgress?: (progress: TrainingPlanImportProgress) => void;
+};
+
+const reportImportProgress = (
+  options: TrainingPlanImportOptions,
+  phase: TrainingPlanImportProgress['phase'],
+  percentage: number,
+): void => {
+  options.onProgress?.({ phase, percentage: Math.max(0, Math.min(100, Math.round(percentage))) });
+};
 
 const getDateRange = (document: TrainingPlanImportDocument): { start: string; end: string } => {
   return {
@@ -580,13 +595,16 @@ export const importTrainingPlan = async (
     startDate: document.start_date,
     endDate: document.end_date,
   });
+  reportImportProgress(options, 'preparing', 4);
   const range = getDateRange(document);
   const families = groupTrainingPlanSessions(document);
+  reportImportProgress(options, 'exercises', 10);
   const resolvedExercises = await resolveExercises(
     families.flatMap(family =>
       family.sport === 'strength' ? family.sessions.flatMap(session => session.exercises ?? []) : [],
     ),
   );
+  reportImportProgress(options, 'exercises', 25);
   await expireTrainingTemplates(userId);
   logTrainingPlanImport('families:grouped', {
     count: families.length,
@@ -635,9 +653,10 @@ export const importTrainingPlan = async (
     existingRunningTemplates = existingRunning.data ?? [];
     existingStrengthTemplates = existingStrength.data ?? [];
   }
+  reportImportProgress(options, 'templates', 35);
   try {
     const templateIdsByFamily = new Map<string, string>();
-    for (const family of families) {
+    for (const [familyIndex, family] of families.entries()) {
       const existingTemplate = findReusableImportedTemplate(
         family.sport === 'running' ? existingRunningTemplates : existingStrengthTemplates,
         family.familyKey,
@@ -664,6 +683,7 @@ export const importTrainingPlan = async (
         else reusedTemplateCount += 1;
         templateIdsByFamily.set(family.familyKey, result.id);
       }
+      reportImportProgress(options, 'templates', 35 + ((familyIndex + 1) / families.length) * 55);
     }
     const requestedPlansWithPossibleDuplicates: WorkoutPlanInsert[] = families.flatMap(family =>
       family.sessions.map(session => ({
@@ -686,6 +706,7 @@ export const importTrainingPlan = async (
     logTrainingPlanImport('plans:upsert', {
       requested: requestedPlans.length,
     });
+    reportImportProgress(options, 'calendar', 94);
     let createdPlanCount = 0;
     if (requestedPlans.length > 0) {
       const { data: insertedPlans, error } = await supabase
@@ -707,6 +728,7 @@ export const importTrainingPlan = async (
       reusedTemplates: reusedTemplateCount,
       createdPlans: createdPlanCount,
     });
+    reportImportProgress(options, 'complete', 100);
     return {
       createdTemplateIds: created.map(item => item.id),
       createdPlanCount,

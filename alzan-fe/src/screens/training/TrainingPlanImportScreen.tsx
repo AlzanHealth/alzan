@@ -59,6 +59,7 @@ export const TrainingPlanImportScreen = () => {
     isAnalyzing,
     analysisProgress,
     isImporting,
+    importProgress,
     canImport,
     analyze,
     importPlan,
@@ -105,6 +106,15 @@ export const TrainingPlanImportScreen = () => {
       [{ text: t('common.ok'), onPress: () => navigation.navigate('TrainingHome') }],
     );
   }, [importPlan, navigation, t]);
+
+  const importProgressLabel =
+    importProgress?.phase === 'exercises'
+      ? t('training.trainingPlanImportExercises')
+      : importProgress?.phase === 'templates'
+        ? t('training.trainingPlanImportTemplates')
+        : importProgress?.phase === 'calendar'
+          ? t('training.trainingPlanImportCalendar')
+          : t('training.trainingPlanImportPreparing');
 
   return (
     <LinearGradient
@@ -226,7 +236,7 @@ export const TrainingPlanImportScreen = () => {
                 style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: canImport ? 1 : 0.45 }]}
               >
                 {isImporting ? (
-                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.primaryButtonText}>{t('training.trainingPlanImporting')}</Text>
                 ) : (
                   <>
                     <Upload size={18} color="#fff" />
@@ -234,6 +244,28 @@ export const TrainingPlanImportScreen = () => {
                   </>
                 )}
               </TouchableOpacity>
+              {isImporting && importProgress ? (
+                <View
+                  style={styles.importProgress}
+                  accessibilityRole="progressbar"
+                  accessibilityValue={{ min: 0, max: 100, now: importProgress.percentage }}
+                >
+                  <View style={styles.importProgressHeader}>
+                    <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>{importProgressLabel}</Text>
+                    <Text style={[styles.progressPercentage, { color: colors.primary }]}>
+                      {importProgress.percentage}%
+                    </Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${importProgress.percentage}%`, backgroundColor: colors.primary },
+                      ]}
+                    />
+                  </View>
+                </View>
+              ) : null}
             </GlassCard>
           )}
         </ScrollView>
@@ -288,6 +320,9 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   progressBlock: { marginTop: 12, gap: 7 },
   progressLabel: { fontSize: 13, fontWeight: '600' },
+  importProgress: { marginTop: 14, gap: 7 },
+  importProgressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  progressPercentage: { fontSize: 13, fontWeight: '800' },
   progressTrack: { height: 8, borderRadius: 8, overflow: 'hidden', backgroundColor: 'rgba(128,128,128,0.18)' },
   progressFill: { height: '100%', borderRadius: 8 },
   previewCard: { padding: 20, borderRadius: 24 },

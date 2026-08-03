@@ -8,6 +8,7 @@ import {
 import {
   importTrainingPlan,
   preflightTrainingPlanExercises,
+  type TrainingPlanImportProgress,
 } from '../modules/training/services/trainingPlanImportService';
 import { analyzeTrainingPlanJson } from '../modules/training/services/trainingPlanImportAnalysis';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +32,7 @@ export const useTrainingPlanImport = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<TrainingPlanImportProgress | null>(null);
 
   const parsed = useMemo(() => (rawJson.trim() ? parseTrainingPlanJson(rawJson) : null), [rawJson]);
   const validationErrors = analysisErrors.length > 0 ? analysisErrors : parsed && !parsed.ok ? parsed.errors : [];
@@ -94,9 +96,11 @@ export const useTrainingPlanImport = () => {
     });
     importInFlightRef.current = true;
     setIsImporting(true);
+    setImportProgress({ phase: 'preparing', percentage: 0 });
     try {
       const result = await importTrainingPlan(user.id, document, {
         autoDeleteExpiredTemplates: settings.autoDeleteExpiredTemplates,
+        onProgress: setImportProgress,
       });
       invalidateTrainingCalendar(queryClient);
       await Promise.all([
@@ -111,6 +115,7 @@ export const useTrainingPlanImport = () => {
     } finally {
       importInFlightRef.current = false;
       setIsImporting(false);
+      setImportProgress(null);
     }
   }, [document, queryClient, settings.autoDeleteExpiredTemplates, user]);
 
@@ -122,6 +127,7 @@ export const useTrainingPlanImport = () => {
     isAnalyzing,
     analysisProgress,
     isImporting,
+    importProgress,
     canImport: !!document && !isAnalyzing && !isImporting,
     analyze,
     importPlan,
