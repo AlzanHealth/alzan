@@ -373,7 +373,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
       setTrainingGoal(goalValue);
 
       setSportType((existingTemplate.sport_type as SportType) || 'running');
-      setEnvironmentType(existingTemplate.environment_type || null);
+      setEnvironmentType(
+        existingTemplate.environment_type || (existingTemplate.sport_type === 'running' ? 'outdoor' : null),
+      );
       setSurface(existingTemplate.surface || null);
       setElevationGain(existingTemplate.elev_gain_m?.toString() || '');
       setPoolType(existingTemplate.pool_type || null);

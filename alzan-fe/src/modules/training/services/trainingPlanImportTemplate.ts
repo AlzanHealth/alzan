@@ -21,7 +21,7 @@ export const buildTrainingPlanImportTemplate = (referenceDate: Date = new Date()
           "sport": "running",
           "name": "Series 6 x 800 m",
           "template_key": "series-800",
-          "workout_goal": "intervals",
+          "workout_goal": "speed",
           "modality": "outdoor",
           "distance_km": 8.5,
           "duration_min": 50,
@@ -47,6 +47,7 @@ export const buildTrainingPlanImportTemplate = (referenceDate: Date = new Date()
           "name": "Fuerza tren inferior",
           "template_key": "lower-body",
           "workout_goal": "strength",
+          "modality": "gym",
           "exercises": [
             { "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rest_seconds": 150 }
           ]
@@ -71,6 +72,8 @@ SALIDA
 - No generes el campo notes en ningún objeto.
 - La raíz solo contiene format, version, plan_name, start_date, end_date y weeks.
 - Cada week solo contiene week_number y sessions. Cada session solo contiene date, weekday, sport, name, template_key, workout_goal, modality, distance_km, duration_min, running_steps y exercises.
+- Cada sesión debe incluir modality y workout_goal. Para running usa siempre modality: outdoor (Exterior). Para strength usa modality: gym (Gimnasio), salvo que el documento indique claramente free_weights, machines, calisthenics, core o mobility.
+- Usa únicamente objetivos del catálogo: running: endurance, speed, tempo_threshold, long_run, recovery o test; strength: hypertrophy, strength, muscular_endurance, technique, mobility o recovery. Convierte aliases como easy_run→endurance, intervals→speed y tempo→tempo_threshold sin cambiar el entrenamiento.
 - Running usa running_steps; strength usa exercises. No mezcles ambos.
 - No generes rpe, rir, rir_min ni rir_max en ninguna parte. Si el DOCX contiene RPE o RIR, omítelo: esos campos no deben aparecer en el JSON de importación.
 - No escribas duration_s, distance_m, target_type, target_min, target_max, progression_key ni children dentro de exercises de strength. Esas propiedades solo pertenecen a running_steps.

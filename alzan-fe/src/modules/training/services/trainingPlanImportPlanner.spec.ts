@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   findReusableImportedTemplate,
   getImportedTemplateScheduledDay,
+  getImportedSessionMetadata,
   groupTrainingPlanSessions,
 } from './trainingPlanImportPlanner';
 import type { TrainingPlanImportDocument } from './trainingPlanImportContract';
@@ -54,10 +55,41 @@ const document: TrainingPlanImportDocument = {
   ],
 };
 
+assert.deepEqual(getImportedSessionMetadata({ sport: 'running', workout_goal: 'intervals' }), {
+  workoutGoal: 'speed',
+  modality: 'outdoor',
+});
+assert.deepEqual(getImportedSessionMetadata({ sport: 'running', workout_goal: 'tempo', modality: 'outdoor' }), {
+  workoutGoal: 'tempo_threshold',
+  modality: 'outdoor',
+});
+assert.deepEqual(getImportedSessionMetadata({ sport: 'strength', workout_goal: 'hypertrophy' }), {
+  workoutGoal: 'hypertrophy',
+  modality: 'gym',
+});
+assert.deepEqual(
+  getImportedSessionMetadata({
+    sport: 'strength',
+    workout_goal: 'strength',
+    modality: 'free_weights',
+  }),
+  { workoutGoal: 'strength', modality: 'free_weights' },
+);
+assert.deepEqual(getImportedSessionMetadata({ sport: 'running', workout_goal: 'Resistencia', modality: 'Exterior' }), {
+  workoutGoal: 'endurance',
+  modality: 'outdoor',
+});
+assert.deepEqual(
+  getImportedSessionMetadata({ sport: 'strength', workout_goal: 'Resistencia muscular', modality: 'Peso libre' }),
+  { workoutGoal: 'muscular_endurance', modality: 'free_weights' },
+);
+
 const groups = groupTrainingPlanSessions(document);
 assert.equal(groups.length, 2);
 assert.equal(groups.find(group => group.sport === 'running')?.sessions.length, 2);
 assert.equal(groups.find(group => group.sport === 'strength')?.sessions.length, 2);
+assert.equal(groups.find(group => group.sport === 'running')?.modality, 'outdoor');
+assert.equal(groups.find(group => group.sport === 'strength')?.modality, 'gym');
 assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'running')!), 1);
 assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'strength')!), 2);
 

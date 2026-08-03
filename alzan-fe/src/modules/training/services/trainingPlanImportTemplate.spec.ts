@@ -18,6 +18,13 @@ assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No generes rpe, rir, rir_min ni 
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No uses target_type: "rpe"'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No escribas duration_s, distance_m'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Cada exercise solo puede usar'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Cada sesión debe incluir modality'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('modality: outdoor'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('modality: gym'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('endurance, speed, tempo_threshold, long_run, recovery o test'));
+assert.ok(
+  TRAINING_PLAN_IMPORT_PROMPT.includes('hypertrophy, strength, muscular_endurance, technique, mobility o recovery'),
+);
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Copia exactamente fechas'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('informe de bloqueo'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('exercise_id'));
@@ -41,7 +48,8 @@ assert.equal(parseTrainingPlanJson(TRAINING_PLAN_IMPORT_TEMPLATE).ok, true);
 assert.ok(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT.includes(TRAINING_PLAN_IMPORT_TEMPLATE));
 assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /CATÁLOGO DE EJERCICIOS DE ALZAN/);
 assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /11111111-1111-4111-8111-111111111111/);
-assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"workout_goal": "intervals"'));
+assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"workout_goal": "speed"'));
+assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"modality": "gym"'));
 
 const datedTemplate = buildTrainingPlanImportTemplate(new Date('2026-07-30T12:00:00+02:00'));
 assert.ok(datedTemplate.includes('"start_date": "2026-08-03"'));

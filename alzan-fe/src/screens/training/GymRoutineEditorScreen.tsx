@@ -75,7 +75,7 @@ export const GymRoutineEditorScreen = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [workoutGoal, setWorkoutGoal] = useState<string | null>(null);
-  const [modality, setModality] = useState<string | null>(null);
+  const [modality, setModality] = useState<string | null>('gym');
   const [currentView, setCurrentView] = useState<'main' | 'builder'>('main');
   const [goalModalVisible, setGoalModalVisible] = useState(false);
   const [modalityModalVisible, setModalityModalVisible] = useState(false);
@@ -210,7 +210,7 @@ export const GymRoutineEditorScreen = () => {
       setExercises(routineData.exercises || []);
       setSupersetLinks(buildSupersetLinksFromExercises(routineData.exercises || []));
       setWorkoutGoal(routineData.workout_goal || null);
-      setModality(routineData.modality || null);
+      setModality(routineData.modality || 'gym');
       setRecurrenceEndDate(lifecycleData.recurrence_end_date || '');
       setAutoDeleteAfterEnd(lifecycleData.auto_delete_after_end ?? trainingSettings.autoDeleteExpiredTemplates);
     }

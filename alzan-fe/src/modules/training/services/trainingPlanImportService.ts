@@ -226,6 +226,7 @@ const createEnduranceTemplate = async (
       base_name: family.name,
       description: first.notes ?? null,
       workout_goal: family.workoutGoal,
+      environment_type: family.modality ?? 'outdoor',
       // A single weekday can be represented by the recurring template and
       // keeps the weekday selected in the editor. Mixed-weekday families stay
       // date-driven so propagation cannot invent sessions.

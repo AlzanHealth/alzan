@@ -302,7 +302,7 @@ export const GymRoutinesListScreen = () => {
                         <Text style={[styles.cardTitle, dynamicStyles.title]}>{routine.base_name}</Text>
                         <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
                           {routine.workout_goal || routine.modality
-                            ? `${routine.workout_goal ? getOptionLabel('strength', routine.workout_goal, 'goal') : ''}${routine.workout_goal && routine.modality ? ' • ' : ''}${routine.modality ? getOptionLabel('strength', routine.modality, 'modality') : ''}`
+                            ? `${routine.workout_goal ? getOptionLabel('strength', routine.workout_goal, 'goal') : ''}${routine.workout_goal ? ' • ' : ''}${getOptionLabel('strength', routine.modality || 'gym', 'modality')}`
                             : routine.description || t('training.noDescription')}
                         </Text>
                         {routine.created_at && (
