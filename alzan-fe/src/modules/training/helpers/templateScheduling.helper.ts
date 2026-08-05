@@ -1,4 +1,4 @@
-import { isValid, parseISO } from 'date-fns';
+import { addDays, format, isSameWeek, isValid, parseISO, startOfWeek } from 'date-fns';
 
 export const isScheduledWeekday = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 6;
@@ -10,3 +10,20 @@ export const isValidIsoDate = (value: unknown): value is string => {
 
 export const resolveOneOffDate = (isRecurring: boolean, date: string | null | undefined): string | null =>
   !isRecurring && isValidIsoDate(date) ? date : null;
+
+const weekStartsOnMonday = { weekStartsOn: 1 as const };
+
+export const getCurrentWeekDateForWeekday = (weekday: number, referenceDate: Date = new Date()): string | null => {
+  if (!isScheduledWeekday(weekday)) return null;
+  const mondayOffset = weekday === 0 ? 6 : weekday - 1;
+  return format(addDays(startOfWeek(referenceDate, weekStartsOnMonday), mondayOffset), 'yyyy-MM-dd');
+};
+
+export const getCurrentWeekdayForDate = (
+  date: string | null | undefined,
+  referenceDate: Date = new Date(),
+): number | null => {
+  if (!isValidIsoDate(date)) return null;
+  const parsedDate = parseISO(date);
+  return isSameWeek(parsedDate, referenceDate, weekStartsOnMonday) ? parsedDate.getDay() : null;
+};

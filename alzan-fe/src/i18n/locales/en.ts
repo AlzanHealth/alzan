@@ -1761,6 +1761,7 @@ const en = {
     setsLabel: 'Sets',
     scheduleDay: 'Schedule day',
     scheduleDate: 'Schedule date',
+    oneOffDateLabel: 'Choose another date',
     oneOffDatePlaceholder: 'Choose a date',
     oneOffDateRequired: 'Choose a date for this one-off workout.',
     confirmAndAdd: 'Confirm and Add',

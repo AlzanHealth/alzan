@@ -77,6 +77,8 @@ import {
 import { fetchEnduranceStepProgressions } from '../../modules/training/services/enduranceProgressionService';
 import { buildEnduranceTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
 import {
+  getCurrentWeekDateForWeekday,
+  getCurrentWeekdayForDate,
   isScheduledWeekday,
   isValidIsoDate,
   resolveOneOffDate,
@@ -371,6 +373,23 @@ export const EnduranceWorkoutBuilderScreen = () => {
     },
     enabled: !!templateId && !!user && existingTemplate?.scheduled_day === null,
   });
+
+  const isImportedDateDrivenTemplate =
+    existingTemplate?.source === 'imported' &&
+    existingTemplate.scheduled_day === null &&
+    !!existingTemplate.recurrence_start_date &&
+    !!existingTemplate.recurrence_end_date;
+  const oneOffWeekday = !isRecurring ? getCurrentWeekdayForDate(oneOffDate) : null;
+
+  const handleScheduleDaysChange = (days: number[]) => {
+    if (!isRecurring) {
+      const selectedDay = days[0];
+      setScheduledDays([]);
+      setOneOffDate(selectedDay === undefined ? null : getCurrentWeekDateForWeekday(selectedDay));
+      return;
+    }
+    setScheduledDays(days);
+  };
 
   const isHydratingEditTemplate =
     isEditMode && (isExistingTemplateLoading || isExistingProgressionsLoading) && !sportType;
@@ -746,12 +765,6 @@ export const EnduranceWorkoutBuilderScreen = () => {
     }
     return '';
   };
-
-  const isImportedDateDrivenTemplate =
-    existingTemplate?.source === 'imported' &&
-    existingTemplate.scheduled_day === null &&
-    !!existingTemplate.recurrence_start_date &&
-    !!existingTemplate.recurrence_end_date;
 
   const getRecurrenceStartDateForSave = (scheduledDay: number | null): string | null => {
     if (!isRecurring) {
@@ -3279,14 +3292,14 @@ export const EnduranceWorkoutBuilderScreen = () => {
               {/* Block 4: Programación */}
               <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                 <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
-                  {(isRecurring ? t('training.scheduleForWeekday') : t('training.scheduleDate')).toUpperCase()}
+                  {t('training.scheduleForWeekday').toUpperCase()}
                 </Text>
                 <View style={{ marginTop: 8 }}>
                   <WeekDaySelector
-                    selectedDays={scheduledDays}
-                    onDaysChange={setScheduledDays}
+                    selectedDays={isRecurring ? scheduledDays : oneOffWeekday === null ? [] : [oneOffWeekday]}
+                    onDaysChange={handleScheduleDaysChange}
                     isRecurring={isRecurring}
-                    showDays={isRecurring}
+                    showDays={!isImportedDateDrivenTemplate}
                     onToggleRecurring={() => {
                       const nextRecurring = !isRecurring;
                       setIsRecurring(nextRecurring);
@@ -3313,8 +3326,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   {!isRecurring && !isImportedDateDrivenTemplate && (
                     <OneOffDateSelector
                       value={oneOffDate}
-                      onChange={setOneOffDate}
-                      label={t('training.scheduleDate')}
+                      onChange={date => {
+                        setScheduledDays([]);
+                        setOneOffDate(date);
+                      }}
+                      label={t('training.oneOffDateLabel')}
                       placeholder={t('training.oneOffDatePlaceholder')}
                     />
                   )}

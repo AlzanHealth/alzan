@@ -58,6 +58,8 @@ import { getDefaultGymExerciseTargets } from '../../modules/training/helpers/gym
 import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { buildGymTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
 import {
+  getCurrentWeekDateForWeekday,
+  getCurrentWeekdayForDate,
   isScheduledWeekday,
   isValidIsoDate,
   resolveOneOffDate,
@@ -96,6 +98,18 @@ export const GymRoutineEditorScreen = () => {
   const [recurrenceStartDate, setRecurrenceStartDate] = useState<string | null>(null);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
   const [autoDeleteAfterEnd, setAutoDeleteAfterEnd] = useState(true);
+  const oneOffWeekday = !isRecurring ? getCurrentWeekdayForDate(oneOffDate) : null;
+
+  const handleScheduleDaysChange = (days: number[]) => {
+    if (!isRecurring) {
+      const selectedDay = days[0];
+      setSelectedDays([]);
+      setOneOffDate(selectedDay === undefined ? null : getCurrentWeekDateForWeekday(selectedDay));
+      return;
+    }
+    setSelectedDays(days);
+  };
+
   const [exercises, setExercises] = useState<RoutineDataExercise[]>([]);
   const [supersetLinks, setSupersetLinks] = useState<Set<number>>(new Set());
   const [helpModalVisible, setHelpModalVisible] = useState(false);
@@ -973,14 +987,12 @@ export const GymRoutineEditorScreen = () => {
 
                 {/* Schedule Day Selector */}
                 <View style={styles.formGroup}>
-                  <Text style={[styles.label, dynamicStyles.sublabel]}>
-                    {isRecurring ? t('training.scheduleDay') : t('training.scheduleDate')}
-                  </Text>
+                  <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.scheduleDay')}</Text>
                   <WeekDaySelector
-                    selectedDays={selectedDays}
-                    onDaysChange={setSelectedDays}
+                    selectedDays={isRecurring ? selectedDays : oneOffWeekday === null ? [] : [oneOffWeekday]}
+                    onDaysChange={handleScheduleDaysChange}
                     isRecurring={isRecurring}
-                    showDays={isRecurring}
+                    showDays={!isImportedDateDrivenTemplate}
                     onToggleRecurring={() => {
                       const nextRecurring = !isRecurring;
                       setIsRecurring(nextRecurring);
@@ -991,8 +1003,11 @@ export const GymRoutineEditorScreen = () => {
                   {!isRecurring && !isImportedDateDrivenTemplate && (
                     <OneOffDateSelector
                       value={oneOffDate}
-                      onChange={setOneOffDate}
-                      label={t('training.scheduleDate')}
+                      onChange={date => {
+                        setSelectedDays([]);
+                        setOneOffDate(date);
+                      }}
+                      label={t('training.oneOffDateLabel')}
                       placeholder={t('training.oneOffDatePlaceholder')}
                     />
                   )}

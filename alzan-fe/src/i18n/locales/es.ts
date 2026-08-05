@@ -1778,6 +1778,7 @@ export default {
     setsLabel: 'Sets',
     scheduleDay: 'Programar día',
     scheduleDate: 'Programar fecha',
+    oneOffDateLabel: 'Elegir otra fecha',
     oneOffDatePlaceholder: 'Elegir fecha',
     oneOffDateRequired: 'Elige una fecha para este entrenamiento de un solo día.',
     confirmAndAdd: 'Confirmar y Añadir',
