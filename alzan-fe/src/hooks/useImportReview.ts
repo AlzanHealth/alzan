@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ActivityImportReview } from '../openapi/generated/alzan-be/sdk.gen';
 import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
+import { buildTemplateAssociationPayload } from '../modules/training/helpers/templateAssociation.helper';
 
 interface ReviewActionTarget {
   targetSessionId?: string;
@@ -50,15 +51,31 @@ export const useImportReview = (sessionId?: string) => {
       workoutPlanId?: string;
     } & ReviewActionTarget) => {
       if (!sessionId) throw new Error('SESSION_REQUIRED');
+      const hasEnduranceTemplate = enduranceTemplateId != null;
+      const hasWorkoutTemplate = workoutTemplateId != null;
+      if (hasEnduranceTemplate && hasWorkoutTemplate) {
+        throw new Error('IMPORT_REVIEW_TEMPLATE_INPUT_INVALID');
+      }
+      const associationPayload =
+        hasEnduranceTemplate || hasWorkoutTemplate
+          ? buildTemplateAssociationPayload({
+              sport: hasWorkoutTemplate ? 'strength' : 'running',
+              templateId: hasWorkoutTemplate ? workoutTemplateId : enduranceTemplateId,
+              workoutPlanId,
+            })
+          : {
+              endurance_template_id: null,
+              workout_template_id: null,
+              workout_plan_id: workoutPlanId,
+            };
+      if (!associationPayload) {
+        console.warn('Skipping template association with a non-UUID template id');
+        throw new Error('IMPORT_REVIEW_TEMPLATE_ID_INVALID');
+      }
       return run(
         ActivityImportReview.associateTemplate({
           path: { id: sessionId },
-          body: {
-            endurance_template_id: enduranceTemplateId ?? null,
-            workout_template_id: workoutTemplateId ?? null,
-            workout_plan_id: workoutPlanId,
-            target_session_id: targetSessionId,
-          },
+          body: { ...associationPayload, target_session_id: targetSessionId },
         }),
       );
     },

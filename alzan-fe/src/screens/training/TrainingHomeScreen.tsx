@@ -55,6 +55,7 @@ import { moveWorkoutPlan } from '../../modules/training/services/trainingResched
 import { ActivityImportReview } from '../../openapi/generated/alzan-be/sdk.gen';
 import { matchPlansToCompletedSessions } from './helpers/dailyPlanSessionMerge.helper';
 import { invalidateTrainingCalendar } from '../../lib/trainingQueryKeys';
+import { buildTemplateAssociationPayload } from '../../modules/training/helpers/templateAssociation.helper';
 
 interface DailyEntry {
   id: string;
@@ -189,12 +190,19 @@ export const TrainingHomeScreen = () => {
       enduranceTemplateId: string;
       workoutPlanId: string;
     }): Promise<string> => {
+      const associationPayload = buildTemplateAssociationPayload({
+        sport: 'running',
+        templateId: enduranceTemplateId,
+        workoutPlanId,
+      });
+      if (!associationPayload) {
+        console.warn('Skipping calendar association with a non-UUID endurance template id');
+        throw new Error('IMPORT_REVIEW_TEMPLATE_ID_INVALID');
+      }
       const { data } = await ActivityImportReview.associateTemplate({
         path: { id: sessionId },
         body: {
-          endurance_template_id: enduranceTemplateId,
-          workout_template_id: null,
-          workout_plan_id: workoutPlanId,
+          ...associationPayload,
         },
       });
       if (!data?.session_id) throw new Error('IMPORT_REVIEW_ACTION_FAILED');
@@ -593,14 +601,14 @@ export const TrainingHomeScreen = () => {
         isExtraSession: true, // Marker for deletion logic (cannot delete from calendar)
 
         // Fields for render logic
-        gym_template_id: isGym ? s.workout_template_id || 'dummy' : null,
-        endurance_template_id: !isGym ? 'dummy' : null,
+        gym_template_id: isGym ? s.workout_template_id : null,
+        endurance_template_id: !isGym ? s.endurance_template_id : null,
         isGym,
 
         // Mapped Template Data
         workout_templates: isGym
           ? {
-              id: 'dummy',
+              id: s.workout_template_id ?? '',
               base_name: s.name,
               description: t('training.sessionCompleted'),
               sport_type: 'gym',
@@ -609,7 +617,7 @@ export const TrainingHomeScreen = () => {
 
         endurance_workout_templates: !isGym
           ? {
-              id: 'dummy',
+              id: s.endurance_template_id ?? '',
               base_name: s.name,
               description: `${
                 s.distance_m
