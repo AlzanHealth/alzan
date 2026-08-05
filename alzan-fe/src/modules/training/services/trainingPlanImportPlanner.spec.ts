@@ -90,8 +90,8 @@ assert.equal(groups.find(group => group.sport === 'running')?.sessions.length, 2
 assert.equal(groups.find(group => group.sport === 'strength')?.sessions.length, 2);
 assert.equal(groups.find(group => group.sport === 'running')?.modality, 'outdoor');
 assert.equal(groups.find(group => group.sport === 'strength')?.modality, 'gym');
-assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'running')!), 1);
-assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'strength')!), 2);
+assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'running')!), null);
+assert.equal(getImportedTemplateScheduledDay(groups.find(group => group.sport === 'strength')!), null);
 
 const structuralDocument: TrainingPlanImportDocument = {
   ...document,
@@ -121,7 +121,7 @@ const structuralDocument: TrainingPlanImportDocument = {
   ],
 };
 assert.equal(groupTrainingPlanSessions(structuralDocument).length, 1);
-assert.equal(getImportedTemplateScheduledDay(groupTrainingPlanSessions(structuralDocument)[0]), 1);
+assert.equal(getImportedTemplateScheduledDay(groupTrainingPlanSessions(structuralDocument)[0]), null);
 
 const weekdayDates = [
   ['2026-08-02', 0],
@@ -132,7 +132,7 @@ const weekdayDates = [
   ['2026-08-07', 5],
   ['2026-08-08', 6],
 ] as const;
-for (const [date, expectedDay] of weekdayDates) {
+for (const [date] of weekdayDates) {
   assert.equal(
     getImportedTemplateScheduledDay({
       familyKey: 'test',
@@ -143,7 +143,7 @@ for (const [date, expectedDay] of weekdayDates) {
       sessions: [{ date, sport: 'running', name: 'Test' }],
       signature: 'test',
     }),
-    expectedDay,
+    null,
   );
 }
 

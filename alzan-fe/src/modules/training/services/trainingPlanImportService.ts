@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabaseClient';
-import type { EnduranceWorkoutTemplateProgressionInsert, WorkoutPlanInsert } from '../../../types/requests.types';
+import type { EnduranceWorkoutTemplateProgressionInsert } from '../../../types/requests.types';
 import { getProgressionWeekIndex, type StepProgressionOverride } from '../helpers/enduranceProgression.helper';
 import { replaceEnduranceStepProgressions } from './enduranceProgressionService';
 import { expireTrainingTemplates } from './templateLifecycleService';
@@ -11,6 +11,7 @@ import {
   type ImportedTemplateFamily,
 } from './trainingPlanImportPlanner';
 import { logTrainingPlanImport, logTrainingPlanImportError } from './trainingPlanImportLogger';
+import { buildImportedWorkoutPlans } from './trainingPlanImportCalendar.helper';
 import { toImportedProgressionKey } from './trainingPlanImportProgressionKey';
 import {
   getTrainingExerciseResolutionKey,
@@ -242,9 +243,8 @@ const createEnduranceTemplate = async (
       description: first.notes ?? null,
       workout_goal: family.workoutGoal,
       environment_type: family.modality ?? 'outdoor',
-      // A single weekday can be represented by the recurring template and
-      // keeps the weekday selected in the editor. Mixed-weekday families stay
-      // date-driven so propagation cannot invent sessions.
+      // Imported calendar entries are created from the exact JSON dates below.
+      // Never turn an imported family into a recurrence implicitly.
       scheduled_day: null,
       recurrence_start_date: range.start,
       recurrence_end_date: range.end,
@@ -685,24 +685,7 @@ export const importTrainingPlan = async (
       }
       reportImportProgress(options, 'templates', 35 + ((familyIndex + 1) / families.length) * 55);
     }
-    const requestedPlansWithPossibleDuplicates: WorkoutPlanInsert[] = families.flatMap(family =>
-      family.sessions.map(session => ({
-        user_id: userId,
-        planned_date: session.date,
-        status: 'planned',
-        notes: session.notes ?? null,
-        import_dedupe_key: `training-plan-v1:${session.date}:${family.familyKey}`,
-        ...(family.sport === 'running'
-          ? { endurance_template_id: templateIdsByFamily.get(family.familyKey) }
-          : { gym_template_id: templateIdsByFamily.get(family.familyKey) }),
-      })),
-    );
-    const requestedPlansByDateAndTemplate = new Map<string, WorkoutPlanInsert>();
-    requestedPlansWithPossibleDuplicates.forEach(plan => {
-      const templateId = plan.gym_template_id ?? plan.endurance_template_id;
-      if (templateId) requestedPlansByDateAndTemplate.set(`${plan.planned_date}:${templateId}`, plan);
-    });
-    const requestedPlans = [...requestedPlansByDateAndTemplate.values()];
+    const requestedPlans = buildImportedWorkoutPlans(userId, families, templateIdsByFamily);
     logTrainingPlanImport('plans:upsert', {
       requested: requestedPlans.length,
     });
