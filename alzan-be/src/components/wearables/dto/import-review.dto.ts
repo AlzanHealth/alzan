@@ -5,17 +5,17 @@ import { IsOptional, IsUUID } from 'class-validator';
 export class TemplateAssociationInputDto {
   @ApiPropertyOptional({ name: 'endurance_template_id', format: 'uuid', nullable: true })
   @IsOptional()
-  @IsUUID()
+  @IsUUID('loose')
   endurance_template_id?: string | null;
 
   @ApiPropertyOptional({ name: 'workout_template_id', format: 'uuid', nullable: true })
   @IsOptional()
-  @IsUUID()
+  @IsUUID('loose')
   workout_template_id?: string | null;
 
   @ApiPropertyOptional({ name: 'workout_plan_id', format: 'uuid' })
   @IsOptional()
-  @IsUUID()
+  @IsUUID('loose')
   workout_plan_id?: string;
 
   @ApiPropertyOptional({ name: 'target_session_id', format: 'uuid' })
