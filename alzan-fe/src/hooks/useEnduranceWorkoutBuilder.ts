@@ -14,6 +14,10 @@ import {
 } from '../modules/training/services/enduranceProgressionService';
 import { buildUserEditedTemplateIdentity } from '../modules/training/helpers/templateEditorIdentity.helper';
 import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
+import {
+  removeOneOffTrainingPlans,
+  syncOneOffTrainingPlan,
+} from '../modules/training/services/oneOffTrainingPlanService';
 
 export interface BuilderStep {
   id: string; // temp or real id
@@ -43,6 +47,8 @@ export interface BuilderTemplateData {
   total_duration_s?: number;
   total_distance_m?: number;
   scheduled_day?: number | null; // 0 = Sunday, 1 = Monday, etc.
+  one_off_date?: string | null;
+  remove_one_off_plan?: boolean;
   recurrence_start_date?: string | null;
   recurrence_end_date?: string | null;
   auto_delete_after_end?: boolean;
@@ -263,6 +269,17 @@ export const useEnduranceWorkoutBuilder = () => {
           templateId: finalTemplateId,
           recurrenceEndDate: data.recurrence_end_date,
         });
+
+        if (data.one_off_date) {
+          await syncOneOffTrainingPlan({
+            userId: user.id,
+            templateId: finalTemplateId,
+            plannedDate: data.one_off_date,
+            kind: 'endurance',
+          });
+        } else if (data.remove_one_off_plan) {
+          await removeOneOffTrainingPlans({ userId: user.id, templateId: finalTemplateId, kind: 'endurance' });
+        }
         console.log('[useEnduranceWorkoutBuilder.save] Éxito - todos los pasos insertados');
 
         return { id: finalTemplateId };

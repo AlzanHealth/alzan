@@ -36,6 +36,7 @@ import { EnduranceStepEditorModal } from './components/EnduranceStepEditorModal'
 import { HyroxStepEditorModal } from './components/HyroxStepEditorModal';
 import { EnduranceTemplateSummaryPanel } from './components/EnduranceTemplateSummaryPanel';
 import { WeekDaySelector } from '../../components/training/WeekDaySelector';
+import { OneOffDateSelector } from '../../components/training/OneOffDateSelector';
 import { RepetitionsSelectorModal } from './components/RepetitionsSelectorModal';
 import { useEnduranceWorkoutBuilder, BuilderStep } from '../../hooks/useEnduranceWorkoutBuilder';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
@@ -75,7 +76,12 @@ import {
 } from '../../modules/training/helpers/enduranceProgression.helper';
 import { fetchEnduranceStepProgressions } from '../../modules/training/services/enduranceProgressionService';
 import { buildEnduranceTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
-import { isScheduledWeekday } from '../../modules/training/helpers/templateScheduling.helper';
+import {
+  isScheduledWeekday,
+  isValidIsoDate,
+  resolveOneOffDate,
+} from '../../modules/training/helpers/templateScheduling.helper';
+import { getOneOffTrainingPlanDate } from '../../modules/training/services/oneOffTrainingPlanService';
 
 interface Step {
   id: string; // temp id
@@ -190,6 +196,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [scheduledDays, setScheduledDays] = useState<number[]>([]);
   const [originalScheduledDay, setOriginalScheduledDay] = useState<number | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [oneOffDate, setOneOffDate] = useState<string | null>(null);
   const [recurrenceStartDate, setRecurrenceStartDate] = useState<string | null>(null);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<string>('');
   const [recurrenceWeeks, setRecurrenceWeeks] = useState<string>('');
@@ -356,6 +363,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
     enabled: !!templateId,
   });
 
+  const { data: existingOneOffPlanDate = null } = useQuery({
+    queryKey: ['enduranceTemplateOneOffPlan', templateId, user?.id],
+    queryFn: async () => {
+      if (!templateId || !user) return null;
+      return getOneOffTrainingPlanDate({ userId: user.id, templateId, kind: 'endurance' });
+    },
+    enabled: !!templateId && !!user && existingTemplate?.scheduled_day === null,
+  });
+
   const isHydratingEditTemplate =
     isEditMode && (isExistingTemplateLoading || isExistingProgressionsLoading) && !sportType;
 
@@ -426,6 +442,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         setOriginalScheduledDay(null);
       }
       setIsRecurring(isScheduledWeekday(existingTemplate.scheduled_day));
+      setOneOffDate(null);
       setRecurrenceStartDate(existingTemplate.recurrence_start_date || null);
       setRecurrenceEndDate(existingTemplate.recurrence_end_date || '');
       const lifecycleData = existingTemplate as unknown as {
@@ -507,6 +524,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
     isExistingProgressionsLoading,
     trainingSettings.autoDeleteExpiredTemplates,
   ]);
+
+  useEffect(() => {
+    if (isEditMode) setOneOffDate(existingOneOffPlanDate);
+  }, [existingOneOffPlanDate, isEditMode]);
 
   // Progression rows are stored separately from the step tree. Reconcile them
   // whenever steps are edited so deleted steps cannot keep overriding the
@@ -726,6 +747,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return '';
   };
 
+  const isImportedDateDrivenTemplate =
+    existingTemplate?.source === 'imported' &&
+    existingTemplate.scheduled_day === null &&
+    !!existingTemplate.recurrence_start_date &&
+    !!existingTemplate.recurrence_end_date;
+
   const getRecurrenceStartDateForSave = (scheduledDay: number | null): string | null => {
     if (!isRecurring) {
       // Imported plans with several weekdays are date-driven rather than
@@ -758,7 +785,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   const executeSave = async (detachFromImport = false) => {
     try {
-      const isOneOff = !isRecurring && scheduledDays.length > 0;
+      const savedOneOffDate = isImportedDateDrivenTemplate ? null : resolveOneOffDate(isRecurring, oneOffDate);
+      const isOneOff = !isRecurring && !!savedOneOffDate && !isImportedDateDrivenTemplate;
       const templateScheduledDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
       const recurrenceStartDateForSave = getRecurrenceStartDateForSave(templateScheduledDay);
       const recurrenceEndDateForSave = getValidatedRecurrenceEndDate();
@@ -771,7 +799,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
       const finalGoal = trainingGoal;
 
-      const result = await saveWorkout.mutateAsync({
+      await saveWorkout.mutateAsync({
         data: {
           base_name: name,
           description,
@@ -785,6 +813,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 : (parseInt(manualDuration) || 0) * 60,
           total_distance_m: Math.round(totalDistance),
           scheduled_day: templateScheduledDay,
+          one_off_date: savedOneOffDate,
+          remove_one_off_plan:
+            isRecurring &&
+            isEditMode &&
+            !isImportedDateDrivenTemplate &&
+            existingTemplate?.scheduled_day === null &&
+            !!existingOneOffPlanDate,
           recurrence_start_date: recurrenceStartDateForSave,
           recurrence_end_date: recurrenceEndDateForSave,
           auto_delete_after_end: autoDeleteAfterEnd,
@@ -857,33 +892,14 @@ export const EnduranceWorkoutBuilderScreen = () => {
         templateId: templateId,
       });
 
-      if (isOneOff && user) {
-        for (const day of scheduledDays) {
-          let targetDate = new Date();
-          for (let i = 0; i < 7; i++) {
-            if (targetDate.getDay() === day) break;
-            targetDate = addDays(targetDate, 1);
-          }
-          const formattedDate = format(targetDate, 'yyyy-MM-dd');
-
-          const { error: planError } = await supabase.from('workout_plans').insert({
-            user_id: user.id,
-            planned_date: formattedDate,
-            endurance_template_id: result.id,
-          });
-
-          if (planError) {
-            console.error(`Error creating one-off plan for day ${day}:`, planError);
-          }
-        }
-      }
-
-      const scheduledDayNames = scheduledDays.map(d => getWeekdayName(d)).join(', ');
+      const scheduledDateLabel = savedOneOffDate
+        ? format(new Date(`${savedOneOffDate}T00:00:00`), 'dd/MM/yyyy', { locale: getDateFnsLocale() })
+        : '';
 
       Alert.alert(
         isEditMode ? t('training.updatedTitle') : t('training.savedTitle'),
         isOneOff
-          ? t('training.workoutSavedAndScheduledFor', { days: scheduledDayNames })
+          ? t('training.workoutSavedAndScheduledOn', { date: scheduledDateLabel })
           : isEditMode
             ? t('training.workoutUpdatedSuccessfully')
             : t('training.workoutSavedSuccessfully'),
@@ -936,6 +952,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
     if (isRecurring && scheduledDays.length === 0) {
       Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
+      return;
+    }
+
+    if (!isRecurring && !isImportedDateDrivenTemplate && !isValidIsoDate(oneOffDate)) {
+      Alert.alert(t('common.error'), t('training.oneOffDateRequired'));
       return;
     }
 
@@ -2056,6 +2077,14 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const renderTemplateSummary = (selectedSport: SportType, showEditorAction = true, compact = false) => {
     const formattedDistance = convertDistanceToUi(totalDistance, 2);
     const scheduledDayNames = scheduledDays.map(day => getWeekdayName(day)).join(', ');
+    const scheduleLabel =
+      !isRecurring && isValidIsoDate(oneOffDate)
+        ? t('training.plannedForDate', {
+            date: format(new Date(`${oneOffDate}T00:00:00`), 'dd/MM/yyyy', { locale: getDateFnsLocale() }),
+          })
+        : scheduledDayNames
+          ? t('training.plannedForDays', { days: scheduledDayNames })
+          : undefined;
     const structuredDurationLabel =
       sportType === HYROX_SPORT_TYPE && totalDuration <= 0
         ? `${parseInt(manualDuration, 10) || 0} min`
@@ -2071,7 +2100,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
           getOptions(selectedSport, 'modality').length > 0 ? getEnvironmentDisplayLabel(environmentType) : undefined
         }
         surfaceLabel={getOptions(selectedSport, 'terrain').length > 0 ? getSurfaceDisplayLabel(surface) : undefined}
-        scheduleLabel={scheduledDayNames ? t('training.plannedForDays', { days: scheduledDayNames }) : undefined}
+        scheduleLabel={scheduleLabel}
         durationLabel={structuredSport ? structuredDurationLabel : `${parseInt(manualDuration, 10) || 0} min`}
         distanceLabel={structuredSport ? `${formattedDistance.value} ${formattedDistance.unit}` : undefined}
         phaseSummary={
@@ -3250,17 +3279,19 @@ export const EnduranceWorkoutBuilderScreen = () => {
               {/* Block 4: Programación */}
               <GlassCard style={[styles.formBlock, dynamicStyles.card]}>
                 <Text style={[styles.blockTitle, { color: themeColors.textSecondary }]}>
-                  {t('training.scheduleForWeekday').toUpperCase()}
+                  {(isRecurring ? t('training.scheduleForWeekday') : t('training.scheduleDate')).toUpperCase()}
                 </Text>
                 <View style={{ marginTop: 8 }}>
                   <WeekDaySelector
                     selectedDays={scheduledDays}
                     onDaysChange={setScheduledDays}
                     isRecurring={isRecurring}
+                    showDays={isRecurring}
                     onToggleRecurring={() => {
                       const nextRecurring = !isRecurring;
                       setIsRecurring(nextRecurring);
                       if (!nextRecurring) {
+                        setScheduledDays([]);
                         setRecurrenceWeeks('');
                         const isImportedDateDrivenTemplate =
                           existingTemplate?.source === 'imported' &&
@@ -3278,6 +3309,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     }}
                     singleSelect={true}
                   />
+
+                  {!isRecurring && !isImportedDateDrivenTemplate && (
+                    <OneOffDateSelector
+                      value={oneOffDate}
+                      onChange={setOneOffDate}
+                      label={t('training.scheduleDate')}
+                      placeholder={t('training.oneOffDatePlaceholder')}
+                    />
+                  )}
 
                   {isRecurring && (
                     <>

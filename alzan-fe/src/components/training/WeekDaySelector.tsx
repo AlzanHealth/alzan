@@ -12,6 +12,7 @@ interface WeekDaySelectorProps {
   recurringLabel?: string;
   readOnly?: boolean;
   singleSelect?: boolean;
+  showDays?: boolean;
 }
 
 export const WeekDaySelector = ({
@@ -22,6 +23,7 @@ export const WeekDaySelector = ({
   recurringLabel = 'Repetir todas las semanas',
   readOnly = false,
   singleSelect = false,
+  showDays = true,
 }: WeekDaySelectorProps) => {
   const { colors: themeColors, isDark } = useTrainingStyles();
   const { width } = useWindowDimensions();
@@ -69,46 +71,48 @@ export const WeekDaySelector = ({
 
   return (
     <View style={styles.container}>
-      <View style={[styles.daysRow, { gap: rowGap }]}>
-        {days.map(day => {
-          const isSelected = selectedDays.includes(day.value);
-          return (
-            <TouchableOpacity
-              key={day.value}
-              style={[
-                styles.dayChip,
-                {
-                  width: chipSize,
-                  height: chipSize,
-                  borderRadius: chipSize / 2,
-                },
-                isSelected && styles.activeDayChip,
-                !isSelected && {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                  borderColor: themeColors.border,
-                },
-                isSelected && {
-                  backgroundColor: themeColors.primary,
-                  borderColor: themeColors.primary,
-                },
-              ]}
-              onPress={() => handleDayPress(day.value)}
-              disabled={readOnly}
-            >
-              <Text
+      {showDays && (
+        <View style={[styles.daysRow, { gap: rowGap }]}>
+          {days.map(day => {
+            const isSelected = selectedDays.includes(day.value);
+            return (
+              <TouchableOpacity
+                key={day.value}
                 style={[
-                  styles.dayChipText,
-                  { fontSize: chipFontSize },
-                  isSelected && styles.activeDayChipText,
-                  !isSelected && { color: themeColors.textSecondary },
+                  styles.dayChip,
+                  {
+                    width: chipSize,
+                    height: chipSize,
+                    borderRadius: chipSize / 2,
+                  },
+                  isSelected && styles.activeDayChip,
+                  !isSelected && {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                    borderColor: themeColors.border,
+                  },
+                  isSelected && {
+                    backgroundColor: themeColors.primary,
+                    borderColor: themeColors.primary,
+                  },
                 ]}
+                onPress={() => handleDayPress(day.value)}
+                disabled={readOnly}
               >
-                {day.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                <Text
+                  style={[
+                    styles.dayChipText,
+                    { fontSize: chipFontSize },
+                    isSelected && styles.activeDayChipText,
+                    !isSelected && { color: themeColors.textSecondary },
+                  ]}
+                >
+                  {day.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {onToggleRecurring && (
         <TouchableOpacity style={styles.repeatToggleContainer} onPress={onToggleRecurring} disabled={readOnly}>
