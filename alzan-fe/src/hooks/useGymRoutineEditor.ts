@@ -10,6 +10,7 @@ import {
 } from '../services/localization';
 import { Exercise, WorkoutTemplateExercise } from '../types/requests.types';
 import { buildUserEditedTemplateIdentity } from '../modules/training/helpers/templateEditorIdentity.helper';
+import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 import {
   buildStrengthExerciseReconciliationPlan,
   buildStrengthProgressionTargetPatch,
@@ -393,9 +394,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['gymRoutines'] });
       if (routineId) queryClient.invalidateQueries({ queryKey: ['routine', routineId] });
 
-      // Fix keys to match TrainingHomeScreen
-      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+      invalidateTrainingCalendar(queryClient);
     },
   });
 

@@ -66,6 +66,7 @@ import {
   calculateStartDateFromEndAndWeeks,
   EligibleProgressionStep,
   ensureStepProgressionKeys,
+  filterStepProgressionsBySteps,
   getEligibleProgressionSteps,
   getNextScheduledDateString,
   normalizeStepProgressions,
@@ -507,6 +508,18 @@ export const EnduranceWorkoutBuilderScreen = () => {
     trainingSettings.autoDeleteExpiredTemplates,
   ]);
 
+  // Progression rows are stored separately from the step tree. Reconcile them
+  // whenever steps are edited so deleted steps cannot keep overriding the
+  // values shown in the builder or the calendar preview.
+  useEffect(() => {
+    if (steps.length === 0) return;
+
+    setStepProgressions(previous => {
+      const current = filterStepProgressionsBySteps(steps, previous);
+      return current.length === previous.length ? previous : current;
+    });
+  }, [steps]);
+
   const poolTypeOptions = sportType ? getOptions(sportType, 'pool_type') : [];
   const strokeOptions = sportType ? getOptions(sportType, 'stroke') : [];
   const climbingGradeOptions = sportType ? getOptions(sportType, 'climbing_grade') : [];
@@ -714,7 +727,18 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const getRecurrenceStartDateForSave = (scheduledDay: number | null): string | null => {
-    if (!isRecurring) return recurrenceStartDate || null;
+    if (!isRecurring) {
+      // Imported plans with several weekdays are date-driven rather than
+      // weekly templates. Preserve their range; a manually created one-off
+      // must never retain a stale recurrence start date.
+      const isImportedDateDrivenTemplate =
+        existingTemplate?.source === 'imported' &&
+        existingTemplate.scheduled_day === null &&
+        !!existingTemplate.recurrence_start_date &&
+        !!existingTemplate.recurrence_end_date;
+
+      return isImportedDateDrivenTemplate ? recurrenceStartDate || existingTemplate.recurrence_start_date : null;
+    }
     if (scheduledDay === null) return null;
     if (recurrenceStartDate) {
       return recurrenceStartDate;
@@ -826,7 +850,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
           notes: sportType === 'football' ? notes : null,
         },
         steps: stepsWithProgressionKeys as BuilderStep[],
-        progressions: recurrenceEndDateForSave ? stepProgressions : [],
+        progressions:
+          recurrenceStartDateForSave && recurrenceEndDateForSave
+            ? filterStepProgressionsBySteps(stepsWithProgressionKeys, stepProgressions)
+            : [],
         templateId: templateId,
       });
 
@@ -3235,7 +3262,12 @@ export const EnduranceWorkoutBuilderScreen = () => {
                       setIsRecurring(nextRecurring);
                       if (!nextRecurring) {
                         setRecurrenceWeeks('');
-                        if (!isEditMode) {
+                        const isImportedDateDrivenTemplate =
+                          existingTemplate?.source === 'imported' &&
+                          existingTemplate.scheduled_day === null &&
+                          !!existingTemplate.recurrence_start_date &&
+                          !!existingTemplate.recurrence_end_date;
+                        if (!isEditMode || !isImportedDateDrivenTemplate) {
                           setRecurrenceStartDate(null);
                           setStepProgressions([]);
                         }

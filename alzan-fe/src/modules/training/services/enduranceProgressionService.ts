@@ -9,6 +9,7 @@ import {
 import {
   applyProgressionsToSteps,
   applyTemplateSummaryProgression,
+  filterStepProgressionsBySteps,
   getProgressionWeekIndex,
   normalizeStepProgressions,
   StepProgressionOverride,
@@ -128,7 +129,7 @@ export const applyProgressionsForPlannedDate = (
   const weekIndex = getProgressionWeekIndex(template.recurrence_start_date, plannedDate);
   if (weekIndex < 1) return steps;
 
-  return applyProgressionsToSteps(steps, weekIndex, progressions);
+  return applyProgressionsToSteps(steps, weekIndex, filterStepProgressionsBySteps(steps, progressions));
 };
 
 export const applyTemplateProgressionForPlannedDate = <TTemplate extends EnduranceWorkoutTemplate>(

@@ -4,6 +4,7 @@ import {
   applyTemplateSummaryProgression,
   calculateProgressionWeeks,
   createProgressionKey,
+  filterStepProgressionsBySteps,
   getEligibleProgressionSteps,
   getNextScheduledDateString,
   getProgressionWeekIndex,
@@ -197,6 +198,43 @@ assert.deepEqual(normalized, [
     target_max: 270,
   },
 ]);
+
+const nestedProgressionSteps: ProgressionBuilderStep[] = [
+  {
+    id: 'current-work',
+    progression_key: 'current-work-key',
+    phase_type: 'interval',
+    duration_type: 'distance',
+    distance_m: 2000,
+    target_type: 'pace',
+    repetitions: 1,
+    is_group: false,
+    children: [
+      {
+        id: 'current-recovery',
+        progression_key: 'current-recovery-key',
+        phase_type: 'recovery',
+        duration_type: 'time',
+        duration_s: 120,
+        target_type: 'none',
+        repetitions: 1,
+        is_group: false,
+      },
+    ],
+  },
+];
+
+assert.deepEqual(
+  filterStepProgressionsBySteps(nestedProgressionSteps, [
+    { progression_key: 'current-work-key', week_index: 1, target_min: 300 },
+    { progression_key: 'current-recovery-key', week_index: 1, duration_s: 90 },
+    { progression_key: 'deleted-step-key', week_index: 1, target_min: 240 },
+  ]),
+  [
+    { progression_key: 'current-work-key', week_index: 1, target_min: 300 },
+    { progression_key: 'current-recovery-key', week_index: 1, duration_s: 90 },
+  ],
+);
 
 const progressedSteps = applyProgressionsToSteps(baseSteps, 1, normalized);
 assert.equal(progressedSteps[1].target_min, 270);

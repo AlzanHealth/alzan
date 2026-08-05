@@ -4,12 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import { propagateTrainingPlans } from '../modules/training/services/trainingCopyService';
 import { DurationType, PhaseType, SportType, TargetType } from '../types/requests.types';
 import { Database } from '../types/database.types';
-import { StepProgressionOverride } from '../modules/training/helpers/enduranceProgression.helper';
+import {
+  filterStepProgressionsBySteps,
+  StepProgressionOverride,
+} from '../modules/training/helpers/enduranceProgression.helper';
 import {
   deleteFuturePlansOutsideEnduranceRecurrence,
   replaceEnduranceStepProgressions,
 } from '../modules/training/services/enduranceProgressionService';
 import { buildUserEditedTemplateIdentity } from '../modules/training/helpers/templateEditorIdentity.helper';
+import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 
 export interface BuilderStep {
   id: string; // temp or real id
@@ -249,7 +253,11 @@ export const useEnduranceWorkoutBuilder = () => {
         };
 
         await processSteps(steps);
-        await replaceEnduranceStepProgressions(finalTemplateId, data.recurrence_end_date ? progressions || [] : []);
+        const currentStepProgressions = filterStepProgressionsBySteps(steps, progressions || []);
+        await replaceEnduranceStepProgressions(
+          finalTemplateId,
+          data.recurrence_start_date && data.recurrence_end_date ? currentStepProgressions : [],
+        );
         await deleteFuturePlansOutsideEnduranceRecurrence({
           userId: user.id,
           templateId: finalTemplateId,
@@ -276,11 +284,8 @@ export const useEnduranceWorkoutBuilder = () => {
       queryClient.invalidateQueries({ queryKey: ['enduranceTemplate'] });
       queryClient.invalidateQueries({ queryKey: ['enduranceTemplateProgressions'] });
 
-      // Fix keys to match TrainingHomeScreen
-      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+      invalidateTrainingCalendar(queryClient);
       queryClient.invalidateQueries({ queryKey: ['scheduledTemplates'] });
-      queryClient.invalidateQueries({ queryKey: ['scheduledWorkoutPreview'] });
     },
   });
 

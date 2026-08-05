@@ -138,6 +138,30 @@ export const ensureStepProgressionKeys = <TStep extends ProgressionBuilderStep>(
     return nextStep;
   }) as TStep[];
 
+/**
+ * Removes overrides that point to steps no longer present in the template.
+ *
+ * Step rows are replaced atomically when a template is edited, while their
+ * progression rows are stored separately. Keeping an override for a deleted
+ * step allows the same key to leak old targets into the calendar preview.
+ */
+export const filterStepProgressionsBySteps = <TStep extends ProgressionBuilderStep>(
+  steps: TStep[],
+  progressions: StepProgressionOverride[],
+): StepProgressionOverride[] => {
+  const currentProgressionKeys = new Set<string>();
+
+  const collectKeys = (stepList: ProgressionBuilderStep[]) => {
+    stepList.forEach(step => {
+      if (step.progression_key) currentProgressionKeys.add(step.progression_key);
+      if (step.children) collectKeys(step.children);
+    });
+  };
+
+  collectKeys(steps);
+  return progressions.filter(progression => currentProgressionKeys.has(progression.progression_key));
+};
+
 const isEligibleStep = (step: ProgressionBuilderStep, sportType: SportType): boolean => {
   if (!step.progression_key) return false;
 
