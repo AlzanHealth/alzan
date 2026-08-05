@@ -493,6 +493,7 @@ export type Database = {
           surface: string | null;
           template_match_method: Database['public']['Enums']['import_match_method_enum'] | null;
           template_match_score: number | null;
+          template_name_state: Json | null;
           template_suggestion_deferred_at: string | null;
           timezone: string | null;
           total_reps: number | null;
@@ -577,6 +578,7 @@ export type Database = {
           surface?: string | null;
           template_match_method?: Database['public']['Enums']['import_match_method_enum'] | null;
           template_match_score?: number | null;
+          template_name_state?: Json | null;
           template_suggestion_deferred_at?: string | null;
           timezone?: string | null;
           total_reps?: number | null;
@@ -661,6 +663,7 @@ export type Database = {
           surface?: string | null;
           template_match_method?: Database['public']['Enums']['import_match_method_enum'] | null;
           template_match_score?: number | null;
+          template_name_state?: Json | null;
           template_suggestion_deferred_at?: string | null;
           timezone?: string | null;
           total_reps?: number | null;
@@ -4651,6 +4654,7 @@ export type Database = {
           gym_template_id: string | null;
           id: string;
           import_dedupe_key: string | null;
+          is_one_off_schedule: boolean;
           notes: string | null;
           planned_date: string;
           status: Database['public']['Enums']['workout_plans_status'];
@@ -4665,6 +4669,7 @@ export type Database = {
           gym_template_id?: string | null;
           id?: string;
           import_dedupe_key?: string | null;
+          is_one_off_schedule?: boolean;
           notes?: string | null;
           planned_date: string;
           status?: Database['public']['Enums']['workout_plans_status'];
@@ -4679,6 +4684,7 @@ export type Database = {
           gym_template_id?: string | null;
           id?: string;
           import_dedupe_key?: string | null;
+          is_one_off_schedule?: boolean;
           notes?: string | null;
           planned_date?: string;
           status?: Database['public']['Enums']['workout_plans_status'];
@@ -5209,6 +5215,7 @@ export type Database = {
           surface: string | null;
           template_match_method: Database['public']['Enums']['import_match_method_enum'] | null;
           template_match_score: number | null;
+          template_name_state: Json | null;
           template_suggestion_deferred_at: string | null;
           timezone: string | null;
           total_reps: number | null;
@@ -5386,6 +5393,14 @@ export type Database = {
           items: Json;
           total_count: number;
         }[];
+      };
+      set_one_off_workout_plan: {
+        Args: {
+          p_planned_date?: string;
+          p_template_id: string;
+          p_template_kind: string;
+        };
+        Returns: string;
       };
       show_limit: { Args: never; Returns: number };
       show_trgm: { Args: { '': string }; Returns: string[] };

@@ -60,9 +60,11 @@ import { buildGymTemplateFamilySignature } from '../../modules/training/helpers/
 import {
   getCurrentWeekDateForWeekday,
   getCurrentWeekdayForDate,
+  hasValidRecurringDay,
   isScheduledWeekday,
   isValidIsoDate,
   resolveOneOffDate,
+  shouldShowScheduleDays,
 } from '../../modules/training/helpers/templateScheduling.helper';
 
 export const GymRoutineEditorScreen = () => {
@@ -673,6 +675,11 @@ export const GymRoutineEditorScreen = () => {
       return;
     }
 
+    if (!hasValidRecurringDay(isRecurring, selectedDays)) {
+      Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
+      return;
+    }
+
     if (!isRecurring && !isImportedDateDrivenTemplate && !isValidIsoDate(oneOffDate)) {
       Alert.alert(t('common.error'), t('training.oneOffDateRequired'));
       return;
@@ -992,7 +999,10 @@ export const GymRoutineEditorScreen = () => {
                     selectedDays={isRecurring ? selectedDays : oneOffWeekday === null ? [] : [oneOffWeekday]}
                     onDaysChange={handleScheduleDaysChange}
                     isRecurring={isRecurring}
-                    showDays={!isImportedDateDrivenTemplate}
+                    showDays={shouldShowScheduleDays({
+                      isRecurring,
+                      isImportedDateDriven: isImportedDateDrivenTemplate,
+                    })}
                     onToggleRecurring={() => {
                       const nextRecurring = !isRecurring;
                       setIsRecurring(nextRecurring);

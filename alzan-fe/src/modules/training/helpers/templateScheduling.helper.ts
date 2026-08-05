@@ -11,6 +11,17 @@ export const isValidIsoDate = (value: unknown): value is string => {
 export const resolveOneOffDate = (isRecurring: boolean, date: string | null | undefined): string | null =>
   !isRecurring && isValidIsoDate(date) ? date : null;
 
+export const shouldShowScheduleDays = ({
+  isRecurring,
+  isImportedDateDriven,
+}: {
+  isRecurring: boolean;
+  isImportedDateDriven: boolean;
+}): boolean => !isImportedDateDriven || isRecurring;
+
+export const hasValidRecurringDay = (isRecurring: boolean, selectedDays: number[]): boolean =>
+  !isRecurring || (selectedDays.length === 1 && isScheduledWeekday(selectedDays[0]));
+
 const weekStartsOnMonday = { weekStartsOn: 1 as const };
 
 export const getCurrentWeekDateForWeekday = (weekday: number, referenceDate: Date = new Date()): string | null => {

@@ -5,6 +5,8 @@ import {
   isScheduledWeekday,
   isValidIsoDate,
   resolveOneOffDate,
+  hasValidRecurringDay,
+  shouldShowScheduleDays,
 } from './templateScheduling.helper';
 
 assert.equal(isScheduledWeekday(0), true);
@@ -30,3 +32,11 @@ assert.equal(getCurrentWeekDateForWeekday(7, referenceDate), null);
 assert.equal(getCurrentWeekdayForDate('2026-08-05', referenceDate), 3);
 assert.equal(getCurrentWeekdayForDate('2026-08-09', referenceDate), 0);
 assert.equal(getCurrentWeekdayForDate('2026-08-10', referenceDate), null);
+
+assert.equal(shouldShowScheduleDays({ isRecurring: true, isImportedDateDriven: true }), true);
+assert.equal(shouldShowScheduleDays({ isRecurring: false, isImportedDateDriven: true }), false);
+assert.equal(shouldShowScheduleDays({ isRecurring: false, isImportedDateDriven: false }), true);
+assert.equal(hasValidRecurringDay(true, []), false);
+assert.equal(hasValidRecurringDay(true, [2]), true);
+assert.equal(hasValidRecurringDay(true, [2, 3]), false);
+assert.equal(hasValidRecurringDay(false, []), true);

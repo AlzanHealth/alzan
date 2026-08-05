@@ -1,5 +1,6 @@
 import { getImportedTemplateFamilyKey, getTrainingPlanSessionSignature } from './trainingPlanImportPlanner';
 import { getProgressionWeekIndex } from '../helpers/enduranceProgression.helper';
+import { resolveTrainingImportMetadata } from '../helpers/trainingPlanImportMetadata.helper';
 
 export const TRAINING_PLAN_IMPORT_FORMAT = 'alzan-training-plan';
 export const TRAINING_PLAN_IMPORT_VERSION = 1;
@@ -84,6 +85,7 @@ export type TrainingPlanValidationErrorCode =
   | 'unsupported_sport'
   | 'invalid_range'
   | 'invalid_session_shape'
+  | 'invalid_session_metadata'
   | 'weekday_mismatch'
   | 'incompatible_template_family'
   | 'too_many_sessions';
@@ -555,20 +557,28 @@ const parseSession = (
       );
     }
   }
+  const templateKey = readString(value.template_key, `${path}.template_key`, errors);
+  const rawWorkoutGoal = readString(value.workout_goal, `${path}.workout_goal`, errors);
+  const rawModality = readString(value.modality, `${path}.modality`, errors);
+  const metadata = resolveTrainingImportMetadata(sport as TrainingPlanSport, rawWorkoutGoal, rawModality);
+  if (!metadata.ok) {
+    metadata.invalidFields.forEach(field =>
+      addError(
+        errors,
+        'invalid_session_metadata',
+        `${path}.${field}`,
+        `Unsupported ${field === 'workout_goal' ? 'workout goal' : 'modality'} for ${sport}`,
+      ),
+    );
+  }
   return {
     date,
     ...(normalizedWeekday ? { weekday: normalizedWeekday } : {}),
     sport: sport as TrainingPlanSport,
     name,
-    ...(readString(value.template_key, `${path}.template_key`, errors)
-      ? { template_key: readString(value.template_key, `${path}.template_key`, errors) }
-      : {}),
-    ...(readString(value.workout_goal, `${path}.workout_goal`, errors)
-      ? { workout_goal: readString(value.workout_goal, `${path}.workout_goal`, errors) }
-      : {}),
-    ...(readString(value.modality, `${path}.modality`, errors)
-      ? { modality: readString(value.modality, `${path}.modality`, errors) }
-      : {}),
+    ...(templateKey ? { template_key: templateKey } : {}),
+    ...(metadata.ok && metadata.workoutGoal ? { workout_goal: metadata.workoutGoal } : {}),
+    ...(metadata.ok ? { modality: metadata.modality } : {}),
     // Notes are accepted for backwards compatibility but are intentionally not imported.
     ...(readNumber(value.distance_km, `${path}.distance_km`, errors, 0, 1000) === undefined
       ? {}

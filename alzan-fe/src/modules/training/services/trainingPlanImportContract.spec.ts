@@ -49,6 +49,52 @@ if (parsed.ok) {
   assert.equal(parsed.value.weeks[0].sessions[0].weekday, 'lunes');
   assert.equal(parsed.value.weeks[0].sessions[0].running_steps?.[1].repetitions, 6);
   assert.equal(parsed.value.weeks[1].sessions[1].exercises?.[0].weight_kg, 80);
+  assert.equal(parsed.value.weeks[0].sessions[0].modality, 'outdoor');
+  assert.equal(parsed.value.weeks[0].sessions[1].modality, 'gym');
+}
+
+const normalizedMetadata = parseTrainingPlanJson(
+  JSON.stringify({
+    ...validDocument,
+    weeks: [
+      {
+        week_number: 1,
+        sessions: [
+          { ...runningSession('2026-08-03'), workout_goal: 'Tempo', modality: 'Outdoor' },
+          { ...strengthSession('2026-08-04'), workout_goal: 'Fuerza', modality: 'Free Weights' },
+        ],
+      },
+    ],
+  }),
+);
+assert.equal(normalizedMetadata.ok, true);
+if (normalizedMetadata.ok) {
+  assert.equal(normalizedMetadata.value.weeks[0].sessions[0].workout_goal, 'tempo_threshold');
+  assert.equal(normalizedMetadata.value.weeks[0].sessions[0].modality, 'outdoor');
+  assert.equal(normalizedMetadata.value.weeks[0].sessions[1].workout_goal, 'strength');
+  assert.equal(normalizedMetadata.value.weeks[0].sessions[1].modality, 'free_weights');
+}
+
+const invalidMetadata = parseTrainingPlanJson(
+  JSON.stringify({
+    ...validDocument,
+    weeks: [
+      {
+        week_number: 1,
+        sessions: [
+          { ...runningSession('2026-08-03'), workout_goal: 'inventado' },
+          { ...strengthSession('2026-08-04'), modality: 'parque' },
+        ],
+      },
+    ],
+  }),
+);
+assert.equal(invalidMetadata.ok, false);
+if (!invalidMetadata.ok) {
+  assert.deepEqual(
+    invalidMetadata.errors.filter(error => error.code === 'invalid_session_metadata').map(error => error.path),
+    ['weeks[0].sessions[0].workout_goal', 'weeks[0].sessions[1].modality'],
+  );
 }
 
 const legacyNotes = {

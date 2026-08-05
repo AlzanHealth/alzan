@@ -9,6 +9,7 @@ import type {
   TrainingPlanSession,
   TrainingPlanRunningStep,
 } from './trainingPlanImportContract';
+import { resolveTrainingImportMetadata } from '../helpers/trainingPlanImportMetadata.helper';
 
 export type ImportedTemplateFamily = {
   familyKey: string;
@@ -28,63 +29,14 @@ export type ImportedTemplateCandidate = {
   recurrence_end_date: string | null;
 };
 
-const IMPORTED_GOAL_ALIASES: Record<TrainingPlanSession['sport'], Record<string, string>> = {
-  running: {
-    easy_run: 'endurance',
-    resistencia: 'endurance',
-    intervals: 'speed',
-    interval: 'speed',
-    velocidad: 'speed',
-    tempo: 'tempo_threshold',
-    threshold: 'tempo_threshold',
-    tempo_umbral: 'tempo_threshold',
-    long: 'long_run',
-    tirada_larga: 'long_run',
-    recuperacion: 'recovery',
-    prueba: 'test',
-  },
-  strength: {
-    gym: 'strength',
-    hipertrofia: 'hypertrophy',
-    fuerza: 'strength',
-    resistencia_muscular: 'muscular_endurance',
-    tecnica: 'technique',
-    movilidad: 'mobility',
-    recuperacion: 'recovery',
-  },
-};
-
-const normalizeImportedToken = (value: string): string =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase()
-    .replace(/[\s/-]+/g, '_');
-
 export const getImportedSessionMetadata = (
   session: Pick<TrainingPlanSession, 'sport' | 'workout_goal' | 'modality'>,
 ): { workoutGoal: string | null; modality: string | null } => {
-  const goalToken = session.workout_goal ? normalizeImportedToken(session.workout_goal) : '';
-  const workoutGoal = goalToken ? IMPORTED_GOAL_ALIASES[session.sport][goalToken] || goalToken : null;
-  const modalityToken = session.modality ? normalizeImportedToken(session.modality) : '';
-  const modalityAliases: Record<string, string> = {
-    exterior: 'outdoor',
-    aire_libre: 'outdoor',
-    cinta: 'treadmill',
-    gimnasio: 'gym',
-    peso_libre: 'free_weights',
-    maquinas: 'machines',
-    calistenia: 'calisthenics',
-    movilidad: 'mobility',
-  };
-  const modality = modalityToken
-    ? modalityAliases[modalityToken] || session.modality!.trim()
-    : session.sport === 'running'
-      ? 'outdoor'
-      : 'gym';
-
-  return { workoutGoal, modality };
+  const result = resolveTrainingImportMetadata(session.sport, session.workout_goal, session.modality);
+  if (!result.ok) {
+    throw new Error(`Invalid imported session metadata: ${result.invalidFields.join(', ')}`);
+  }
+  return { workoutGoal: result.workoutGoal, modality: result.modality };
 };
 
 export const findReusableImportedTemplate = (

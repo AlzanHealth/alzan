@@ -79,9 +79,11 @@ import { buildEnduranceTemplateFamilySignature } from '../../modules/training/he
 import {
   getCurrentWeekDateForWeekday,
   getCurrentWeekdayForDate,
+  hasValidRecurringDay,
   isScheduledWeekday,
   isValidIsoDate,
   resolveOneOffDate,
+  shouldShowScheduleDays,
 } from '../../modules/training/helpers/templateScheduling.helper';
 import { getOneOffTrainingPlanDate } from '../../modules/training/services/oneOffTrainingPlanService';
 
@@ -963,7 +965,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
 
-    if (isRecurring && scheduledDays.length === 0) {
+    if (!hasValidRecurringDay(isRecurring, scheduledDays)) {
       Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
       return;
     }
@@ -3299,7 +3301,10 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     selectedDays={isRecurring ? scheduledDays : oneOffWeekday === null ? [] : [oneOffWeekday]}
                     onDaysChange={handleScheduleDaysChange}
                     isRecurring={isRecurring}
-                    showDays={!isImportedDateDrivenTemplate}
+                    showDays={shouldShowScheduleDays({
+                      isRecurring,
+                      isImportedDateDriven: isImportedDateDrivenTemplate,
+                    })}
                     onToggleRecurring={() => {
                       const nextRecurring = !isRecurring;
                       setIsRecurring(nextRecurring);
