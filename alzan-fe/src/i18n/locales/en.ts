@@ -230,7 +230,7 @@ const en = {
     nextMealTimingTitle: 'NEXT MEAL MARGIN',
     nextMealTimingInfoModalTitle: 'Next meal margin',
     nextMealTimingInfoModalBody:
-      'Choose how far in advance the meal to log appears. The normal value is limited by the real interval between meals; at night it is multiplied by 2.5 and never exceeds six hours.',
+      'Controls the card in Home > Today’s Agenda that shows which meal to log next. Tapping it takes you to Nutrition to log that meal. The normal value is limited by the real interval between meals; at night it is multiplied by 2.5 and never exceeds six hours.',
     nextMealTimingLabel: 'Automatic margin',
     nextMealTimingHint:
       'The default is 1 hour; you can set 0 to switch exactly at the meal time. Dinner uses 2.5 times this margin, with a maximum of 6 hours and never exceeding the time until breakfast.',
@@ -239,7 +239,7 @@ const en = {
     nutritionDayTitle: 'NUTRITION DAY',
     nutritionDayInfoModalTitle: 'Nutrition day',
     nutritionDayInfoModalBody:
-      'Choose when the app should switch to the next nutrition day.\n\nBefore this time, automatic meal logging still uses the previous day, which helps with late dinners or snacks after midnight.',
+      'Defines when Nutrition changes the date it considers “today”.\n\nIt affects the Nutrition day selector and the date assigned when logging meals or creating recipes without choosing another day. It does not change meal times or the Home margins.',
     nutritionDayRolloverLabel: 'Switch day at',
     nutritionDayRolloverHint: 'Meals logged before this time use the previous nutrition day.',
     defaultHydrationInfoModalTitle: 'Default hydration',

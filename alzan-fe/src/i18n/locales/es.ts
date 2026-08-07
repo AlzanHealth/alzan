@@ -233,7 +233,7 @@ export default {
     nextMealTimingTitle: 'MARGEN DE SIGUIENTE COMIDA',
     nextMealTimingInfoModalTitle: 'Margen de siguiente comida',
     nextMealTimingInfoModalBody:
-      'Define con cuánta antelación aparece la comida que debes registrar. El valor normal se limita al intervalo real entre comidas; por la noche se multiplica por 2,5 y nunca supera las seis horas.',
+      'Controla la tarjeta de Inicio > Agenda de Hoy que muestra qué comida registrar a continuación. Al tocarla, te lleva a Nutrición para registrar esa comida. El valor normal se limita al intervalo real entre comidas; por la noche se multiplica por 2,5 y nunca supera las seis horas.',
     nextMealTimingLabel: 'Margen automático',
     nextMealTimingHint:
       'Por defecto es 1 hora; puedes poner 0 para cambiar justo a la hora de la comida. Cena usa 2,5 veces este margen, con un máximo de 6 horas y sin superar el tiempo hasta el desayuno.',
@@ -242,7 +242,7 @@ export default {
     nutritionDayTitle: 'DÍA NUTRICIONAL',
     nutritionDayInfoModalTitle: 'Día nutricional',
     nutritionDayInfoModalBody:
-      'Elige a qué hora debe pasar la app al siguiente día de nutrición.\n\nAntes de esa hora, los registros automáticos siguen usando el día anterior, útil para cenas o snacks después de medianoche.',
+      'Define a qué hora cambia la fecha que Nutrición considera como “hoy”.\n\nAfecta al selector de días de Nutrición y a la fecha que se asigna al registrar comidas o crear recetas sin elegir otro día. No cambia la hora de las comidas ni los márgenes de Inicio.',
     nutritionDayRolloverLabel: 'Cambiar día a las',
     nutritionDayRolloverHint: 'Las comidas registradas antes de esta hora usan el día nutricional anterior.',
     defaultHydrationInfoModalTitle: 'Hidratación por defecto',
