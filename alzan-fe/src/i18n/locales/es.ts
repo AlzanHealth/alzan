@@ -230,6 +230,15 @@ export default {
     dailyMealsInfoModalTitle: 'Comidas del día',
     dailyMealsInfoModalBody:
       'Define qué comidas principales quieres usar en tu plan diario y en qué horario se te recuerdan.\n\nSe aplica en Nutrición Home, en el registro de comidas y en los recordatorios automáticos.',
+    nextMealTimingTitle: 'MARGEN DE SIGUIENTE COMIDA',
+    nextMealTimingInfoModalTitle: 'Margen de siguiente comida',
+    nextMealTimingInfoModalBody:
+      'Define con cuánta antelación aparece la comida que debes registrar. El valor normal se limita al intervalo real entre comidas; por la noche se multiplica por 2,5 y nunca supera las seis horas.',
+    nextMealTimingLabel: 'Margen automático',
+    nextMealTimingHint:
+      'Por defecto es 1 hora. Cena usa 2,5 veces este margen, con un máximo de 6 horas y sin superar el tiempo hasta el desayuno.',
+    nextMealTimingPlaceholder: '1',
+    nextMealTimingSaveError: 'No se pudo guardar el margen de la siguiente comida.',
     nutritionDayTitle: 'DÍA NUTRICIONAL',
     nutritionDayInfoModalTitle: 'Día nutricional',
     nutritionDayInfoModalBody:

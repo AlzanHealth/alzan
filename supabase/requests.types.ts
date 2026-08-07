@@ -104,6 +104,7 @@ export interface NutritionSettingsJson {
   copy_mode: "none" | "sequential" | "alternating" | null;
   default_recipe_visibility?: "private" | "public";
   recipe_search_scope?: RecipeSearchScope;
+  next_meal_cutoff_hours?: number;
   nutrition_day_rollover_time?: string;
   shopping_list_start_day?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   default_hydration_ml?: number;

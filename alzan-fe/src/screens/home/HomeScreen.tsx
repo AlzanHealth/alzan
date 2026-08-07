@@ -106,7 +106,9 @@ export const HomeScreen = () => {
   useEffect(() => {
     if (notifSettings?.meals) {
       const resolveMealType = () =>
-        getMealTypeForTime(notifSettings.meals, preferences?.nutrition_prefs?.enabled_meals);
+        getMealTypeForTime(notifSettings.meals, preferences?.nutrition_prefs?.enabled_meals, new Date(), {
+          cutoffHours: preferences?.nutrition_prefs?.next_meal_cutoff_hours,
+        });
 
       setNextMealType(resolveMealType());
 

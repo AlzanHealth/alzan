@@ -227,6 +227,15 @@ const en = {
     dailyMealsInfoModalTitle: 'Daily meals',
     dailyMealsInfoModalBody:
       'Define which main meals are enabled in your day and the reminder time for each one.\n\nIt applies in Nutrition Home, meal logging, and automatic reminders.',
+    nextMealTimingTitle: 'NEXT MEAL MARGIN',
+    nextMealTimingInfoModalTitle: 'Next meal margin',
+    nextMealTimingInfoModalBody:
+      'Choose how far in advance the meal to log appears. The normal value is limited by the real interval between meals; at night it is multiplied by 2.5 and never exceeds six hours.',
+    nextMealTimingLabel: 'Automatic margin',
+    nextMealTimingHint:
+      'The default is 1 hour. Dinner uses 2.5 times this margin, with a maximum of 6 hours and never exceeding the time until breakfast.',
+    nextMealTimingPlaceholder: '1',
+    nextMealTimingSaveError: 'Could not save the next meal margin.',
     nutritionDayTitle: 'NUTRITION DAY',
     nutritionDayInfoModalTitle: 'Nutrition day',
     nutritionDayInfoModalBody:

@@ -12,9 +12,19 @@ const DEFAULT_MEAL_TIMES: Record<ScheduledMealType, string> = {
   dinner: '21:00',
 };
 
-const REGULAR_CUTOFF_MINUTES = 60;
-const DINNER_CUTOFF_MINUTES = 180;
+const NIGHT_MULTIPLIER = 2.5;
+const MAX_NIGHT_CUTOFF_MINUTES = 6 * 60;
 const MINUTES_PER_DAY = 24 * 60;
+
+export const DEFAULT_NEXT_MEAL_CUTOFF_HOURS = 1;
+export const MIN_NEXT_MEAL_CUTOFF_HOURS = 0.25;
+export const MAX_NEXT_MEAL_CUTOFF_HOURS = 24;
+
+export const normalizeNextMealCutoffHours = (value: unknown): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_NEXT_MEAL_CUTOFF_HOURS;
+
+  return Math.min(MAX_NEXT_MEAL_CUTOFF_HOURS, Math.max(MIN_NEXT_MEAL_CUTOFF_HOURS, value));
+};
 
 const parseTime = (time: string | undefined, fallback: string): number => {
   const value = time ?? fallback;
@@ -58,11 +68,14 @@ export const getMealTypeForTime = (
   schedule: MealSchedule | undefined,
   enabledMeals: EnabledMeals | undefined,
   date = new Date(),
+  options?: { cutoffHours?: number },
 ): ScheduledMealType => {
   const activeMeals = MEAL_ORDER.filter(mealType => enabledMeals?.[mealType] !== false);
 
   if (activeMeals.length === 0) return 'breakfast';
   if (activeMeals.length === 1) return activeMeals[0];
+
+  const baseCutoffMinutes = Math.round(normalizeNextMealCutoffHours(options?.cutoffHours) * 60);
 
   const mealEnds = activeMeals.map((mealType, index) => {
     const nextMealType = activeMeals[(index + 1) % activeMeals.length];
@@ -71,7 +84,12 @@ export const getMealTypeForTime = (
 
     while (nextTime <= currentTime) nextTime += MINUTES_PER_DAY;
 
-    const cutoff = mealType === 'dinner' ? DINNER_CUTOFF_MINUTES : REGULAR_CUTOFF_MINUTES;
+    const intervalMinutes = nextTime - currentTime;
+    const cutoff =
+      mealType === 'dinner'
+        ? Math.min(baseCutoffMinutes * NIGHT_MULTIPLIER, MAX_NIGHT_CUTOFF_MINUTES, intervalMinutes)
+        : Math.min(baseCutoffMinutes, intervalMinutes);
+
     return normalizeMinutes(nextTime - cutoff);
   });
 

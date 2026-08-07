@@ -79,6 +79,7 @@ const DEFAULT_NUTRITION_PREFS: NutritionSettingsJson = {
   copy_mode: 'none',
   default_recipe_visibility: 'private',
   recipe_search_scope: 'source',
+  next_meal_cutoff_hours: 1,
   nutrition_day_rollover_time: DEFAULT_NUTRITION_DAY_ROLLOVER_TIME,
   shopping_list_start_day: 1,
 };
