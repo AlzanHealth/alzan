@@ -18,7 +18,7 @@ import {
   LucideIcon,
 } from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 import { spacing, borderRadius, typography } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
@@ -34,6 +34,7 @@ import { useHomeSettings } from '../../hooks/settings/useHomeSettings';
 import { HomeSummaryActiveWorkout, HomeSummaryScheduledWorkout, useHomeSummary } from '../../hooks/useHomeSummary';
 import { usePreferencesContext } from '../../context/PreferencesContext';
 import { getMealTypeForTime } from '../../modules/nutrition/services/nextMealPlanner';
+import { useCurrentNutritionDate } from '../../modules/nutrition/hooks/useCurrentNutritionDate';
 
 import { useHealthInsights } from '../../modules/health/hooks/useHealthInsights';
 import { useTodaySteps } from '../../modules/health/hooks/useSteps';
@@ -76,7 +77,8 @@ export const HomeScreen = () => {
   const { data: todaySteps } = useTodaySteps();
   const { homeCards } = useHomeCards();
   const pendingWorkout = !activeTodayWorkout && scheduledWorkouts.length > 0 ? scheduledWorkouts[0] : null;
-  const { totals, targets, meals } = useDayNutrition(new Date());
+  const currentNutritionDate = useCurrentNutritionDate(preferences?.nutrition_prefs?.nutrition_day_rollover_time);
+  const { totals, targets, meals } = useDayNutrition(parseISO(currentNutritionDate));
   const latestWeight = health?.weight?.weight_kg;
 
   // UI State
@@ -115,7 +117,11 @@ export const HomeScreen = () => {
       }, 60000);
       return () => clearInterval(interval);
     }
-  }, [notifSettings, preferences?.nutrition_prefs?.enabled_meals]);
+  }, [
+    notifSettings,
+    preferences?.nutrition_prefs?.enabled_meals,
+    preferences?.nutrition_prefs?.next_meal_cutoff_hours,
+  ]);
 
   // Get Next Meal Status
   const nextMealItems = meals ? meals.filter(m => m.mealType === nextMealType) : [];

@@ -233,7 +233,7 @@ const en = {
       'Controls the card in Home > Today’s Agenda that shows which meal to log next. Tapping it takes you to Nutrition to log that meal. The normal value is limited by the real interval between meals; at night it is multiplied by 2.5 and never exceeds six hours.',
     nextMealTimingLabel: 'Automatic margin',
     nextMealTimingHint:
-      'The default is 1 hour; you can set 0 to switch exactly at the meal time. Dinner uses 2.5 times this margin, with a maximum of 6 hours and never exceeding the time until breakfast.',
+      'The default is 1 hour and the current maximum is {{max}} h, based on your meal times. You can set 0 to switch exactly at the meal time. Dinner uses 2.5 times this margin, up to 6 hours.',
     nextMealTimingPlaceholder: '1',
     nextMealTimingSaveError: 'Could not save the next meal margin.',
     nutritionDayTitle: 'NUTRITION DAY',

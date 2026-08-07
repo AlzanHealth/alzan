@@ -5092,6 +5092,36 @@ export type Database = {
         };
         Returns: undefined;
       };
+      copy_meal_to_date: {
+        Args: { p_items: Json; p_log: Json };
+        Returns: {
+          adherence_status: string | null;
+          calc_version: string;
+          carbs_g: number | null;
+          data_quality: Database['public']['Enums']['meal_logs_data_quality'];
+          date: string;
+          diet_template_meal_id: string | null;
+          fats_g: number | null;
+          id: string;
+          kcal: number | null;
+          logged_at: string;
+          meal_type: Database['public']['Enums']['meal_type_enum'];
+          name: string | null;
+          notes: string | null;
+          origin: Database['public']['Enums']['meal_logs_origin'];
+          origin_confidence: number | null;
+          protein_g: number | null;
+          source: string;
+          source_recipe_id: string | null;
+          user_id: string;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'meal_logs';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       delete_training_template: {
         Args: { p_template_id: string; p_template_kind: string };
         Returns: boolean;
@@ -5334,6 +5364,18 @@ export type Database = {
         Returns: undefined;
       };
       reset_user_data: { Args: never; Returns: undefined };
+      save_user_recipe_atomic: {
+        Args: {
+          p_expected_updated_at: string;
+          p_items: Json;
+          p_name_es: string;
+          p_name_norm_es: string;
+          p_nutrition: Json;
+          p_recipe_id: string;
+          p_visibility: Database['public']['Enums']['recipe_visibility_enum'];
+        };
+        Returns: Json;
+      };
       search_exercises_ranked: {
         Args: {
           p_equipment_id?: number;

@@ -52,6 +52,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
   const webDetectorRef = useRef<WebBarcodeDetector | null>(null);
   const webAnimationFrameRef = useRef<number | null>(null);
   const lastWebDetectAtRef = useRef(0);
+  const consecutiveWebDetectionErrorsRef = useRef(0);
 
   useEffect(() => {
     if (isWeb || !shouldRequestCameraPermissionOnScannerOpen(permission, permissionRequestedRef.current)) {
@@ -135,6 +136,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
       if (detector && video && video.readyState >= 2) {
         try {
           const detections = await detector.detect(video);
+          consecutiveWebDetectionErrorsRef.current = 0;
           for (const detection of detections) {
             if (detection.rawValue && detection.format) {
               processDetectedBarcode(detection.format, detection.rawValue);
@@ -144,7 +146,12 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
             }
           }
         } catch (_error) {
-          // ignore frame-level detection errors
+          consecutiveWebDetectionErrorsRef.current += 1;
+          if (consecutiveWebDetectionErrorsRef.current >= 5) {
+            stopWebScanner();
+            setWebError(t('nutrition.webBarcodeCameraError'));
+            return;
+          }
         }
       }
 
@@ -166,7 +173,10 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
         ).BarcodeDetector;
 
         const BarcodeDetectorCtor = await resolveWebBarcodeDetectorConstructor(nativeDetectorConstructor, async () => {
-          const { BarcodeDetector } = await import('barcode-detector/ponyfill');
+          const { BarcodeDetector, setZXingModuleOverrides } = await import('barcode-detector/ponyfill');
+          setZXingModuleOverrides({
+            locateFile: (fileName: string) => (fileName.endsWith('.wasm') ? '/zxing_reader.wasm' : fileName),
+          });
           return BarcodeDetector;
         });
 

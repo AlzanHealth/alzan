@@ -66,6 +66,7 @@ import { useTranslation } from 'react-i18next';
 import { buildTimePickerDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import {
   DEFAULT_NEXT_MEAL_CUTOFF_HOURS,
+  getMaxNextMealCutoffHours,
   normalizeNextMealCutoffHours,
 } from '../../modules/nutrition/services/nextMealPlanner';
 import { useSetNutritionVacationDates, useVacationDateSet } from '../../modules/nutrition/hooks/useNutritionData';
@@ -292,7 +293,8 @@ export const NutritionSettingsScreen = () => {
   const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
   const shoppingListStartDay = normalizeShoppingListStartDay(preferences?.nutrition_prefs?.shopping_list_start_day);
   const storedNextMealCutoffHours = preferences?.nutrition_prefs?.next_meal_cutoff_hours;
-  const nextMealCutoffHours = normalizeNextMealCutoffHours(storedNextMealCutoffHours);
+  const maxNextMealCutoffHours = getMaxNextMealCutoffHours(notifSettings?.meals, enabledMeals);
+  const nextMealCutoffHours = normalizeNextMealCutoffHours(storedNextMealCutoffHours, maxNextMealCutoffHours);
   const storedDefaultHydrationMl = preferences?.nutrition_prefs?.default_hydration_ml;
   const defaultHydrationMl =
     typeof storedDefaultHydrationMl === 'number' && Number.isFinite(storedDefaultHydrationMl)
@@ -606,7 +608,7 @@ export const NutritionSettingsScreen = () => {
     const parsed = Number(nextMealCutoffInput);
     if (!Number.isFinite(parsed)) return DEFAULT_NEXT_MEAL_CUTOFF_HOURS;
 
-    return normalizeNextMealCutoffHours(parsed);
+    return normalizeNextMealCutoffHours(parsed, maxNextMealCutoffHours);
   };
 
   const saveNextMealCutoff = async () => {
@@ -1104,7 +1106,7 @@ export const NutritionSettingsScreen = () => {
                       {t('nutrition.nextMealTimingLabel')}
                     </Text>
                     <Text style={[styles.toggleDesc, { color: themeColors.textSecondary }]}>
-                      {t('nutrition.nextMealTimingHint')}
+                      {t('nutrition.nextMealTimingHint', { max: maxNextMealCutoffHours })}
                     </Text>
                   </View>
                 </View>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type { MealItem, MealLog, MealType, DietTemplateMeal } from '../../../types/requests.types';
-import { buildMealCopyDraft, persistMealCopy, type MealCopyPersistence, type MealCopySource } from './mealCopyPlanner';
+import { buildMealCopyDraft, validateMealCopyDestination, type MealCopySource } from './mealCopyPlanner';
 
 const userId = 'user-1';
 
@@ -114,47 +114,19 @@ const testBuildsPlannedCopyWithoutInventingItems = () => {
   assert.deepEqual(draft.items, []);
 };
 
-const testNeverOverwritesDestination = async () => {
-  const inserted: string[] = [];
-  const deleted: string[] = [];
-  const persistence: MealCopyPersistence = {
-    insertLog: async log => {
-      inserted.push(log.date);
-      return { ...loggedMeal, ...log, id: 'new-log' };
-    },
-    insertItems: async () => undefined,
-    deleteLog: async id => {
-      deleted.push(id);
-    },
-  };
-
-  await persistMealCopy(testDraft(), persistence);
-
-  assert.deepEqual(inserted, [testDestination.date]);
-  assert.deepEqual(deleted, []);
-};
-
-const testRollsBackLogWhenItemsFail = async () => {
-  const deleted: string[] = [];
-  const persistence: MealCopyPersistence = {
-    insertLog: async log => ({ ...loggedMeal, ...log, id: 'new-log' }),
-    insertItems: async () => {
-      throw new Error('items failed');
-    },
-    deleteLog: async id => {
-      deleted.push(id);
-    },
-  };
-
-  await assert.rejects(() => persistMealCopy(testDraft(), persistence), /items failed/);
-  assert.deepEqual(deleted, ['new-log']);
+const testValidatesDestinationAtTheServiceBoundary = () => {
+  const referenceDate = new Date(2026, 7, 5, 12);
+  assert.doesNotThrow(() => validateMealCopyDestination(testDestination, referenceDate));
+  assert.throws(
+    () => validateMealCopyDestination({ ...testDestination, date: '2027-01-01' }, referenceDate),
+    /outside the nutrition calendar range/,
+  );
 };
 
 const run = async () => {
   testBuildsRegisteredCopy();
   testBuildsPlannedCopyWithoutInventingItems();
-  await testNeverOverwritesDestination();
-  await testRollsBackLogWhenItemsFail();
+  testValidatesDestinationAtTheServiceBoundary();
   console.log('mealCopyPlanner: all tests passed');
 };
 

@@ -5,6 +5,7 @@ import {
   buildRecipeSoftDeletePayload,
   canSubmitRecipeDraft,
   getRecipeSaveMode,
+  getSavedRecipeDraftState,
   getMealSourceRecipeIdForSave,
   getPresetRecipeDraftMode,
   isOwnUserRecipe,
@@ -233,6 +234,22 @@ function run() {
     deleted_at: '2026-07-06T14:25:00.000Z',
     updated_at: '2026-07-06T14:25:00.000Z',
   });
+
+  assert.deepEqual(
+    getSavedRecipeDraftState({
+      recipeId: 'new-recipe-id',
+      recipeName: 'Tortilla nueva',
+      recipeUpdatedAt: '2026-08-07T13:30:00.000Z',
+      recipeSignature: 'new-signature',
+    }),
+    {
+      editingRecipeId: 'new-recipe-id',
+      editingRecipeName: 'Tortilla nueva',
+      editingRecipeUpdatedAt: '2026-08-07T13:30:00.000Z',
+      editingRecipeSignature: 'new-signature',
+      mealSourceRecipeId: 'new-recipe-id',
+    },
+  );
 }
 
 run();

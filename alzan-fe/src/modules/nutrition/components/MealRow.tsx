@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   },
   nameButton: {
     alignSelf: 'flex-start',
-    minHeight: 24,
+    minHeight: 44,
     justifyContent: 'center',
   },
   name: {

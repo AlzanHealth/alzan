@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
-import { getMealTypeForTime, normalizeNextMealCutoffHours, type MealSchedule } from './nextMealPlanner';
+import {
+  getMaxNextMealCutoffHours,
+  getMealTypeForTime,
+  normalizeNextMealCutoffHours,
+  type MealSchedule,
+} from './nextMealPlanner';
 
 const schedule: MealSchedule = {
   breakfast: { time: '08:00' },
@@ -112,6 +117,13 @@ const testSupportsZeroAndTwoDecimalCutoffs = () => {
   assert.equal(getMealTypeForTime(schedule, enabledMeals, at(14), { cutoffHours: 0 }), 'lunch');
 };
 
+const testLimitsTheSettingToTheShortestEnabledMealInterval = () => {
+  assert.equal(getMaxNextMealCutoffHours(schedule, enabledMeals), 3);
+  assert.equal(getMaxNextMealCutoffHours(schedule, { ...enabledMeals, almuerzo: false }), 3.5);
+  assert.equal(normalizeNextMealCutoffHours(4, 3.5), 3.5);
+  assert.equal(normalizeNextMealCutoffHours(undefined, 0.5), 0.5);
+};
+
 const testSkipsDisabledMeals = () => {
   assert.equal(getMealTypeForTime(schedule, { ...enabledMeals, almuerzo: false }, at(12)), 'breakfast');
   assert.equal(getMealTypeForTime(schedule, { ...enabledMeals, almuerzo: false }, at(13, 1)), 'lunch');
@@ -140,6 +152,7 @@ testUsesTheUsersConfiguredTimes();
 testUsesTheConfiguredCutoffAndNightMultiplier();
 testCapsNightCutoffAndNeverExceedsTheMealInterval();
 testSupportsZeroAndTwoDecimalCutoffs();
+testLimitsTheSettingToTheShortestEnabledMealInterval();
 testSkipsDisabledMeals();
 testFallsBackToBreakfastWhenNoMealIsEnabled();
 console.log('nextMealPlanner: all tests passed');

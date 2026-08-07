@@ -20,11 +20,17 @@ export const DEFAULT_NEXT_MEAL_CUTOFF_HOURS = 1;
 export const MIN_NEXT_MEAL_CUTOFF_HOURS = 0;
 export const MAX_NEXT_MEAL_CUTOFF_HOURS = 24;
 
-export const normalizeNextMealCutoffHours = (value: unknown): number => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_NEXT_MEAL_CUTOFF_HOURS;
+export const normalizeNextMealCutoffHours = (
+  value: unknown,
+  maximumHours: number = MAX_NEXT_MEAL_CUTOFF_HOURS,
+): number => {
+  const safeMaximum = Math.min(MAX_NEXT_MEAL_CUTOFF_HOURS, Math.max(MIN_NEXT_MEAL_CUTOFF_HOURS, maximumHours));
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return Math.min(DEFAULT_NEXT_MEAL_CUTOFF_HOURS, safeMaximum);
+  }
 
   const rounded = Math.round(value * 100) / 100;
-  return Math.min(MAX_NEXT_MEAL_CUTOFF_HOURS, Math.max(MIN_NEXT_MEAL_CUTOFF_HOURS, rounded));
+  return Math.min(safeMaximum, Math.max(MIN_NEXT_MEAL_CUTOFF_HOURS, rounded));
 };
 
 const parseTime = (time: string | undefined, fallback: string): number => {
@@ -47,6 +53,24 @@ const parseTime = (time: string | undefined, fallback: string): number => {
 };
 
 const normalizeMinutes = (minutes: number): number => ((minutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+
+export const getMaxNextMealCutoffHours = (
+  schedule: MealSchedule | undefined,
+  enabledMeals: EnabledMeals | undefined,
+): number => {
+  const activeMeals = MEAL_ORDER.filter(mealType => enabledMeals?.[mealType] !== false);
+  if (activeMeals.length < 2) return MAX_NEXT_MEAL_CUTOFF_HOURS;
+
+  const shortestIntervalMinutes = activeMeals.reduce((shortest, mealType, index) => {
+    const nextMealType = activeMeals[(index + 1) % activeMeals.length];
+    const currentTime = parseTime(schedule?.[mealType]?.time, DEFAULT_MEAL_TIMES[mealType]);
+    let nextTime = parseTime(schedule?.[nextMealType]?.time, DEFAULT_MEAL_TIMES[nextMealType]);
+    while (nextTime <= currentTime) nextTime += MINUTES_PER_DAY;
+    return Math.min(shortest, nextTime - currentTime);
+  }, MINUTES_PER_DAY);
+
+  return Math.round((shortestIntervalMinutes / 60) * 100) / 100;
+};
 
 type MealEnd = {
   minute: number;

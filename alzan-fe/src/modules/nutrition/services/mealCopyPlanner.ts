@@ -6,6 +6,8 @@ import type {
   MealLogInsert,
   MealType,
 } from '../../../types/requests.types';
+import { isValid, parseISO, startOfDay } from 'date-fns';
+import { getNutritionCalendarRange } from './nutritionCalendarRange';
 
 export type MealCopySource = {
   log?: MealLog;
@@ -23,10 +25,25 @@ export type MealCopyDraft = {
   items: Omit<MealItemInsert, 'meal_log_id'>[];
 };
 
-export type MealCopyPersistence = {
-  insertLog: (log: MealLogInsert) => Promise<MealLog>;
-  insertItems: (logId: string, items: MealItemInsert[]) => Promise<void>;
-  deleteLog: (logId: string) => Promise<void>;
+const COPYABLE_MEAL_TYPES: MealType[] = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'];
+
+export const validateMealCopyDestination = (
+  destination: MealCopyDestination,
+  referenceDate: Date = new Date(),
+): void => {
+  const parsedDate = parseISO(destination.date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(destination.date) || !isValid(parsedDate)) {
+    throw new Error('Invalid meal copy date');
+  }
+  if (!COPYABLE_MEAL_TYPES.includes(destination.mealType)) {
+    throw new Error('Invalid meal copy type');
+  }
+
+  const { minimumDate, maximumDate } = getNutritionCalendarRange(referenceDate);
+  const normalizedDate = startOfDay(parsedDate);
+  if (normalizedDate < minimumDate || normalizedDate > maximumDate) {
+    throw new Error('Meal copy date is outside the nutrition calendar range');
+  }
 };
 
 export const buildMealCopyDraft = (
@@ -89,23 +106,4 @@ export const buildMealCopyDraft = (
   );
 
   return { log: draftLog, items };
-};
-
-export const persistMealCopy = async (draft: MealCopyDraft, persistence: MealCopyPersistence): Promise<MealLog> => {
-  const savedLog = await persistence.insertLog(draft.log);
-
-  if (draft.items.length === 0) return savedLog;
-
-  try {
-    const items: MealItemInsert[] = draft.items.map(item => ({
-      ...item,
-      meal_log_id: savedLog.id,
-    }));
-    await persistence.insertItems(savedLog.id, items);
-  } catch (error: unknown) {
-    await persistence.deleteLog(savedLog.id);
-    throw error;
-  }
-
-  return savedLog;
 };
