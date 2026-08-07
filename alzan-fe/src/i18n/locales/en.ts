@@ -1064,7 +1064,7 @@ const en = {
     training: 'Training',
     scheduledTodayAction: 'Scheduled for today • Tap to start',
     inProgressTodayAction: 'In progress today • Tap to resume',
-    nextMeal: 'Next Meal:',
+    logMeal: 'Log',
     todaysAgenda: 'Today’s Agenda',
     completed: 'Completed',
     workouts: 'Workouts',

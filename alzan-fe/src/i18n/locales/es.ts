@@ -1076,7 +1076,7 @@ export default {
     training: 'Entrenamiento',
     scheduledTodayAction: 'Programado para hoy • Toca para empezar',
     inProgressTodayAction: 'En curso hoy • Toca para reanudar',
-    nextMeal: 'Siguiente Comida:',
+    logMeal: 'Registrar',
     todaysAgenda: 'Agenda de Hoy',
     completed: 'Completados',
     workouts: 'Entrenos',
