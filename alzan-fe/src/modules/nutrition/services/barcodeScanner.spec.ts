@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import {
   createBarcodeDetectionState,
+  extractProductCodeFromQr,
   getScannerFrameSize,
   getWebCameraConstraints,
+  normalizeProductLookupCode,
   registerBarcodeDetection,
   resolveWebBarcodeDetectorConstructor,
   shouldPreferEnvironmentCamera,
   shouldRequestCameraPermissionOnScannerOpen,
+  stopWebCamera,
 } from './barcodeScanner';
 
 assert.equal(shouldRequestCameraPermissionOnScannerOpen(null, false), false);
@@ -67,6 +70,52 @@ const expiredDetection = registerBarcodeDetection(firstDetection.state, {
 assert.equal(expiredDetection.confirmedBarcode, null);
 assert.equal(expiredDetection.state.matches, 1);
 
+assert.equal(extractProductCodeFromQr('231626003623'), '231626003623');
+assert.equal(extractProductCodeFromQr('(01)08412345678901(10)LOT123'), '08412345678901');
+assert.equal(extractProductCodeFromQr('https://example.com/product?gtin=08412345678901'), '08412345678901');
+assert.equal(extractProductCodeFromQr('https://example.com/lot/L521888'), null);
+assert.equal(normalizeProductLookupCode(' 8410 1234 5678 3 '), '8410123456783');
+assert.equal(normalizeProductLookupCode('https://example.com/product?gtin=08412345678901'), '08412345678901');
+assert.equal(normalizeProductLookupCode('https://example.com/lot/L521888'), null);
+
+const firstQrDetection = registerBarcodeDetection(createBarcodeDetectionState(), {
+  rawType: 'qr_code',
+  rawData: '(01)08412345678901(10)LOT123',
+  timestamp: 4_000,
+});
+assert.equal(firstQrDetection.confirmedBarcode, null);
+assert.equal(firstQrDetection.state.barcode, '08412345678901');
+
+const confirmedQrDetection = registerBarcodeDetection(firstQrDetection.state, {
+  rawType: 'qr',
+  rawData: '08412345678901',
+  timestamp: 4_500,
+});
+assert.equal(confirmedQrDetection.confirmedBarcode, '08412345678901');
+
+const unknownQrDetection = registerBarcodeDetection(createBarcodeDetectionState(), {
+  rawType: 'qr_code',
+  rawData: 'https://example.com/lot/L521888',
+  timestamp: 5_000,
+});
+const confirmedUnknownQr = registerBarcodeDetection(unknownQrDetection.state, {
+  rawType: 'qr_code',
+  rawData: 'https://example.com/lot/L521888',
+  timestamp: 5_500,
+});
+assert.equal(confirmedUnknownQr.confirmedBarcode, 'https://example.com/lot/L521888');
+assert.equal(normalizeProductLookupCode(confirmedUnknownQr.confirmedBarcode), null);
+
+const stoppedTracks: string[] = [];
+const stream = {
+  getTracks: () => [{ stop: () => stoppedTracks.push('first') }, { stop: () => stoppedTracks.push('second') }],
+};
+const video = { srcObject: stream };
+stopWebCamera(stream, video);
+stopWebCamera(null, video);
+assert.deepEqual(stoppedTracks, ['first', 'second']);
+assert.equal(video.srcObject, null);
+
 for (const [rawType, barcode] of [
   ['ean8', '12345678'],
   ['upc_a', '123456789012'],
@@ -81,7 +130,6 @@ for (const [rawType, barcode] of [
 }
 
 for (const [rawType, barcode] of [
-  ['qr_code', '8410123456783'],
   ['ean13', '123'],
   ['ean8', 'abcdefgh'],
   ['upc_a', '12345678901'],

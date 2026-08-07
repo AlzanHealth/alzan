@@ -16,13 +16,14 @@ import {
   resolveWebBarcodeDetectorConstructor,
   shouldPreferEnvironmentCamera,
   shouldRequestCameraPermissionOnScannerOpen,
+  stopWebCamera,
 } from '../services/barcodeScanner';
 
 type WebBarcodeDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string; format?: string }>>;
 };
 
-type WebBarcodeFormat = 'ean_13' | 'ean_8' | 'upc_a' | 'upc_e';
+type WebBarcodeFormat = 'ean_13' | 'ean_8' | 'upc_a' | 'upc_e' | 'qr_code';
 
 type WebBarcodeDetectorConstructor = new (options: { formats: WebBarcodeFormat[] }) => WebBarcodeDetector;
 
@@ -51,6 +52,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
   const webStreamRef = useRef<MediaStream | null>(null);
   const webDetectorRef = useRef<WebBarcodeDetector | null>(null);
   const webAnimationFrameRef = useRef<number | null>(null);
+  const stopWebScannerRef = useRef<(() => void) | null>(null);
   const lastWebDetectAtRef = useRef(0);
   const consecutiveWebDetectionErrorsRef = useRef(0);
 
@@ -88,6 +90,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
     if (!detection.confirmedBarcode) return;
     setScanned(true);
     scannedRef.current = true;
+    stopWebScannerRef.current?.();
     onBarcodeDetected(detection.confirmedBarcode);
   };
 
@@ -110,17 +113,10 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
         webAnimationFrameRef.current = null;
       }
 
-      const stream = webStreamRef.current;
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopWebCamera(webStreamRef.current, webVideoRef.current);
       webStreamRef.current = null;
-
-      const video = webVideoRef.current;
-      if (video) {
-        video.srcObject = null;
-      }
     };
+    stopWebScannerRef.current = stopWebScanner;
 
     const scanLoop = async (timestamp: number) => {
       if (canceled || scannedRef.current) return;
@@ -181,7 +177,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
         });
 
         webDetectorRef.current = new BarcodeDetectorCtor({
-          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'],
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'],
         });
 
         const hasCoarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
@@ -223,8 +219,14 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
     return () => {
       canceled = true;
       stopWebScanner();
+      stopWebScannerRef.current = null;
     };
   }, [isWeb, t, webBarcodeDetectorSupported, webScannerAttempt]);
+
+  const handleClose = () => {
+    stopWebScannerRef.current?.();
+    onClose();
+  };
 
   // Permission not determined yet
   if (!isWeb && !permission) {
@@ -251,7 +253,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
         <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
           <Text style={styles.permissionBtnText}>{t('nutrition.allowCamera')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+        <TouchableOpacity style={styles.cancelBtn} onPress={handleClose}>
           <Text style={[styles.cancelBtnText, { color: themeColors.textSecondary }]}>{t('common.cancel')}</Text>
         </TouchableOpacity>
       </View>
@@ -268,7 +270,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
         <Text style={[styles.permissionText, { color: themeColors.textSecondary }]}>
           {t('nutrition.webBarcodeUnsupported')}
         </Text>
-        <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+        <TouchableOpacity style={styles.cancelBtn} onPress={handleClose}>
           <Text style={[styles.cancelBtnText, { color: themeColors.textSecondary }]}>{t('training.close')}</Text>
         </TouchableOpacity>
       </View>
@@ -297,7 +299,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
           facing="back"
           enableTorch={flashOn}
           barcodeScannerSettings={{
-            barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'],
+            barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr'],
           }}
           onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
         />
@@ -344,7 +346,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
 
       {/* Controls */}
       <View style={styles.controls}>
-        <TouchableOpacity style={styles.controlBtn} onPress={onClose}>
+        <TouchableOpacity style={styles.controlBtn} onPress={handleClose}>
           <X size={24} color="#FFF" />
         </TouchableOpacity>
 

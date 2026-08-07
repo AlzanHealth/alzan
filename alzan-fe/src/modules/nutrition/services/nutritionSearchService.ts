@@ -10,6 +10,7 @@ import {
   IngredientSearchFilters,
 } from '../../../services/ingredientsService';
 import { getFoodNutritionById, warmNutritionApiHeaders } from '../../../services/nutritionApi';
+import { normalizeProductLookupCode } from './barcodeScanner';
 import { FoodSearchResult, MealComponent } from '../types/ingredients';
 import {
   buildTokenIlikeClauses,
@@ -667,49 +668,54 @@ export async function fetchByBarcode(barcode: string): Promise<FoodSearchResult 
 
   const sanitizedBarcode = barcode.trim();
   if (!sanitizedBarcode) return null;
-  if (barcodeCache.has(sanitizedBarcode)) {
-    return barcodeCache.get(sanitizedBarcode) ?? null;
+  const lookupCode = normalizeProductLookupCode(sanitizedBarcode);
+  if (!lookupCode) {
+    return null;
   }
 
-  const inFlightLookup = inFlightBarcodeLookups.get(sanitizedBarcode);
+  if (barcodeCache.has(lookupCode)) {
+    return barcodeCache.get(lookupCode) ?? null;
+  }
+
+  const inFlightLookup = inFlightBarcodeLookups.get(lookupCode);
   if (inFlightLookup) {
     return inFlightLookup;
   }
 
   const lookupPromise = (async (): Promise<FoodSearchResult | null> => {
     try {
-      const food = await getFoodNutritionById(sanitizedBarcode);
+      const food = await getFoodNutritionById(lookupCode);
 
       if (!food) {
-        barcodeCache.set(sanitizedBarcode, null);
+        barcodeCache.set(lookupCode, null);
         return null;
       }
 
       const result: FoodSearchResult = {
-        id: `off_${food.id || sanitizedBarcode}`,
+        id: `off_${food.id || lookupCode}`,
         name: food.name,
         brand: food.brand ?? undefined,
         source: 'openfoodfacts',
-        external_id: food.id || sanitizedBarcode,
+        external_id: food.id || lookupCode,
         itemType: 'ingredient',
         kcal_100: food.per_100g.kcal,
         protein_g_100: food.per_100g.protein_g,
         carbs_g_100: food.per_100g.carbs_g,
         fat_g_100: food.per_100g.fats_g,
-        barcode: sanitizedBarcode,
+        barcode: lookupCode,
       };
 
-      barcodeCache.set(sanitizedBarcode, result);
+      barcodeCache.set(lookupCode, result);
       return result;
     } catch (error) {
       console.error('Barcode fetch failed:', error);
       throw error;
     } finally {
-      inFlightBarcodeLookups.delete(sanitizedBarcode);
+      inFlightBarcodeLookups.delete(lookupCode);
     }
   })();
 
-  inFlightBarcodeLookups.set(sanitizedBarcode, lookupPromise);
+  inFlightBarcodeLookups.set(lookupCode, lookupPromise);
   return lookupPromise;
 }
 
