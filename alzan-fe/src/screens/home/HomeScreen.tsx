@@ -30,7 +30,6 @@ import { SportIcon } from '../../components/icons/SportIcon';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useSettingsNotifications } from '../../hooks/settings/useSettingsNotifications';
-import { useMediaPermissions } from '../../hooks/useMediaPermissions';
 import { useHomeSettings } from '../../hooks/settings/useHomeSettings';
 import { HomeSummaryActiveWorkout, HomeSummaryScheduledWorkout, useHomeSummary } from '../../hooks/useHomeSummary';
 import { usePreferencesContext } from '../../context/PreferencesContext';
@@ -56,7 +55,6 @@ export const HomeScreen = () => {
   const { preferences } = usePreferencesContext();
   const { homeMode, homePrimaryAction } = useHomeSettings();
   const { data: homeSummary } = useHomeSummary();
-  useMediaPermissions(); // Request camera/mic permissions on mount
 
   // Auto-refresh when screen comes into focus
   useFocusEffect(

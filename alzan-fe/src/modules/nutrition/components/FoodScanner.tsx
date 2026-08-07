@@ -2,60 +2,29 @@
 // Barcode scanner component using expo-camera
 
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { X, Flashlight, FlashlightOff, ScanBarcode } from 'lucide-react-native';
 import { warmBarcodeLookup } from '../services/nutritionSearchService';
 import { useTranslation } from 'react-i18next';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SCAN_AREA_SIZE = SCREEN_WIDTH * 0.7;
-const SCAN_CONFIRMATION_WINDOW_MS = 800;
-
-type SupportedBarcodeType = 'ean13' | 'ean8' | 'upc_a' | 'upc_e';
-
-type PendingScanState = {
-  barcode: string;
-  matches: number;
-  timestamp: number;
-};
+import {
+  createBarcodeDetectionState,
+  getScannerFrameSize,
+  getWebCameraConstraints,
+  registerBarcodeDetection,
+  resolveWebBarcodeDetectorConstructor,
+  shouldPreferEnvironmentCamera,
+  shouldRequestCameraPermissionOnScannerOpen,
+} from '../services/barcodeScanner';
 
 type WebBarcodeDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string; format?: string }>>;
 };
 
-function normalizeBarcode(value: string): string {
-  return value.replace(/\s+/g, '').trim();
-}
+type WebBarcodeFormat = 'ean_13' | 'ean_8' | 'upc_a' | 'upc_e';
 
-function normalizeBarcodeType(value: string): SupportedBarcodeType | null {
-  const normalized = value.toLowerCase().replace(/[-_\s]/g, '');
-  if (normalized === 'ean13') return 'ean13';
-  if (normalized === 'ean8') return 'ean8';
-  if (normalized === 'upca') return 'upc_a';
-  if (normalized === 'upce') return 'upc_e';
-  return null;
-}
-
-function isValidBarcodeForType(type: SupportedBarcodeType, barcode: string): boolean {
-  if (!/^\d+$/.test(barcode)) {
-    return false;
-  }
-
-  switch (type) {
-    case 'ean13':
-      return barcode.length === 13;
-    case 'ean8':
-      return barcode.length === 8;
-    case 'upc_a':
-      return barcode.length === 12;
-    case 'upc_e':
-      return barcode.length >= 6 && barcode.length <= 8;
-    default:
-      return false;
-  }
-}
+type WebBarcodeDetectorConstructor = new (options: { formats: WebBarcodeFormat[] }) => WebBarcodeDetector;
 
 interface FoodScannerProps {
   onBarcodeDetected: (barcode: string) => void;
@@ -65,6 +34,8 @@ interface FoodScannerProps {
 export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onClose }) => {
   const { t } = useTranslation();
   const { colors: themeColors, isDark } = useNutritionStyles();
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const scanAreaSize = getScannerFrameSize({ width: viewportWidth, height: viewportHeight });
   const isWeb = Platform.OS === 'web';
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -72,7 +43,9 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
   const [webBarcodeDetectorSupported, setWebBarcodeDetectorSupported] = useState<boolean | null>(null);
   const [webError, setWebError] = useState<string | null>(null);
   const [webInitializing, setWebInitializing] = useState(false);
-  const pendingScanRef = useRef<PendingScanState | null>(null);
+  const [webScannerAttempt, setWebScannerAttempt] = useState(0);
+  const permissionRequestedRef = useRef(false);
+  const pendingScanRef = useRef(createBarcodeDetectionState());
   const scannedRef = useRef(false);
   const webVideoRef = useRef<HTMLVideoElement | null>(null);
   const webStreamRef = useRef<MediaStream | null>(null);
@@ -81,10 +54,13 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
   const lastWebDetectAtRef = useRef(0);
 
   useEffect(() => {
-    if (!permission?.granted) {
-      requestPermission();
+    if (isWeb || !shouldRequestCameraPermissionOnScannerOpen(permission, permissionRequestedRef.current)) {
+      return;
     }
-  }, [permission]);
+
+    permissionRequestedRef.current = true;
+    void requestPermission();
+  }, [isWeb, permission, requestPermission]);
 
   useEffect(() => {
     scannedRef.current = scanned;
@@ -96,50 +72,22 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
 
   useEffect(() => {
     if (!isWeb) return;
-    const BarcodeDetectorCtor = (globalThis as { BarcodeDetector?: unknown }).BarcodeDetector;
-    setWebBarcodeDetectorSupported(Boolean(BarcodeDetectorCtor));
+    setWebBarcodeDetectorSupported(Boolean(navigator.mediaDevices?.getUserMedia));
   }, [isWeb]);
 
   const processDetectedBarcode = (rawType: string, rawData: string) => {
     if (scannedRef.current) return;
-    const normalizedType = normalizeBarcodeType(rawType);
-    if (!normalizedType) {
-      return;
-    }
+    const detection = registerBarcodeDetection(pendingScanRef.current, {
+      rawType,
+      rawData,
+      timestamp: Date.now(),
+    });
+    pendingScanRef.current = detection.state;
 
-    const normalizedBarcode = normalizeBarcode(rawData);
-    if (!isValidBarcodeForType(normalizedType, normalizedBarcode)) {
-      return;
-    }
-
-    const now = Date.now();
-    const pendingScan = pendingScanRef.current;
-
-    if (
-      pendingScan &&
-      pendingScan.barcode === normalizedBarcode &&
-      now - pendingScan.timestamp <= SCAN_CONFIRMATION_WINDOW_MS
-    ) {
-      const nextMatches = pendingScan.matches + 1;
-      pendingScanRef.current = {
-        barcode: normalizedBarcode,
-        matches: nextMatches,
-        timestamp: now,
-      };
-
-      if (nextMatches >= 2) {
-        setScanned(true);
-        scannedRef.current = true;
-        onBarcodeDetected(normalizedBarcode);
-      }
-      return;
-    }
-
-    pendingScanRef.current = {
-      barcode: normalizedBarcode,
-      matches: 1,
-      timestamp: now,
-    };
+    if (!detection.confirmedBarcode) return;
+    setScanned(true);
+    scannedRef.current = true;
+    onBarcodeDetected(detection.confirmedBarcode);
   };
 
   const handleBarCodeScanned = (result: BarcodeScanningResult) => {
@@ -147,7 +95,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
   };
 
   useEffect(() => {
-    if (!isWeb || !permission?.granted || webBarcodeDetectorSupported !== true) {
+    if (!isWeb || webBarcodeDetectorSupported !== true) {
       return;
     }
 
@@ -211,25 +159,26 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
           return;
         }
 
-        const BarcodeDetectorCtor = (
+        const nativeDetectorConstructor = (
           globalThis as {
-            BarcodeDetector?: new (options: { formats: string[] }) => WebBarcodeDetector;
+            BarcodeDetector?: WebBarcodeDetectorConstructor;
           }
         ).BarcodeDetector;
 
-        if (!BarcodeDetectorCtor) {
-          setWebInitializing(false);
-          return;
-        }
+        const BarcodeDetectorCtor = await resolveWebBarcodeDetectorConstructor(nativeDetectorConstructor, async () => {
+          const { BarcodeDetector } = await import('barcode-detector/ponyfill');
+          return BarcodeDetector;
+        });
 
         webDetectorRef.current = new BarcodeDetectorCtor({
           formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'],
         });
 
+        const hasCoarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+        const preferEnvironmentCamera = shouldPreferEnvironmentCamera(hasCoarsePointer, navigator.maxTouchPoints ?? 0);
+
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-          },
+          video: getWebCameraConstraints(preferEnvironmentCamera),
           audio: false,
         });
 
@@ -265,10 +214,10 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
       canceled = true;
       stopWebScanner();
     };
-  }, [isWeb, permission?.granted, t, webBarcodeDetectorSupported]);
+  }, [isWeb, t, webBarcodeDetectorSupported, webScannerAttempt]);
 
   // Permission not determined yet
-  if (!permission) {
+  if (!isWeb && !permission) {
     return (
       <View style={[styles.container, { backgroundColor: isDark ? themeColors.surfaceSolid : '#F5F5F5' }]}>
         <Text style={[styles.permissionText, { color: themeColors.textSecondary }]}>
@@ -279,7 +228,7 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
   }
 
   // Permission denied
-  if (!permission.granted) {
+  if (!isWeb && permission && !permission.granted) {
     return (
       <View style={[styles.container, { backgroundColor: isDark ? themeColors.surfaceSolid : '#F5F5F5' }]}>
         <ScanBarcode size={64} color="#CCC" />
@@ -350,9 +299,9 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
         <View style={styles.overlayTop} />
 
         {/* Middle row with scan area */}
-        <View style={styles.overlayMiddle}>
+        <View style={[styles.overlayMiddle, { height: scanAreaSize }]}>
           <View style={styles.overlaySide} />
-          <View style={styles.scanArea}>
+          <View style={[styles.scanArea, { width: scanAreaSize, height: scanAreaSize }]}>
             {/* Corner markers */}
             <View style={[styles.corner, styles.cornerTL]} />
             <View style={[styles.corner, styles.cornerTR]} />
@@ -367,7 +316,16 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
           {webInitializing ? (
             <Text style={styles.instructionText}>{t('nutrition.loadingCamera')}</Text>
           ) : webError ? (
-            <Text style={styles.instructionText}>{webError}</Text>
+            <View style={styles.webErrorState}>
+              <Text style={styles.instructionText}>{webError}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.retryBtn}
+                onPress={() => setWebScannerAttempt(attempt => attempt + 1)}
+              >
+                <Text style={styles.retryBtnText}>{t('nutrition.retry')}</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <Text style={styles.instructionText}>{t('nutrition.scanBarcodeInstruction')}</Text>
           )}
@@ -445,15 +403,12 @@ const styles = StyleSheet.create({
   },
   overlayMiddle: {
     flexDirection: 'row',
-    height: SCAN_AREA_SIZE,
   },
   overlaySide: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   scanArea: {
-    width: SCAN_AREA_SIZE,
-    height: SCAN_AREA_SIZE,
     position: 'relative',
   },
   overlayBottom: {
@@ -466,6 +421,26 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '500',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  webErrorState: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  retryBtn: {
+    minWidth: 120,
+    minHeight: 44,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   corner: {
     position: 'absolute',

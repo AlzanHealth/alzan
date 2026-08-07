@@ -91,10 +91,10 @@ const en = {
     missingMealNameMessage: 'Please enter a name for the meal.',
     saveMealError: 'Could not save the meal.',
     loadingCamera: 'Loading camera...',
-    webBarcodeUnsupportedTitle: 'Scanner unavailable in this browser',
+    webBarcodeUnsupportedTitle: 'Scanner unavailable on this device',
     webBarcodeUnsupported:
-      'Barcode scanning on web depends on browser support, and Safari does not support it reliably. Use the iOS or Android app to scan products.',
-    webBarcodeCameraError: 'Could not start the camera for scanning.',
+      'This browser cannot access a camera. Use another compatible browser or the iOS or Android app.',
+    webBarcodeCameraError: 'Could not open the camera. Check the browser permission and try again.',
     incompleteDataWarning: '⚠️ Some data may be incomplete',
     proteinCaps: 'Protein',
     mealWith: 'Meal with',
