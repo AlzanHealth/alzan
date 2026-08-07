@@ -3,8 +3,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMemo } from 'react';
 import { nutritionService } from '../services/nutritionService';
 import { createVacationDateSet } from '../services/nutritionVacation';
-import { DietTemplateInsert, DietTemplateUpdate, MealLog, MealLogInsert } from '../../../types/requests.types';
+import {
+  DietTemplateInsert,
+  DietTemplateUpdate,
+  MealLog,
+  MealLogInsert,
+  MealType,
+} from '../../../types/requests.types';
 import { IngredientInput } from '../types/db';
+import type { DailyMealItem } from '../types';
+import { copyMealToDate } from '../services/dietCopyService';
 import { useAuth } from '../../../context/AuthContext';
 import { getCurrentAppLocale } from '../../../services/localization';
 import { usePreferences } from '../../../hooks/settings/usePreferences';
@@ -192,6 +200,30 @@ export function useDeleteMealLog() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: nutritionService.deleteMealLog,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+    },
+  });
+}
+
+export type CopyMealInput = {
+  source: DailyMealItem;
+  date: string;
+  mealType: MealType;
+};
+
+export function useCopyMeal() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ source, date, mealType }: CopyMealInput) => {
+      if (!user) throw new Error('No user');
+
+      return copyMealToDate(user.id, { log: source.log, templateMeal: source.templateMeal }, { date, mealType });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
       queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });

@@ -13,6 +13,7 @@ import { useDayNutrition } from '../../modules/nutrition/hooks/useDayNutritionLo
 import {
   useUpsertMealLog,
   useDeleteMealLog,
+  useCopyMeal,
   useWaterIntake,
   useVacationDateSet,
 } from '../../modules/nutrition/hooks/useNutritionData';
@@ -28,7 +29,10 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
+import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { getNutritionDayDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
+import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
+import { CopyMealModal, CopyMealDestination } from '../../modules/nutrition/components/CopyMealModal';
 
 // Helper to group meals
 const groupMealsByType = (meals: DailyMealItem[]) => {
@@ -65,9 +69,12 @@ export const NutritionHomeScreen = () => {
   const nutritionDayRolloverTime = normalizeNutritionDayRolloverTime(
     preferences?.nutrition_prefs?.nutrition_day_rollover_time,
   );
+  const currentNutritionDate = getNutritionDayDate(new Date(), nutritionDayRolloverTime);
 
   // Date Logic
   const [selectedDate, setSelectedDate] = useState(() => getNutritionDayDate(new Date(), nutritionDayRolloverTime));
+  const [mealToCopy, setMealToCopy] = useState<DailyMealItem | null>(null);
+  const nutritionCalendarRange = React.useMemo(() => getNutritionCalendarRange(new Date()), []);
   const daySwitcherRef = React.useRef<DaySwitcherRef>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
   const isAutoSelectedDateRef = React.useRef(true);
@@ -174,6 +181,7 @@ export const NutritionHomeScreen = () => {
   // Actions
   const upsertLog = useUpsertMealLog();
   const deleteMealLog = useDeleteMealLog();
+  const copyMeal = useCopyMeal();
 
   // The floating "+" defaults the meal slot to the current time of day so the
   // user lands in the right section without scrolling to find it. Falls back to
@@ -198,6 +206,25 @@ export const NutritionHomeScreen = () => {
       mealItem: item,
       isExtra: item.status === 'extra_meal',
     });
+  };
+
+  const handleCopyMeal = (item: DailyMealItem) => {
+    setMealToCopy(item);
+  };
+
+  const handleCopyMealSubmit = async ({ date, mealType }: CopyMealDestination) => {
+    if (!mealToCopy) return;
+
+    await copyMeal.mutateAsync({ source: mealToCopy, date, mealType });
+    setMealToCopy(null);
+
+    Alert.alert(
+      t('nutrition.copyMealSuccessTitle'),
+      t('nutrition.copyMealSuccessMessage', {
+        date: formatLocalizedDate(parseISO(date), { en: 'MMM d, yyyy', es: "d 'de' MMM yyyy" }),
+        mealType: t(MEAL_TYPE_LABELS[mealType]),
+      }),
+    );
   };
 
   const handleCheckMeal = (item: DailyMealItem) => {
@@ -364,6 +391,7 @@ export const NutritionHomeScreen = () => {
                 meals={mealsForType}
                 onAdd={() => handleAddFood(type)}
                 onEditMeal={handleEditMeal}
+                onCopyMeal={handleCopyMeal}
                 onCheckMeal={handleCheckMeal}
                 onDeleteMeal={handleDeleteMeal}
                 isSecondary={isSecondary}
@@ -383,6 +411,17 @@ export const NutritionHomeScreen = () => {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+
+        <CopyMealModal
+          visible={mealToCopy !== null}
+          sourceName={mealToCopy?.displayName ?? ''}
+          initialDate={currentNutritionDate}
+          minimumDate={nutritionCalendarRange.minimumDate}
+          maximumDate={nutritionCalendarRange.maximumDate}
+          mealTypes={displayMealTypes}
+          onCancel={() => setMealToCopy(null)}
+          onCopy={handleCopyMealSubmit}
+        />
 
         {/* Quick-add FAB: opens the quick-add sheet on the meal slot matching the time of day */}
         <TouchableOpacity

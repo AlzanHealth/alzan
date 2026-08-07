@@ -10,12 +10,13 @@ interface MealRowProps {
   item: DailyMealItem;
   onCheck: () => void;
   onEdit: () => void;
+  onCopy: () => void;
   onDelete?: () => void;
   onSkip?: () => void;
   showMacros?: boolean;
 }
 
-export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onDelete, showMacros = true }) => {
+export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onCopy, onDelete, showMacros = true }) => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
   const isPending = item.status === 'pending';
@@ -35,7 +36,14 @@ export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onDelete, showMa
       ]}
     >
       <View style={styles.info}>
-        <Text style={[styles.name, { color: themeColors.textPrimary }]}>{item.displayName}</Text>
+        <TouchableOpacity
+          onPress={onCopy}
+          accessibilityRole="button"
+          accessibilityLabel={t('nutrition.copyMealAccessibility', { mealName: item.displayName })}
+          style={styles.nameButton}
+        >
+          <Text style={[styles.name, { color: themeColors.textPrimary }]}>{item.displayName}</Text>
+        </TouchableOpacity>
         <View style={styles.macros}>
           <Text style={[styles.kcalText, { color: themeColors.textPrimary }]}>
             {Math.round(macros.kcal)}
@@ -90,6 +98,11 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
+  },
+  nameButton: {
+    alignSelf: 'flex-start',
+    minHeight: 24,
+    justifyContent: 'center',
   },
   name: {
     fontSize: 16,

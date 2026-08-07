@@ -12,6 +12,7 @@ interface MealSectionProps {
   meals: DailyMealItem[];
   onAdd: () => void;
   onEditMeal: (item: DailyMealItem) => void;
+  onCopyMeal: (item: DailyMealItem) => void;
   onCheckMeal: (item: DailyMealItem) => void;
   onDeleteMeal?: (item: DailyMealItem) => void;
   isSecondary?: boolean;
@@ -23,6 +24,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
   meals,
   onAdd,
   onEditMeal,
+  onCopyMeal,
   onCheckMeal,
   onDeleteMeal,
   isSecondary = false,
@@ -66,6 +68,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
           <MealRow
             item={meal}
             onEdit={() => onEditMeal(meal)}
+            onCopy={() => onCopyMeal(meal)}
             onCheck={() => onCheckMeal(meal)}
             onDelete={onDeleteMeal ? () => onDeleteMeal(meal) : undefined}
             showMacros={showMacros}

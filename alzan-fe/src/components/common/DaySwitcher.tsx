@@ -1,8 +1,9 @@
 import React, { useRef, useMemo, forwardRef, useImperativeHandle, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, useWindowDimensions } from 'react-native';
-import { format, addDays, isSameDay, startOfWeek, startOfDay, addWeeks } from 'date-fns';
+import { format, addDays, isSameDay, startOfDay, startOfWeek } from 'date-fns';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
+import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
 
 interface DaySwitcherProps {
   selectedDate: Date;
@@ -23,23 +24,7 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
     const MAX_CONTENT_WIDTH = 450;
     const PADDING_H = 16;
 
-    // Configuration
-    // We want a large range of weeks. Let's say +/- 50 weeks? Or infinite loading?
-    // Use a fixed large range for now for simplicity, centered on "today" or "start".
-    const WEEKS_BUFFER = 4; // 4 weeks before and after
-
-    // Base Monday: start of current week
-    const currentWeekStart = useMemo(() => startOfWeek(startOfDay(new Date()), { weekStartsOn: 1 }), []);
-
-    // Generate Array of "Week Start Dates"
-    const weeks = useMemo(() => {
-      // Generate range: [-WEEKS_BUFFER ... 0 ... +WEEKS_BUFFER]
-      const arr: Date[] = [];
-      for (let i = -WEEKS_BUFFER; i <= WEEKS_BUFFER; i++) {
-        arr.push(addWeeks(currentWeekStart, i));
-      }
-      return arr;
-    }, [currentWeekStart]);
+    const { weeks, currentWeekIndex } = useMemo(() => getNutritionCalendarRange(), []);
 
     // Find index of the week containing selectedDate
     // This is for initial scroll OR when selectedDate changes (if we want to auto-scroll)
@@ -51,8 +36,8 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
 
     const initialIndex = useMemo(() => {
       const idx = getIndexForDate(new Date()); // Today
-      return idx >= 0 ? idx : WEEKS_BUFFER; // Default to middle
-    }, [weeks]);
+      return idx >= 0 ? idx : currentWeekIndex; // Default to middle
+    }, [currentWeekIndex, weeks]);
 
     const flatListRef = useRef<FlatList>(null);
     const [visibleWeekIndex, setVisibleWeekIndex] = useState(initialIndex);
