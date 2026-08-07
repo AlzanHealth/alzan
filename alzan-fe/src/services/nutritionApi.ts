@@ -4,6 +4,7 @@
 
 import { CONFIG } from '../constants/environment';
 import { supabase } from '../lib/supabaseClient';
+import { isProductNotFoundHttpError, NutritionApiHttpError } from './nutritionApiHttp';
 
 const BASE_URL = CONFIG.nutritionApiBaseUrl;
 const DEFAULT_USER_AGENT_EMAIL = 'invitado@alzan.app';
@@ -152,20 +153,47 @@ async function apiFetch<T>(url: string): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
+  console.info('[nutritionApi] request:start', { url });
+
   try {
     const res = await fetch(url, { headers, signal: controller.signal });
+    console.info('[nutritionApi] request:response', {
+      url,
+      status: res.status,
+      ok: res.ok,
+      contentType: res.headers.get('content-type'),
+    });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      console.error(`[nutritionApi] Error ${res.status}: ${text}`);
-      throw new Error(`Error en API nutricional: ${res.status}`);
+      console.error('[nutritionApi] request:http-error', {
+        url,
+        status: res.status,
+        body: text.slice(0, 500),
+      });
+      throw new NutritionApiHttpError({
+        status: res.status,
+        url,
+        body: text,
+      });
     }
-    return (await res.json()) as T;
+
+    const data = (await res.json()) as T;
+    console.info('[nutritionApi] request:success', {
+      url,
+      responseKeys: data && typeof data === 'object' ? Object.keys(data) : [],
+    });
+    return data;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       console.error(`[nutritionApi] Request timeout after ${API_TIMEOUT_MS}ms: ${url}`);
       throw new Error('Tiempo de espera agotado en la API nutricional');
     }
-    console.error('[nutritionApi] Network error:', error);
+    console.error('[nutritionApi] request:failed', {
+      url,
+      errorName: error instanceof Error ? error.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+    });
     throw error;
   } finally {
     clearTimeout(timeoutId);
@@ -300,7 +328,28 @@ export async function getFoodNutritionById(foodId: string): Promise<FoodNutritio
     fields: PRODUCT_DETAILS_FIELDS,
   });
   const url = `${BASE_URL}/api/v2/product/${encodeURIComponent(foodId)}?${params.toString()}`;
-  const data = await apiFetch<OFFProductResponse>(url);
+  console.info('[nutritionApi] product:lookup', { foodId, url });
+  let data: OFFProductResponse;
+  try {
+    data = await apiFetch<OFFProductResponse>(url);
+  } catch (error) {
+    if (isProductNotFoundHttpError(error)) {
+      console.warn('[nutritionApi] product:not-found', {
+        foodId,
+        status: error.status,
+        responseBody: error.body.slice(0, 500),
+      });
+      return null;
+    }
+    throw error;
+  }
+
+  console.info('[nutritionApi] product:result', {
+    foodId,
+    apiCode: data.code,
+    apiStatus: data.status,
+    hasProduct: Boolean(data.product),
+  });
 
   if (!data.product) return null;
 

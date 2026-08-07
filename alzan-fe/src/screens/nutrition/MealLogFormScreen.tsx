@@ -1297,6 +1297,10 @@ export const MealLogFormScreen = () => {
   };
 
   const handleBarcodeDetected = async (barcode: string) => {
+    console.info('[MealLogForm][barcode] detected', {
+      value: barcode,
+      length: barcode.length,
+    });
     setShowScanner(false);
     setIsBarcodeLookupPending(true);
 
@@ -1304,17 +1308,29 @@ export const MealLogFormScreen = () => {
       const product = await fetchByBarcode(barcode);
 
       if (product) {
+        console.info('[MealLogForm][barcode] product-selected', {
+          barcode,
+          productId: product.id,
+          productName: product.name,
+        });
         setSelectedFood(product);
         setAmountInput('100');
         return;
       }
+
+      console.warn('[MealLogForm][barcode] product-not-found', { barcode });
 
       Alert.alert(t('nutrition.productNotFoundTitle'), t('nutrition.productNotFoundMessage', { barcode }), [
         { text: t('nutrition.scanAnother'), onPress: () => setShowScanner(true) },
         { text: t('nutrition.manualEntry'), onPress: () => setInputMode('manual') },
       ]);
     } catch (error) {
-      console.error('Barcode lookup error:', error);
+      console.error('[MealLogForm][barcode] lookup-failed', {
+        barcode,
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
       Alert.alert(t('common.error'), t('nutrition.productInfoFetchError'), [
         { text: t('nutrition.retry'), onPress: () => setShowScanner(true) },
       ]);

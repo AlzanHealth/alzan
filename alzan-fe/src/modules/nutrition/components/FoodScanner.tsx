@@ -91,6 +91,11 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
     setScanned(true);
     scannedRef.current = true;
     stopWebScannerRef.current?.();
+    console.info('[FoodScanner] detection-confirmed', {
+      rawType,
+      rawValue: rawData,
+      normalizedValue: detection.confirmedBarcode,
+    });
     onBarcodeDetected(detection.confirmedBarcode);
   };
 
@@ -188,6 +193,12 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
           audio: false,
         });
 
+        console.info('[FoodScanner][web] camera-opened', {
+          detector: nativeDetectorConstructor ? 'native' : 'zxing-ponyfill',
+          preferEnvironmentCamera,
+          videoTrack: stream.getVideoTracks()[0]?.getSettings(),
+        });
+
         if (canceled) {
           stream.getTracks().forEach(track => track.stop());
           return;
@@ -208,7 +219,12 @@ export const FoodScanner: React.FC<FoodScannerProps> = ({ onBarcodeDetected, onC
         if (canceled) return;
         setWebInitializing(false);
         webAnimationFrameRef.current = requestAnimationFrame(scanLoop);
-      } catch (_error) {
+      } catch (error) {
+        console.error('[FoodScanner][web] initialization-failed', {
+          errorName: error instanceof Error ? error.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+        });
         setWebError(t('nutrition.webBarcodeCameraError'));
         setWebInitializing(false);
       }

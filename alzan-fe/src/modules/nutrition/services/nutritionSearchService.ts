@@ -664,14 +664,27 @@ export function warmBarcodeLookup(): void {
 }
 
 export async function fetchByBarcode(barcode: string): Promise<FoodSearchResult | null> {
+  console.info('[barcodeLookup] received', {
+    rawValue: barcode,
+    rawLength: barcode?.length ?? 0,
+  });
   if (!barcode) return null;
 
   const sanitizedBarcode = barcode.trim();
   if (!sanitizedBarcode) return null;
   const lookupCode = normalizeProductLookupCode(sanitizedBarcode);
   if (!lookupCode) {
+    console.warn('[barcodeLookup] unsupported-payload', {
+      rawValue: sanitizedBarcode,
+      reason: 'No se pudo extraer un GTIN válido del valor escaneado',
+    });
     return null;
   }
+
+  console.info('[barcodeLookup] normalized', {
+    rawValue: sanitizedBarcode,
+    lookupCode,
+  });
 
   if (barcodeCache.has(lookupCode)) {
     return barcodeCache.get(lookupCode) ?? null;
@@ -687,9 +700,16 @@ export async function fetchByBarcode(barcode: string): Promise<FoodSearchResult 
       const food = await getFoodNutritionById(lookupCode);
 
       if (!food) {
+        console.warn('[barcodeLookup] product-not-found', { lookupCode });
         barcodeCache.set(lookupCode, null);
         return null;
       }
+
+      console.info('[barcodeLookup] product-found', {
+        lookupCode,
+        foodId: food.id,
+        foodName: food.name,
+      });
 
       const result: FoodSearchResult = {
         id: `off_${food.id || lookupCode}`,
@@ -708,7 +728,12 @@ export async function fetchByBarcode(barcode: string): Promise<FoodSearchResult 
       barcodeCache.set(lookupCode, result);
       return result;
     } catch (error) {
-      console.error('Barcode fetch failed:', error);
+      console.error('[barcodeLookup] failed', {
+        lookupCode,
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
       throw error;
     } finally {
       inFlightBarcodeLookups.delete(lookupCode);
