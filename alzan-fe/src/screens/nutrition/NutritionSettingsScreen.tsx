@@ -597,12 +597,9 @@ export const NutritionSettingsScreen = () => {
   };
 
   const handleNextMealCutoffInputChange = (value: string) => {
-    setNextMealCutoffInput(
-      value
-        .replace(',', '.')
-        .replace(/[^\d.]/g, '')
-        .slice(0, 5),
-    );
+    const sanitized = value.replace(',', '.').replace(/[^\d.]/g, '');
+    const [whole, decimals] = sanitized.split('.');
+    setNextMealCutoffInput(decimals === undefined ? whole.slice(0, 5) : `${whole.slice(0, 5)}.${decimals.slice(0, 2)}`);
   };
 
   const getNextMealCutoffDraftHours = () => {

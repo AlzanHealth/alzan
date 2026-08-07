@@ -17,13 +17,14 @@ const MAX_NIGHT_CUTOFF_MINUTES = 6 * 60;
 const MINUTES_PER_DAY = 24 * 60;
 
 export const DEFAULT_NEXT_MEAL_CUTOFF_HOURS = 1;
-export const MIN_NEXT_MEAL_CUTOFF_HOURS = 0.25;
+export const MIN_NEXT_MEAL_CUTOFF_HOURS = 0;
 export const MAX_NEXT_MEAL_CUTOFF_HOURS = 24;
 
 export const normalizeNextMealCutoffHours = (value: unknown): number => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_NEXT_MEAL_CUTOFF_HOURS;
 
-  return Math.min(MAX_NEXT_MEAL_CUTOFF_HOURS, Math.max(MIN_NEXT_MEAL_CUTOFF_HOURS, value));
+  const rounded = Math.round(value * 100) / 100;
+  return Math.min(MAX_NEXT_MEAL_CUTOFF_HOURS, Math.max(MIN_NEXT_MEAL_CUTOFF_HOURS, rounded));
 };
 
 const parseTime = (time: string | undefined, fallback: string): number => {
@@ -47,13 +48,21 @@ const parseTime = (time: string | undefined, fallback: string): number => {
 
 const normalizeMinutes = (minutes: number): number => ((minutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
 
-const isInWindow = (nowMinutes: number, previousEnd: number, currentEnd: number): boolean => {
-  if (previousEnd < currentEnd) {
-    return nowMinutes > previousEnd && nowMinutes <= currentEnd;
+type MealEnd = {
+  minute: number;
+  inclusive: boolean;
+};
+
+const isInWindow = (nowMinutes: number, previousEnd: MealEnd, currentEnd: MealEnd): boolean => {
+  const isAfterPreviousEnd = previousEnd.inclusive ? nowMinutes > previousEnd.minute : nowMinutes >= previousEnd.minute;
+  const isBeforeCurrentEnd = currentEnd.inclusive ? nowMinutes <= currentEnd.minute : nowMinutes < currentEnd.minute;
+
+  if (previousEnd.minute < currentEnd.minute) {
+    return isAfterPreviousEnd && isBeforeCurrentEnd;
   }
 
-  if (previousEnd > currentEnd) {
-    return nowMinutes > previousEnd || nowMinutes <= currentEnd;
+  if (previousEnd.minute > currentEnd.minute) {
+    return isAfterPreviousEnd || isBeforeCurrentEnd;
   }
 
   return false;
@@ -90,7 +99,10 @@ export const getMealTypeForTime = (
         ? Math.min(baseCutoffMinutes * NIGHT_MULTIPLIER, MAX_NIGHT_CUTOFF_MINUTES, intervalMinutes)
         : Math.min(baseCutoffMinutes, intervalMinutes);
 
-    return normalizeMinutes(nextTime - cutoff);
+    return {
+      minute: normalizeMinutes(nextTime - cutoff),
+      inclusive: cutoff > 0,
+    };
   });
 
   const nowMinutes = date.getHours() * 60 + date.getMinutes();

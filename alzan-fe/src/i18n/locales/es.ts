@@ -236,7 +236,7 @@ export default {
       'Define con cuánta antelación aparece la comida que debes registrar. El valor normal se limita al intervalo real entre comidas; por la noche se multiplica por 2,5 y nunca supera las seis horas.',
     nextMealTimingLabel: 'Margen automático',
     nextMealTimingHint:
-      'Por defecto es 1 hora. Cena usa 2,5 veces este margen, con un máximo de 6 horas y sin superar el tiempo hasta el desayuno.',
+      'Por defecto es 1 hora; puedes poner 0 para cambiar justo a la hora de la comida. Cena usa 2,5 veces este margen, con un máximo de 6 horas y sin superar el tiempo hasta el desayuno.',
     nextMealTimingPlaceholder: '1',
     nextMealTimingSaveError: 'No se pudo guardar el margen de la siguiente comida.',
     nutritionDayTitle: 'DÍA NUTRICIONAL',
