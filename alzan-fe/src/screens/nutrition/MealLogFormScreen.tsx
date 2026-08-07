@@ -42,6 +42,7 @@ import {
   canSubmitRecipeDraft,
   getMealSourceRecipeIdForSave,
   getPresetRecipeDraftMode,
+  getRecipeSaveMode,
   isOwnUserRecipe,
 } from '../../modules/nutrition/services/recipeEditing';
 import {
@@ -241,6 +242,7 @@ export const MealLogFormScreen = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [isBarcodeLookupPending, setIsBarcodeLookupPending] = useState(false);
   const [editingSavedRecipeId, setEditingSavedRecipeId] = useState<string | null>(null);
+  const [editingSavedRecipeName, setEditingSavedRecipeName] = useState<string | null>(null);
   const [editingSavedRecipeUpdatedAt, setEditingSavedRecipeUpdatedAt] = useState<string | null>(null);
   const [editingRecipeSignature, setEditingRecipeSignature] = useState<string | null>(null);
   const [mealSourceRecipeId, setMealSourceRecipeId] = useState<string | null>(
@@ -444,6 +446,15 @@ export const MealLogFormScreen = () => {
 
   const currentRecipeSignature = useMemo(() => buildRecipeSignature(name, ingredients), [ingredients, name]);
   const isEditingRecipe = editingSavedRecipeId !== null;
+  const recipeSaveMode = getRecipeSaveMode({
+    editingRecipeId: editingSavedRecipeId,
+    originalName: editingSavedRecipeName,
+    currentName: name,
+    originalSignature: editingRecipeSignature,
+    currentSignature: currentRecipeSignature,
+  });
+  const isUpdatingExistingRecipe = recipeSaveMode === 'update-existing';
+  const isSavingRecipeAsNew = recipeSaveMode === 'create-new' && editingRecipeSignature !== null;
   const canSubmitRecipe = canSubmitRecipeDraft({
     name,
     ingredientsLength: ingredients.length,
@@ -502,6 +513,7 @@ export const MealLogFormScreen = () => {
     setName(editableRecipe.name);
     setIngredients(transformedIngredients);
     setEditingSavedRecipeId(draftMode.editingRecipeId);
+    setEditingSavedRecipeName(editableRecipe.name);
     setEditingSavedRecipeUpdatedAt(editableRecipe.updated_at);
     setEditingRecipeSignature(draftMode.originalSignature);
     setMealSourceRecipeId(editableRecipe.id);
@@ -531,6 +543,7 @@ export const MealLogFormScreen = () => {
     }
 
     setEditingSavedRecipeId(draftMode.editingRecipeId);
+    setEditingSavedRecipeName(editableRecipe.name);
     setEditingSavedRecipeUpdatedAt(editableRecipe.updated_at);
     setEditingRecipeSignature(draftMode.originalSignature);
     setMealSourceRecipeId(editableRecipe.id);
@@ -716,6 +729,7 @@ export const MealLogFormScreen = () => {
     // Set the name from the selected item
     setName(item.name);
     setEditingSavedRecipeId(null);
+    setEditingSavedRecipeName(item.itemType === 'recipe' ? item.name : null);
     setEditingSavedRecipeUpdatedAt(null);
     setEditingRecipeSignature(null);
     setMealSourceRecipeId(selectedRecipeId);
@@ -733,7 +747,7 @@ export const MealLogFormScreen = () => {
         if (recipeIngredients.length > 0) {
           const transformedIngredients = mapRecipeIngredientsToMealComponents(recipeIngredients);
           setIngredients(transformedIngredients);
-          setEditingRecipeSignature(null);
+          setEditingRecipeSignature(buildRecipeSignature(item.name, transformedIngredients));
           setSearchMessage({ type: 'info', text: t('nutrition.ingredientsAddedAutomatically') });
         }
       } catch (error) {
@@ -963,6 +977,7 @@ export const MealLogFormScreen = () => {
 
   const handleSaveCurrentRecipe = async () => {
     if (isSaving) return;
+    if (recipeSaveMode === 'no-changes') return;
 
     if (!name.trim()) {
       Alert.alert(t('nutrition.missingMealNameTitle'), t('nutrition.missingMealNameMessage'));
@@ -1005,7 +1020,7 @@ export const MealLogFormScreen = () => {
       }
 
       const normalizedName = normalizeName(name.trim());
-      let recipeId = editingSavedRecipeId;
+      let recipeId = isUpdatingExistingRecipe ? editingSavedRecipeId : null;
       const nutritionSnapshot = buildRecipeNutritionSnapshot(ingredients, name.trim());
 
       if (recipeId) {
@@ -1102,7 +1117,7 @@ export const MealLogFormScreen = () => {
         return;
       }
 
-      if (!isEditingRecipe && defaultRecipeVisibility === 'public' && recipeId) {
+      if (!isUpdatingExistingRecipe && defaultRecipeVisibility === 'public' && recipeId) {
         try {
           await publishRecipe(recipeId);
         } catch (error) {
@@ -1117,10 +1132,15 @@ export const MealLogFormScreen = () => {
         queryClient.invalidateQueries({ queryKey: ['recipeFavorites'] }),
       ]);
       setEditingSavedRecipeId(null);
+      setEditingSavedRecipeName(null);
       setEditingSavedRecipeUpdatedAt(null);
       setEditingRecipeSignature(null);
-      const successTitle = isEditingRecipe ? t('nutrition.recipeUpdatedTitle') : t('nutrition.recipeSavedTitle');
-      const successMessage = isEditingRecipe ? t('nutrition.recipeUpdatedMessage') : t('nutrition.recipeSavedMessage');
+      const successTitle = isUpdatingExistingRecipe
+        ? t('nutrition.recipeUpdatedTitle')
+        : t('nutrition.recipeSavedTitle');
+      const successMessage = isUpdatingExistingRecipe
+        ? t('nutrition.recipeUpdatedMessage')
+        : t('nutrition.recipeSavedMessage');
 
       if (isRecipeEditorOnly) {
         Alert.alert(successTitle, successMessage, [{ text: t('common.ok'), onPress: () => navigation.goBack() }]);
@@ -1362,6 +1382,7 @@ export const MealLogFormScreen = () => {
     setMealSearchFilter('recipe');
     setMealRecipePage(1);
     setEditingSavedRecipeId(null);
+    setEditingSavedRecipeName(null);
     setEditingSavedRecipeUpdatedAt(null);
     setEditingRecipeSignature(null);
     setMealSourceRecipeId(null);
@@ -1915,7 +1936,7 @@ export const MealLogFormScreen = () => {
                     styles.recipeBuilderSaveButton,
                     {
                       backgroundColor:
-                        canSubmitRecipe && !isSaving
+                        canSubmitRecipe && recipeSaveMode !== 'no-changes' && !isSaving
                           ? themeColors.primary
                           : isDark
                             ? 'rgba(255,255,255,0.14)'
@@ -1923,25 +1944,37 @@ export const MealLogFormScreen = () => {
                     },
                   ]}
                   onPress={handleSaveCurrentRecipe}
-                  disabled={!canSubmitRecipe || isSaving}
+                  disabled={!canSubmitRecipe || recipeSaveMode === 'no-changes' || isSaving}
                 >
                   <View style={styles.recipeBuilderSaveButtonContent}>
                     {isSaving ? (
                       <>
                         <ActivityIndicator size="small" color="#FFFFFF" />
                         <Text style={styles.recipeBuilderSaveButtonText}>
-                          {isEditingRecipe ? t('nutrition.editingRecipeAction') : t('nutrition.savingRecipeAction')}
+                          {isUpdatingExistingRecipe
+                            ? t('nutrition.updatingRecipeAction')
+                            : t('nutrition.savingRecipeAction')}
                         </Text>
                       </>
                     ) : (
                       <Text style={styles.recipeBuilderSaveButtonText}>
-                        {isEditingRecipe ? t('nutrition.editRecipeAction') : t('nutrition.saveRecipeAction')}
+                        {recipeSaveMode === 'no-changes'
+                          ? t('nutrition.noRecipeChangesAction')
+                          : isUpdatingExistingRecipe
+                            ? t('nutrition.updateRecipeAction')
+                            : isSavingRecipeAsNew
+                              ? t('nutrition.saveAsNewRecipeAction')
+                              : t('nutrition.saveRecipeAction')}
                       </Text>
                     )}
                   </View>
                 </TouchableOpacity>
                 <Text style={[styles.recipeBuilderSaveHint, { color: themeColors.textSecondary }]}>
-                  {t('nutrition.saveRecipeHint')}
+                  {isUpdatingExistingRecipe
+                    ? t('nutrition.updateRecipeHint')
+                    : isSavingRecipeAsNew
+                      ? t('nutrition.saveAsNewRecipeHint')
+                      : t('nutrition.saveRecipeHint')}
                 </Text>
               </View>
 

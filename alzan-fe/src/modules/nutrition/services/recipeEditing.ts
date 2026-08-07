@@ -31,6 +31,8 @@ export type PresetRecipeDraftMode =
       originalSignature: null;
     };
 
+export type RecipeSaveMode = 'update-existing' | 'create-new' | 'no-changes';
+
 const normalizeRecipeName = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, ' ');
 
 const normalizeQuantity = (quantity: number): number => Math.round(quantity * 10) / 10;
@@ -63,6 +65,25 @@ export const canSubmitRecipeDraft = ({
   currentSignature: string;
 }): boolean => {
   return name.trim().length > 0 && ingredientsLength > 0 && originalSignature !== currentSignature;
+};
+
+export const getRecipeSaveMode = ({
+  editingRecipeId,
+  originalName,
+  currentName,
+  originalSignature,
+  currentSignature,
+}: {
+  editingRecipeId: string | null;
+  originalName: string | null;
+  currentName: string;
+  originalSignature: string | null;
+  currentSignature: string;
+}): RecipeSaveMode => {
+  if (originalSignature !== null && originalSignature === currentSignature) return 'no-changes';
+  if (!editingRecipeId) return 'create-new';
+  if (normalizeRecipeName(originalName ?? '') !== normalizeRecipeName(currentName)) return 'create-new';
+  return 'update-existing';
 };
 
 export const getPresetRecipeDraftMode = ({
