@@ -2,6 +2,8 @@ import { CONFIG } from '../../constants/environment';
 import { supabase } from '../../lib/supabaseClient';
 import {
   CloudProviderSyncResult,
+  CorosCapability,
+  CorosDisconnectResult,
   LocalHealthSyncRequest,
   LocalHealthSyncResult,
   ProviderOrigin,
@@ -111,6 +113,18 @@ export const wearablesLocalHealthApi = {
   syncSuuntoActivities: () =>
     requestJson<CloudProviderSyncResult>('/wearables/cloud/suunto/sync', {
       method: 'POST',
+    }),
+
+  getCorosCapability: () => requestJson<CorosCapability>('/wearables/cloud/coros/capability'),
+
+  syncCoros: () =>
+    requestJson<CloudProviderSyncResult>('/wearables/cloud/coros/sync', {
+      method: 'POST',
+    }),
+
+  disconnectCoros: () =>
+    requestJson<CorosDisconnectResult>('/wearables/connections/coros', {
+      method: 'DELETE',
     }),
 };
 

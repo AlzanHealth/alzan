@@ -1267,7 +1267,14 @@ export default {
       'Vas a abrir la pantalla de permisos del sistema para {{service}}. Revisa los tipos de datos antes de permitir el acceso. Puedes cancelar aquí y seguir en Alzan.',
     permissionSheetOAuthDescription:
       'Vas a abrir el inicio de sesión de {{service}}. Puedes cancelar aquí y seguir en Alzan, o continuar para autorizar la conexión.',
+    permissionSheetCorosDescription:
+      'COROS compartirá con Alzan tus entrenamientos, archivos FIT, pasos, calorías, sueño, frecuencia cardiaca en reposo y HRV. Iniciarás sesión directamente en COROS; Alzan nunca recibirá tu contraseña. Puedes desconectar y borrar estos datos cuando quieras.',
     permissionSheetContinue: 'Continuar',
+    corosSyncSummary:
+      'Entrenamientos importados: {{imported}} · Omitidos: {{skipped}} · Fallidos: {{failed}} · Días de salud: {{healthDays}}',
+    corosDisconnectPendingTitle: 'COROS desconectado localmente',
+    corosDisconnectPendingMessage:
+      'Los datos COROS se han eliminado de Alzan. COROS no respondió a la revocación y Alzan volverá a intentarlo durante las próximas 24 horas.',
     oauthCallbackCompleting: 'Completando conexión. Podrás cerrar esta ventana en un momento.',
     oauthCallbackManualClose: 'Vuelve a Alzan para terminar la conexión.',
     healthConnectSourceTitle: 'Elige un origen de Health Connect',
@@ -1557,6 +1564,8 @@ export default {
     stravaConnectedSince: 'Conectado',
   },
   training: {
+    dataProvidedByCoros: 'Datos proporcionados por COROS',
+    dataProvidedByCorosDevice: 'Datos proporcionados por COROS · {{device}}',
     workout: 'Entrenamiento de',
     selectTargetPace: 'Selecciona el ritmo objetivo (min',
     selectTargetPaceObjective: 'Selecciona el ritmo objetivo (min',

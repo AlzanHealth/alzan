@@ -1253,7 +1253,14 @@ const en = {
       'You are about to open the system permission screen for {{service}}. Review the data types before allowing access. You can cancel here and stay in Alzan.',
     permissionSheetOAuthDescription:
       'You are about to open {{service}} sign-in. You can cancel here and stay in Alzan, or continue to authorize the connection.',
+    permissionSheetCorosDescription:
+      'COROS will share your workouts, FIT files, steps, calories, sleep, resting heart rate, and HRV with Alzan. You will sign in directly with COROS; Alzan never receives your password. You can disconnect and erase this data at any time.',
     permissionSheetContinue: 'Continue',
+    corosSyncSummary:
+      'Workouts imported: {{imported}} · Skipped: {{skipped}} · Failed: {{failed}} · Health days: {{healthDays}}',
+    corosDisconnectPendingTitle: 'COROS disconnected locally',
+    corosDisconnectPendingMessage:
+      'Your COROS data has been removed from Alzan. COROS did not respond to revocation, so Alzan will retry for the next 24 hours.',
     oauthCallbackCompleting: 'Completing connection. You can close this window in a moment.',
     oauthCallbackManualClose: 'Return to Alzan to finish the connection.',
     healthConnectSourceTitle: 'Choose one Health Connect source',
@@ -1542,6 +1549,8 @@ const en = {
     stravaConnectedSince: 'Connected',
   },
   training: {
+    dataProvidedByCoros: 'Data provided by COROS',
+    dataProvidedByCorosDevice: 'Data provided by COROS · {{device}}',
     workout: 'Workout of',
     selectTargetPace: 'Select target pace (min',
     selectTargetPaceObjective: 'Select target pace objective (min',

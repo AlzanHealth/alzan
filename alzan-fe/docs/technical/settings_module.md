@@ -60,8 +60,9 @@ Se han centralizado aquí los ajustes específicos de los módulos:
 - Actividad semanal objetivo
 
 ### 4. ConnectedAppsScreen
-- Lista de apps (Suunto, Strava, etc.) marcadas como **Próximamente**.
-- Funcionalidad de conexión deshabilitada temporalmente.
+- Gestiona Strava, Suunto, Polar, Apple Health, Health Connect y COROS.
+- COROS consulta primero `/wearables/cloud/coros/capability`, por lo que la tarjeta solo aparece para usuarios permitidos por el rollout del backend.
+- La conexión y los entrenamientos no dependen del consentimiento de salud; antes de importar pasos, sueño, RHR o HRV se solicita consentimiento explícito vigente. La desconexión usa el backend para revocar y borrar datos, no elimina directamente la fila Supabase.
 
 ### 5. DataExportScreen (GDPR)
 - Exportar todos los datos a JSON

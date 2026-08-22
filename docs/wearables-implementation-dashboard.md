@@ -12,10 +12,11 @@ Este dashboard resume los cambios implementados para la integracion de wearables
 | Apple HealthKit   | Hecho v1 | Existe modulo nativo iOS `AlzanAppleHealth` con HealthKit read-only, permisos, workouts, sleep, biomarcadores, peso/body fat y rutas. Requiere iPhone fisico para datos reales. |
 | Pantalla Pasos    | Hecho v1 | La pantalla lee `daily_steps`; Apple Health y Health Connect la alimentan. Garmin/Suunto no deben mostrarse como pasos diarios cloud todavia.                                  |
 | Polar             | Hecho v1 | OAuth callback publico, registro AccessLink y sync manual de `/v3/exercises` hacia el writer canonico.                                                                          |
-| Cloud providers   | Parcial  | Polar ya tiene pull manual. El resto sigue preparado por OAuth/provenance, pero sin jobs/webhooks/backfills.                                                                    |
-| Frontend contrato | Mejorado | Settings permite conectar/sincronizar Apple Health, Health Connect y Polar; Apple usa modulo nativo propio y Polar usa endpoint cloud.                                          |
-| Seguridad         | Mejorada | Tokens nuevos pasan a tabla privada; raw payloads no tienen policy cliente. Falta cifrado fuerte/Vault.                                                                         |
-| Verificacion      | Parcial  | Backend, formato, imports wearables y build Android pasan. Frontend `typecheck`/lint global siguen bloqueados por tipado Supabase general.                                      |
+| COROS             | Piloto listo | OAuth con `openId`, backfill 90 días, daily health, FIT seguro, webhook duradero, cifrado AES-256-GCM, rollout por UUID y borrado completo. Falta credencial/payload real COROS. |
+| Cloud providers   | Parcial  | Polar, Suunto y COROS tienen rutas productivas; los demás siguen preparados por OAuth/provenance sin jobs completos.                                                            |
+| Frontend contrato | Mejorado | Settings permite conectar/sincronizar Apple Health, Health Connect, Polar, Suunto y COROS; COROS se oculta fuera del rollout permitido.                                        |
+| Seguridad         | Mejorada | Tokens privados; COROS además cifra access/refresh tokens, valida FIT contra SSRF y reintenta deautorización remota con outbox cifrado.                                         |
+| Verificacion      | Hecho local | Formato, lint, typecheck, build backend, prebuild Expo, export web, OpenAPI, 22 checks de importación y prueba SQL COROS pasan. Falta el E2E contra sandbox/cuenta real de COROS. |
 
 ## Mapa Rapido de Cambios
 
@@ -77,7 +78,7 @@ Reglas actuales:
 
 - `activity_sessions.total_steps` puede guardar pasos dentro de un entrenamiento, pero no alimenta la pantalla `Pasos`.
 - Si hay varias fuentes para una fecha, la app no las suma. La fila manual gana; si no existe manual, se muestra el mayor total de proveedor.
-- Apple Health y Health Connect son los unicos canales que alimentan `daily_steps` de forma productiva hoy.
+- Apple Health, Health Connect y COROS son los canales que alimentan `daily_steps` de forma productiva hoy; COROS solo después de consentimiento explícito vigente.
 - Garmin tiene OAuth y mapper de daily activity, pero no tiene `GarminCloudSyncService` ni endpoint de daily summaries.
 - Suunto tiene sync de workouts/FIT; esos pasos son de entrenamientos y no equivalen a pasos diarios en `daily_steps`.
 
@@ -211,11 +212,11 @@ Pendiente recomendado: cifrado fuerte de tokens con Vault/pgsodium o envelope en
 | --------------------------------------------- | -------------------------------------------------------------------------------- |
 | Cobertura avanzada Health Connect             | La v1 lee los records basicos; faltan rutas, laps y streams deportivos ricos.    |
 | Delta sync HealthKit con anchors reales       | La v1 hace sync manual por ventana; falta `HKAnchoredObjectQuery` persistente.   |
-| Jobs cloud por Garmin/Suunto/Polar/COROS/etc. | La base esta preparada, pero no se implementaron pulls/webhooks.                 |
+| Jobs cloud de proveedores restantes          | COROS, Suunto y Polar ya tienen integración; faltan proveedores no implementados. |
 | Procesamiento de deletes                      | Hay sync state y source ids, pero falta event processor por canal.               |
 | Duplicate groups cross-provider               | Existe `DedupeService` inicial, pero no tablas de agrupacion finales.            |
-| Cifrado fuerte de tokens                      | Se separaron tokens a tabla privada; falta Vault/encryption.                     |
-| Regeneracion OpenAPI cliente                  | Swagger backend esta preparado, pero no se regenero cliente desde servidor vivo. |
+| Cifrado de tokens de otros proveedores        | COROS ya usa AES-256-GCM; el hardening equivalente sigue pendiente para otros proveedores. |
+| Certificación COROS real                      | OpenAPI local está regenerado; faltan credenciales, payloads sandbox y certificación externa de COROS. |
 
 ## Como Explicarlo En Una Frase
 

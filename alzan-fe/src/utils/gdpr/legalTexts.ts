@@ -1,6 +1,6 @@
 export const TERMS_AND_CONDITIONS = `# TÉRMINOS Y CONDICIONES DE USO — ALZAN HEALTH
 
-**Última actualización:** 20 Diciembre 2025
+**Última actualización:** 22 Agosto 2026
 
 ---
 
@@ -80,6 +80,8 @@ export const TERMS_AND_CONDITIONS = `# TÉRMINOS Y CONDICIONES DE USO — ALZAN 
 *   no se utiliza para reconocimiento facial ni inferencias biométricas.
 
 **5.5. Disponibilidad y evolución:** determinadas funciones pueden cambiar, suspenderse o actualizarse por mejoras, seguridad o requisitos legales/técnicos. Intentaremos que los cambios sean razonables y comunicados cuando proceda.
+
+**5.6. Integraciones deportivas:** si conectas voluntariamente un proveedor como COROS, la App puede importar los entrenamientos y datos de salud que autorices. La conexión se realiza en la página del proveedor mediante OAuth; Alzan Health no solicita ni recibe tu contraseña del proveedor.
 
 ---
 
@@ -252,7 +254,7 @@ Para dudas legales, soporte, privacidad o ejercicio de derechos:
 
 export const PRIVACY_POLICY = `# POLÍTICA DE PRIVACIDAD — ALZAN HEALTH
 
-**Última actualización:** 20 Diciembre 2025
+**Última actualización:** 22 Agosto 2026
 
 ---
 
@@ -327,6 +329,11 @@ La App puede permitirte registrar y visualizar (según lo que tú decidas introd
 *   % grasa u otras métricas corporales
 *   Ritmo cardíaco (si lo registras)
 *   Sueño (si lo registras)
+*   Entrenamientos, rutas, vueltas, frecuencia cardiaca y métricas de rendimiento importadas de proveedores autorizados
+*   Pasos, calorías, frecuencia cardiaca en reposo y variabilidad de la frecuencia cardiaca (HRV)
+*   Identificador y modelo del dispositivo deportivo que originó los datos
+
+Cuando conectas COROS, podemos recibir resúmenes de actividad, archivos FIT y datos diarios expresamente autorizados por ti. No recibimos las credenciales con las que inicias sesión en COROS.
 
 Estos datos pueden ser datos relativos a la salud y son **categoría especial (Art. 9 RGPD)**, con protección reforzada.
 
@@ -361,6 +368,7 @@ Si nos escribes por email o soporte:
 *   **Directamente de ti:** al registrarte, al introducir registros de entrenamiento/nutrición/salud, al subir foto de perfil.
 *   **Del dispositivo/App:** datos técnicos mínimos necesarios para funcionamiento/seguridad.
 *   **De proveedores de autenticación:** si usas “Sign in with Apple/Google”, recibimos identificadores necesarios para autenticarte (por ejemplo, email o identificador, según el proveedor y tu configuración).
+*   **De integraciones deportivas autorizadas:** si conectas COROS, recibimos de COROS los entrenamientos y datos diarios que hayas autorizado, así como un identificador técnico de la conexión. La autorización y el inicio de sesión ocurren directamente en COROS.
 *   **De bases de datos de alimentos:** recibimos datos del alimento, no datos personales tuyos (aunque el hecho de que “tú” selecciones un alimento se convierte en un registro personal tuyo dentro de la App).
 
 ---
@@ -407,6 +415,12 @@ Y para datos de salud (categoría especial), además necesitamos una condición 
 *   **Finalidad:** verificación de email, reset de contraseña, avisos esenciales del servicio.
 *   **Base legal:** contrato y/o obligación legal según el caso (Art. 6).
 
+**6.8 Integraciones deportivas y COROS**
+*   **Finalidad:** unificar en tu panel privado el historial de entrenamientos, rutas, vueltas y métricas diarias autorizadas.
+*   **Base legal (Art. 6):** ejecución de la funcionalidad solicitada y consentimiento.
+*   **Condición adicional (Art. 9):** consentimiento explícito para sueño, frecuencia cardiaca, HRV y demás datos relativos a la salud.
+*   **Límites:** no vendemos estos datos, no los usamos para publicidad, no los mostramos a otros usuarios y no los utilizamos para diagnóstico médico. Cualquier uso futuro de analítica o IA que cambie estas finalidades requerirá información y base jurídica adecuadas antes de activarse.
+
 ---
 
 ## 7. Menores de edad (UE y España)
@@ -436,6 +450,7 @@ Podemos usar proveedores que tratan datos siguiendo nuestras instrucciones para:
 *   Apple/Google (solo si habilitas login social).
 *   Proveedor de email transaccional (si configuras SMTP para verificación/reset).
 *   Notificaciones push (APNs/FCM si las implementas).
+*   COROS, únicamente para realizar la autorización OAuth, descargar los datos que hayas autorizado y tramitar la revocación de la conexión.
 
 Estos proveedores reciben solo los datos mínimos para ejecutar su función.
 
@@ -469,6 +484,8 @@ Cuando solicitas borrar tu cuenta:
     *   obligaciones legales,
     *   seguridad (prevención de fraude),
     *   defensa ante reclamaciones.
+
+Al desconectar COROS, eliminamos o desvinculamos localmente los tokens, payloads, actividades, datos diarios y derivados COROS. También solicitamos la desautorización remota. Si COROS no está disponible, conservamos exclusivamente el token cifrado mínimo necesario en una cola sin identificador directo, durante un máximo de 24 horas, para reintentar la revocación; después se elimina.
 
 **10.3 Backups**
 Por razones de seguridad/continuidad, los datos pueden permanecer en copias de seguridad durante un periodo limitado hasta su rotación (p. ej., 30–90 días, ajustable según tu infraestructura).
@@ -567,14 +584,14 @@ export const HEALTH_CONSENT = `ALZAN — CONSENTIMIENTO EXPLÍCITO
 De acuerdo con el Art. 9 del GDPR, los datos de salud requieren consentimiento explícito.
 
 1. DATOS DE SALUD
-Peso, altura, medidas, FC reposo, sueño, grasa corporal, entrenamientos.
+Peso, altura, medidas, FC reposo, HRV, sueño, grasa corporal, pasos, calorías y entrenamientos. Si conectas COROS, también resúmenes de actividad, rutas, vueltas, archivos FIT y modelo del dispositivo.
 
 2. FINALIDAD
 Registrar progresos, métricas y análisis. NO se usan para publicidad.
 
 3. DESTINATARIOS
-Supabase (almacenamiento), Apps conectadas (si el usuario autoriza).
+Supabase (infraestructura y almacenamiento) y el proveedor conectado, como COROS, solo para autorizar, sincronizar o revocar la conexión. No se venden ni se usan para publicidad o diagnóstico médico.
 
 4. RETIRADA
-Puede retirar consentimiento en Ajustes > Privacidad. Implica dejar de usar la app.
+Puedes retirar el consentimiento en Ajustes > Privacidad o desconectar COROS en Ajustes > Apps conectadas. Podrás seguir usando Alzan, aunque las funciones de salud afectadas quedarán desactivadas. La desconexión permite eliminar los datos COROS importados.
 `;

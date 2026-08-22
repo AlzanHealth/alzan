@@ -12,13 +12,14 @@ Implemented in this branch:
 - Alzan-owned Apple Health native module `NativeModules.AlzanAppleHealth` for read-only HealthKit sync, installed through `alzan-fe/plugins/withAlzanAppleHealth.js`.
 - Alzan-owned Android Health Connect native module `NativeModules.AlzanHealthConnect` for read-only Health Connect sync, installed through `alzan-fe/plugins/withAlzanHealthConnect.js`.
 - Polar AccessLink v1 manual sync through `POST /wearables/cloud/polar/sync`.
+- COROS OAuth, 90-day workout/FIT and daily-health backfill, three-day overlap sync, authenticated workout webhook queue, pilot rollout, encrypted tokens, and complete disconnect.
 - Health Connect origin discovery and selected-source persistence.
 - OAuth token hardening for future provider callbacks by moving tokens from visible `user_connections` rows into private `provider_connection_tokens`.
 - Connected Apps actions for Apple Health, Health Connect, and Polar in `alzan-fe/src/screens/settings/ConnectedAppsScreen.tsx`.
 
 Not implemented here:
 
-- Cloud provider pull jobs, webhooks, and delete event processors.
+- Cloud provider jobs and delete/update event processors for providers other than the implemented Suunto/COROS/Polar paths.
 - Cross-provider duplicate group tables.
 - Health Connect high-detail records beyond v1 coverage, such as route geometry, laps, speed, power, cadence, distance summaries, calories, VO2 max, SpO2, respiratory rate, temperature, and body fat.
 
@@ -175,7 +176,8 @@ Current provider coverage for the Steps screen:
 | Health Connect local SDK | Yes | Yes | Reads `StepsRecord.count` for the selected `DataOrigin`, uploads `daily_activity`, and writes `daily_steps`. |
 | Garmin cloud | No | No | OAuth and daily activity mapper exist, but there is no Garmin daily summary sync service or endpoint. |
 | Suunto cloud | No | No | Workout sync can write workout `total_steps` to `activity_sessions`; daily steps are not written to `daily_steps`. |
-| Fitbit/Oura/Polar/COROS/Ultrahuman cloud | No | No | Health mappers exist, but no productive cloud daily steps sync writes `daily_steps`. |
+| COROS cloud | Yes | Yes | `/coros/daily/query` writes authorized `step` totals to `daily_steps` after explicit versioned health consent. |
+| Fitbit/Oura/Polar/Ultrahuman cloud | No | No | Health mappers exist, but no productive cloud daily steps sync writes `daily_steps`. |
 | WHOOP cloud | No | No | Current mappers cover cycle/sleep/recovery, not daily steps. |
 
 Run the executable audit from the repo root:
@@ -191,6 +193,16 @@ The audit source is `alzan-be/src/components/wearables/services/provider-steps-a
 `POST /wearables/cloud/polar/sync`
 
 This endpoint requires an active Polar OAuth connection. It reads private tokens from `provider_connection_tokens`, calls Polar AccessLink `/v3/exercises`, stores raw payloads, and upserts activities through the canonical writer.
+
+### COROS cloud
+
+`POST /wearables/cloud/coros/sync` imports a 90-day first window and three-day overlapping deltas. COROS limits calls to 30 days, so the service splits the interval before calling `/v2/coros/sport/list` and `/coros/daily/query`.
+
+`POST /webhooks/coros/workouts` is public at the HTTP auth layer but requires constant-time validation of COROS `client` and `secret` headers. It persists each activity summary before returning `{"message":"ok","result":"0000"}`. `GET /webhooks/coros/status` returns `{"status":"ok"}`.
+
+`DELETE /wearables/connections/coros` attempts remote deauthorization and always completes the local purge. Failed remote calls enter an encrypted retry outbox for at most 24 hours.
+
+See `docs/coros-integration.md` for the complete contract and `docs/coros-api-application/README.md` for the external access request.
 
 ## Mobile Responsibilities
 
@@ -228,7 +240,7 @@ Polar:
 ## Security Notes
 
 - `user_connections` remains visible to the user for connection metadata, but new OAuth callbacks store secrets in `provider_connection_tokens`.
-- `provider_connection_tokens` and `external_raw_payloads_v2` have RLS enabled and no client policies.
+- `provider_connection_tokens` and `external_raw_payloads_v2` have RLS enabled and no client policies. COROS token values are additionally encrypted with AES-256-GCM before storage.
 - `LocalHealthSyncService` requires `user_preferences.health_data_consent = true` before importing local health data.
 - Health Connect imports are rejected if the payload package does not match the selected origin.
 - Route points and health samples have user-owned RLS policies; social surfaces must still avoid exposing GPS and biomarkers without explicit product opt-in.

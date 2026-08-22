@@ -7,6 +7,7 @@ import { WearableProvider } from '../providers.types';
 export interface ProviderEndpoints {
   authorizeUrl: string;
   tokenUrl: string;
+  refreshUrl?: string;
 }
 
 export interface ProviderCredentials {
@@ -21,6 +22,7 @@ export interface OAuthTokenResponse {
   refresh_token?: string;
   expires_in: number;
   token_type?: string;
+  openId?: string;
 }
 
 export interface OAuthState {
@@ -121,9 +123,13 @@ export abstract class BaseOAuthProvider {
    */
   async refreshAccessToken(userId: string, refreshToken: string): Promise<OAuthTokenResponse> {
     const { data, headers } = this.prepareRefreshRequest(refreshToken);
-    const response = await axios.post(this.endpoints.tokenUrl, new URLSearchParams(data).toString(), {
-      headers,
-    });
+    const response = await axios.post(
+      this.endpoints.refreshUrl ?? this.endpoints.tokenUrl,
+      new URLSearchParams(data).toString(),
+      {
+        headers,
+      },
+    );
 
     const tokenResponse: OAuthTokenResponse = response.data;
 
@@ -288,6 +294,10 @@ export abstract class BaseOAuthProvider {
     return { userId: null, username: null };
   }
 
+  protected protectTokenForStorage(token: string): string {
+    return token;
+  }
+
   private async saveConnection(
     userId: string,
     tokenResponse: OAuthTokenResponse,
@@ -359,8 +369,8 @@ export abstract class BaseOAuthProvider {
         connection_id: connectionId,
         user_id: userId,
         provider: this.providerName,
-        access_token: tokenResponse.access_token,
-        refresh_token: tokenResponse.refresh_token,
+        access_token: this.protectTokenForStorage(tokenResponse.access_token),
+        refresh_token: tokenResponse.refresh_token ? this.protectTokenForStorage(tokenResponse.refresh_token) : null,
         token_type: tokenResponse.token_type,
         token_expires_at: expiresAt.toISOString(),
         scope: scope ?? null,

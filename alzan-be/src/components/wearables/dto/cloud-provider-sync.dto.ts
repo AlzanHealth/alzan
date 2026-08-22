@@ -36,4 +36,10 @@ export class CloudProviderSyncOutputDto {
 
   @Expose()
   last_success_at!: string | null;
+
+  @Expose()
+  health_days_imported?: number;
+
+  @Expose()
+  health_consent_required?: boolean;
 }

@@ -873,20 +873,19 @@
     "id": "coros-daily-activity-health-json",
     "provider": "coros",
     "domain": "daily_activity",
-    "sourceUrl": "https://support.coros.com/hc/en-us/articles/25002333092500-Requesting-a-Bulk-Export-of-COROS-Data",
+    "sourceUrl": "https://open.coros.com",
     "payload": {
-      "date": "2026-05-01",
-      "timezone": "Europe/Madrid",
-      "steps": 9800,
-      "calories": 560,
-      "distanceM": 7300
+      "happenDay": 20260501,
+      "step": 9800,
+      "calorie": 560000,
+      "rhr": 53,
+      "ppgHrv": 56
     },
     "expected": {
       "source": "coros",
       "date": "2026-05-01",
       "totalSteps": 9800,
-      "caloriesKcal": 560,
-      "distanceM": 7300
+      "caloriesKcal": 560
     }
   },
   {
@@ -894,34 +893,19 @@
     "id": "coros-sleep-health-json",
     "provider": "coros",
     "domain": "sleep",
-    "sourceUrl": "https://support.coros.com/hc/en-us/articles/25002333092500-Requesting-a-Bulk-Export-of-COROS-Data",
+    "sourceUrl": "https://open.coros.com",
     "payload": {
-      "date": "2026-05-02",
-      "sleep": {
-        "id": "coros-sleep-redacted",
-        "startTime": "2026-05-01T22:20:00Z",
-        "endTime": "2026-05-02T06:20:00Z",
-        "totalSleepMin": 430,
-        "awakeMin": 50,
-        "lightSleepMin": 230,
-        "deepSleepMin": 80,
-        "remSleepMin": 120,
-        "sleepScore": 84,
-        "avgHeartRate": 53,
-        "avgHrv": 56,
-        "respiratoryRate": 14,
-        "spo2Avg": 96
-      }
+      "happenDay": 20260502,
+      "sleepStartTime": "2026-05-01 22:20:00",
+      "sleepEndTime": "2026-05-02 06:20:00",
+      "sleepAvgHr": 53,
+      "ppgHrv": 56
     },
     "expected": {
       "source": "coros",
-      "sourceSleepId": "coros-sleep-redacted",
-      "totalSleepMin": 430,
-      "sleepScore": 84,
+      "totalSleepMin": 480,
       "avgHeartRateBpm": 53,
-      "avgHrvMs": 56,
-      "avgRespiratoryRpm": 14,
-      "avgSpo2Pct": 96
+      "avgHrvMs": 56
     }
   },
   {
@@ -929,34 +913,17 @@
     "id": "coros-recovery-health-json",
     "provider": "coros",
     "domain": "recovery",
-    "sourceUrl": "https://support.coros.com/hc/en-us/articles/25002333092500-Requesting-a-Bulk-Export-of-COROS-Data",
+    "sourceUrl": "https://open.coros.com",
     "payload": {
-      "date": "2026-05-02",
-      "timestamp": "2026-05-02T07:00:00Z",
-      "recoveryScore": 76,
-      "readinessScore": 78,
-      "sleepScore": 84,
-      "trainingLoad": 63,
-      "restingHeartRate": 53,
-      "hrv": 56,
-      "respiratoryRate": 14,
-      "spo2Avg": 96,
-      "recoveryBalance": 72,
-      "stressScore": 20
+      "happenDay": 20260502,
+      "rhr": 53,
+      "ppgHrv": 56
     },
     "expected": {
       "source": "coros",
       "date": "2026-05-02",
-      "recoveryScore": 76,
-      "readinessScore": 78,
-      "sleepScore": 84,
-      "strainScore": 63,
       "restingHrBpm": 53,
-      "avgHrvMs": 56,
-      "respiratoryRateRpm": 14,
-      "spo2AvgPct": 96,
-      "balance": 72,
-      "stressState": 20
+      "avgHrvMs": 56
     }
   },
   {

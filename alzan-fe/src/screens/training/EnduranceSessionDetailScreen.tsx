@@ -324,6 +324,21 @@ export const EnduranceSessionDetailScreen = () => {
 
   const resolvedSessionId = isPendingSession ? undefined : session.id;
 
+  const { data: corosDevice } = useQuery({
+    queryKey: ['corosDevice', session.device_id],
+    queryFn: async () => {
+      if (!session.device_id) return null;
+      const { data, error } = await supabase
+        .from('devices')
+        .select('device_name, device_model')
+        .eq('id', session.device_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: session.provider === 'coros' && !!session.device_id,
+  });
+
   // Fetch workout sets for gym sessions
   const { data: sessionDetail } = useSessionDetail(session.sport_type === 'strength' ? resolvedSessionId : undefined);
   const exerciseGroups = sessionDetail?.exerciseGroups || [];
@@ -1498,6 +1513,15 @@ export const EnduranceSessionDetailScreen = () => {
                 locale: getDateFnsLocale(),
               })}
             </Text>
+            {session.provider === 'coros' && (
+              <Text style={[styles.providerAttribution, { color: themeColors.textSecondary }]}>
+                {corosDevice?.device_model || corosDevice?.device_name
+                  ? t('training.dataProvidedByCorosDevice', {
+                      device: corosDevice.device_model || corosDevice.device_name,
+                    })
+                  : t('training.dataProvidedByCoros')}
+              </Text>
+            )}
             {(session.sport_subtype ||
               session.surface ||
               session.base_load ||
@@ -2392,6 +2416,11 @@ const styles = StyleSheet.create({
   date: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  providerAttribution: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+    fontWeight: '600',
   },
   statsContainer: {
     gap: spacing.m,

@@ -3006,6 +3006,45 @@ export type Database = {
           },
         ];
       };
+      provider_deauthorization_jobs: {
+        Row: {
+          attempts: number;
+          created_at: string;
+          encrypted_access_token: string;
+          expires_at: string;
+          id: string;
+          last_error: string | null;
+          next_attempt_at: string;
+          provider: Database['public']['Enums']['wearable_provider_enum'];
+          updated_at: string;
+          user_reference_hash: string;
+        };
+        Insert: {
+          attempts?: number;
+          created_at?: string;
+          encrypted_access_token: string;
+          expires_at?: string;
+          id?: string;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          provider: Database['public']['Enums']['wearable_provider_enum'];
+          updated_at?: string;
+          user_reference_hash: string;
+        };
+        Update: {
+          attempts?: number;
+          created_at?: string;
+          encrypted_access_token?: string;
+          expires_at?: string;
+          id?: string;
+          last_error?: string | null;
+          next_attempt_at?: string;
+          provider?: Database['public']['Enums']['wearable_provider_enum'];
+          updated_at?: string;
+          user_reference_hash?: string;
+        };
+        Relationships: [];
+      };
       provider_oauth_states: {
         Row: {
           code_verifier: string | null;
@@ -5122,6 +5161,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      delete_coros_user_data: { Args: { p_user_id: string }; Returns: Json };
       delete_training_template: {
         Args: { p_template_id: string; p_template_kind: string };
         Returns: boolean;

@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabaseClient';
+import { wearablesLocalHealthApi } from '../../modules/wearables';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) {
@@ -27,6 +28,15 @@ export const deleteUserAccount = async () => {
   }
 
   try {
+    // Revoke and purge COROS before the user row disappears. A provider outage
+    // does not block local account deletion; the backend keeps an encrypted,
+    // time-limited retry job when remote deauthorization cannot complete.
+    try {
+      await wearablesLocalHealthApi.disconnectCoros();
+    } catch (corosError) {
+      console.warn('[gdpr.deleteUserAccount] COROS pre-delete disconnect could not complete:', corosError);
+    }
+
     // 2. Intentar vía RPC (fuente principal de borrado total)
     const { error: rpcError } = await supabase.rpc('delete_user_account');
     if (!rpcError) {

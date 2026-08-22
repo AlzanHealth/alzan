@@ -5,6 +5,7 @@ import { SupabaseUserAuth } from '../../../core/guards/auth.decorator';
 import { CloudProviderSyncOutputDto } from '../dto/cloud-provider-sync.dto';
 import { PolarAccessLinkService } from '../services/polar-access-link.service';
 import { SuuntoCloudSyncService } from '../services/suunto-cloud-sync.service';
+import { CorosCloudSyncService } from '../services/coros-cloud-sync.service';
 
 @ApiTags('Wearables')
 @Controller('wearables/cloud')
@@ -13,6 +14,7 @@ export class CloudProviderSyncController {
   constructor(
     private readonly polarAccessLinkService: PolarAccessLinkService,
     private readonly suuntoCloudSyncService: SuuntoCloudSyncService,
+    private readonly corosCloudSyncService: CorosCloudSyncService,
   ) {}
 
   @Post('polar/sync')
@@ -42,6 +44,24 @@ export class CloudProviderSyncController {
       activities_reconciled: result.activitiesReconciled,
       errors_by_code: result.errorsByCode,
       phase_durations_ms: result.phaseDurationsMs,
+      last_success_at: result.lastSuccessAt,
+    };
+  }
+
+  @Post('coros/sync')
+  @ApiOkResponse({ type: CloudProviderSyncOutputDto })
+  public async syncCoros(@UserContext() ctx: UserCtx): Promise<CloudProviderSyncOutputDto> {
+    const result = await this.corosCloudSyncService.sync(ctx.user.id);
+    return {
+      provider: result.provider,
+      job_id: result.jobId,
+      status: result.status,
+      activities_imported: result.activitiesImported,
+      activities_skipped: result.activitiesSkipped,
+      activities_failed: result.activitiesFailed,
+      errors_by_code: result.errorsByCode,
+      health_days_imported: result.healthDaysImported,
+      health_consent_required: result.healthConsentRequired,
       last_success_at: result.lastSuccessAt,
     };
   }

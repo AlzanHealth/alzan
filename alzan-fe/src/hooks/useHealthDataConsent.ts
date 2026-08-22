@@ -6,7 +6,7 @@ import { usePreferencesContext } from '../context/PreferencesContext';
 import { supabase } from '../lib/supabaseClient';
 import { UserPreferenceInsert } from '../types/requests.types';
 
-const HEALTH_DATA_CONSENT_VERSION = 'wearables_local_sync_v1';
+const HEALTH_DATA_CONSENT_VERSION = 'health_integrations_v2_2026_08_22';
 
 const promptForHealthDataConsent = ({
   title,
@@ -33,7 +33,8 @@ export function useHealthDataConsent() {
 
   const ensureHealthDataConsent = useCallback(async (): Promise<boolean> => {
     if (!user) throw new Error('User not authenticated');
-    if (preferences?.health_data_consent) return true;
+    if (preferences?.health_data_consent && preferences.health_data_consent_version === HEALTH_DATA_CONSENT_VERSION)
+      return true;
 
     const accepted = await promptForHealthDataConsent({
       title: t('settings.healthDataConsentTitle'),
@@ -58,7 +59,7 @@ export function useHealthDataConsent() {
 
     await refetch(true);
     return true;
-  }, [preferences?.health_data_consent, refetch, t, user]);
+  }, [preferences?.health_data_consent, preferences?.health_data_consent_version, refetch, t, user]);
 
   return { ensureHealthDataConsent };
 }

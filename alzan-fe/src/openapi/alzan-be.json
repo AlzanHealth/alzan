@@ -532,6 +532,27 @@
         "tags": ["Wearables"]
       }
     },
+    "/wearables/cloud/coros/sync": {
+      "post": {
+        "operationId": "syncCoros",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CloudProviderSyncOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CloudProviderSyncOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
     "/activity-sessions/{id}/template-association": {
       "post": {
         "operationId": "associateTemplate",
@@ -732,6 +753,65 @@
           }
         },
         "tags": ["Activity import review"]
+      }
+    },
+    "/webhooks/coros/status": {
+      "get": {
+        "operationId": "status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CorosWebhookStatusDto" } } }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/webhooks/coros/workouts": {
+      "post": {
+        "operationId": "receiveWorkouts",
+        "parameters": [
+          { "name": "secret", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "client", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CorosWorkoutPushDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CorosWebhookResponseDto" } } }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/wearables/cloud/coros/capability": {
+      "get": {
+        "operationId": "capability",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CorosCapabilityDto" } } }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/wearables/connections/coros": {
+      "delete": {
+        "operationId": "disconnect",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CorosDisconnectDto" } } }
+          }
+        },
+        "tags": ["Wearables"]
       }
     }
   },
@@ -1006,7 +1086,9 @@
           "activities_reconciled": { "type": "number" },
           "errors_by_code": { "type": "object" },
           "phase_durations_ms": { "type": "object" },
-          "last_success_at": { "type": "string", "nullable": true }
+          "last_success_at": { "type": "string", "nullable": true },
+          "health_days_imported": { "type": "number" },
+          "health_consent_required": { "type": "boolean" }
         },
         "required": ["provider", "activities_imported", "last_success_at"]
       },
@@ -1041,6 +1123,40 @@
       "StrengthAssignmentInputDto": {
         "type": "object",
         "properties": { "target_session_id": { "type": "string", "format": "uuid" } }
+      },
+      "CorosWebhookStatusDto": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "enum": ["ok"] } },
+        "required": ["status"]
+      },
+      "CorosWorkoutPushDto": {
+        "type": "object",
+        "properties": { "sportDataList": { "type": "array", "maxItems": 100, "items": { "type": "object" } } },
+        "required": ["sportDataList"]
+      },
+      "CorosWebhookResponseDto": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string", "enum": ["ok"] },
+          "result": { "type": "string", "enum": ["0000"] }
+        },
+        "required": ["message", "result"]
+      },
+      "CorosCapabilityDto": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "mode": { "type": "string", "enum": ["disabled", "pilot", "public"] }
+        },
+        "required": ["enabled", "mode"]
+      },
+      "CorosDisconnectDto": {
+        "type": "object",
+        "properties": {
+          "disconnected": { "type": "boolean" },
+          "remote_deauthorization_pending": { "type": "boolean" }
+        },
+        "required": ["disconnected", "remote_deauthorization_pending"]
       }
     }
   },

@@ -231,19 +231,63 @@ function assertCorosCalculatedZones(): void {
 }
 
 function assertCorosHealthMappers(): void {
-  const daily = mapCorosDailyActivityToCanonical({ date: '2026-05-01', steps: 12000, calories: 2200 });
+  const daily = mapCorosDailyActivityToCanonical({
+    happenDay: 20260501,
+    step: 12000,
+    calorie: 2200000,
+    rhr: 56,
+    ppgHrv: 50,
+    sleepAvgHr: 70,
+    hrvList: [{ hrv: 25, hr: 60, timestamp: 1777593600 }],
+  });
   assert.equal(daily.source, 'coros');
   assert.equal(daily.totalSteps, 12000);
+  assert.equal(daily.caloriesKcal, 2200);
   const sleep = mapCorosSleepToCanonical({
-    date: '2026-05-01',
-    startTime: '2026-05-01T22:00:00Z',
-    endTime: '2026-05-02T06:00:00Z',
-    stages: { deep: 80, light: 260, rem: 120, awake: 20 },
+    happenDay: 20260501,
+    sleepStartTime: '2026-04-30 22:00:00',
+    sleepEndTime: '2026-05-01 06:00:00',
+    sleepAvgHr: 70,
+    ppgHrv: 50,
   });
-  assert.equal(sleep.deepSleepMin, 80);
-  const recovery = mapCorosRecoveryToCanonical({ date: '2026-05-01', recoveryScore: 82, hrvRmssd: 55 });
-  assert.equal(recovery.recoveryScore, 82);
-  assert.equal(recovery.hrvRmssdMs, 55);
+  assert.equal(sleep.date, '2026-05-01');
+  assert.equal(sleep.totalSleepMin, 480);
+  assert.equal(sleep.deepSleepMin, null);
+  assert.equal(sleep.avgHeartRateBpm, 70);
+  const recovery = mapCorosRecoveryToCanonical({ happenDay: 20260501, rhr: 56, ppgHrv: 50 });
+  assert.equal(recovery.recoveryScore, null);
+  assert.equal(recovery.restingHrBpm, 56);
+  assert.equal(recovery.avgHrvMs, 50);
+}
+
+function assertCorosOfficialWorkoutSummary(): void {
+  const canonical = parseCorosActivityFileToCanonical(
+    JSON.stringify({
+      labelId: '418173315956375553',
+      mode: 9,
+      subMode: 6,
+      deviceName: 'COROS DURA',
+      distance: 40000,
+      duration: 3600,
+      startTime: 1777622400,
+      endTime: 1777626000,
+      calorie: 820000,
+      step: 0,
+      startTimezone: 4,
+      endTimezone: 4,
+      fitUrl: 'https://oss.coros.com/fit/example.fit',
+    }),
+    'coros-official-summary.json',
+  );
+  assert.equal(canonical.providerActivityId, '418173315956375553');
+  assert.equal(canonical.sportType, 'cycling');
+  assert.equal(canonical.sportSubtype, 'gravel');
+  assert.equal(canonical.summary.startedAt, '2026-05-01T08:00:00.000Z');
+  assert.equal(canonical.summary.durationSeconds, 3600);
+  assert.equal(canonical.summary.distanceM, 40000);
+  assert.equal(canonical.summary.caloriesKcal, 820);
+  assert.equal(canonical.device?.model, 'COROS DURA');
+  assert.equal(canonical.vendorFields.fitUrl, 'https://oss.coros.com/fit/example.fit');
 }
 
 assertCorosRunningJson();
@@ -252,3 +296,4 @@ assertCorosSportsWithoutGps();
 assertCorosCyclingSwimmingWalkingStrength();
 assertCorosCalculatedZones();
 assertCorosHealthMappers();
+assertCorosOfficialWorkoutSummary();

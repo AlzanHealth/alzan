@@ -19,6 +19,7 @@ import { useAppleHealthConnection } from '../../hooks/useAppleHealthConnection';
 import { useHealthConnectConnection } from '../../hooks/useHealthConnectConnection';
 import { usePolarConnection } from '../../hooks/usePolarConnection';
 import { useSuuntoConnection } from '../../hooks/useSuuntoConnection';
+import { useCorosConnection } from '../../hooks/useCorosConnection';
 
 type PermissionFlow = {
   serviceName: string;
@@ -34,6 +35,7 @@ export const ConnectedAppsScreen = () => {
   const healthConnect = useHealthConnectConnection();
   const polar = usePolarConnection();
   const suunto = useSuuntoConnection();
+  const coros = useCorosConnection();
   const [permissionFlow, setPermissionFlow] = useState<PermissionFlow | null>(null);
   const formatLastSync = (lastSyncedAt?: string | null) =>
     lastSyncedAt ? t('settings.lastSync', { date: new Date(lastSyncedAt).toLocaleDateString() }) : null;
@@ -194,6 +196,26 @@ export const ConnectedAppsScreen = () => {
           onSync={suunto.sync}
           detail={formatLastSync(suunto.lastSyncedAt)}
         />
+
+        {coros.isAvailable && (
+          <AppCard
+            name="COROS"
+            connected={coros.isConnected}
+            isLoading={coros.isLoading}
+            isActioning={coros.isConnecting || coros.isDisconnecting}
+            isSyncing={coros.isSyncing}
+            onConnect={() =>
+              openPermissionFlow({
+                serviceName: 'COROS',
+                description: t('settings.permissionSheetCorosDescription'),
+                onContinue: coros.connect,
+              })
+            }
+            onDisconnect={coros.disconnect}
+            onSync={coros.sync}
+            detail={formatLastSync(coros.lastSyncedAt)}
+          />
+        )}
 
         <AppCard name="Garmin" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
 

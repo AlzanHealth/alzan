@@ -50,11 +50,68 @@ function roundNullable(value: number | null | undefined): number | null {
 }
 
 function normaliseTimestamp(value: unknown): string | null {
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+(?:\.\d+)?$/.test(value.trim())
+        ? Number(value)
+        : null;
+  if (numeric != null && numeric > 0) {
+    const milliseconds = numeric < 100_000_000_000 ? numeric * 1000 : numeric;
+    const timestamp = new Date(milliseconds);
+    return Number.isFinite(timestamp.getTime()) ? timestamp.toISOString() : null;
+  }
   const text = readString(value);
   if (!text) return null;
   const timestamp = Date.parse(text);
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
+
+const COROS_NUMERIC_SPORTS: Readonly<Record<string, CanonicalActivitySportMapping>> = {
+  '8:1': { sportType: 'running', sportSubtype: 'outdoor' },
+  '8:2': { sportType: 'running', sportSubtype: 'treadmill' },
+  '9:1': { sportType: 'cycling', sportSubtype: 'road' },
+  '9:2': { sportType: 'cycling', sportSubtype: 'indoor_trainer' },
+  '9:3': { sportType: 'cycling', sportSubtype: 'e_bike' },
+  '9:4': { sportType: 'cycling', sportSubtype: 'mtb' },
+  '9:5': { sportType: 'cycling', sportSubtype: 'e_mtb' },
+  '9:6': { sportType: 'cycling', sportSubtype: 'gravel' },
+  '10:1': { sportType: 'swimming', sportSubtype: 'open_water' },
+  '10:2': { sportType: 'swimming', sportSubtype: 'pool' },
+  '13:1': { sportType: 'other', sportSubtype: 'triathlon' },
+  '13:2': { sportType: 'other', sportSubtype: 'multisport' },
+  '13:3': { sportType: 'skiing', sportSubtype: 'ski_touring' },
+  '13:4': { sportType: 'climbing', sportSubtype: 'outdoor' },
+  '14:1': { sportType: 'climbing', sportSubtype: 'mountaineering' },
+  '15:1': { sportType: 'trail', sportSubtype: 'trail_running' },
+  '16:1': { sportType: 'hiking', sportSubtype: 'trail' },
+  '18:1': { sportType: 'gym', sportSubtype: 'gps_cardio' },
+  '18:2': { sportType: 'gym', sportSubtype: 'indoor_cardio' },
+  '19:1': { sportType: 'skiing', sportSubtype: 'cross_country' },
+  '20:1': { sportType: 'running', sportSubtype: 'track' },
+  '21:1': { sportType: 'skiing', sportSubtype: 'alpine' },
+  '21:2': { sportType: 'snowboard', sportSubtype: 'resort' },
+  '23:2': { sportType: 'strength', sportSubtype: 'indoor' },
+  '24:1': { sportType: 'other', sportSubtype: 'rowing' },
+  '24:2': { sportType: 'gym', sportSubtype: 'indoor_rower' },
+  '25:1': { sportType: 'other', sportSubtype: 'whitewater' },
+  '26:1': { sportType: 'other', sportSubtype: 'flatwater' },
+  '27:1': { sportType: 'surf', sportSubtype: 'windsurfing' },
+  '28:1': { sportType: 'surf', sportSubtype: 'speedsurfing' },
+  '29:1': { sportType: 'skiing', sportSubtype: 'ski_touring' },
+  '31:1': { sportType: 'hiking', sportSubtype: 'urban_walk' },
+  '33:2': { sportType: 'climbing', sportSubtype: 'single_pitch' },
+  '33:3': { sportType: 'climbing', sportSubtype: 'bouldering' },
+  '38:1': { sportType: 'basketball', sportSubtype: 'indoor' },
+  '39:1': { sportType: 'football', sportSubtype: 'football_11' },
+  '40:1': { sportType: 'tennis', sportSubtype: 'pickleball' },
+  '42:2': { sportType: 'gym', sportSubtype: 'yoga' },
+  '43:2': { sportType: 'gym', sportSubtype: 'pilates' },
+  '44:2': { sportType: 'martial_arts', sportSubtype: 'boxing' },
+  '47:1': { sportType: 'tennis', sportSubtype: 'outdoor' },
+  '98:1': { sportType: 'other', sportSubtype: 'custom_outdoor' },
+  '99:2': { sportType: 'other', sportSubtype: 'custom_indoor' },
+};
 
 function deriveEndTime(startedAt: string | null, durationSeconds: number | null): string | null {
   if (!startedAt || durationSeconds == null || durationSeconds <= 0) return null;
@@ -116,6 +173,12 @@ function normaliseSportText(value: string | null): string {
 }
 
 function mapCorosSport(record: JsonRecord): CanonicalActivitySportMapping {
+  const mode = readNumber(record.mode);
+  const subMode = readNumber(record.subMode);
+  if (mode != null && subMode != null) {
+    const mapped = COROS_NUMERIC_SPORTS[`${Math.round(mode)}:${Math.round(subMode)}`];
+    if (mapped) return mapped;
+  }
   const rawSport =
     readString(record.activityType) ??
     readString(record.activity_type) ??
@@ -212,6 +275,7 @@ function readCorosSport(record: JsonRecord): string | null {
 
 function readDurationSeconds(record: JsonRecord): number | null {
   const seconds =
+    readNumber(record.duration) ??
     readNumber(record.durationSeconds) ??
     readNumber(record.duration_seconds) ??
     readNumber(record.workoutTimeSeconds) ??
@@ -233,7 +297,11 @@ function readDistanceMeters(record: JsonRecord): number | null {
 }
 
 function readCalories(record: JsonRecord): number | null {
-  return readNumber(record.caloriesKcal) ?? readNumber(record.calories_kcal) ?? readNumber(record.calories);
+  const explicitKcal =
+    readNumber(record.caloriesKcal) ?? readNumber(record.calories_kcal) ?? readNumber(record.calories);
+  if (explicitKcal != null) return explicitKcal;
+  const corosCalories = readNumber(record.calorie);
+  return corosCalories == null ? null : corosCalories / 1000;
 }
 
 function readSpeedMps(value: unknown, unit?: unknown): number | null {
@@ -431,7 +499,10 @@ function parseCorosJson(content: string, filename: string, options?: ParseCorosA
     sportType: sport.sportType,
     sportSubtype: sport.sportSubtype,
     providerActivityId:
-      readIdentifier(record.id) ?? readIdentifier(record.activityId) ?? readIdentifier(record.workoutId),
+      readIdentifier(record.labelId) ??
+      readIdentifier(record.id) ??
+      readIdentifier(record.activityId) ??
+      readIdentifier(record.workoutId),
     summary: {
       startedAt,
       endedAt,
@@ -458,7 +529,7 @@ function parseCorosJson(content: string, filename: string, options?: ParseCorosA
       avgTemperatureC:
         readNumber(record.avgTemperature ?? record.averageTemperature) ?? averageMetric(streams.temperature),
       maxTemperatureC: readNumber(record.maxTemperature) ?? maxMetric(streams.temperature),
-      totalSteps: readNumber(record.steps) ?? readNumber(record.totalSteps),
+      totalSteps: readNumber(record.step) ?? readNumber(record.steps) ?? readNumber(record.totalSteps),
       recoveryTimeSeconds: readNumber(record.recoveryTimeSeconds),
       vo2Max: readNumber(record.vo2Max),
       epoc: readNumber(record.epoc),
@@ -471,14 +542,21 @@ function parseCorosJson(content: string, filename: string, options?: ParseCorosA
       nativeZones.length > 0 ? nativeZones : calculateHeartRateZones(streams.heartRate, options?.estimatedMaxHeartRate),
     device: {
       name: readString(record.deviceName) ?? readString(record.device?.toString()),
-      model: readString(record.deviceModel) ?? (isRecord(record.device) ? readString(record.device.model) : null),
+      model:
+        readString(record.deviceModel) ??
+        readString(record.deviceName) ??
+        (isRecord(record.device) ? readString(record.device.model) : null),
       serial: readString(record.deviceSerial) ?? (isRecord(record.device) ? readString(record.device.serial) : null),
     },
     vendorFields: {
       sourceProvider: 'coros',
       corosFilename: filename,
       corosSport: readCorosSport(record),
-      corosMode: readString(record.mode),
+      corosMode: readNumber(record.mode) ?? readString(record.mode),
+      corosSubMode: readNumber(record.subMode) ?? readString(record.subMode),
+      fitUrl: readString(record.fitUrl),
+      startTimezoneCode: readNumber(record.startTimezone),
+      endTimezoneCode: readNumber(record.endTimezone),
       trainingLoad: readNumber(record.training_load ?? record.trainingLoad),
       aerobicTrainingEffect: readNumber(record.aerobic_te ?? record.aerobicTrainingEffect),
       anaerobicTrainingEffect: readNumber(record.anaerobic_te ?? record.anaerobicTrainingEffect),

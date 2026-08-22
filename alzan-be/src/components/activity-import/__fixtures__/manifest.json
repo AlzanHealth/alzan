@@ -432,26 +432,18 @@
     "format": "json",
     "file": "providers/coros/running.json",
     "sourceKind": "synthetic_official_shape",
-    "sourceUrl": "https://support.coros.com/hc/en-us/articles/360040257251-Run",
+    "sourceUrl": "https://open.coros.com",
     "expectedSummary": {
       "durationSeconds": 600,
       "distanceM": 2200,
       "caloriesKcal": 180,
-      "avgHeartRate": 140,
-      "maxHeartRate": 172,
-      "avgCadence": 168,
-      "avgPowerW": 255,
-      "elevationGainM": 24
+      "totalSteps": 2540
     },
-    "expectedStreams": {
-      "positionMinCount": 2,
-      "heartRateMinCount": 3,
-      "cadenceMinCount": 3,
-      "powerMinCount": 3
-    },
+    "expectedStreams": {},
     "expectedProviderFields": {
       "sourceProvider": "coros",
-      "corosSport": "Run"
+      "corosMode": 8,
+      "corosSubMode": 1
     }
   },
   {

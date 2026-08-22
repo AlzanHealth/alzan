@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { Api } from '../../core/swagger/swagger-api.decorator';
 import { SwaggerApi } from '../../core/swagger/swagger-api.enum';
 import { SupabaseModule } from '../../core/supabase/supabase.module';
+import { ProvidersModule } from '../providers/providers.module';
+import { CorosWebhookController } from './controllers/coros-webhook.controller';
+import { CorosConnectionController } from './controllers/coros-connection.controller';
 import { CloudProviderSyncController } from './controllers/cloud-provider-sync.controller';
 import { ImportReviewController } from './controllers/import-review.controller';
 import { LocalHealthSyncController } from './controllers/local-health-sync.controller';
@@ -16,12 +19,21 @@ import { PolarAccessLinkService } from './services/polar-access-link.service';
 import { ProviderOriginService } from './services/provider-origin.service';
 import { RawPayloadService } from './services/raw-payload.service';
 import { SuuntoCloudSyncService } from './services/suunto-cloud-sync.service';
+import { CorosCloudSyncService } from './services/coros-cloud-sync.service';
+import { CorosWebhookService } from './services/coros-webhook.service';
+import { CorosConnectionService } from './services/coros-connection.service';
 import { WearableImportLifecycleService } from './services/wearable-import-lifecycle.service';
 
 @Api(SwaggerApi.WEARABLES_API)
 @Module({
-  imports: [SupabaseModule],
-  controllers: [LocalHealthSyncController, CloudProviderSyncController, ImportReviewController],
+  imports: [SupabaseModule, ProvidersModule],
+  controllers: [
+    LocalHealthSyncController,
+    CloudProviderSyncController,
+    ImportReviewController,
+    CorosWebhookController,
+    CorosConnectionController,
+  ],
   providers: [
     RawPayloadService,
     ProviderOriginService,
@@ -35,6 +47,9 @@ import { WearableImportLifecycleService } from './services/wearable-import-lifec
     PolarAccessLinkService,
     WearableImportLifecycleService,
     SuuntoCloudSyncService,
+    CorosCloudSyncService,
+    CorosWebhookService,
+    CorosConnectionService,
   ],
   exports: [
     RawPayloadService,

@@ -6,10 +6,6 @@ import {
 
 type JsonRecord = Record<string, unknown>;
 
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function readNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value !== 'string') return null;
@@ -22,120 +18,112 @@ function readString(value: unknown): string | null {
 }
 
 function normaliseTimestamp(value: unknown): string | null {
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d+(?:\.\d+)?$/.test(value.trim())
+        ? Number(value)
+        : null;
+  if (numeric != null && numeric > 0) {
+    const milliseconds = numeric < 100_000_000_000 ? numeric * 1000 : numeric;
+    const timestamp = new Date(milliseconds);
+    return Number.isFinite(timestamp.getTime()) ? timestamp.toISOString() : null;
+  }
   const text = readString(value);
   if (!text) return null;
-  const timestamp = Date.parse(text);
+  const normalizedText = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text) ? `${text.replace(' ', 'T')}Z` : text;
+  const timestamp = Date.parse(normalizedText);
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
 }
 
 function readDate(value: unknown): string {
+  const numeric = readNumber(value);
+  if (numeric != null) {
+    const compact = String(Math.round(numeric));
+    if (/^\d{8}$/.test(compact)) return `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}`;
+  }
   const text = readString(value);
   return text ? text.slice(0, 10) : new Date(0).toISOString().slice(0, 10);
 }
 
-function readNestedNumber(record: JsonRecord, key: string): number | null {
-  const parts = key.split('.');
-  let current: unknown = record;
-  for (const part of parts) {
-    if (!isRecord(current)) return null;
-    current = current[part];
-  }
-  return readNumber(current);
-}
-
-function readSleepRecord(payload: JsonRecord): JsonRecord {
-  if (isRecord(payload.sleep)) return payload.sleep;
-  if (Array.isArray(payload.sleep) && isRecord(payload.sleep[0])) return payload.sleep[0];
-  return payload;
-}
-
 export function mapCorosDailyActivityToCanonical(payload: JsonRecord): CorosDailyActivityCanonical {
-  const date = readDate(payload.date ?? payload.day ?? payload.timestamp);
+  const date = readDate(payload.happenDay);
   return {
     source: 'coros',
     date,
-    timezone: readString(payload.timezone) ?? 'UTC',
-    totalSteps: readNumber(payload.steps) ?? readNumber(payload.totalSteps),
-    activeSteps: readNumber(payload.activeSteps),
-    walkingSteps: readNumber(payload.walkingSteps),
-    runningSteps: readNumber(payload.runningSteps),
-    caloriesKcal: readNumber(payload.calories) ?? readNumber(payload.caloriesKcal),
-    activeCaloriesKcal: readNumber(payload.activeCalories),
-    distanceM: readNumber(payload.distanceM) ?? readNumber(payload.distance),
-    activeDistanceM: readNumber(payload.activeDistanceM),
-    floorsClimbed: readNumber(payload.floors) ?? readNumber(payload.elevationFloors),
-    sedentaryMinutes: readNumber(payload.sedentaryMinutes),
-    lightlyActiveMin: readNumber(payload.lightlyActiveMinutes),
-    fairlyActiveMin: readNumber(payload.fairlyActiveMinutes),
-    veryActiveMin: readNumber(payload.veryActiveMinutes),
-    intervals: Array.isArray(payload.intervals)
-      ? payload.intervals.filter(isRecord).map(interval => ({
-          startTime: normaliseTimestamp(interval.startTime ?? interval.time) ?? `${date}T00:00:00.000Z`,
-          endTime: normaliseTimestamp(interval.endTime),
-          steps: readNumber(interval.steps),
-          caloriesKcal: readNumber(interval.calories),
-          distanceM: readNumber(interval.distanceM) ?? readNumber(interval.distance),
-          rawPayload: interval,
-        }))
-      : [],
+    timezone: 'COROS_LOCAL',
+    totalSteps: readNumber(payload.step),
+    activeSteps: null,
+    walkingSteps: null,
+    runningSteps: null,
+    caloriesKcal: readNumber(payload.calorie) == null ? null : (readNumber(payload.calorie) as number) / 1000,
+    activeCaloriesKcal: null,
+    distanceM: null,
+    activeDistanceM: null,
+    floorsClimbed: null,
+    sedentaryMinutes: null,
+    lightlyActiveMin: null,
+    fairlyActiveMin: null,
+    veryActiveMin: null,
+    intervals: [],
     rawPayload: payload,
   };
 }
 
 export function mapCorosSleepToCanonical(payload: JsonRecord): CorosSleepCanonical {
-  const sleep = readSleepRecord(payload);
-  const startTime = normaliseTimestamp(sleep.startTime ?? sleep.bedtimeStart) ?? new Date(0).toISOString();
-  const endTime = normaliseTimestamp(sleep.endTime ?? sleep.bedtimeEnd) ?? startTime;
+  const startTime = normaliseTimestamp(payload.sleepStartTime) ?? new Date(0).toISOString();
+  const endTime = normaliseTimestamp(payload.sleepEndTime) ?? startTime;
+  const durationMinutes = Math.max(0, (Date.parse(endTime) - Date.parse(startTime)) / 60000);
   return {
     source: 'coros',
-    sourceSleepId: readString(sleep.id) ?? readString(sleep.sleepId),
-    date: readDate(sleep.date ?? payload.date ?? startTime),
-    timezone: readString(payload.timezone) ?? readString(sleep.timezone) ?? 'UTC',
+    sourceSleepId: null,
+    date: readDate(payload.happenDay),
+    timezone: 'COROS_LOCAL',
     startTime,
     endTime,
-    bedtimeStart: normaliseTimestamp(sleep.bedtimeStart) ?? startTime,
-    bedtimeEnd: normaliseTimestamp(sleep.bedtimeEnd) ?? endTime,
-    isNap: Boolean(sleep.isNap),
-    totalSleepMin: readNumber(sleep.totalSleepMin) ?? readNumber(sleep.total_sleep_minutes),
-    awakeMin: readNumber(sleep.awakeMin) ?? readNestedNumber(sleep, 'stages.awake'),
-    lightSleepMin: readNumber(sleep.lightSleepMin) ?? readNestedNumber(sleep, 'stages.light'),
-    deepSleepMin: readNumber(sleep.deepSleepMin) ?? readNestedNumber(sleep, 'stages.deep'),
-    remSleepMin: readNumber(sleep.remSleepMin) ?? readNestedNumber(sleep, 'stages.rem'),
-    sleepLatencyMin: readNumber(sleep.sleepLatencyMin),
-    wasoMin: readNumber(sleep.wasoMin),
-    afterWakeupMin: readNumber(sleep.afterWakeupMin),
-    sleepScore: readNumber(sleep.sleepScore) ?? readNumber(sleep.score),
-    avgHeartRateBpm: readNumber(sleep.avgHeartRate) ?? readNumber(sleep.averageHeartRate),
-    minHeartRateBpm: readNumber(sleep.minHeartRate),
-    maxHeartRateBpm: readNumber(sleep.maxHeartRate),
-    restingHrBpm: readNumber(sleep.restingHeartRate),
-    avgHrvMs: readNumber(sleep.avgHrv) ?? readNumber(sleep.hrv),
-    hrvRmssdMs: readNumber(sleep.hrvRmssd),
-    avgRespiratoryRpm: readNumber(sleep.respiratoryRate),
-    avgSpo2Pct: readNumber(sleep.spo2Avg),
-    minSpo2Pct: readNumber(sleep.spo2Min),
+    bedtimeStart: startTime,
+    bedtimeEnd: endTime,
+    isNap: false,
+    totalSleepMin: durationMinutes,
+    awakeMin: null,
+    lightSleepMin: null,
+    deepSleepMin: null,
+    remSleepMin: null,
+    sleepLatencyMin: null,
+    wasoMin: null,
+    afterWakeupMin: null,
+    sleepScore: null,
+    avgHeartRateBpm: readNumber(payload.sleepAvgHr),
+    minHeartRateBpm: null,
+    maxHeartRateBpm: null,
+    restingHrBpm: null,
+    avgHrvMs: readNumber(payload.ppgHrv),
+    hrvRmssdMs: null,
+    avgRespiratoryRpm: null,
+    avgSpo2Pct: null,
+    minSpo2Pct: null,
     rawPayload: payload,
   };
 }
 
 export function mapCorosRecoveryToCanonical(payload: JsonRecord): CorosRecoveryCanonical {
-  const date = readDate(payload.date ?? payload.day ?? payload.timestamp);
+  const date = readDate(payload.happenDay);
   return {
     source: 'coros',
     date,
-    timezone: readString(payload.timezone) ?? 'UTC',
-    timestamp: normaliseTimestamp(payload.timestamp) ?? `${date}T00:00:00.000Z`,
-    recoveryScore: readNumber(payload.recoveryScore) ?? readNumber(payload.readinessScore),
-    readinessScore: readNumber(payload.readinessScore),
-    sleepScore: readNumber(payload.sleepScore),
-    strainScore: readNumber(payload.trainingLoad) ?? readNumber(payload.training_load),
-    restingHrBpm: readNumber(payload.restingHeartRate),
-    avgHrvMs: readNumber(payload.hrv) ?? readNumber(payload.avgHrv),
-    hrvRmssdMs: readNumber(payload.hrvRmssd),
-    respiratoryRateRpm: readNumber(payload.respiratoryRate),
-    spo2AvgPct: readNumber(payload.spo2Avg),
-    balance: readNumber(payload.recoveryBalance) ?? readNumber(payload.trainingReadiness),
-    stressState: readNumber(payload.stressScore),
+    timezone: 'COROS_LOCAL',
+    timestamp: `${date}T00:00:00.000Z`,
+    recoveryScore: null,
+    readinessScore: null,
+    sleepScore: null,
+    strainScore: null,
+    restingHrBpm: readNumber(payload.rhr),
+    avgHrvMs: readNumber(payload.ppgHrv),
+    hrvRmssdMs: null,
+    respiratoryRateRpm: null,
+    spo2AvgPct: null,
+    balance: null,
+    stressState: null,
     rawPayload: payload,
   };
 }

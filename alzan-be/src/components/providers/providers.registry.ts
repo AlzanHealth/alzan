@@ -7,6 +7,7 @@ import { PolarOAuthService } from './oauth/polar-oauth.service';
 import { WearableProvider } from './providers.types';
 import { StravaOAuthService } from './oauth/strava-oauth.service';
 import { SuuntoOAuthService } from './oauth/suunto-oauth.service';
+import { CorosOAuthService } from './oauth/coros-oauth.service';
 import { UltrahumanOAuthService } from './oauth/ultrahuman-oauth.service';
 import { WhoopOAuthService } from './oauth/whoop-oauth.service';
 
@@ -20,6 +21,7 @@ export class ProvidersRegistry {
     private readonly garminOAuthService: GarminOAuthService,
     private readonly polarOAuthService: PolarOAuthService,
     private readonly suuntoOAuthService: SuuntoOAuthService,
+    private readonly corosOAuthService: CorosOAuthService,
     private readonly whoopOAuthService: WhoopOAuthService,
     private readonly ouraOAuthService: OuraOAuthService,
     private readonly fitbitOAuthService: FitbitOAuthService,
@@ -30,6 +32,7 @@ export class ProvidersRegistry {
       garmin: this.garminOAuthService,
       polar: this.polarOAuthService,
       suunto: this.suuntoOAuthService,
+      coros: this.corosOAuthService,
       whoop: this.whoopOAuthService,
       oura: this.ouraOAuthService,
       fitbit: this.fitbitOAuthService,

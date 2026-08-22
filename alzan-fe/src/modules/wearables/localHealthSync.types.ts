@@ -96,4 +96,16 @@ export type CloudProviderSyncResult = {
   errors_by_code?: Record<string, number>;
   phase_durations_ms?: Record<string, number>;
   last_success_at: string | null;
+  health_days_imported?: number;
+  health_consent_required?: boolean;
+};
+
+export type CorosCapability = {
+  enabled: boolean;
+  mode: 'disabled' | 'pilot' | 'public';
+};
+
+export type CorosDisconnectResult = {
+  disconnected: boolean;
+  remote_deauthorization_pending: boolean;
 };
