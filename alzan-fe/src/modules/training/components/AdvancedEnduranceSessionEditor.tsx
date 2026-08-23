@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import type { TranslationKey } from '../../../i18n/locales/en';
@@ -28,6 +28,7 @@ type Props = {
 };
 
 type AddMode = { kind: 'step' | 'group'; parentClientId: string | null } | null;
+type VisibleDurationType = 'time' | 'distance';
 
 const PHASES: AdvancedPhaseType[] = ['warmup', 'interval', 'recovery', 'cooldown', 'relax'];
 const PHASE_LABEL_KEYS: Record<AdvancedPhaseType, TranslationKey> = {
@@ -37,11 +38,14 @@ const PHASE_LABEL_KEYS: Record<AdvancedPhaseType, TranslationKey> = {
   cooldown: 'training.cooldown',
   relax: 'training.relax',
 };
-const DURATION_TYPES: AdvancedDurationType[] = ['time', 'distance', 'lap_button'];
-const DURATION_LABEL_KEYS: Record<AdvancedDurationType, TranslationKey> = {
+const DURATION_TYPES: VisibleDurationType[] = ['time', 'distance'];
+const DURATION_LABEL_KEYS: Record<VisibleDurationType, TranslationKey> = {
   time: 'training.advancedDurationTime',
   distance: 'training.advancedDurationDistance',
-  lap_button: 'training.advancedDurationLapButton',
+};
+const DURATION_HINT_KEYS: Record<VisibleDurationType, TranslationKey> = {
+  time: 'training.advancedDurationTimeHint',
+  distance: 'training.advancedDurationDistanceHint',
 };
 
 function parseNumber(value: string): number | null {
@@ -123,6 +127,7 @@ function SectionEditor({
   const intensityLabel =
     sport === 'running' ? t('training.pace') : sport === 'swimming' ? t('training.pacePer100m') : t('training.speed');
   const intensityValue = section[intensityKey];
+  const selectedDurationType = section.durationType === 'distance' ? 'distance' : 'time';
   const summary = [
     formatDistance(section, sport, distanceUnit, toDisplayDistance),
     section.durationS ? formatDuration(section.durationS) : '',
@@ -172,7 +177,8 @@ function SectionEditor({
 
       {expanded && (
         <View style={styles.cardBody}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
+          <Text style={[styles.choiceSectionLabel, { color: themeColors.textSecondary }]}>{t('training.phases')}</Text>
+          <View style={styles.choiceWrap}>
             {PHASES.map(phase => (
               <Pressable
                 key={phase}
@@ -192,9 +198,12 @@ function SectionEditor({
                 </Text>
               </Pressable>
             ))}
-          </ScrollView>
+          </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
+          <Text style={[styles.choiceSectionLabel, { color: themeColors.textSecondary }]}>
+            {t('training.chooseDurationType')}
+          </Text>
+          <View style={styles.choiceWrap}>
             {DURATION_TYPES.map(durationType => (
               <Pressable
                 key={durationType}
@@ -217,11 +226,14 @@ function SectionEditor({
                 </Text>
               </Pressable>
             ))}
-          </ScrollView>
+          </View>
+          <Text style={[styles.choiceHint, { color: themeColors.textSecondary }]}>
+            {t(DURATION_HINT_KEYS[selectedDurationType])}
+          </Text>
 
-          <View style={styles.fieldRow}>
-            <View style={styles.fieldHalf}>
-              <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>{t('training.duration')}</Text>
+          {selectedDurationType === 'time' ? (
+            <View style={styles.primaryField}>
+              <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>{t('training.duration')}</Text>
               <TextInput
                 style={inputStyle}
                 keyboardType="decimal-pad"
@@ -231,58 +243,104 @@ function SectionEditor({
                 onChangeText={value => onChange({ ...section, durationS: parseDuration(value) })}
               />
             </View>
-            <View style={styles.fieldHalf}>
-              <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>{t('training.distance')}</Text>
+          ) : (
+            <View style={styles.primaryField}>
+              <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>{t('training.distance')}</Text>
+              <View>
+                <TextInput
+                  style={inputStyle}
+                  keyboardType="decimal-pad"
+                  value={
+                    section.distanceM == null
+                      ? ''
+                      : sport === 'swimming'
+                        ? String(section.distanceM)
+                        : String(toDisplayDistance(section.distanceM))
+                  }
+                  placeholder="0"
+                  placeholderTextColor={themeColors.textSecondary}
+                  onChangeText={value =>
+                    onChange({
+                      ...section,
+                      distanceM: value
+                        ? sport === 'swimming'
+                          ? parseNumber(value)
+                          : toDbDistance(parseNumber(value) ?? 0)
+                        : null,
+                    })
+                  }
+                />
+                <Text style={[styles.unitLabel, { color: themeColors.textSecondary }]}>{distanceLabel}</Text>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.secondaryField}>
+            <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>
+              {selectedDurationType === 'time'
+                ? `${t('training.distance')} · ${t('training.optional')}`
+                : `${t('training.duration')} · ${t('training.optional')}`}
+            </Text>
+            {selectedDurationType === 'time' ? (
+              <View>
+                <TextInput
+                  style={inputStyle}
+                  keyboardType="decimal-pad"
+                  value={
+                    section.distanceM == null
+                      ? ''
+                      : sport === 'swimming'
+                        ? String(section.distanceM)
+                        : String(toDisplayDistance(section.distanceM))
+                  }
+                  placeholder="0"
+                  placeholderTextColor={themeColors.textSecondary}
+                  onChangeText={value =>
+                    onChange({
+                      ...section,
+                      distanceM: value
+                        ? sport === 'swimming'
+                          ? parseNumber(value)
+                          : toDbDistance(parseNumber(value) ?? 0)
+                        : null,
+                    })
+                  }
+                />
+                <Text style={[styles.unitLabel, { color: themeColors.textSecondary }]}>{distanceLabel}</Text>
+              </View>
+            ) : (
               <TextInput
                 style={inputStyle}
                 keyboardType="decimal-pad"
-                value={
-                  section.distanceM == null
-                    ? ''
-                    : sport === 'swimming'
-                      ? String(section.distanceM)
-                      : String(toDisplayDistance(section.distanceM))
-                }
-                placeholder="0"
+                value={formatDuration(section.durationS)}
+                placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onChangeText={value =>
-                  onChange({
-                    ...section,
-                    distanceM: value
-                      ? sport === 'swimming'
-                        ? parseNumber(value)
-                        : toDbDistance(parseNumber(value) ?? 0)
-                      : null,
-                  })
-                }
+                onChangeText={value => onChange({ ...section, durationS: parseDuration(value) })}
               />
-              <Text style={[styles.unitLabel, { color: themeColors.textSecondary }]}>{distanceLabel}</Text>
-            </View>
+            )}
           </View>
 
-          <View style={styles.fieldRow}>
-            <View style={styles.fieldHalf}>
-              <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>{intensityLabel}</Text>
-              <TextInput
-                style={inputStyle}
-                keyboardType="decimal-pad"
-                value={
-                  intensityValue == null
-                    ? ''
-                    : sport === 'cycling'
-                      ? String(intensityValue)
-                      : formatDuration(intensityValue)
-                }
-                placeholder={sport === 'cycling' ? '0' : '0:00'}
-                placeholderTextColor={themeColors.textSecondary}
-                onChangeText={value =>
-                  onChange({
-                    ...section,
-                    [intensityKey]: sport === 'cycling' ? parseNumber(value) : parseDuration(value),
-                  })
-                }
-              />
-            </View>
+          <View style={styles.intensityField}>
+            <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>{intensityLabel}</Text>
+            <TextInput
+              style={inputStyle}
+              keyboardType="decimal-pad"
+              value={
+                intensityValue == null
+                  ? ''
+                  : sport === 'cycling'
+                    ? String(intensityValue)
+                    : formatDuration(intensityValue)
+              }
+              placeholder={sport === 'cycling' ? '0' : '0:00'}
+              placeholderTextColor={themeColors.textSecondary}
+              onChangeText={value =>
+                onChange({
+                  ...section,
+                  [intensityKey]: sport === 'cycling' ? parseNumber(value) : parseDuration(value),
+                })
+              }
+            />
           </View>
         </View>
       )}
@@ -305,7 +363,7 @@ export const AdvancedEnduranceSessionEditor = ({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [addMode, setAddMode] = useState<AddMode>(null);
   const [newPhase, setNewPhase] = useState<AdvancedPhaseType>('interval');
-  const [newDurationType, setNewDurationType] = useState<AdvancedDurationType>('time');
+  const [newDurationType, setNewDurationType] = useState<VisibleDurationType>('time');
   const [newRepetitions, setNewRepetitions] = useState('4');
 
   const topLevelSections = useMemo(() => sections.filter(section => section.parentClientId == null), [sections]);
@@ -321,7 +379,7 @@ export const AdvancedEnduranceSessionEditor = ({
     });
   const openAddModal = (kind: 'step' | 'group', parentClientId: string | null = null) => {
     setNewPhase('interval');
-    setNewDurationType(kind === 'group' ? 'lap_button' : 'time');
+    setNewDurationType('time');
     setNewRepetitions('4');
     setAddMode({ kind, parentClientId });
   };
@@ -635,6 +693,9 @@ export const AdvancedEnduranceSessionEditor = ({
                 </Pressable>
               ))}
             </View>
+            <Text style={[styles.modalHint, { color: themeColors.textSecondary }]}>
+              {t(DURATION_HINT_KEYS[newDurationType])}
+            </Text>
 
             {addMode?.kind === 'group' && (
               <View style={styles.repetitionInputRow}>
@@ -666,11 +727,11 @@ export const AdvancedEnduranceSessionEditor = ({
 };
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.m },
-  sectionCard: { borderRadius: borderRadius.l, borderLeftWidth: 5, padding: spacing.m },
-  compactCard: { marginTop: spacing.s, padding: spacing.s, borderRadius: borderRadius.m, borderLeftWidth: 3 },
+  container: { gap: spacing.l },
+  sectionCard: { borderRadius: borderRadius.l, borderLeftWidth: 5, padding: spacing.l },
+  compactCard: { marginTop: spacing.m, padding: spacing.m, borderRadius: borderRadius.l, borderLeftWidth: 3 },
   cardHeader: {
-    minHeight: 54,
+    minHeight: 60,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -683,33 +744,43 @@ const styles = StyleSheet.create({
   cardBody: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(127,127,127,0.2)',
-    marginTop: spacing.s,
-    paddingTop: spacing.s,
+    marginTop: spacing.m,
+    paddingTop: spacing.m,
   },
-  choiceRow: { gap: spacing.xs, paddingVertical: spacing.xs },
-  choice: { borderRadius: borderRadius.full, paddingHorizontal: spacing.s, paddingVertical: spacing.xs },
+  choiceSectionLabel: { ...typography.caption, fontWeight: '800', marginTop: spacing.s, marginBottom: spacing.s },
+  choiceWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s },
+  choice: {
+    minHeight: 38,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    justifyContent: 'center',
+  },
   choiceText: { ...typography.caption, fontWeight: '700' },
-  fieldRow: { flexDirection: 'row', gap: spacing.s, marginTop: spacing.s },
-  fieldHalf: { flex: 1, position: 'relative' },
-  fieldLabel: { ...typography.caption, marginBottom: spacing.xs },
+  choiceHint: { ...typography.caption, lineHeight: 18, marginTop: spacing.s },
+  primaryField: { marginTop: spacing.l },
+  secondaryField: { marginTop: spacing.m },
+  intensityField: { marginTop: spacing.m },
+  fieldLabel: { ...typography.caption, marginBottom: spacing.s },
   input: {
-    minHeight: 46,
+    minHeight: 52,
+    borderWidth: 1,
     borderRadius: borderRadius.m,
-    paddingHorizontal: spacing.s,
-    paddingVertical: spacing.xs,
-    fontSize: 16,
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    fontSize: 17,
   },
-  compactInput: { minHeight: 42, fontSize: 15 },
-  unitLabel: { position: 'absolute', right: spacing.s, bottom: 14, fontSize: 12 },
-  groupCard: { borderRadius: borderRadius.l, borderLeftWidth: 5, padding: spacing.m },
+  compactInput: { minHeight: 48, fontSize: 16 },
+  unitLabel: { position: 'absolute', right: spacing.m, bottom: 17, fontSize: 12 },
+  groupCard: { borderRadius: borderRadius.l, borderLeftWidth: 5, padding: spacing.l },
   groupBody: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(127,127,127,0.2)',
-    marginTop: spacing.s,
-    paddingTop: spacing.s,
+    marginTop: spacing.m,
+    paddingTop: spacing.m,
   },
   sameValueRow: {
-    minHeight: 52,
+    minHeight: 68,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -719,13 +790,13 @@ const styles = StyleSheet.create({
   sameValueTitle: { ...typography.body, fontWeight: '700' },
   sameValueStatus: { ...typography.caption, marginTop: 2 },
   repetitionCard: {
-    marginTop: spacing.s,
+    marginTop: spacing.m,
     borderRadius: borderRadius.m,
-    padding: spacing.s,
+    padding: spacing.m,
     backgroundColor: 'rgba(127,127,127,0.08)',
   },
-  repetitionTitle: { ...typography.body, fontWeight: '800', marginBottom: spacing.xs },
-  inlineAdd: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.s },
+  repetitionTitle: { ...typography.body, fontWeight: '800', marginBottom: spacing.s },
+  inlineAdd: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.m },
   inlineAddText: { ...typography.caption, fontWeight: '800' },
   totalsCard: { borderRadius: borderRadius.l, padding: spacing.m, gap: spacing.s },
   totalsTitle: { ...typography.body, fontWeight: '700' },
@@ -762,6 +833,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalOptionText: { ...typography.caption, fontWeight: '700' },
+  modalHint: { ...typography.caption, lineHeight: 18, marginTop: spacing.xs },
   repetitionInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   repetitionInput: {
     minWidth: 72,
