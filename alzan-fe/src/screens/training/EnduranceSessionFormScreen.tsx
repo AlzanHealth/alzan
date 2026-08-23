@@ -3115,36 +3115,34 @@ export const EnduranceSessionFormScreen = () => {
                   <TouchableOpacity
                     style={[
                       styles.modeToggleButton,
-                      registrationMode === 'simple' && { backgroundColor: themeColors.primary },
+                      registrationMode === 'simple' && {
+                        borderWidth: 2,
+                        borderColor: themeColors.primary,
+                        backgroundColor: themeColors.primary + '10',
+                      },
                     ]}
                     onPress={() => setRegistrationMode('simple')}
                     accessibilityRole="button"
                     accessibilityState={{ selected: registrationMode === 'simple' }}
                   >
-                    <Text
-                      style={[
-                        styles.modeToggleText,
-                        { color: registrationMode === 'simple' ? '#FFFFFF' : themeColors.textSecondary },
-                      ]}
-                    >
+                    <Text style={[styles.modeToggleText, { color: themeColors.primary }]}>
                       {t('training.simpleMode')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
                       styles.modeToggleButton,
-                      registrationMode === 'advanced' && { backgroundColor: themeColors.primary },
+                      registrationMode === 'advanced' && {
+                        borderWidth: 2,
+                        borderColor: themeColors.primary,
+                        backgroundColor: themeColors.primary + '10',
+                      },
                     ]}
                     onPress={() => setRegistrationMode('advanced')}
                     accessibilityRole="button"
                     accessibilityState={{ selected: registrationMode === 'advanced' }}
                   >
-                    <Text
-                      style={[
-                        styles.modeToggleText,
-                        { color: registrationMode === 'advanced' ? '#FFFFFF' : themeColors.textSecondary },
-                      ]}
-                    >
+                    <Text style={[styles.modeToggleText, { color: themeColors.primary }]}>
                       {t('training.advancedMode')}
                     </Text>
                   </TouchableOpacity>
@@ -3300,36 +3298,41 @@ export const EnduranceSessionFormScreen = () => {
                 </>
               )}
 
-              <View style={styles.row}>
-                {currentConfig?.fields.heartRate && (
-                  <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
-                    <Text style={styles.label}>{t('training.avgHeartRate')}</Text>
-                    <TextInput
-                      style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      placeholderTextColor={themeColors.textSecondary}
-                      value={hr}
-                      onChangeText={setHr}
-                    />
-                  </View>
-                )}
-                {currentConfig?.fields.rpe && (
-                  <View
-                    style={[styles.formGroup, { flex: 1, marginLeft: currentConfig.fields.heartRate ? spacing.s : 0 }]}
-                  >
-                    <Text style={styles.label}>{t('training.effortRpe')}</Text>
-                    <TextInput
-                      style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                      keyboardType="numeric"
-                      placeholder={t('training.repsPlaceholder')}
-                      placeholderTextColor={themeColors.textSecondary}
-                      value={rpe}
-                      onChangeText={setRpe}
-                    />
-                  </View>
-                )}
-              </View>
+              {registrationMode === 'simple' && (
+                <View style={styles.row}>
+                  {currentConfig?.fields.heartRate && (
+                    <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
+                      <Text style={styles.label}>{t('training.avgHeartRate')}</Text>
+                      <TextInput
+                        style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor={themeColors.textSecondary}
+                        value={hr}
+                        onChangeText={setHr}
+                      />
+                    </View>
+                  )}
+                  {currentConfig?.fields.rpe && (
+                    <View
+                      style={[
+                        styles.formGroup,
+                        { flex: 1, marginLeft: currentConfig.fields.heartRate ? spacing.s : 0 },
+                      ]}
+                    >
+                      <Text style={styles.label}>{t('training.effortRpe')}</Text>
+                      <TextInput
+                        style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
+                        keyboardType="numeric"
+                        placeholder={t('training.repsPlaceholder')}
+                        placeholderTextColor={themeColors.textSecondary}
+                        value={rpe}
+                        onChangeText={setRpe}
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
 
               <View style={styles.row}>
                 <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
