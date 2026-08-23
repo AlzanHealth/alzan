@@ -23,10 +23,13 @@ import { CanonicalActivityWriterService } from './canonical-activity-writer.serv
 import { CanonicalHealthWriterService } from './canonical-health-writer.service';
 import {
   assertCorosFitBytes,
+  assertCorosApiSuccess,
   buildCorosDateWindows,
   extractCorosDailyRecords,
+  extractCorosFitUrls,
   extractCorosWorkoutRecords,
 } from './coros-api.utils';
+import { mergeCorosMultisportActivities } from './coros-multisport.utils';
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
@@ -261,8 +264,12 @@ export class CorosCloudSyncService {
         payload: summary,
         traceId: jobId,
       });
-      const fitBytes = await this.fetchWorkoutFit(token, summary, labelId);
-      const fitActivity = parseCorosActivityFileToCanonical(fitBytes, `coros-${labelId}.fit`);
+      const fitFiles = await this.fetchWorkoutFits(token, summary, labelId);
+      const fitActivity = mergeCorosMultisportActivities(
+        fitFiles.map((fitBytes, index) =>
+          parseCorosActivityFileToCanonical(fitBytes, `coros-${labelId}-${index + 1}.fit`),
+        ),
+      );
       const summaryActivity = parseCorosActivityFileToCanonical(JSON.stringify(summary), `coros-${labelId}.json`);
       const activity = {
         ...fitActivity,
@@ -403,50 +410,54 @@ export class CorosCloudSyncService {
           timeout: 15_000,
         }),
       );
+      assertCorosApiSuccess(response.data);
       return response.data;
     } catch (error: unknown) {
       throw this.toHttpException(error);
     }
   }
 
-  private async fetchWorkoutFit(token: CorosToken, summary: JsonRecord, labelId: string): Promise<Uint8Array> {
-    const fitUrl = this.readString(summary.fitUrl);
+  private async fetchWorkoutFits(token: CorosToken, summary: JsonRecord, labelId: string): Promise<Uint8Array[]> {
     try {
-      const response = fitUrl
-        ? await this.executeRequest(() => {
-            const url = validateCorosFitUrl(fitUrl, this.fitAllowedHosts);
-            return axios.get<ArrayBuffer>(url.toString(), {
-              responseType: 'arraybuffer',
-              timeout: 15_000,
-              maxRedirects: 0,
-              maxContentLength: MAX_FIT_BYTES,
-              maxBodyLength: MAX_FIT_BYTES,
-            });
-          })
-        : await this.executeRequest(() =>
-            axios.get<ArrayBuffer>(`${this.apiBaseUrl}/v2/coros/sport/detail/fit`, {
-              params: {
-                mode: summary.mode,
-                subMode: summary.subMode,
-                labelId,
-                openId: token.openId,
-                token: token.accessToken,
-              },
-              headers: { token: token.accessToken },
-              responseType: 'arraybuffer',
-              timeout: 15_000,
-              maxRedirects: 0,
-              maxContentLength: MAX_FIT_BYTES,
-              maxBodyLength: MAX_FIT_BYTES,
-            }),
-          );
-      const bytes = Uint8Array.from(new Uint8Array(response.data));
-      assertCorosFitBytes(bytes, MAX_FIT_BYTES);
-      return bytes;
+      let fitUrls = extractCorosFitUrls(summary);
+      if (fitUrls.length === 0) {
+        const detailResponse = await this.executeRequest(() =>
+          axios.get<unknown>(`${this.apiBaseUrl}/v2/coros/sport/detail/fit`, {
+            params: {
+              mode: summary.mode,
+              subMode: summary.subMode,
+              labelId,
+              openId: token.openId,
+              token: token.accessToken,
+            },
+            headers: { Accept: 'application/json', token: token.accessToken },
+            timeout: 15_000,
+          }),
+        );
+        fitUrls = extractCorosFitUrls(detailResponse.data);
+      }
+      if (fitUrls.length === 0) throw new Error('COROS_FIT_URL_MISSING');
+      return Promise.all(fitUrls.map(fitUrl => this.downloadFit(fitUrl)));
     } catch (error: unknown) {
       if (error instanceof Error && error.message.startsWith('COROS_FIT_')) throw error;
       throw this.toHttpException(error);
     }
+  }
+
+  private async downloadFit(fitUrl: string): Promise<Uint8Array> {
+    const url = validateCorosFitUrl(fitUrl, this.fitAllowedHosts);
+    const response = await this.executeRequest(() =>
+      axios.get<ArrayBuffer>(url.toString(), {
+        responseType: 'arraybuffer',
+        timeout: 15_000,
+        maxRedirects: 0,
+        maxContentLength: MAX_FIT_BYTES,
+        maxBodyLength: MAX_FIT_BYTES,
+      }),
+    );
+    const bytes = Uint8Array.from(new Uint8Array(response.data));
+    assertCorosFitBytes(bytes, MAX_FIT_BYTES);
+    return bytes;
   }
 
   private async getUsableToken(userId: string): Promise<CorosToken> {
@@ -592,6 +603,9 @@ export class CorosCloudSyncService {
   }
 
   private toHttpException(error: unknown): Error {
+    if (error instanceof Error && error.message.startsWith('COROS_API_ERROR_')) {
+      return new BadGatewayException(error.message);
+    }
     if (axios.isAxiosError(error) && error.response?.status === 429) {
       return new ServiceUnavailableException('COROS_RATE_LIMITED');
     }

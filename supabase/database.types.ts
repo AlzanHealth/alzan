@@ -585,6 +585,7 @@ export type Database = {
           notes: string | null
           pending_watch_metrics: Json | null
           pool_type: string | null
+          pre_wearable_merge_snapshot: Json | null
           provider: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id: string | null
           pte: number | null
@@ -674,6 +675,7 @@ export type Database = {
           notes?: string | null
           pending_watch_metrics?: Json | null
           pool_type?: string | null
+          pre_wearable_merge_snapshot?: Json | null
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
           pte?: number | null
@@ -763,6 +765,7 @@ export type Database = {
           notes?: string | null
           pending_watch_metrics?: Json | null
           pool_type?: string | null
+          pre_wearable_merge_snapshot?: Json | null
           provider?: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id?: string | null
           pte?: number | null
@@ -2332,10 +2335,14 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          next_processing_at: string
           object_type: string
           payload: Json | null
           payload_hash: string
           processed_at: string | null
+          processing_attempts: number
+          processing_error: string | null
+          processing_status: string
           provider: Database["public"]["Enums"]["wearable_provider_enum"]
           received_at: string
           related_id: string | null
@@ -2352,10 +2359,14 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          next_processing_at?: string
           object_type: string
           payload?: Json | null
           payload_hash: string
           processed_at?: string | null
+          processing_attempts?: number
+          processing_error?: string | null
+          processing_status?: string
           provider: Database["public"]["Enums"]["wearable_provider_enum"]
           received_at?: string
           related_id?: string | null
@@ -2372,10 +2383,14 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          next_processing_at?: string
           object_type?: string
           payload?: Json | null
           payload_hash?: string
           processed_at?: string | null
+          processing_attempts?: number
+          processing_error?: string | null
+          processing_status?: string
           provider?: Database["public"]["Enums"]["wearable_provider_enum"]
           received_at?: string
           related_id?: string | null
@@ -5445,6 +5460,7 @@ export type Database = {
           notes: string | null
           pending_watch_metrics: Json | null
           pool_type: string | null
+          pre_wearable_merge_snapshot: Json | null
           provider: Database["public"]["Enums"]["provider_enum"]
           provider_activity_id: string | null
           pte: number | null

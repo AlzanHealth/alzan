@@ -95,6 +95,7 @@ DECLARE
   v_parent_id uuid;
   v_section_id uuid;
   v_section_map jsonb := '{}'::jsonb;
+  v_group_repetitions jsonb := '{}'::jsonb;
   v_sport_type text := p_session->>'sport_type';
   v_template_id uuid := NULLIF(p_session->>'endurance_template_id', '')::uuid;
   v_distance_m numeric := 0;
@@ -104,6 +105,7 @@ DECLARE
   v_is_group boolean;
   v_item_distance_m numeric;
   v_item_duration_s integer;
+  v_item_multiplier integer;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'MANUAL_ENDURANCE_UNAUTHENTICATED' USING ERRCODE = '42501';
@@ -148,6 +150,7 @@ BEGIN
     v_is_group := COALESCE((v_item->>'isGroup')::boolean, false);
     v_parent_client_id := NULLIF(v_item->>'parentClientId', '');
     v_parent_id := NULL;
+    v_item_multiplier := 1;
     IF v_parent_client_id IS NOT NULL THEN
       v_parent_id := NULLIF(v_section_map->>v_parent_client_id, '')::uuid;
       IF v_parent_id IS NULL THEN
@@ -160,6 +163,9 @@ BEGIN
           AND parent_section.is_group
       ) THEN
         RAISE EXCEPTION 'MANUAL_ENDURANCE_PARENT_NOT_GROUP';
+      END IF;
+      IF NULLIF(v_item->>'repetitionIndex', '') IS NULL THEN
+        v_item_multiplier := greatest(1, COALESCE((v_group_repetitions->>v_parent_client_id)::integer, 1));
       END IF;
     END IF;
 
@@ -224,13 +230,19 @@ BEGIN
     );
 
     v_section_map := v_section_map || jsonb_build_object(v_client_id, v_section_id::text);
+    IF v_is_group THEN
+      v_group_repetitions := v_group_repetitions || jsonb_build_object(
+        v_client_id,
+        greatest(1, COALESCE((v_item->>'repetitions')::integer, 1))
+      );
+    END IF;
 
     IF NOT v_is_group THEN
       IF NULLIF(v_item->>'distanceM', '')::numeric > 0 THEN
-        v_distance_m := v_distance_m + v_item_distance_m;
+        v_distance_m := v_distance_m + (v_item_distance_m * v_item_multiplier);
       END IF;
       IF NULLIF(v_item->>'durationS', '')::integer > 0 THEN
-        v_duration_s := v_duration_s + v_item_duration_s;
+        v_duration_s := v_duration_s + (v_item_duration_s * v_item_multiplier);
       END IF;
     END IF;
   END LOOP;

@@ -58,6 +58,7 @@ import { AdvancedEnduranceSessionEditor } from '../../modules/training/component
 import { useCreateManualEnduranceActivity } from '../../modules/training/hooks/useCreateManualEnduranceActivity';
 import {
   calculateAdvancedTotals,
+  buildAdvancedSessionTimestamps,
   createEmptyAdvancedSection,
   deriveAdvancedSectionMetrics,
   hasValidAdvancedSection,
@@ -1218,13 +1219,7 @@ export const EnduranceSessionFormScreen = () => {
             .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
           return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
         };
-        const endTime =
-          durationInSeconds > 0
-            ? new Date(new Date(startDateTime).getTime() + durationInSeconds * 1000).toISOString()
-            : new Date().toISOString();
-        const localEnd = new Date(
-          new Date(`${normalizedDate}T${normalizedTime}:00`).getTime() + durationInSeconds * 1000,
-        );
+        const advancedTimestamps = buildAdvancedSessionTimestamps(normalizedDate, normalizedTime, durationInSeconds);
 
         const createdSessionId = await createAdvancedSession.mutateAsync({
           session: {
@@ -1232,8 +1227,8 @@ export const EnduranceSessionFormScreen = () => {
             sport_subtype: resolvePersistedSportSubtype(sportSubtype, modalityOptions),
             pool_type: sportType === 'swimming' ? poolType : null,
             stroke: sportType === 'swimming' ? stroke : null,
-            start_time: startDateTime,
-            end_time: endTime,
+            start_time: advancedTimestamps.startTime,
+            end_time: advancedTimestamps.endTime,
             duration_s: advancedTotals.durationS,
             distance_m: advancedTotals.distanceM,
             elev_gain_m: elevation ? safeParseFloat(elevation) : sumSectionMetric(section => section.elevationGainM),
@@ -1248,8 +1243,8 @@ export const EnduranceSessionFormScreen = () => {
             notes: notes || null,
             endurance_template_id: activeTemplate?.id ?? null,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            started_at_local: `${normalizedDate}T${normalizedTime}:00`,
-            ended_at_local: localEnd.toISOString().slice(0, 19),
+            started_at_local: advancedTimestamps.startedAtLocal,
+            ended_at_local: advancedTimestamps.endedAtLocal,
           },
           sections: serializeAdvancedSections(advancedSectionsWithDerivedMetrics),
         });

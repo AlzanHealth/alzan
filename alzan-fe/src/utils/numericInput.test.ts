@@ -11,7 +11,9 @@ assert.equal(TIME_INPUT_PROPS.inputMode, undefined);
 assert.equal(parseLocalizedDecimal('1,5'), 1.5);
 assert.equal(parseLocalizedDecimal(' 1.5 '), 1.5);
 assert.equal(parseLocalizedDecimal('-2,25'), -2.25);
-assert.equal(parseLocalizedDecimal('1,2,3'), 1.2);
+assert.equal(parseLocalizedDecimal('1,2,3'), null);
+assert.equal(parseLocalizedDecimal('12abc'), null);
+assert.equal(parseLocalizedDecimal('1.234,5'), null);
 assert.equal(parseLocalizedDecimal(''), null);
 assert.equal(parseLocalizedDecimal('not-a-number'), null);
 

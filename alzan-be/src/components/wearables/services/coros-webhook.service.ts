@@ -12,7 +12,7 @@ import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { verifyCorosWebhookCredentials } from '../../providers/oauth/coros-security';
 import { CorosWorkoutPushDto } from '../dto/coros-webhook.dto';
 import { CorosCloudSyncService } from './coros-cloud-sync.service';
-import { assertCorosWebhookPayloadSize } from './coros-api.utils';
+import { assertCorosWebhookPayloadSize, getCorosWebhookFailureState } from './coros-api.utils';
 import { RawPayloadService } from './raw-payload.service';
 
 const MAX_COROS_WEBHOOK_BYTES = 2 * 1024 * 1024;
@@ -95,11 +95,14 @@ export class CorosWebhookService implements OnModuleInit, OnModuleDestroy {
     try {
       const { data: events, error } = await this.supabaseAdminService.client
         .from('external_raw_payloads_v2')
-        .select('id, user_id, payload')
+        .select('id, user_id, payload, processing_attempts')
         .eq('provider', 'coros')
         .eq('source_channel', 'cloud')
         .eq('object_type', 'coros_workout_push')
+        .in('processing_status', ['pending', 'retry'])
         .is('processed_at', null)
+        .lte('next_processing_at', new Date().toISOString())
+        .order('next_processing_at', { ascending: true })
         .order('received_at', { ascending: true })
         .limit(100);
       if (error) throw error;
@@ -107,11 +110,18 @@ export class CorosWebhookService implements OnModuleInit, OnModuleDestroy {
       for (const event of events ?? []) {
         try {
           if (!this.isRecord(event.payload)) {
-            this.logger.warn('Deferred a queued COROS webhook with an invalid stored payload');
+            await this.markDeadLetter(event.id, event.processing_attempts, 'COROS_WEBHOOK_STORED_PAYLOAD_INVALID');
             continue;
           }
           const result = await this.corosCloudSyncService.syncWorkoutPush(event.user_id, event.payload);
-          if (result.status === 'running' || result.status === 'failed') continue;
+          if (result.status === 'running') {
+            await this.deferEvent(event.id);
+            continue;
+          }
+          if (result.status === 'failed') {
+            await this.markFailure(event.id, event.processing_attempts, 'COROS_ACTIVITY_IMPORT_FAILED');
+            continue;
+          }
           const { data: connection } = await this.supabaseAdminService.client
             .from('user_connections')
             .select('id')
@@ -122,6 +132,8 @@ export class CorosWebhookService implements OnModuleInit, OnModuleDestroy {
             .from('external_raw_payloads_v2')
             .update({
               processed_at: new Date().toISOString(),
+              processing_status: 'processed',
+              processing_error: null,
               related_table: 'user_connections',
               related_id: connection?.id ?? null,
             })
@@ -129,6 +141,7 @@ export class CorosWebhookService implements OnModuleInit, OnModuleDestroy {
           if (updateError) throw updateError;
         } catch (syncError) {
           this.logger.warn('Deferred a queued COROS webhook after sync failure', syncError as Error);
+          await this.markFailure(event.id, event.processing_attempts, this.errorMessage(syncError));
         }
       }
     } catch (error) {
@@ -136,6 +149,48 @@ export class CorosWebhookService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.draining = false;
     }
+  }
+
+  private async deferEvent(eventId: string): Promise<void> {
+    const { error } = await this.supabaseAdminService.client
+      .from('external_raw_payloads_v2')
+      .update({
+        processing_status: 'retry',
+        next_processing_at: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .eq('id', eventId);
+    if (error) throw error;
+  }
+
+  private async markFailure(eventId: string, previousAttempts: number, message: string): Promise<void> {
+    const failure = getCorosWebhookFailureState(previousAttempts);
+    if (failure.isDeadLetter || !failure.nextAttemptAt) {
+      await this.markDeadLetter(eventId, previousAttempts, message);
+      return;
+    }
+    const { error } = await this.supabaseAdminService.client
+      .from('external_raw_payloads_v2')
+      .update({
+        processing_status: 'retry',
+        processing_attempts: failure.attempts,
+        next_processing_at: failure.nextAttemptAt,
+        processing_error: message,
+      })
+      .eq('id', eventId);
+    if (error) throw error;
+  }
+
+  private async markDeadLetter(eventId: string, previousAttempts: number, message: string): Promise<void> {
+    const { error } = await this.supabaseAdminService.client
+      .from('external_raw_payloads_v2')
+      .update({
+        processing_status: 'dead_letter',
+        processing_attempts: Math.max(previousAttempts + 1, 10),
+        processing_error: message,
+        processed_at: new Date().toISOString(),
+      })
+      .eq('id', eventId);
+    if (error) throw error;
   }
 
   private readIdentifier(value: unknown): string | null {
@@ -146,5 +201,9 @@ export class CorosWebhookService implements OnModuleInit, OnModuleDestroy {
 
   private isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'COROS_WEBHOOK_PROCESSING_FAILED';
   }
 }

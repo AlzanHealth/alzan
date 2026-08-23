@@ -465,7 +465,14 @@ async function assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate(): P
         source_package: null,
         source_record_id: null,
         sport_type: 'running',
+        sport_subtype: 'planned_easy',
         source: 'planned',
+        start_time: '2026-08-23T08:00:00.000Z',
+        end_time: null,
+        duration_s: null,
+        timezone: 'Europe/Madrid',
+        status: 'active',
+        pre_wearable_merge_snapshot: null,
         duplicate_of_session_id: null,
         duplicate_resolution: null,
         duplicate_score: null,
@@ -508,6 +515,17 @@ async function assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate(): P
   const sessionId = await service.upsertActivity(input);
 
   assert.equal(sessionId, 'survivor-session');
+  assert.ok(
+    client.updates.some(
+      update =>
+        update.table === 'activity_sessions' &&
+        update.filters.some(filter => filter.column === 'id' && filter.value === 'survivor-session') &&
+        typeof update.payload?.pre_wearable_merge_snapshot === 'object' &&
+        (update.payload.pre_wearable_merge_snapshot as Record<string, unknown>).start_time ===
+          '2026-08-23T08:00:00.000Z',
+    ),
+    'native session values must be snapshotted before wearable association',
+  );
   assert.ok(
     client.updates.some(
       update =>

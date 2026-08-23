@@ -193,6 +193,7 @@ CREATE TABLE public.activity_sessions (
   duplicate_score numeric,
   duplicate_resolution USER-DEFINED,
   pending_watch_metrics jsonb,
+  pre_wearable_merge_snapshot jsonb,
   needs_strength_review boolean NOT NULL DEFAULT false,
   import_review_seen_at timestamp with time zone,
   template_suggestion_deferred_at timestamp with time zone,
@@ -649,6 +650,10 @@ CREATE TABLE public.external_raw_payloads_v2 (
   related_id uuid,
   received_at timestamp with time zone NOT NULL DEFAULT now(),
   processed_at timestamp with time zone,
+  processing_status text NOT NULL DEFAULT 'pending'::text,
+  processing_attempts integer NOT NULL DEFAULT 0,
+  next_processing_at timestamp with time zone NOT NULL DEFAULT now(),
+  processing_error text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT external_raw_payloads_v2_pkey PRIMARY KEY (id),
   CONSTRAINT external_raw_payloads_v2_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)

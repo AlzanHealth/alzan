@@ -4,6 +4,7 @@ DO $test$
 DECLARE
   v_user_id uuid;
   v_running_id uuid;
+  v_repeated_id uuid;
   v_swimming_id uuid;
 BEGIN
   SELECT id INTO v_user_id FROM public.users ORDER BY created_at LIMIT 1;
@@ -60,6 +61,25 @@ BEGIN
 
   IF (SELECT distance_m FROM public.activity_sessions WHERE id = v_swimming_id) <> 1000 THEN
     RAISE EXCEPTION 'MANUAL_ENDURANCE_SWIMMING_TOTALS_INVALID';
+  END IF;
+
+  v_repeated_id := public.create_manual_endurance_activity(
+    jsonb_build_object(
+      'sport_type', 'running',
+      'name', 'Shared repeated block',
+      'start_time', '2026-08-23T10:00:00+00'
+    ),
+    jsonb_build_array(
+      jsonb_build_object('clientId', 'shared-block', 'isGroup', true, 'phaseType', 'interval', 'durationType', 'lap_button', 'repetitions', 4, 'orderIndex', 0),
+      jsonb_build_object('clientId', 'shared-work', 'parentClientId', 'shared-block', 'isGroup', false, 'phaseType', 'interval', 'durationType', 'distance', 'distanceM', 400, 'durationS', 120, 'orderIndex', 1)
+    )
+  );
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.activity_sessions
+    WHERE id = v_repeated_id AND distance_m = 1600 AND duration_s = 480
+  ) THEN
+    RAISE EXCEPTION 'MANUAL_ENDURANCE_SHARED_REPETITIONS_NOT_APPLIED';
   END IF;
 
   BEGIN

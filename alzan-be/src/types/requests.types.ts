@@ -714,6 +714,10 @@ type ExternalRawPayloadsV2Table = {
     related_id: string | null;
     received_at: string;
     processed_at: string | null;
+    processing_status: string;
+    processing_attempts: number;
+    next_processing_at: string;
+    processing_error: string | null;
     created_at: string;
   };
   Insert: {
@@ -734,6 +738,10 @@ type ExternalRawPayloadsV2Table = {
     related_id?: string | null;
     received_at?: string;
     processed_at?: string | null;
+    processing_status?: string;
+    processing_attempts?: number;
+    next_processing_at?: string;
+    processing_error?: string | null;
     created_at?: string;
   };
   Update: {
@@ -754,6 +762,10 @@ type ExternalRawPayloadsV2Table = {
     related_id?: string | null;
     received_at?: string;
     processed_at?: string | null;
+    processing_status?: string;
+    processing_attempts?: number;
+    next_processing_at?: string;
+    processing_error?: string | null;
     created_at?: string;
   };
   Relationships: [];

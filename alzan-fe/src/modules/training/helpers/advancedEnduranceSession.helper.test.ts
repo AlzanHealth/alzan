@@ -3,6 +3,7 @@ import {
   addAdvancedGroup,
   addAdvancedSection,
   calculateAdvancedTotals,
+  buildAdvancedSessionTimestamps,
   deriveAdvancedSectionMetrics,
   collapseGroupRepetitions,
   createEmptyAdvancedSection,
@@ -109,6 +110,53 @@ assert.deepEqual(totals, {
   paceSPer100m: 40.714285714285715,
   speedMPerS: 2.456140350877193,
 });
+
+const repeatedTotals = calculateAdvancedTotals([
+  {
+    ...createEmptyAdvancedSection('repeat-group'),
+    isGroup: true,
+    durationType: 'lap_button',
+    repetitions: 4,
+  },
+  {
+    ...createEmptyAdvancedSection('repeat-work', 'repeat-group'),
+    distanceM: 400,
+    durationS: 120,
+  },
+]);
+assert.equal(repeatedTotals.distanceM, 1600);
+assert.equal(repeatedTotals.durationS, 480);
+
+const expandedRepeatedTotals = calculateAdvancedTotals([
+  {
+    ...createEmptyAdvancedSection('expanded-group'),
+    isGroup: true,
+    durationType: 'lap_button',
+    repetitions: 2,
+  },
+  {
+    ...createEmptyAdvancedSection('expanded-1', 'expanded-group'),
+    repetitionIndex: 1,
+    distanceM: 400,
+    durationS: 120,
+  },
+  {
+    ...createEmptyAdvancedSection('expanded-2', 'expanded-group'),
+    repetitionIndex: 2,
+    distanceM: 500,
+    durationS: 130,
+  },
+]);
+assert.equal(expandedRepeatedTotals.distanceM, 900);
+assert.equal(expandedRepeatedTotals.durationS, 250);
+
+const distanceOnlyTimestamps = buildAdvancedSessionTimestamps('2026-01-15', '10:00', 0);
+assert.equal(distanceOnlyTimestamps.endTime, distanceOnlyTimestamps.startTime);
+assert.equal(distanceOnlyTimestamps.startedAtLocal, '2026-01-15T10:00:00');
+assert.equal(distanceOnlyTimestamps.endedAtLocal, '2026-01-15T10:00:00');
+
+const durationTimestamps = buildAdvancedSessionTimestamps('2026-01-15', '10:00', 3600);
+assert.equal(durationTimestamps.endedAtLocal, '2026-01-15T11:00:00');
 
 const swimmingTotals = calculateAdvancedTotals([
   { ...createEmptyAdvancedSection('swim-1'), distanceM: 500, durationS: 600, paceSPer100m: 120 },

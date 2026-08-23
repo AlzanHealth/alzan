@@ -17,7 +17,9 @@ export const TIME_INPUT_PROPS: NumericInputProps = {
 };
 
 export const parseLocalizedDecimal = (value: string): number | null => {
-  const normalized = value.trim().replace(',', '.');
+  const trimmed = value.trim();
+  if (!/^[+-]?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(trimmed)) return null;
+  const normalized = trimmed.replace(',', '.');
   if (!normalized) return null;
 
   const parsed = Number.parseFloat(normalized);

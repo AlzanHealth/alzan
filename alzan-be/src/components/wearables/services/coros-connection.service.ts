@@ -63,10 +63,11 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
           try {
             await this.enqueueDeauthorization(userId, token.access_token, error);
           } catch (enqueueError) {
-            this.logger.error('Failed to queue COROS remote deauthorization; continuing with local deletion', {
+            this.logger.error('Failed to durably queue COROS remote deauthorization; local deletion aborted', {
               error: this.errorMessage(enqueueError),
               userReferenceHash: createHash('sha256').update(userId).digest('hex'),
             });
+            throw enqueueError;
           }
         }
       }

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Modal, Pressable, StyleSheet, Switch, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import type { TranslationKey } from '../../../i18n/locales/en';
@@ -55,6 +55,37 @@ const DURATION_HINT_KEYS: Record<VisibleDurationType, TranslationKey> = {
   time: 'training.advancedDurationTimeHint',
   distance: 'training.advancedDurationDistanceHint',
 };
+
+type BufferedMetricInputProps = Omit<TextInputProps, 'value' | 'onChangeText'> & {
+  formattedValue: string;
+  onCommit: (value: string) => void;
+};
+
+function BufferedMetricInput({ formattedValue, onCommit, onBlur, onFocus, ...props }: BufferedMetricInputProps) {
+  const [draft, setDraft] = useState(formattedValue);
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) setDraft(formattedValue);
+  }, [formattedValue, isFocused]);
+
+  return (
+    <TextInput
+      {...props}
+      value={draft}
+      onChangeText={setDraft}
+      onFocus={event => {
+        setIsFocused(true);
+        onFocus?.(event);
+      }}
+      onBlur={event => {
+        setIsFocused(false);
+        onCommit(draft);
+        onBlur?.(event);
+      }}
+    />
+  );
+}
 
 function parseNumber(value: string): number | null {
   const parsed = parseLocalizedDecimal(value);
@@ -251,23 +282,23 @@ function SectionEditor({
           {selectedDurationType === 'time' ? (
             <View style={styles.primaryField}>
               <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>{t('training.duration')}</Text>
-              <TextInput
+              <BufferedMetricInput
                 style={inputStyle}
                 {...TIME_INPUT_PROPS}
-                value={formatDuration(section.durationS)}
+                formattedValue={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onChangeText={value => updateMetric('duration', parseDuration(value))}
+                onCommit={value => updateMetric('duration', parseDuration(value))}
               />
             </View>
           ) : (
             <View style={styles.primaryField}>
               <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>{t('training.distance')}</Text>
               <View>
-                <TextInput
+                <BufferedMetricInput
                   style={inputStyle}
                   {...DECIMAL_INPUT_PROPS}
-                  value={
+                  formattedValue={
                     section.distanceM == null
                       ? ''
                       : sport === 'swimming'
@@ -276,7 +307,7 @@ function SectionEditor({
                   }
                   placeholder="0"
                   placeholderTextColor={themeColors.textSecondary}
-                  onChangeText={value =>
+                  onCommit={value =>
                     updateMetric(
                       'distance',
                       value
@@ -300,10 +331,10 @@ function SectionEditor({
             </Text>
             {selectedDurationType === 'time' ? (
               <View>
-                <TextInput
+                <BufferedMetricInput
                   style={inputStyle}
                   {...DECIMAL_INPUT_PROPS}
-                  value={
+                  formattedValue={
                     section.distanceM == null
                       ? ''
                       : sport === 'swimming'
@@ -312,7 +343,7 @@ function SectionEditor({
                   }
                   placeholder="0"
                   placeholderTextColor={themeColors.textSecondary}
-                  onChangeText={value =>
+                  onCommit={value =>
                     updateMetric(
                       'distance',
                       value
@@ -326,23 +357,23 @@ function SectionEditor({
                 <Text style={[styles.unitLabel, { color: themeColors.textSecondary }]}>{distanceLabel}</Text>
               </View>
             ) : (
-              <TextInput
+              <BufferedMetricInput
                 style={inputStyle}
                 {...TIME_INPUT_PROPS}
-                value={formatDuration(section.durationS)}
+                formattedValue={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onChangeText={value => updateMetric('duration', parseDuration(value))}
+                onCommit={value => updateMetric('duration', parseDuration(value))}
               />
             )}
           </View>
 
           <View style={styles.intensityField}>
             <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>{intensityLabel}</Text>
-            <TextInput
+            <BufferedMetricInput
               style={inputStyle}
               {...(sport === 'cycling' ? DECIMAL_INPUT_PROPS : TIME_INPUT_PROPS)}
-              value={
+              formattedValue={
                 intensityValue == null
                   ? ''
                   : sport === 'cycling'
@@ -351,7 +382,7 @@ function SectionEditor({
               }
               placeholder={sport === 'cycling' ? '0' : '0:00'}
               placeholderTextColor={themeColors.textSecondary}
-              onChangeText={value =>
+              onCommit={value =>
                 updateMetric('intensity', sport === 'cycling' ? parseNumber(value) : parseDuration(value))
               }
             />

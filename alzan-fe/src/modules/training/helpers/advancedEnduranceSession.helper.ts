@@ -298,12 +298,27 @@ export function deriveAdvancedSectionMetrics(
 }
 
 export function calculateAdvancedTotals(sections: AdvancedSectionDraft[]): AdvancedTotals {
+  const groupRepetitions = new Map(
+    sections.filter(section => section.isGroup).map(section => [section.clientId, Math.max(1, section.repetitions)]),
+  );
   const leaves = sections.filter(section => !section.isGroup);
   const distanceValues = leaves
-    .map(section => section.distanceM)
+    .map(section => {
+      const multiplier =
+        section.parentClientId && section.repetitionIndex == null
+          ? (groupRepetitions.get(section.parentClientId) ?? 1)
+          : 1;
+      return section.distanceM == null ? null : section.distanceM * multiplier;
+    })
     .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
   const durationValues = leaves
-    .map(section => section.durationS)
+    .map(section => {
+      const multiplier =
+        section.parentClientId && section.repetitionIndex == null
+          ? (groupRepetitions.get(section.parentClientId) ?? 1)
+          : 1;
+      return section.durationS == null ? null : section.durationS * multiplier;
+    })
     .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
   const distanceM = distanceValues.length > 0 ? distanceValues.reduce((sum, value) => sum + value, 0) : null;
   const durationS = durationValues.length > 0 ? durationValues.reduce((sum, value) => sum + value, 0) : null;
@@ -314,6 +329,33 @@ export function calculateAdvancedTotals(sections: AdvancedSectionDraft[]): Advan
     paceSPerKm: distanceM && durationS ? durationS / (distanceM / 1000) : null,
     paceSPer100m: distanceM && durationS ? durationS / (distanceM / 100) : null,
     speedMPerS: distanceM && durationS ? distanceM / durationS : null,
+  };
+}
+
+function formatLocalDateTime(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hours = String(value.getHours()).padStart(2, '0');
+  const minutes = String(value.getMinutes()).padStart(2, '0');
+  const seconds = String(value.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
+export function buildAdvancedSessionTimestamps(
+  localDate: string,
+  localTime: string,
+  durationSeconds: number,
+): { startTime: string; endTime: string; startedAtLocal: string; endedAtLocal: string } {
+  const startedAtLocal = `${localDate}T${localTime}:00`;
+  const start = new Date(startedAtLocal);
+  const safeDurationSeconds = Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 0;
+  const end = new Date(start.getTime() + safeDurationSeconds * 1000);
+  return {
+    startTime: start.toISOString(),
+    endTime: end.toISOString(),
+    startedAtLocal,
+    endedAtLocal: formatLocalDateTime(end),
   };
 }
 

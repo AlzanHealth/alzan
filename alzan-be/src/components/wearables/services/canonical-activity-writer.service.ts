@@ -164,6 +164,8 @@ export class CanonicalActivityWriterService {
       }
     }
 
+    if (completeAssociatedPlans) await this.ensurePreWearableMergeSnapshot(sessionId);
+
     await this.persistActivityBundle({
       input,
       sessionId,
@@ -197,6 +199,26 @@ export class CanonicalActivityWriterService {
     }
 
     return sessionId;
+  }
+
+  private async ensurePreWearableMergeSnapshot(sessionId: string): Promise<void> {
+    const { data, error } = await this.supabaseAdminService.client
+      .from('activity_sessions')
+      .select(
+        'pre_wearable_merge_snapshot, sport_type, sport_subtype, start_time, end_time, duration_s, timezone, started_at_local, ended_at_local, route_polyline, status, distance_m, elev_gain_m, elev_loss_m, avg_heart_rate, max_heart_rate, min_heart_rate, avg_speed_m_per_s, calories_kcal, device_id, avg_cadence, max_cadence, avg_power_w, max_power_w, avg_temp_c, max_temp_c, recovery_time_s, total_steps, vo2_max, tss_hr, epoc, pte, duplicate_of_session_id, duplicate_score, duplicate_resolution, needs_strength_review, pending_watch_metrics',
+      )
+      .eq('id', sessionId)
+      .maybeSingle();
+    if (error || !data) throw new InternalServerErrorException('WEARABLE_ASSOCIATION_SNAPSHOT_READ_FAILED');
+    if (data.pre_wearable_merge_snapshot != null) return;
+    const { pre_wearable_merge_snapshot: ignoredSnapshot, ...snapshot } = data;
+    void ignoredSnapshot;
+    const { error: updateError } = await this.supabaseAdminService.client
+      .from('activity_sessions')
+      .update({ pre_wearable_merge_snapshot: snapshot as Json })
+      .eq('id', sessionId)
+      .is('pre_wearable_merge_snapshot', null);
+    if (updateError) throw new InternalServerErrorException('WEARABLE_ASSOCIATION_SNAPSHOT_WRITE_FAILED');
   }
 
   private async finishLifecycleReconciliation(
