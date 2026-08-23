@@ -5131,6 +5131,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      copy_completed_activity_session: {
+        Args: { p_session_id: string; p_target_date: string };
+        Returns: string;
+      };
       copy_meal_to_date: {
         Args: { p_items: Json; p_log: Json };
         Returns: {

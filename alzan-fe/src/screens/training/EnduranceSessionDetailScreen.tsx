@@ -23,7 +23,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { SPORTS_CONFIG, formatDuration, getSportDefaultTitleKey } from '../../constants/sports';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useSessionDetail, useUpdateWorkoutSet } from '../../hooks/useSessionDetail';
 import { useEnduranceTemplateSteps } from '../../hooks/useEnduranceSessions';
@@ -54,7 +54,7 @@ import { Alert } from '../../components/common/Alert';
 import { ActivitySession, EnduranceWorkoutStep } from '../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
-import { getDateFnsLocale } from '../../i18n/dateLocale';
+import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
 import { useUploadPolyline } from '../../hooks/useActivityPolyline';
 import { useApplyStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
 import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImportedStrengthSummary';
@@ -67,6 +67,10 @@ import { supabase } from '../../lib/supabaseClient';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { getHeartRateZoneFillPercentage } from './helpers/heartRateZoneDisplay.helper';
+import { CopyCompletedSessionModal } from '../../modules/training/components/CopyCompletedSessionModal';
+import { useCopyCompletedSession } from '../../modules/training/hooks/useCopyCompletedSession';
+import { getSessionLocalDate } from '../../modules/training/services/copyCompletedSessionService';
+import { getDefaultCopyTargetDate } from '../../modules/training/helpers/copyCompletedSession.helper';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
@@ -238,6 +242,7 @@ export const EnduranceSessionDetailScreen = () => {
   const { getOptionLabel } = useSportCatalog();
   const updateSet = useUpdateWorkoutSet();
   const applyStrengthActivityImport = useApplyStrengthActivityImport();
+  const copyCompletedSession = useCopyCompletedSession();
 
   // State for editing sets (gym only)
   const [editingSet, setEditingSet] = useState<{
@@ -256,11 +261,32 @@ export const EnduranceSessionDetailScreen = () => {
 
   const [routePolyline, setRoutePolyline] = useState<string | null>(initialSession?.route_polyline ?? null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
+  const [copyModalVisible, setCopyModalVisible] = useState(false);
 
   // Controls parent ScrollView scrolling — disabled while the user interacts with the map.
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
   const handleMapInteractionStart = useCallback(() => setMapScrollEnabled(false), []);
   const handleMapInteractionEnd = useCallback(() => setMapScrollEnabled(true), []);
+
+  const sourceDate = getSessionLocalDate(session);
+  const copyInitialDate = useMemo(() => parseISO(getDefaultCopyTargetDate()), []);
+  const handleCopyCompletedSession = useCallback(
+    async (targetDate: string) => {
+      await copyCompletedSession.mutateAsync({
+        sessionId: session.id,
+        sourceDate,
+        targetDate,
+      });
+      setCopyModalVisible(false);
+      Alert.alert(
+        t('training.copyCompletedSessionSuccessTitle'),
+        t('training.copyCompletedSessionSuccessMessage', {
+          date: formatLocalizedDate(parseISO(targetDate), { en: 'MMM d, yyyy', es: "d 'de' MMMM 'de' yyyy" }),
+        }),
+      );
+    },
+    [copyCompletedSession, session.id, sourceDate, t],
+  );
 
   // Route upload mutation
   const uploadPolyline = useUploadPolyline({
@@ -1808,6 +1834,16 @@ export const EnduranceSessionDetailScreen = () => {
             }
           />
 
+          {session.status === 'completed' && !isPendingSession ? (
+            <View style={styles.copySessionSection}>
+              <PrimaryButton
+                title={t('training.copyCompletedSession')}
+                onPress={() => setCopyModalVisible(true)}
+                variant="outline"
+              />
+            </View>
+          ) : null}
+
           {!isGymSession && (session.notes || template?.notes) && (
             <View style={styles.sectionContainer}>
               <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>{t('training.notesLabel')}</Text>
@@ -2196,6 +2232,15 @@ export const EnduranceSessionDetailScreen = () => {
         </ScrollView>
       </SafeAreaView>
 
+      <CopyCompletedSessionModal
+        visible={copyModalVisible}
+        sourceName={session.name || t(getSportDefaultTitleKey(session.sport_type, session.sport_subtype))}
+        sourceDate={sourceDate}
+        initialDate={copyInitialDate}
+        onCancel={() => setCopyModalVisible(false)}
+        onCopy={handleCopyCompletedSession}
+      />
+
       {/* Rename Activity Modal */}
       <Modal visible={renameVisible} transparent animationType="fade" onRequestClose={() => setRenameVisible(false)}>
         <View style={styles.modalContainer}>
@@ -2360,6 +2405,9 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 320,
     gap: spacing.s,
+  },
+  copySessionSection: {
+    marginBottom: spacing.l,
   },
   header: {
     flexDirection: 'row',
