@@ -337,6 +337,118 @@ export type Database = {
           },
         ];
       };
+      activity_session_sections: {
+        Row: {
+          avg_cadence: number | null;
+          avg_heart_rate: number | null;
+          avg_power_w: number | null;
+          calories_kcal: number | null;
+          created_at: string;
+          distance_m: number | null;
+          duration_s: number | null;
+          duration_type: Database['public']['Enums']['duration_type_enum'];
+          elev_gain_m: number | null;
+          id: string;
+          is_group: boolean;
+          label: string | null;
+          max_heart_rate: number | null;
+          max_power_w: number | null;
+          notes: string | null;
+          order_index: number;
+          pace_s_per_100m: number | null;
+          pace_s_per_km: number | null;
+          parent_section_id: string | null;
+          phase_type: Database['public']['Enums']['phase_type_enum'];
+          repetition_index: number | null;
+          repetitions: number;
+          rpe: number | null;
+          session_id: string;
+          source_template_step_id: string | null;
+          speed_m_per_s: number | null;
+          user_id: string;
+        };
+        Insert: {
+          avg_cadence?: number | null;
+          avg_heart_rate?: number | null;
+          avg_power_w?: number | null;
+          calories_kcal?: number | null;
+          created_at?: string;
+          distance_m?: number | null;
+          duration_s?: number | null;
+          duration_type: Database['public']['Enums']['duration_type_enum'];
+          elev_gain_m?: number | null;
+          id?: string;
+          is_group?: boolean;
+          label?: string | null;
+          max_heart_rate?: number | null;
+          max_power_w?: number | null;
+          notes?: string | null;
+          order_index: number;
+          pace_s_per_100m?: number | null;
+          pace_s_per_km?: number | null;
+          parent_section_id?: string | null;
+          phase_type: Database['public']['Enums']['phase_type_enum'];
+          repetition_index?: number | null;
+          repetitions?: number;
+          rpe?: number | null;
+          session_id: string;
+          source_template_step_id?: string | null;
+          speed_m_per_s?: number | null;
+          user_id: string;
+        };
+        Update: {
+          avg_cadence?: number | null;
+          avg_heart_rate?: number | null;
+          avg_power_w?: number | null;
+          calories_kcal?: number | null;
+          created_at?: string;
+          distance_m?: number | null;
+          duration_s?: number | null;
+          duration_type?: Database['public']['Enums']['duration_type_enum'];
+          elev_gain_m?: number | null;
+          id?: string;
+          is_group?: boolean;
+          label?: string | null;
+          max_heart_rate?: number | null;
+          max_power_w?: number | null;
+          notes?: string | null;
+          order_index?: number;
+          pace_s_per_100m?: number | null;
+          pace_s_per_km?: number | null;
+          parent_section_id?: string | null;
+          phase_type?: Database['public']['Enums']['phase_type_enum'];
+          repetition_index?: number | null;
+          repetitions?: number;
+          rpe?: number | null;
+          session_id?: string;
+          source_template_step_id?: string | null;
+          speed_m_per_s?: number | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'activity_session_sections_parent_section_id_fkey';
+            columns: ['parent_section_id'];
+            isOneToOne: false;
+            referencedRelation: 'activity_session_sections';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'activity_session_sections_session_id_fkey';
+            columns: ['session_id'];
+            isOneToOne: false;
+            referencedRelation: 'activity_sessions';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'activity_session_sections_source_template_step_id_fkey';
+            columns: ['source_template_step_id'];
+            isOneToOne: false;
+            referencedRelation: 'endurance_workout_steps';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       activity_session_superset_links: {
         Row: {
           created_at: string;
@@ -5164,6 +5276,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      create_manual_endurance_activity: {
+        Args: { p_sections: Json; p_session: Json };
+        Returns: string;
       };
       delete_coros_user_data: { Args: { p_user_id: string }; Returns: Json };
       delete_training_template: {

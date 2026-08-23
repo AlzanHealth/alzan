@@ -51,7 +51,7 @@ import {
   Upload,
 } from 'lucide-react-native';
 import { Alert } from '../../components/common/Alert';
-import { ActivitySession, EnduranceWorkoutStep } from '../../types/requests.types';
+import { ActivitySession, ActivitySessionSection, EnduranceWorkoutStep } from '../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { formatLocalizedDate, getDateFnsLocale } from '../../i18n/dateLocale';
@@ -386,6 +386,21 @@ export const EnduranceSessionDetailScreen = () => {
   // Fetch laps
   const { data: laps } = useSessionLaps(resolvedSessionId);
   const { data: heartRateZones } = useSessionHeartRateZones(resolvedSessionId);
+  const { data: activitySections = [] } = useQuery({
+    queryKey: ['activitySessionSections', resolvedSessionId],
+    queryFn: async (): Promise<ActivitySessionSection[]> => {
+      if (!resolvedSessionId) return [];
+      const { data, error } = await supabase
+        .from('activity_session_sections')
+        .select('*')
+        .eq('session_id', resolvedSessionId)
+        .order('order_index')
+        .order('repetition_index', { ascending: true, nullsFirst: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!resolvedSessionId,
+  });
   const { data: importedStrengthSummary } = useSessionImportedStrengthSummary(resolvedSessionId);
 
   // Fetch template details to get surface and environment type
@@ -1415,6 +1430,79 @@ export const EnduranceSessionDetailScreen = () => {
     );
   };
 
+  const renderRecordedBreakdown = () => {
+    if (activitySections.length === 0) return null;
+
+    const topLevelSections = activitySections.filter(section => section.parent_section_id == null);
+    const formatSectionMetric = (section: ActivitySessionSection) => {
+      const metrics: string[] = [];
+      if (section.distance_m != null) {
+        const distance = convertDistanceToUi(section.distance_m, 2);
+        metrics.push(`${distance.value} ${distance.unit}`);
+      }
+      if (section.duration_s != null) metrics.push(formatDuration(section.duration_s));
+      if (section.pace_s_per_km != null)
+        metrics.push(`${t('training.pace')} ${formatDuration(section.pace_s_per_km)}/km`);
+      if (section.pace_s_per_100m != null)
+        metrics.push(`${t('training.pacePer100m')} ${formatDuration(section.pace_s_per_100m)}`);
+      if (section.speed_m_per_s != null)
+        metrics.push(convertSpeedToUi(section.speed_m_per_s, session.sport_type).label);
+      if (section.avg_heart_rate != null) metrics.push(`${Math.round(section.avg_heart_rate)} bpm`);
+      if (section.max_heart_rate != null) metrics.push(`${Math.round(section.max_heart_rate)} bpm max`);
+      if (section.avg_power_w != null) metrics.push(`${Math.round(section.avg_power_w)} W`);
+      if (section.max_power_w != null) metrics.push(`${Math.round(section.max_power_w)} W max`);
+      if (section.avg_cadence != null) metrics.push(`${Math.round(section.avg_cadence)} rpm`);
+      if (section.elev_gain_m != null) metrics.push(`+${Math.round(section.elev_gain_m)} m`);
+      if (section.calories_kcal != null) metrics.push(`${Math.round(section.calories_kcal)} kcal`);
+      if (section.rpe != null) metrics.push(`RPE ${section.rpe}`);
+      return metrics.join(' · ');
+    };
+
+    const renderSection = (section: ActivitySessionSection, nested = false) => {
+      const children = activitySections.filter(child => child.parent_section_id === section.id);
+      const phaseLabel = section.is_group ? t('training.repCaps') : t(getPhaseLabel(section.phase_type));
+      const phaseColor = section.is_group ? themeColors.primary : getPhaseColor(section.phase_type);
+      return (
+        <View key={section.id} style={[styles.stepRow, nested && styles.childStepRow]}>
+          <View style={[styles.phaseIndicator, { backgroundColor: phaseColor }, nested && { minHeight: 24 }]} />
+          <View style={styles.stepContent}>
+            <View style={styles.stepHeader}>
+              <Text style={[styles.stepPhase, { color: phaseColor }]}>{phaseLabel}</Text>
+              {section.is_group && <Text style={styles.repText}>{section.repetitions}x</Text>}
+              {!section.is_group && section.repetition_index != null && (
+                <Text style={[styles.repetitionLabel, { color: themeColors.textSecondary }]}>
+                  {t('training.repetitionNumber', { number: section.repetition_index })}
+                </Text>
+              )}
+            </View>
+            {formatSectionMetric(section) ? (
+              <Text style={[styles.stepDetailText, dynamicStyles.sublabel]}>{formatSectionMetric(section)}</Text>
+            ) : null}
+            {section.notes ? (
+              <Text style={[styles.stepDetailText, dynamicStyles.sublabel]}>{section.notes}</Text>
+            ) : null}
+            {children.length > 0 && (
+              <View style={styles.childStepsContainer}>{children.map(child => renderSection(child, true))}</View>
+            )}
+          </View>
+        </View>
+      );
+    };
+
+    return (
+      <View style={styles.sectionContainer}>
+        <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>{t('training.advancedBreakdown')}</Text>
+        <GlassCard style={[styles.stepsCard, dynamicStyles.glassCard]}>
+          {topLevelSections.map((section, index) => (
+            <View key={section.id} style={index < topLevelSections.length - 1 ? styles.stepBorder : undefined}>
+              {renderSection(section)}
+            </View>
+          ))}
+        </GlassCard>
+      </View>
+    );
+  };
+
   if (isPendingSession) {
     const isWaitingForSession = !!activeSessionId && (isSessionLoading || isSessionFetching);
     return (
@@ -2228,6 +2316,7 @@ export const EnduranceSessionDetailScreen = () => {
           )}
 
           {/* Keep programmed workout at the very bottom of the detail screen */}
+          {renderRecordedBreakdown()}
           {renderProgrammedWorkoutSection()}
         </ScrollView>
       </SafeAreaView>
@@ -2576,6 +2665,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textTransform: 'uppercase',
+  },
+  repetitionLabel: {
+    ...typography.caption,
   },
   repBadge: {
     backgroundColor: colors.surfaceHighlight,

@@ -53,6 +53,16 @@ import { fetchTemplateWithProgressedSteps } from '../../modules/training/service
 import { Alert } from '../../components/common/Alert';
 import { RouteMap } from '../../components/common/RouteMap';
 import { useTranslation } from 'react-i18next';
+import { AdvancedEnduranceSessionEditor } from '../../modules/training/components/AdvancedEnduranceSessionEditor';
+import { useCreateManualEnduranceActivity } from '../../modules/training/hooks/useCreateManualEnduranceActivity';
+import {
+  calculateAdvancedTotals,
+  createEmptyAdvancedSection,
+  hasValidAdvancedSection,
+  materializeTemplateSections,
+  serializeAdvancedSections,
+  type AdvancedSectionDraft,
+} from '../../modules/training/helpers/advancedEnduranceSession.helper';
 import {
   resolvePersistedSportSubtype,
   resetSportSubtypeForSportChange,
@@ -285,6 +295,7 @@ export const EnduranceSessionFormScreen = () => {
 
   // Hooks
   const { createSession, updateSession } = useEnduranceSessions();
+  const createAdvancedSession = useCreateManualEnduranceActivity();
   const { getOptions, getOptionLabel } = useSportCatalog();
   const { preferences, toDisplayDistance, toDbDistanceFromDisplay } = useUserPreferences();
   const { data: userProfile } = useUserProfile();
@@ -355,6 +366,8 @@ export const EnduranceSessionFormScreen = () => {
 
   // Form State
   const [sportType, setSportType] = useState<string>(initialSport);
+  const [registrationMode, setRegistrationMode] = useState<'simple' | 'advanced'>('simple');
+  const [advancedSections, setAdvancedSections] = useState<AdvancedSectionDraft[]>([]);
   const [name, setName] = useState(getInitialName());
   const [distance, setDistance] = useState('');
   const [durationHours, setDurationHours] = useState('');
@@ -426,6 +439,7 @@ export const EnduranceSessionFormScreen = () => {
   const [routeUploadAsset, setRouteUploadAsset] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [selectedSplitTabKey, setSelectedSplitTabKey] = useState<string | null>(null);
   const [hasAppliedStrengthImport, setHasAppliedStrengthImport] = useState(false);
+  const hasInitializedAdvancedRef = React.useRef(false);
   const { data: importedStrengthSummary } = useSessionImportedStrengthSummary(gymSessionData?.sessionId);
 
   useEffect(() => {
@@ -436,6 +450,8 @@ export const EnduranceSessionFormScreen = () => {
 
   // Resolve derived state
   const currentConfig = SPORTS_CONFIG[sportType] || SPORTS_CONFIG.other;
+  const advancedAvailable = !isGymMode && ['running', 'cycling', 'swimming'].includes(sportType);
+  const advancedTotals = React.useMemo(() => calculateAdvancedTotals(advancedSections), [advancedSections]);
   const modalityOptions = getOptions(sportType, 'modality');
   const hasModalityOptions = shouldRenderModalitySelector(modalityOptions);
   const terrainOptions = getOptions(sportType, 'terrain');
@@ -584,6 +600,22 @@ export const EnduranceSessionFormScreen = () => {
       hasInitializedRef.current = true;
     }
   }, [gymSessionData, activeTemplate, toDisplayDistance]);
+
+  useEffect(() => {
+    if (hasInitializedAdvancedRef.current) return;
+    if (templateId && !activeTemplate) return;
+
+    setAdvancedSections(
+      activeTemplate?.steps?.length
+        ? materializeTemplateSections(activeTemplate.steps)
+        : [createEmptyAdvancedSection('advanced-step-1')],
+    );
+    hasInitializedAdvancedRef.current = true;
+  }, [activeTemplate, templateId]);
+
+  useEffect(() => {
+    if (!advancedAvailable && registrationMode === 'advanced') setRegistrationMode('simple');
+  }, [advancedAvailable, registrationMode]);
 
   // Helper for safe number parsing (handles commas and dots)
   const safeParseFloat = (str: string) => {
@@ -1085,9 +1117,19 @@ export const EnduranceSessionFormScreen = () => {
 
   const handleSave = async () => {
     // --- VALIDATION ---
+    const isAdvancedRegistration = registrationMode === 'advanced' && advancedAvailable;
 
     // 1. Gym Mode specific
-    if (sportType === 'gym') {
+    if (isAdvancedRegistration) {
+      if (!hasValidAdvancedSection(advancedSections)) {
+        Alert.alert(t('training.missingDataTitle'), t('training.advancedActivityEmpty'));
+        return;
+      }
+      if (sportType === 'swimming' && !sportSubtype) {
+        Alert.alert(t('training.missingDataTitle'), t('training.modalityRequired'));
+        return;
+      }
+    } else if (sportType === 'gym') {
       // "Omitir" enables saving without validation or specific fields
     } else {
       // 2. Endurance Sports Logic
@@ -1139,6 +1181,71 @@ export const EnduranceSessionFormScreen = () => {
     let wasSessionCreated = false;
     try {
       const startDateTime = new Date(`${normalizedDate}T${normalizedTime}:00`).toISOString();
+
+      if (isAdvancedRegistration) {
+        const durationInSeconds = advancedTotals.durationS ?? 0;
+        const advancedLeaves = advancedSections.filter(section => !section.isGroup);
+        const sumSectionMetric = (selector: (section: (typeof advancedLeaves)[number]) => number | null) => {
+          const values = advancedLeaves
+            .map(selector)
+            .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
+          return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) : null;
+        };
+        const maxSectionMetric = (selector: (section: (typeof advancedLeaves)[number]) => number | null) => {
+          const values = advancedLeaves
+            .map(selector)
+            .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
+          return values.length > 0 ? Math.max(...values) : null;
+        };
+        const averageSectionMetric = (selector: (section: (typeof advancedLeaves)[number]) => number | null) => {
+          const values = advancedLeaves
+            .map(selector)
+            .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
+          return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+        };
+        const endTime =
+          durationInSeconds > 0
+            ? new Date(new Date(startDateTime).getTime() + durationInSeconds * 1000).toISOString()
+            : new Date().toISOString();
+        const localEnd = new Date(
+          new Date(`${normalizedDate}T${normalizedTime}:00`).getTime() + durationInSeconds * 1000,
+        );
+
+        const createdSessionId = await createAdvancedSession.mutateAsync({
+          session: {
+            sport_type: sportType as 'running' | 'cycling' | 'swimming',
+            sport_subtype: resolvePersistedSportSubtype(sportSubtype, modalityOptions),
+            pool_type: sportType === 'swimming' ? poolType : null,
+            stroke: sportType === 'swimming' ? stroke : null,
+            start_time: startDateTime,
+            end_time: endTime,
+            duration_s: advancedTotals.durationS,
+            distance_m: advancedTotals.distanceM,
+            elev_gain_m: elevation ? safeParseFloat(elevation) : sumSectionMetric(section => section.elevationGainM),
+            avg_heart_rate: hr ? Number.parseInt(hr, 10) : averageSectionMetric(section => section.heartRateAvg),
+            max_heart_rate: maxSectionMetric(section => section.heartRateMax),
+            avg_power_w: averageSectionMetric(section => section.powerAvgW),
+            max_power_w: maxSectionMetric(section => section.powerMaxW),
+            avg_cadence: averageSectionMetric(section => section.cadenceAvg),
+            calories_kcal: calories ? safeParseFloat(calories) : sumSectionMetric(section => section.caloriesKcal),
+            rpe: rpe ? safeParseFloat(rpe) : null,
+            name: name || t('alzan.activity'),
+            notes: notes || null,
+            endurance_template_id: activeTemplate?.id ?? null,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            started_at_local: `${normalizedDate}T${normalizedTime}:00`,
+            ended_at_local: localEnd.toISOString().slice(0, 19),
+          },
+          sections: serializeAdvancedSections(advancedSections),
+        });
+
+        persistedSessionId = createdSessionId;
+        if (persistedSessionId) await persistParsedRouteDetails(persistedSessionId);
+        Alert.alert(t('training.workoutCompleted'), t('training.advancedActivitySaved'), [
+          { text: t('common.ok'), onPress: () => navigation.navigate('TrainingHome') },
+        ]);
+        return;
+      }
 
       // Prepare payload
       const totalDurationMin =
@@ -1295,7 +1402,10 @@ export const EnduranceSessionFormScreen = () => {
         void rollbackError;
       }
 
-      Alert.alert(t('common.error'), t('training.saveSessionError'));
+      Alert.alert(
+        t('common.error'),
+        isAdvancedRegistration ? t('training.advancedActivitySaveError') : t('training.saveSessionError'),
+      );
     }
   };
 
@@ -3000,138 +3110,195 @@ export const EnduranceSessionFormScreen = () => {
                 </View>
               )}
 
-              <View style={styles.row}>
-                {currentConfig?.fields.distance && (
-                  <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
-                    <Text style={[styles.label, dynamicStyles.sublabel]}>
-                      {t('training.distanceParen')}
-                      {preferences.distance_unit})
-                    </Text>
-                    <TextInput
-                      style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                      keyboardType="numeric"
-                      placeholder="0.0"
-                      placeholderTextColor={themeColors.textSecondary}
-                      value={distance}
-                      onChangeText={setDistance}
-                    />
-                  </View>
-                )}
-                {currentConfig?.fields.duration && (
-                  <View
-                    style={[styles.formGroup, { flex: 1, marginLeft: currentConfig.fields.distance ? spacing.s : 0 }]}
+              {advancedAvailable && (
+                <View style={[styles.modeToggle, dynamicStyles.glassCard]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeToggleButton,
+                      registrationMode === 'simple' && { backgroundColor: themeColors.primary },
+                    ]}
+                    onPress={() => setRegistrationMode('simple')}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: registrationMode === 'simple' }}
                   >
-                    <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.duration')}</Text>
-                    <TouchableOpacity
+                    <Text
                       style={[
-                        styles.input,
-                        dynamicStyles.input,
-                        { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-                      ]}
-                      onPress={() => setShowDurationPicker(true)}
-                    >
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: themeColors.textPrimary }}>
-                        {durationHours || '0'}h : {durationMinutes || '0'}
-                        {t('training.minutesColon')}
-                        {durationSeconds || '0'}s
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-
-              {/* Pace/Rhythm Row */}
-              {!!currentConfig?.units?.speed && (
-                <View style={styles.row}>
-                  <View style={[styles.formGroup, { flex: 1 }]}>
-                    <Text style={styles.label}>{t('training.pace')}</Text>
-                    <View
-                      style={[
-                        styles.input,
-                        dynamicStyles.input,
-                        {
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          paddingRight: 16,
-                        },
+                        styles.modeToggleText,
+                        { color: registrationMode === 'simple' ? '#FFFFFF' : themeColors.textSecondary },
                       ]}
                     >
-                      <TextInput
-                        style={{
-                          flex: 1,
-                          color: themeColors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: '600',
-                          height: '100%',
-                        }}
-                        value={pace}
-                        onChangeText={setPace}
-                        onFocus={() => setIsEditingPace(true)}
-                        onBlur={handlePaceBlur}
-                        placeholder="-"
-                        placeholderTextColor={themeColors.textSecondary}
-                        keyboardType="numeric"
-                      />
-                      <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>
-                        {currentConfig?.units.speed || ''}
-                      </Text>
-                    </View>
-                  </View>
+                      {t('training.simpleMode')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modeToggleButton,
+                      registrationMode === 'advanced' && { backgroundColor: themeColors.primary },
+                    ]}
+                    onPress={() => setRegistrationMode('advanced')}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: registrationMode === 'advanced' }}
+                  >
+                    <Text
+                      style={[
+                        styles.modeToggleText,
+                        { color: registrationMode === 'advanced' ? '#FFFFFF' : themeColors.textSecondary },
+                      ]}
+                    >
+                      {t('training.advancedMode')}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
-              <View style={styles.row}>
-                {currentConfig?.fields.calories && (
-                  <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
-                    <Text style={styles.label}>{t('training.caloriesKcal')}</Text>
-                    <TextInput
-                      style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      placeholderTextColor={themeColors.textSecondary}
-                      value={calories}
-                      onChangeText={value => {
-                        setIsCaloriesLockedFromRouteImport(false);
-                        setCalories(value);
-                      }}
-                    />
+              {registrationMode === 'advanced' ? (
+                <AdvancedEnduranceSessionEditor
+                  sport={sportType as 'running' | 'cycling' | 'swimming'}
+                  sections={advancedSections}
+                  onChange={setAdvancedSections}
+                  distanceUnit={preferences.distance_unit}
+                  toDisplayDistance={toDisplayDistance}
+                  toDbDistance={toDbDistanceFromDisplay}
+                />
+              ) : (
+                <>
+                  <View style={styles.row}>
+                    {currentConfig?.fields.distance && (
+                      <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
+                        <Text style={[styles.label, dynamicStyles.sublabel]}>
+                          {t('training.distanceParen')}
+                          {preferences.distance_unit})
+                        </Text>
+                        <TextInput
+                          style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
+                          keyboardType="numeric"
+                          placeholder="0.0"
+                          placeholderTextColor={themeColors.textSecondary}
+                          value={distance}
+                          onChangeText={setDistance}
+                        />
+                      </View>
+                    )}
+                    {currentConfig?.fields.duration && (
+                      <View
+                        style={[
+                          styles.formGroup,
+                          { flex: 1, marginLeft: currentConfig.fields.distance ? spacing.s : 0 },
+                        ]}
+                      >
+                        <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.duration')}</Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.input,
+                            dynamicStyles.input,
+                            { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+                          ]}
+                          onPress={() => setShowDurationPicker(true)}
+                        >
+                          <Text style={{ fontSize: 16, fontWeight: '600', color: themeColors.textPrimary }}>
+                            {durationHours || '0'}h : {durationMinutes || '0'}
+                            {t('training.minutesColon')}
+                            {durationSeconds || '0'}s
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
-                )}
-                {currentConfig?.fields.calories && (
-                  <View style={[styles.formGroup, { flex: 1, marginLeft: spacing.s }]}>
-                    <Text style={styles.label}>{t('training.recoveryTime')}</Text>
-                    <View
-                      style={[
-                        styles.input,
-                        dynamicStyles.input,
-                        {
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          paddingRight: 16,
-                        },
-                      ]}
-                    >
-                      <TextInput
-                        style={{
-                          flex: 1,
-                          color: themeColors.textPrimary,
-                          fontSize: 16,
-                          fontWeight: '600',
-                          height: '100%',
-                        }}
-                        keyboardType="numeric"
-                        placeholder="0.0"
-                        placeholderTextColor={themeColors.textSecondary}
-                        value={recoveryTimeHours}
-                        onChangeText={setRecoveryTimeHours}
-                      />
-                      <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>{t('training.hours')}</Text>
+
+                  {/* Pace/Rhythm Row */}
+                  {!!currentConfig?.units?.speed && (
+                    <View style={styles.row}>
+                      <View style={[styles.formGroup, { flex: 1 }]}>
+                        <Text style={styles.label}>{t('training.pace')}</Text>
+                        <View
+                          style={[
+                            styles.input,
+                            dynamicStyles.input,
+                            {
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              paddingRight: 16,
+                            },
+                          ]}
+                        >
+                          <TextInput
+                            style={{
+                              flex: 1,
+                              color: themeColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: '600',
+                              height: '100%',
+                            }}
+                            value={pace}
+                            onChangeText={setPace}
+                            onFocus={() => setIsEditingPace(true)}
+                            onBlur={handlePaceBlur}
+                            placeholder="-"
+                            placeholderTextColor={themeColors.textSecondary}
+                            keyboardType="numeric"
+                          />
+                          <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>
+                            {currentConfig?.units.speed || ''}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
+                  )}
+
+                  <View style={styles.row}>
+                    {currentConfig?.fields.calories && (
+                      <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
+                        <Text style={styles.label}>{t('training.caloriesKcal')}</Text>
+                        <TextInput
+                          style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
+                          keyboardType="numeric"
+                          placeholder="0"
+                          placeholderTextColor={themeColors.textSecondary}
+                          value={calories}
+                          onChangeText={value => {
+                            setIsCaloriesLockedFromRouteImport(false);
+                            setCalories(value);
+                          }}
+                        />
+                      </View>
+                    )}
+                    {currentConfig?.fields.calories && (
+                      <View style={[styles.formGroup, { flex: 1, marginLeft: spacing.s }]}>
+                        <Text style={styles.label}>{t('training.recoveryTime')}</Text>
+                        <View
+                          style={[
+                            styles.input,
+                            dynamicStyles.input,
+                            {
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              paddingRight: 16,
+                            },
+                          ]}
+                        >
+                          <TextInput
+                            style={{
+                              flex: 1,
+                              color: themeColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: '600',
+                              height: '100%',
+                            }}
+                            keyboardType="numeric"
+                            placeholder="0.0"
+                            placeholderTextColor={themeColors.textSecondary}
+                            value={recoveryTimeHours}
+                            onChangeText={setRecoveryTimeHours}
+                          />
+                          <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>{t('training.hours')}</Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
+                </>
+              )}
 
               <View style={styles.row}>
                 {currentConfig?.fields.heartRate && (
@@ -4727,6 +4894,22 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.m,
     borderBottomWidth: 1,
     borderColor: 'rgba(150,150,150,0.1)',
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    padding: spacing.xs,
+    borderRadius: borderRadius.m,
+    gap: spacing.xs,
+  },
+  modeToggleButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: borderRadius.s,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeToggleText: {
+    ...typography.button,
   },
   rowLabel: {
     fontSize: 15,

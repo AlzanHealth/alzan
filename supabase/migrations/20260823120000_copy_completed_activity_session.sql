@@ -21,6 +21,10 @@ DECLARE
   v_time_delta interval;
   v_child_payload jsonb;
   v_session_payload jsonb;
+  v_section_map jsonb := '{}'::jsonb;
+  v_source_section record;
+  v_new_section_id uuid;
+  v_new_parent_section_id uuid;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'COPY_SESSION_UNAUTHENTICATED' USING ERRCODE = '42501';
@@ -284,6 +288,43 @@ BEGIN
           'raw_payload', NULL
         )
     )).*;
+  END LOOP;
+
+  -- Preserve the saved manual/endurance breakdown while remapping its hierarchy.
+  FOR v_source_section IN
+    SELECT *
+    FROM public.activity_session_sections
+    WHERE session_id = p_session_id
+    ORDER BY order_index, repetition_index NULLS FIRST, id
+  LOOP
+    v_new_section_id := gen_random_uuid();
+    v_new_parent_section_id := NULL;
+    IF v_source_section.parent_section_id IS NOT NULL THEN
+      v_new_parent_section_id := NULLIF(v_section_map->>v_source_section.parent_section_id::text, '')::uuid;
+      IF v_new_parent_section_id IS NULL THEN
+        RAISE EXCEPTION 'COPY_SESSION_SECTION_PARENT_NOT_FOUND';
+      END IF;
+    END IF;
+
+    INSERT INTO public.activity_session_sections (
+      id, user_id, session_id, parent_section_id, source_template_step_id,
+      order_index, is_group, phase_type, duration_type, label, repetitions,
+      repetition_index, distance_m, duration_s, pace_s_per_km, pace_s_per_100m,
+      speed_m_per_s, avg_heart_rate, max_heart_rate, avg_power_w, max_power_w,
+      avg_cadence, elev_gain_m, calories_kcal, rpe, notes
+    ) VALUES (
+      v_new_section_id, v_user_id, v_new_session_id, v_new_parent_section_id,
+      v_source_section.source_template_step_id, v_source_section.order_index,
+      v_source_section.is_group, v_source_section.phase_type, v_source_section.duration_type,
+      v_source_section.label, v_source_section.repetitions, v_source_section.repetition_index,
+      v_source_section.distance_m, v_source_section.duration_s, v_source_section.pace_s_per_km,
+      v_source_section.pace_s_per_100m, v_source_section.speed_m_per_s,
+      v_source_section.avg_heart_rate, v_source_section.max_heart_rate,
+      v_source_section.avg_power_w, v_source_section.max_power_w,
+      v_source_section.avg_cadence, v_source_section.elev_gain_m,
+      v_source_section.calories_kcal, v_source_section.rpe, v_source_section.notes
+    );
+    v_section_map := v_section_map || jsonb_build_object(v_source_section.id::text, v_new_section_id::text);
   END LOOP;
 
   RETURN v_new_session_id;

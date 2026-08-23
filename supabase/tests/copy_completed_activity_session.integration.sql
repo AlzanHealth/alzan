@@ -8,6 +8,8 @@ DECLARE
   v_copy_id uuid;
   v_exercise_id uuid;
   v_exercise_id_2 uuid;
+  v_section_group_id uuid := gen_random_uuid();
+  v_section_leaf_id uuid := gen_random_uuid();
 BEGIN
   SELECT id INTO v_user_id FROM public.users ORDER BY created_at LIMIT 1;
   IF v_user_id IS NULL THEN
@@ -30,17 +32,29 @@ BEGIN
     v_source_id, v_user_id, 'running', 'imported', 'coros', 'completed',
     '2026-08-23 08:00:00+00', '2026-08-23 08:42:00+00',
     '2026-08-23 10:00:00', '2026-08-23 10:42:00', 2520,
-    'Copy source', 7200, 'encoded-route', 'coros-source-id', 'cloud', 'Europe/Madrid'
+    'Copy source', 7200, 'encoded-route', 'coros-source-id', 'coros-record', 'cloud', 'Europe/Madrid'
   );
 
   INSERT INTO public.activity_laps (session_id, user_id, lap_index, distance_m, duration_s)
   VALUES (v_source_id, v_user_id, 1, 7200, 2520);
+  INSERT INTO public.activity_session_sections (
+    id, user_id, session_id, order_index, is_group, phase_type, duration_type, repetitions
+  ) VALUES (
+    v_section_group_id, v_user_id, v_source_id, 0, true, 'interval', 'lap_button', 2
+  );
+  INSERT INTO public.activity_session_sections (
+    id, user_id, session_id, parent_section_id, order_index, is_group, phase_type,
+    duration_type, repetition_index, distance_m, duration_s
+  ) VALUES (
+    v_section_leaf_id, v_user_id, v_source_id, v_section_group_id, 1, false, 'interval',
+    'distance', 1, 400, 120
+  );
   INSERT INTO public.activity_heart_rate_zones (session_id, zone, duration_s, percentage)
   VALUES (v_source_id, 3, 1200, 47.62);
   INSERT INTO public.activity_route_points (session_id, user_id, point_index, lat, lon, timestamp, source)
   VALUES (v_source_id, v_user_id, 1, 41.3874, 2.1686, '2026-08-23 08:10:00+00', 'wearable_import');
   INSERT INTO public.activity_streams (session_id, user_id, stream_type, data, source)
-  VALUES (v_source_id, v_user_id, 'heart_rate', '[140, 145]'::jsonb, 'wearable_import');
+  VALUES (v_source_id, v_user_id, 'heart_rate', '{"values":[140,145]}'::jsonb, 'wearable_import');
   INSERT INTO public.activity_stream_samples (session_id, user_id, stream_type, value, timestamp, source)
   VALUES (v_source_id, v_user_id, 'heart_rate', 140, '2026-08-23 08:10:00+00', 'wearable_import');
 
@@ -97,6 +111,20 @@ BEGIN
     OR (SELECT count(*) FROM public.activity_stream_samples WHERE session_id = v_copy_id) <> 1
   THEN
     RAISE EXCEPTION 'COPY_SESSION_DETAIL_ROWS_MISSING';
+  END IF;
+
+  IF (SELECT count(*) FROM public.activity_session_sections WHERE session_id = v_copy_id) <> 2
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.activity_session_sections copied
+      JOIN public.activity_session_sections copied_parent ON copied_parent.id = copied.parent_section_id
+      WHERE copied.session_id = v_copy_id
+        AND copied.parent_section_id IS NOT NULL
+        AND copied_parent.session_id = v_copy_id
+        AND copied.id <> v_section_leaf_id
+    )
+  THEN
+    RAISE EXCEPTION 'COPY_SESSION_SECTIONS_MISSING';
   END IF;
 
   IF EXISTS (
