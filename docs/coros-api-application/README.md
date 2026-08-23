@@ -1,6 +1,8 @@
 # Paquete de solicitud COROS API — Alzan Health
 
-No enviar este paquete hasta sustituir `[NOMBRE LEGAL DEL SOLICITANTE]` y confirmar que las tres URLs públicas responden por HTTPS.
+Estado: formulario enviado. Antes de que COROS emita credenciales hay que corregir por correo el dominio originalmente indicado. `alzan.health` devuelve `NXDOMAIN`; el dominio operativo es `alzanhealth.com`. El correo de rectificación listo para enviar está en [`../coros-integration.md`](../coros-integration.md#dominio-público-y-corrección-de-la-solicitud).
+
+Las respuestas siguientes quedan como registro del formulario. No reenviarlo como una segunda solicitud salvo que COROS lo pida.
 
 ## 1. Formulario oficial
 
@@ -11,12 +13,14 @@ Datos:
 ```text
 Platform/Application Name: Alzan Health
 Company Name: Alzan Health
-Platform/Application URL: https://alzan.health
+Platform/Application URL: https://alzanhealth.com
+Platform/Application Description (99 characters):
+Private training dashboard for authorized COROS workouts, daily health data and performance trends.
 Primary Region: Spain / European Union
 Total Active Users: 0–150
 Application type: Personal
 Commercial use: Non-commercial
-Expected launch: Private pilot after COROS sandbox approval
+Expected Integration Launch Date: 2026-10-15
 
 Primary Contact Email: support@alzanhealth.com
 Secondary Contact Email: hello@alzanhealth.com
@@ -30,15 +34,101 @@ Seleccionar:
 
 No seleccionar sincronización bidireccional, planes estructurados, rutas GPX, Bluetooth ni ANT+.
 
-URLs:
+### Preguntas 11–24: número, enunciado y respuesta
+
+#### 11. Platform / Application Description (100 Character Limit)
+
+> This may be Customer-Facing and appear on our Partner Page
+
+Respuesta propuesta — 99 caracteres:
 
 ```text
-OAuth redirect URI: https://api.alzan.health/oauth/coros/callback
-Workout Data Receiving Endpoint: https://api.alzan.health/webhooks/coros/workouts
-Service Status Check: https://api.alzan.health/webhooks/coros/status
+Private training dashboard for authorized COROS workouts, daily health data and performance trends.
 ```
 
-`Intended use of data`:
+#### 12. Authorized Callback Domain (redirect_url):
+
+> Please provide one or two domains starting with http:// or https:// such as https://open.other.com. We will use this to ensure security to check whether the authorized domain is consistent with your redirect URL.
+
+Respuesta — introducir el dominio, sin la ruta del callback:
+
+```text
+https://api.alzanhealth.com
+```
+
+El callback completo que utilizará el backend sigue siendo:
+
+```text
+https://api.alzanhealth.com/oauth/coros/callback
+```
+
+#### 13. If you need the Workout Summary Data Push Service from COROS, please provide the requested information, or write N/A: WORKOUT DATA RECEIVING ENDPOINT URL:
+
+> Check section 5.3 in the API Reference Guide for full details.
+
+Respuesta:
+
+```text
+https://api.alzanhealth.com/webhooks/coros/workouts
+```
+
+#### 14. If you need the Workout Summary Data Push Service from COROS, please provide the requested information, or write N/A: SERVICE STATUS CHECK URL:
+
+> i.e. https://www.example.come/status or https://status.example.io
+
+Respuesta:
+
+```text
+https://api.alzanhealth.com/webhooks/coros/status
+```
+
+#### 15. If your platform / application / product has a Bluetooth or ANT+ element to it, please provide the link to the protocol/profile, or write N/A:
+
+Respuesta:
+
+```text
+N/A
+```
+
+#### 16. Will your platform / application be for personal or public use?
+
+Opciones del formulario:
+
+```text
+Personal
+Public
+Other
+```
+
+Respuesta para el piloto:
+
+```text
+Personal
+```
+
+El piloto queda restringido a los UUID incluidos en `COROS_PILOT_USER_IDS`. Antes de abrirlo al público hay que solicitar a COROS la ampliación correspondiente.
+
+#### 17. Will your platform / application be for commercial or non-commercial use?
+
+Opciones del formulario:
+
+```text
+Commercial
+Non-Commercial
+Other
+```
+
+Respuesta para el piloto:
+
+```text
+Non-Commercial
+```
+
+#### 18. Intended use of data?
+
+> Please describe how mutual user data will be used and processed by your platform
+
+Respuesta:
 
 ```text
 Alzan Health will import workouts authorized by the COROS user, including
@@ -54,7 +144,100 @@ used for advertising, shared with other users or used for medical
 diagnosis. Users will be able to disconnect COROS and delete imported data.
 ```
 
-Logos listos en `assets/`: 102, 120, 144 y 300 px, generados sin alterar diseño ni proporciones desde el icono oficial de Alzan.
+#### 19. Expected Integration Launch Date — YYYY-MM-DD
+
+Respuesta propuesta para el piloto:
+
+```text
+2026-10-15
+```
+
+Esta es una fecha objetivo, no una afirmación de aprobación. Cambiarla antes de enviar si ya no es realista.
+
+#### 20. Do you agree to the COROS API Application Terms?
+
+> Introduction section of this API Application form
+
+Opciones del formulario:
+
+```text
+Yes
+No
+```
+
+La persona solicitante debe leer la introducción del formulario y, solo si la acepta, seleccionar:
+
+```text
+Yes
+```
+
+No puede delegarse esta aceptación al agente ni marcarse automáticamente.
+
+#### 21. Do you agree to the terms of the COROS API Agreement? (Linked below)
+
+Abrir y revisar el acuerdo enlazado por COROS:
+
+<https://www.dropbox.com/scl/fi/pqrgalut8k63gr8aslp3i/COROS-API-Agreement.pdf?rlkey=h8qlr5dmokd2f8orfjchey8xk&st=eph4mmzj&dl=0>
+
+Opciones del formulario:
+
+```text
+Yes
+No
+```
+
+La persona con capacidad para aceptar el acuerdo debe seleccionar `Yes` únicamente después de revisarlo y aceptarlo. No puede delegarse esta aceptación al agente ni marcarse automáticamente.
+
+#### 22. Please enter your name
+
+Respuesta:
+
+```text
+[NOMBRE LEGAL COMPLETO DEL SOLICITANTE]
+```
+
+Debe coincidir con la persona que acepta los campos 20 y 21 y con la firma/contacto de la solicitud.
+
+#### 23. Submit Date — YYYY-MM-DD
+
+Respuesta:
+
+```text
+[YYYY-MM-DD — FECHA REAL EN QUE SE ENVÍA EL FORMULARIO]
+```
+
+No introducir una fecha prevista ni reutilizar la fecha objetivo del campo 19.
+
+#### 24. Please upload the following PNG files of your logo (API applications cannot be approved without all of the required files):
+
+> Standard Logos (These two are required for every application):
+> 144 x 144px
+> 102 x 102px
+>
+> Additional Logos (These two are also required if requesting Workout/Training Plan sync):
+> 120 x 120px
+> 300 x 300px
+
+Respuesta — subir los cuatro PNG preparados en `assets/`:
+
+```text
+alzan-logo-144.png  → 144 × 144 px
+alzan-logo-102.png  → 102 × 102 px
+alzan-logo-120.png  → 120 × 120 px
+alzan-logo-300.png  → 300 × 300 px
+```
+
+Los dos primeros son obligatorios para cualquier solicitud. Dado que Alzan solicita sincronización de workouts, subir también 120 y 300 px evita que COROS considere incompleta la solicitud.
+
+### Comprobación antes de enviar
+
+- Confirmar que `https://api.alzanhealth.com` resuelve por HTTPS.
+- Confirmar que el callback completo está permitido en el backend.
+- Confirmar que el status devuelve HTTP `200` y `{"status":"ok"}`.
+- Confirmar que el endpoint de workouts acepta HTTPS y está protegido por los headers `client` y `secret`.
+- Sustituir nombre legal y fecha real de envío.
+- Revisar personalmente y aceptar, si procede, ambos documentos legales.
+- Subir los cuatro logos PNG.
 
 ## 2. Correo del mismo día
 
@@ -76,16 +259,16 @@ Requested capabilities:
 - Workout Summary Data Push
 
 Application URL:
-https://alzan.health
+https://alzanhealth.com
 
 OAuth redirect URI:
-https://api.alzan.health/oauth/coros/callback
+https://api.alzanhealth.com/oauth/coros/callback
 
 Workout receiving endpoint:
-https://api.alzan.health/webhooks/coros/workouts
+https://api.alzanhealth.com/webhooks/coros/workouts
 
 Service status endpoint:
-https://api.alzan.health/webhooks/coros/status
+https://api.alzanhealth.com/webhooks/coros/status
 
 Please provide the sandbox/test Client ID and Client Secret, the procedure
 for obtaining production credentials and any webhook authentication

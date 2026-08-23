@@ -30,6 +30,11 @@ steps:
       - >-
         --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - "--region=$_DEPLOY_REGION"
+      # COROS persists webhook events before responding and drains them in the
+      # background. Keep one CPU-enabled instance so retries and remote
+      # deauthorizations are not suspended after the HTTP response or scale-to-zero.
+      - "--min=1"
+      - "--no-cpu-throttling"
 
 options:
   logging: CLOUD_LOGGING_ONLY

@@ -32,7 +32,7 @@ const config = new Map<string, string>([
   ['COROS_API_BASE_URL', 'https://opentest.coros.com/'],
   ['COROS_CLIENT_ID', 'coros-client'],
   ['COROS_CLIENT_SECRET', 'coros-secret'],
-  ['COROS_REDIRECT_URI', 'https://api.alzan.health/oauth/coros/callback'],
+  ['COROS_REDIRECT_URI', 'https://api.alzanhealth.com/oauth/coros/callback'],
   ['COROS_ROLLOUT_MODE', 'pilot'],
   ['COROS_PILOT_USER_IDS', 'pilot-user'],
   ['COROS_TOKEN_ENCRYPTION_KEY_V1', encryptionKey],
@@ -49,7 +49,7 @@ assert.deepEqual(service.endpoints, {
 assert.deepEqual(service.credentials, {
   clientId: 'coros-client',
   clientSecret: 'coros-secret',
-  redirectUri: 'https://api.alzan.health/oauth/coros/callback',
+  redirectUri: 'https://api.alzanhealth.com/oauth/coros/callback',
 });
 
 void (async () => {
@@ -61,7 +61,7 @@ void (async () => {
   assert.equal(authorizationUrl.origin + authorizationUrl.pathname, 'https://opentest.coros.com/oauth2/authorize');
   assert.equal(authorizationUrl.searchParams.get('response_type'), 'code');
   assert.equal(authorizationUrl.searchParams.get('client_id'), 'coros-client');
-  assert.equal(authorizationUrl.searchParams.get('redirect_uri'), 'https://api.alzan.health/oauth/coros/callback');
+  assert.equal(authorizationUrl.searchParams.get('redirect_uri'), 'https://api.alzanhealth.com/oauth/coros/callback');
   assert.equal(authorizationUrl.searchParams.get('scope'), null);
   assert.equal(authorizationUrl.searchParams.get('user_id'), null);
   assert.equal(insertedStates.length, 1);
