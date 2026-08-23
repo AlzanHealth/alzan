@@ -55,6 +55,8 @@ export type AdvancedSerializedSection = AdvancedSectionDraft & {
   orderIndex: number;
 };
 
+export type AdvancedMetricField = 'duration' | 'distance' | 'intensity';
+
 const EMPTY_METRICS: Pick<
   AdvancedSectionDraft,
   | 'distanceM'
@@ -219,6 +221,80 @@ export function collapseGroupRepetitions(sections: AdvancedSectionDraft[], group
   }));
 
   return [...withoutRepeatedChildren, ...commonChildren];
+}
+
+function positiveValue(value: number | null): number | null {
+  return value != null && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function getIntensityKey(sport: AdvancedSport): 'paceSPerKm' | 'paceSPer100m' | 'speedMPerS' {
+  return sport === 'running' ? 'paceSPerKm' : sport === 'swimming' ? 'paceSPer100m' : 'speedMPerS';
+}
+
+/**
+ * Fills the missing value among duration, distance and pace/speed.
+ * When a field is edited while all three values exist, that edit is treated as
+ * the source value and the most directly dependent value is recalculated.
+ */
+export function deriveAdvancedSectionMetrics(
+  section: AdvancedSectionDraft,
+  sport: AdvancedSport,
+  changedField?: AdvancedMetricField,
+): AdvancedSectionDraft {
+  if (section.isGroup) return section;
+
+  const intensityKey = getIntensityKey(sport);
+  const durationS = positiveValue(section.durationS);
+  const distanceM = positiveValue(section.distanceM);
+  const intensity = positiveValue(section[intensityKey]);
+  const next = { ...section };
+
+  const calculateDistance = (duration: number, value: number) =>
+    sport === 'swimming'
+      ? (duration / value) * 100
+      : sport === 'running'
+        ? (duration / value) * 1000
+        : duration * value;
+  const calculateDuration = (distance: number, value: number) =>
+    sport === 'swimming'
+      ? (distance / 100) * value
+      : sport === 'running'
+        ? (distance / 1000) * value
+        : distance / value;
+  const calculateIntensity = (duration: number, distance: number) =>
+    sport === 'swimming'
+      ? duration / (distance / 100)
+      : sport === 'running'
+        ? duration / (distance / 1000)
+        : distance / duration;
+
+  if (changedField === 'duration' && durationS != null) {
+    if (intensity != null) next.distanceM = calculateDistance(durationS, intensity);
+    else if (distanceM != null) next[intensityKey] = calculateIntensity(durationS, distanceM);
+    return next;
+  }
+
+  if (changedField === 'distance' && distanceM != null) {
+    if (durationS != null) next[intensityKey] = calculateIntensity(durationS, distanceM);
+    else if (intensity != null) next.durationS = calculateDuration(distanceM, intensity);
+    return next;
+  }
+
+  if (changedField === 'intensity' && intensity != null) {
+    if (durationS != null) next.distanceM = calculateDistance(durationS, intensity);
+    else if (distanceM != null) next.durationS = calculateDuration(distanceM, intensity);
+    return next;
+  }
+
+  if (durationS != null && distanceM != null && intensity == null) {
+    next[intensityKey] = calculateIntensity(durationS, distanceM);
+  } else if (durationS != null && intensity != null && distanceM == null) {
+    next.distanceM = calculateDistance(durationS, intensity);
+  } else if (distanceM != null && intensity != null && durationS == null) {
+    next.durationS = calculateDuration(distanceM, intensity);
+  }
+
+  return next;
 }
 
 export function calculateAdvancedTotals(sections: AdvancedSectionDraft[]): AdvancedTotals {

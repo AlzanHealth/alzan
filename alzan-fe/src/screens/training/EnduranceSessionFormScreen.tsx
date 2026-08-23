@@ -58,9 +58,11 @@ import { useCreateManualEnduranceActivity } from '../../modules/training/hooks/u
 import {
   calculateAdvancedTotals,
   createEmptyAdvancedSection,
+  deriveAdvancedSectionMetrics,
   hasValidAdvancedSection,
   materializeTemplateSections,
   serializeAdvancedSections,
+  type AdvancedSport,
   type AdvancedSectionDraft,
 } from '../../modules/training/helpers/advancedEnduranceSession.helper';
 import {
@@ -451,7 +453,19 @@ export const EnduranceSessionFormScreen = () => {
   // Resolve derived state
   const currentConfig = SPORTS_CONFIG[sportType] || SPORTS_CONFIG.other;
   const advancedAvailable = !isGymMode && ['running', 'cycling', 'swimming'].includes(sportType);
-  const advancedTotals = React.useMemo(() => calculateAdvancedTotals(advancedSections), [advancedSections]);
+  const advancedSport: AdvancedSport | null =
+    sportType === 'running' || sportType === 'cycling' || sportType === 'swimming' ? sportType : null;
+  const advancedSectionsWithDerivedMetrics = React.useMemo(
+    () =>
+      advancedSport
+        ? advancedSections.map(section => deriveAdvancedSectionMetrics(section, advancedSport))
+        : advancedSections,
+    [advancedSections, advancedSport],
+  );
+  const advancedTotals = React.useMemo(
+    () => calculateAdvancedTotals(advancedSectionsWithDerivedMetrics),
+    [advancedSectionsWithDerivedMetrics],
+  );
   const modalityOptions = getOptions(sportType, 'modality');
   const hasModalityOptions = shouldRenderModalitySelector(modalityOptions);
   const terrainOptions = getOptions(sportType, 'terrain');
@@ -1121,7 +1135,7 @@ export const EnduranceSessionFormScreen = () => {
 
     // 1. Gym Mode specific
     if (isAdvancedRegistration) {
-      if (!hasValidAdvancedSection(advancedSections)) {
+      if (!hasValidAdvancedSection(advancedSectionsWithDerivedMetrics)) {
         Alert.alert(t('training.missingDataTitle'), t('training.advancedActivityEmpty'));
         return;
       }
@@ -1184,7 +1198,7 @@ export const EnduranceSessionFormScreen = () => {
 
       if (isAdvancedRegistration) {
         const durationInSeconds = advancedTotals.durationS ?? 0;
-        const advancedLeaves = advancedSections.filter(section => !section.isGroup);
+        const advancedLeaves = advancedSectionsWithDerivedMetrics.filter(section => !section.isGroup);
         const sumSectionMetric = (selector: (section: (typeof advancedLeaves)[number]) => number | null) => {
           const values = advancedLeaves
             .map(selector)
@@ -1236,7 +1250,7 @@ export const EnduranceSessionFormScreen = () => {
             started_at_local: `${normalizedDate}T${normalizedTime}:00`,
             ended_at_local: localEnd.toISOString().slice(0, 19),
           },
-          sections: serializeAdvancedSections(advancedSections),
+          sections: serializeAdvancedSections(advancedSectionsWithDerivedMetrics),
         });
 
         persistedSessionId = createdSessionId;
@@ -3334,7 +3348,7 @@ export const EnduranceSessionFormScreen = () => {
                 </View>
               )}
 
-              <View style={styles.row}>
+              <View style={[styles.row, registrationMode === 'advanced' && styles.advancedDateTimeRow]}>
                 <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
                   <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.date')}</Text>
                   {Platform.OS === 'web' ? (
@@ -4670,6 +4684,9 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+  },
+  advancedDateTimeRow: {
+    marginTop: spacing.l,
   },
   // Gym Specific Styles
   gymContainer: {

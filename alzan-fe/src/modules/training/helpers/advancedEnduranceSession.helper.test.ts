@@ -3,6 +3,7 @@ import {
   addAdvancedGroup,
   addAdvancedSection,
   calculateAdvancedTotals,
+  deriveAdvancedSectionMetrics,
   collapseGroupRepetitions,
   createEmptyAdvancedSection,
   expandGroupRepetitions,
@@ -123,3 +124,83 @@ const cyclingTotals = calculateAdvancedTotals([
 assert.equal(cyclingTotals.distanceM, 20_000);
 assert.equal(cyclingTotals.durationS, 3_600);
 assert.equal(cyclingTotals.speedMPerS, 20_000 / 3_600);
+
+const runningByTimeAndPace = deriveAdvancedSectionMetrics(
+  {
+    ...createEmptyAdvancedSection('running-derived'),
+    durationS: 600,
+    paceSPerKm: 600,
+  },
+  'running',
+);
+assert.equal(runningByTimeAndPace.distanceM, 1000);
+
+const runningByDistanceAndPace = deriveAdvancedSectionMetrics(
+  {
+    ...createEmptyAdvancedSection('running-duration'),
+    distanceM: 2000,
+    paceSPerKm: 300,
+  },
+  'running',
+);
+assert.equal(runningByDistanceAndPace.durationS, 600);
+
+const runningByTimeAndDistance = deriveAdvancedSectionMetrics(
+  {
+    ...createEmptyAdvancedSection('running-pace'),
+    durationS: 600,
+    distanceM: 2000,
+  },
+  'running',
+);
+assert.equal(runningByTimeAndDistance.paceSPerKm, 300);
+
+const editedRunning = deriveAdvancedSectionMetrics(
+  {
+    ...runningByTimeAndDistance,
+    durationS: 300,
+  },
+  'running',
+  'duration',
+);
+assert.equal(editedRunning.distanceM, 1000);
+
+const editedDistance = deriveAdvancedSectionMetrics(
+  {
+    ...runningByTimeAndDistance,
+    distanceM: 1000,
+  },
+  'running',
+  'distance',
+);
+assert.equal(editedDistance.paceSPerKm, 600);
+
+const editedIntensity = deriveAdvancedSectionMetrics(
+  {
+    ...runningByTimeAndDistance,
+    paceSPerKm: 600,
+  },
+  'running',
+  'intensity',
+);
+assert.equal(editedIntensity.distanceM, 1000);
+
+const cyclingDerived = deriveAdvancedSectionMetrics(
+  {
+    ...createEmptyAdvancedSection('cycling-derived'),
+    durationS: 3600,
+    speedMPerS: 5,
+  },
+  'cycling',
+);
+assert.equal(cyclingDerived.distanceM, 18_000);
+
+const swimmingDerived = deriveAdvancedSectionMetrics(
+  {
+    ...createEmptyAdvancedSection('swimming-derived'),
+    durationS: 120,
+    distanceM: 100,
+  },
+  'swimming',
+);
+assert.equal(swimmingDerived.paceSPer100m, 120);

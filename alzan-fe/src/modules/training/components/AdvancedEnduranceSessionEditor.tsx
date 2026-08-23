@@ -10,9 +10,11 @@ import {
   calculateAdvancedTotals,
   collapseGroupRepetitions,
   createEmptyAdvancedSection,
+  deriveAdvancedSectionMetrics,
   expandGroupRepetitions,
   removeAdvancedSection,
   type AdvancedDurationType,
+  type AdvancedMetricField,
   type AdvancedPhaseType,
   type AdvancedSectionDraft,
   type AdvancedSport,
@@ -145,6 +147,15 @@ function SectionEditor({
     { color: themeColors.textPrimary },
     compact && styles.compactInput,
   ];
+  const updateMetric = (field: AdvancedMetricField, value: number | null) => {
+    const fieldValues =
+      field === 'duration'
+        ? { durationS: value }
+        : field === 'distance'
+          ? { distanceM: value }
+          : { [intensityKey]: value };
+    onChange(deriveAdvancedSectionMetrics({ ...section, ...fieldValues }, sport, field));
+  };
   return (
     <View
       style={[styles.sectionCard, dynamicStyles.glassCard, compact && styles.compactCard, { borderLeftColor: accent }]}
@@ -240,7 +251,7 @@ function SectionEditor({
                 value={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onChangeText={value => onChange({ ...section, durationS: parseDuration(value) })}
+                onChangeText={value => updateMetric('duration', parseDuration(value))}
               />
             </View>
           ) : (
@@ -260,14 +271,14 @@ function SectionEditor({
                   placeholder="0"
                   placeholderTextColor={themeColors.textSecondary}
                   onChangeText={value =>
-                    onChange({
-                      ...section,
-                      distanceM: value
+                    updateMetric(
+                      'distance',
+                      value
                         ? sport === 'swimming'
                           ? parseNumber(value)
                           : toDbDistance(parseNumber(value) ?? 0)
                         : null,
-                    })
+                    )
                   }
                 />
                 <Text style={[styles.unitLabel, { color: themeColors.textSecondary }]}>{distanceLabel}</Text>
@@ -296,14 +307,14 @@ function SectionEditor({
                   placeholder="0"
                   placeholderTextColor={themeColors.textSecondary}
                   onChangeText={value =>
-                    onChange({
-                      ...section,
-                      distanceM: value
+                    updateMetric(
+                      'distance',
+                      value
                         ? sport === 'swimming'
                           ? parseNumber(value)
                           : toDbDistance(parseNumber(value) ?? 0)
                         : null,
-                    })
+                    )
                   }
                 />
                 <Text style={[styles.unitLabel, { color: themeColors.textSecondary }]}>{distanceLabel}</Text>
@@ -315,7 +326,7 @@ function SectionEditor({
                 value={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onChangeText={value => onChange({ ...section, durationS: parseDuration(value) })}
+                onChangeText={value => updateMetric('duration', parseDuration(value))}
               />
             )}
           </View>
@@ -335,10 +346,7 @@ function SectionEditor({
               placeholder={sport === 'cycling' ? '0' : '0:00'}
               placeholderTextColor={themeColors.textSecondary}
               onChangeText={value =>
-                onChange({
-                  ...section,
-                  [intensityKey]: sport === 'cycling' ? parseNumber(value) : parseDuration(value),
-                })
+                updateMetric('intensity', sport === 'cycling' ? parseNumber(value) : parseDuration(value))
               }
             />
           </View>
@@ -366,7 +374,14 @@ export const AdvancedEnduranceSessionEditor = ({
   const [newDurationType, setNewDurationType] = useState<VisibleDurationType>('time');
   const [newRepetitions, setNewRepetitions] = useState('4');
 
-  const topLevelSections = useMemo(() => sections.filter(section => section.parentClientId == null), [sections]);
+  const renderedSections = useMemo(
+    () => sections.map(section => deriveAdvancedSectionMetrics(section, sport)),
+    [sections, sport],
+  );
+  const topLevelSections = useMemo(
+    () => renderedSections.filter(section => section.parentClientId == null),
+    [renderedSections],
+  );
   const updateSection = (next: AdvancedSectionDraft) =>
     onChange(sections.map(section => (section.clientId === next.clientId ? next : section)));
   const deleteSection = (clientId: string) => onChange(removeAdvancedSection(sections, clientId));
@@ -464,10 +479,10 @@ export const AdvancedEnduranceSessionEditor = ({
           );
         }
 
-        const commonChildren = sections.filter(
+        const commonChildren = renderedSections.filter(
           child => child.parentClientId === section.clientId && child.repetitionIndex == null,
         );
-        const repeatedChildren = sections.filter(
+        const repeatedChildren = renderedSections.filter(
           child => child.parentClientId === section.clientId && child.repetitionIndex != null,
         );
         const isCustom = customGroups.has(section.clientId);
@@ -561,9 +576,12 @@ export const AdvancedEnduranceSessionEditor = ({
                 {isCustom &&
                   repetitionIndexes.map(index => (
                     <View key={`${section.clientId}-rep-${index}`} style={styles.repetitionCard}>
-                      <Text style={[styles.repetitionTitle, { color: themeColors.primary }]}>
-                        {t('training.repetitionNumber', { number: index })}
-                      </Text>
+                      <View style={styles.repetitionHeader}>
+                        <View style={[styles.repetitionMarker, { backgroundColor: themeColors.primary }]} />
+                        <Text style={[styles.repetitionTitle, { color: themeColors.primary }]}>
+                          {t('training.repetitionNumber', { number: index })}
+                        </Text>
+                      </View>
                       {repeatedChildren
                         .filter(child => child.repetitionIndex === index)
                         .map(child => (
@@ -595,7 +613,7 @@ export const AdvancedEnduranceSessionEditor = ({
       })}
 
       {(() => {
-        const totals = calculateAdvancedTotals(sections);
+        const totals = calculateAdvancedTotals(renderedSections);
         return (
           <View style={[styles.totalsCard, dynamicStyles.glassCard]}>
             <Text style={[styles.totalsTitle, { color: themeColors.textSecondary }]}>{t('training.totalTab')}</Text>
@@ -791,11 +809,13 @@ const styles = StyleSheet.create({
   sameValueStatus: { ...typography.caption, marginTop: 2 },
   repetitionCard: {
     marginTop: spacing.m,
-    borderRadius: borderRadius.m,
-    padding: spacing.m,
-    backgroundColor: 'rgba(127,127,127,0.08)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(127,127,127,0.22)',
+    paddingTop: spacing.l,
   },
-  repetitionTitle: { ...typography.body, fontWeight: '800', marginBottom: spacing.s },
+  repetitionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.m },
+  repetitionMarker: { width: 4, height: 22, borderRadius: borderRadius.full },
+  repetitionTitle: { ...typography.body, fontWeight: '800' },
   inlineAdd: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.m },
   inlineAddText: { ...typography.caption, fontWeight: '800' },
   totalsCard: { borderRadius: borderRadius.l, padding: spacing.m, gap: spacing.s },
