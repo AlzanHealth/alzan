@@ -17,6 +17,7 @@ import {
   parseLengthToCm,
   parseWeightToKg,
 } from '../../utils/unitConversionUtils';
+import { DECIMAL_INPUT_PROPS } from '../../utils/numericInput';
 
 const sanitizeNumericInput = (value: string): string => {
   const normalized = value.replace(',', '.').replace(/[^0-9.]/g, '');
@@ -278,7 +279,7 @@ export const OnboardingPhysical = () => {
             onBlur={onHeightBlur}
             placeholder={heightPlaceholder}
             placeholderTextColor={colors.textSecondary}
-            keyboardType="decimal-pad"
+            {...DECIMAL_INPUT_PROPS}
           />
           {heightError && <Text style={styles.errorText}>{heightError}</Text>}
         </View>
@@ -292,7 +293,7 @@ export const OnboardingPhysical = () => {
             onBlur={onWeightBlur}
             placeholder={weightPlaceholder}
             placeholderTextColor={colors.textSecondary}
-            keyboardType="decimal-pad"
+            {...DECIMAL_INPUT_PROPS}
           />
           {weightError && <Text style={styles.errorText}>{weightError}</Text>}
         </View>

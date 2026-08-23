@@ -24,6 +24,7 @@ import { Alert } from '../../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../../i18n/dateLocale';
 import { TranslationKey } from '../../../i18n/locales/en';
+import { DECIMAL_INPUT_PROPS, parseLocalizedDecimal } from '../../../utils/numericInput';
 
 const isToday = (someDate: Date) => {
   const today = new Date();
@@ -104,8 +105,8 @@ export const MeasurementAdd = () => {
   }
 
   const handleSave = () => {
-    const val = parseFloat(value.replace(',', '.'));
-    if (isNaN(val) || val < 10 || val > 200) {
+    const val = parseLocalizedDecimal(value);
+    if (val === null || val < 10 || val > 200) {
       Alert.alert(t('common.error'), t('health.invalidMeasurementRange'));
       return;
     }
@@ -214,7 +215,7 @@ export const MeasurementAdd = () => {
                   onChangeText={setValue}
                   placeholder="0.0"
                   placeholderTextColor={themeColors.textSecondary}
-                  keyboardType="decimal-pad"
+                  {...DECIMAL_INPUT_PROPS}
                 />
                 <Text style={[styles.unit, { color: themeColors.textSecondary }]}>{t('health.cm')}</Text>
               </View>

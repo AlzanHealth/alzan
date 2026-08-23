@@ -20,6 +20,7 @@ import { BlurView } from 'expo-blur';
 import { X, AlertTriangle } from 'lucide-react-native';
 import { Alert } from './common/Alert';
 import { useTranslation } from 'react-i18next';
+import { DECIMAL_INPUT_PROPS, parseLocalizedDecimal } from '../utils/numericInput';
 
 interface WeightLogModalProps {
   visible: boolean;
@@ -36,13 +37,13 @@ export const WeightLogModal = ({ visible, onClose }: WeightLogModalProps) => {
   const { parseWeightToKg, units } = useUnitConversion();
 
   const handleSave = () => {
-    const weightVal = parseFloat(weight.replace(',', '.'));
+    const weightVal = parseLocalizedDecimal(weight);
 
     // Validate based on unit
     const minVal = units.weight === 'kg' ? 20 : 44;
     const maxVal = units.weight === 'kg' ? 300 : 660;
 
-    if (isNaN(weightVal) || weightVal < minVal || weightVal > maxVal) {
+    if (weightVal === null || weightVal < minVal || weightVal > maxVal) {
       Alert.alert(t('common.error'), t('health.invalidWeightRange', { min: minVal, max: maxVal, unit: units.weight }));
       return;
     }
@@ -126,7 +127,7 @@ export const WeightLogModal = ({ visible, onClose }: WeightLogModalProps) => {
                 onChangeText={setWeight}
                 placeholder="0.0"
                 placeholderTextColor={dynamicStyles.inputPlaceholder}
-                keyboardType="decimal-pad"
+                {...DECIMAL_INPUT_PROPS}
                 autoFocus={visible}
                 maxLength={5}
                 selectionColor={colors.primary}

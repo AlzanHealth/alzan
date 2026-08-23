@@ -12,6 +12,7 @@ import { RestingHRLog } from '../../../types/requests.types';
 import { Alert } from '../../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
+import { INTEGER_INPUT_PROPS } from '../../../utils/numericInput';
 
 export const RestingHRList = () => {
   const { t } = useTranslation();
@@ -106,7 +107,7 @@ export const RestingHRList = () => {
               style={styles.input}
               value={bpm}
               onChangeText={setBpm}
-              keyboardType="number-pad"
+              {...INTEGER_INPUT_PROPS}
               placeholder="60"
               autoFocus
             />

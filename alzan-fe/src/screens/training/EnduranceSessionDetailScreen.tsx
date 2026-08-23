@@ -71,6 +71,7 @@ import { CopyCompletedSessionModal } from '../../modules/training/components/Cop
 import { useCopyCompletedSession } from '../../modules/training/hooks/useCopyCompletedSession';
 import { getSessionLocalDate } from '../../modules/training/services/copyCompletedSessionService';
 import { getDefaultCopyTargetDate } from '../../modules/training/helpers/copyCompletedSession.helper';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
@@ -2421,7 +2422,7 @@ export const EnduranceSessionDetailScreen = () => {
                 <View style={styles.modalInputGroup}>
                   <TextInput
                     style={[styles.modalBigInput, { color: themeColors.textPrimary }]}
-                    keyboardType="number-pad"
+                    {...INTEGER_INPUT_PROPS}
                     value={editReps}
                     onChangeText={setEditReps}
                     selectTextOnFocus
@@ -2434,7 +2435,7 @@ export const EnduranceSessionDetailScreen = () => {
                 <View style={styles.modalInputGroup}>
                   <TextInput
                     style={[styles.modalBigInput, { color: themeColors.textPrimary }]}
-                    keyboardType="decimal-pad"
+                    {...DECIMAL_INPUT_PROPS}
                     value={editWeight}
                     onChangeText={setEditWeight}
                     selectTextOnFocus

@@ -6,6 +6,12 @@ import type { TranslationKey } from '../../../i18n/locales/en';
 import { useTrainingStyles } from '../../../hooks/useTrainingStyles';
 import { borderRadius, spacing, typography } from '../../../theme';
 import {
+  DECIMAL_INPUT_PROPS,
+  INTEGER_INPUT_PROPS,
+  TIME_INPUT_PROPS,
+  parseLocalizedDecimal,
+} from '../../../utils/numericInput';
+import {
   addAdvancedGroup,
   calculateAdvancedTotals,
   collapseGroupRepetitions,
@@ -51,8 +57,8 @@ const DURATION_HINT_KEYS: Record<VisibleDurationType, TranslationKey> = {
 };
 
 function parseNumber(value: string): number | null {
-  const parsed = Number(value.replace(',', '.'));
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  const parsed = parseLocalizedDecimal(value);
+  return parsed !== null && parsed >= 0 ? parsed : null;
 }
 
 function parseDuration(value: string): number | null {
@@ -247,7 +253,7 @@ function SectionEditor({
               <Text style={[styles.fieldLabel, { color: themeColors.textPrimary }]}>{t('training.duration')}</Text>
               <TextInput
                 style={inputStyle}
-                keyboardType="decimal-pad"
+                {...TIME_INPUT_PROPS}
                 value={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
@@ -260,7 +266,7 @@ function SectionEditor({
               <View>
                 <TextInput
                   style={inputStyle}
-                  keyboardType="decimal-pad"
+                  {...DECIMAL_INPUT_PROPS}
                   value={
                     section.distanceM == null
                       ? ''
@@ -296,7 +302,7 @@ function SectionEditor({
               <View>
                 <TextInput
                   style={inputStyle}
-                  keyboardType="decimal-pad"
+                  {...DECIMAL_INPUT_PROPS}
                   value={
                     section.distanceM == null
                       ? ''
@@ -322,7 +328,7 @@ function SectionEditor({
             ) : (
               <TextInput
                 style={inputStyle}
-                keyboardType="decimal-pad"
+                {...TIME_INPUT_PROPS}
                 value={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
@@ -335,7 +341,7 @@ function SectionEditor({
             <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>{intensityLabel}</Text>
             <TextInput
               style={inputStyle}
-              keyboardType="decimal-pad"
+              {...(sport === 'cycling' ? DECIMAL_INPUT_PROPS : TIME_INPUT_PROPS)}
               value={
                 intensityValue == null
                   ? ''
@@ -722,7 +728,7 @@ export const AdvancedEnduranceSessionEditor = ({
                 </Text>
                 <TextInput
                   style={[styles.repetitionInput, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                  keyboardType="number-pad"
+                  {...INTEGER_INPUT_PROPS}
                   value={newRepetitions}
                   onChangeText={setNewRepetitions}
                   placeholder="4"

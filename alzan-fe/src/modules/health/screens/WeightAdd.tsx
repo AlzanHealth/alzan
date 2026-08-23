@@ -21,6 +21,7 @@ import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { Alert } from '../../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../../i18n/dateLocale';
+import { DECIMAL_INPUT_PROPS, parseLocalizedDecimal } from '../../../utils/numericInput';
 
 type WeightAddRouteProp = RouteProp<HealthStackParamList, 'WeightAdd'>;
 
@@ -55,13 +56,13 @@ export const WeightAdd = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleSave = () => {
-    const weightVal = parseFloat(weight.replace(',', '.'));
+    const weightVal = parseLocalizedDecimal(weight);
 
     // Validate based on unit
     const minVal = units.weight === 'kg' ? 20 : 44;
     const maxVal = units.weight === 'kg' ? 300 : 660;
 
-    if (isNaN(weightVal) || weightVal < minVal || weightVal > maxVal) {
+    if (weightVal === null || weightVal < minVal || weightVal > maxVal) {
       Alert.alert(t('common.error'), t('health.invalidWeightRange', { min: minVal, max: maxVal, unit: units.weight }));
       return;
     }
@@ -130,7 +131,7 @@ export const WeightAdd = () => {
               onChangeText={setWeight}
               placeholder="0.0"
               placeholderTextColor={themeColors.textSecondary}
-              keyboardType="decimal-pad"
+              {...DECIMAL_INPUT_PROPS}
               autoFocus
             />
             <Text style={[styles.unit, { color: themeColors.textSecondary }]}>{units.weight}</Text>

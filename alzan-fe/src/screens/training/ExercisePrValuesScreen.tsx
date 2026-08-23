@@ -20,6 +20,7 @@ import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { Alert } from '../../components/common/Alert';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 import { borderRadius, colors, spacing, typography } from '../../theme';
 import {
   useDeleteExerciseWeightEntry,
@@ -260,6 +261,9 @@ export const ExercisePrValuesScreen = () => {
                                 : metric === 'reps'
                                   ? 'number-pad'
                                   : 'decimal-pad'
+                            }
+                            inputMode={
+                              metric === 'reps' ? INTEGER_INPUT_PROPS.inputMode : DECIMAL_INPUT_PROPS.inputMode
                             }
                             placeholder={t(
                               metric === 'time'

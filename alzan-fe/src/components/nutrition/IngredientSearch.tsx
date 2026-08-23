@@ -5,6 +5,7 @@ import { searchIngredients, calculateMacros, IngredientSearchResult } from '../.
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { getCurrentAppLocale } from '../../services/localization';
+import { DECIMAL_INPUT_PROPS, parseLocalizedDecimal } from '../../utils/numericInput';
 
 interface IngredientSearchProps {
   onSelect: (ingredient: IngredientSearchResult, amount: number) => void;
@@ -46,8 +47,9 @@ export const IngredientSearch: React.FC<IngredientSearchProps> = ({ onSelect, on
   }, [query, languageCode, visibleLimit]);
 
   const handleConfirm = () => {
-    if (selectedIngredient && amount) {
-      onSelect(selectedIngredient, parseFloat(amount));
+    const parsedAmount = parseLocalizedDecimal(amount);
+    if (selectedIngredient && parsedAmount !== null) {
+      onSelect(selectedIngredient, parsedAmount);
     }
   };
 
@@ -64,7 +66,7 @@ export const IngredientSearch: React.FC<IngredientSearchProps> = ({ onSelect, on
               style={styles.amountInput}
               value={amount}
               onChangeText={setAmount}
-              keyboardType="numeric"
+              {...DECIMAL_INPUT_PROPS}
               autoFocus
             />
             <Text style={styles.unitText}>
@@ -74,7 +76,7 @@ export const IngredientSearch: React.FC<IngredientSearchProps> = ({ onSelect, on
 
           <View style={styles.macrosPreview}>
             <Text style={styles.macroText}>
-              {calculateMacros(selectedIngredient, parseFloat(amount || '0')).energy_kcal}
+              {calculateMacros(selectedIngredient, parseLocalizedDecimal(amount) ?? 0).energy_kcal}
               {t('nutrition.kcal')}
             </Text>
           </View>

@@ -62,6 +62,7 @@ import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { formatPaceTime } from '../../utils/unitConversionUtils';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS, parseLocalizedDecimal } from '../../utils/numericInput';
 import {
   calculateProgressionWeeks,
   calculateStartDateFromEndAndWeeks,
@@ -883,7 +884,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             : null,
           elev_gain_m:
             sportType === TRAIL_SPORT_TYPE && elevationGain.trim()
-              ? Math.max(0, Number.parseFloat(elevationGain.replace(',', '.')) || 0)
+              ? Math.max(0, parseLocalizedDecimal(elevationGain) ?? 0)
               : null,
           contact_level: sportType === 'martial_arts' ? contactLevel : null,
           boots_used: sportType === 'football' || sportType === 'hiking' ? bootsUsed : null,
@@ -2407,7 +2408,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                     </Text>
                     <TextInput
                       style={[styles.rowInput, { color: themeColors.textPrimary }]}
-                      keyboardType="numeric"
+                      {...INTEGER_INPUT_PROPS}
                       placeholder="60"
                       value={manualDuration}
                       placeholderTextColor={themeColors.textSecondary}
@@ -2485,7 +2486,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                             color: elevationGain ? themeColors.textPrimary : themeColors.textSecondary,
                             minWidth: 64,
                           }}
-                          keyboardType="numeric"
+                          {...DECIMAL_INPUT_PROPS}
                           placeholder="0 m"
                           placeholderTextColor={themeColors.textSecondary}
                           value={elevationGain}
@@ -3401,7 +3402,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           }}
                           placeholder={t('training.indefinite') || 'Indefinida'}
                           placeholderTextColor={themeColors.textSecondary}
-                          keyboardType="number-pad"
+                          {...INTEGER_INPUT_PROPS}
                         />
                       </View>
 

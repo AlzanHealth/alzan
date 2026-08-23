@@ -21,6 +21,7 @@ import { Alert } from '../../../components/common/Alert';
 import { getLocaleTag } from '../../../i18n/dateLocale';
 import { useManualStepsForDate, useUpsertManualSteps } from '../hooks/useSteps';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { INTEGER_INPUT_PROPS } from '../../../utils/numericInput';
 
 type StepsAddNavigationProp = StackNavigationProp<RootStackParamList, 'StepsAdd'>;
 type StepsAddRouteProp = RouteProp<RootStackParamList, 'StepsAdd'>;
@@ -106,7 +107,7 @@ export const StepsAdd = () => {
               onChangeText={setSteps}
               placeholder="0"
               placeholderTextColor={themeColors.textSecondary}
-              keyboardType="number-pad"
+              {...INTEGER_INPUT_PROPS}
               autoFocus
               maxLength={6}
             />

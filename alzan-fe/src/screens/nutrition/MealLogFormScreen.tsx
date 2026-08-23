@@ -21,6 +21,7 @@ import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../navigation/tabBarLayout';
 
 import { IngredientSearchPanel } from '../../modules/nutrition/components/IngredientSearchPanel';
+import { DECIMAL_INPUT_PROPS } from '../../utils/numericInput';
 import { PersonalFoodTrends } from '../../modules/nutrition/components/PersonalFoodTrends';
 import { MacrosSummaryCard } from '../../modules/nutrition/components/MacrosSummaryCard';
 import { FoodScanner } from '../../modules/nutrition/components/FoodScanner';
@@ -1841,7 +1842,7 @@ export const MealLogFormScreen = () => {
                                     ]}
                                     value={editAmountInput}
                                     onChangeText={value => setEditAmountInput(sanitizeIngredientAmountInput(value))}
-                                    keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                                    {...DECIMAL_INPUT_PROPS}
                                     autoFocus
                                     selectTextOnFocus
                                   />
@@ -2007,7 +2008,7 @@ export const MealLogFormScreen = () => {
                               ]}
                               value={amountInput}
                               onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
-                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                              {...DECIMAL_INPUT_PROPS}
                               placeholder="100"
                               placeholderTextColor={themeColors.textSecondary}
                               selectTextOnFocus
@@ -2126,7 +2127,7 @@ export const MealLogFormScreen = () => {
                               ]}
                               value={amountInput}
                               onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
-                              keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                              {...DECIMAL_INPUT_PROPS}
                               placeholder="100"
                               placeholderTextColor={themeColors.textSecondary}
                               selectTextOnFocus
@@ -2193,7 +2194,7 @@ export const MealLogFormScreen = () => {
                         ]}
                         value={amountInput}
                         onChangeText={value => setAmountInput(sanitizeIngredientAmountInput(value))}
-                        keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                        {...DECIMAL_INPUT_PROPS}
                         placeholder={t('nutrition.weightGrams')}
                         placeholderTextColor={themeColors.textSecondary}
                       />
@@ -2221,7 +2222,7 @@ export const MealLogFormScreen = () => {
                             ]}
                             placeholder="0"
                             value={manualMacroInputs.kcal_100}
-                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            {...DECIMAL_INPUT_PROPS}
                             placeholderTextColor={themeColors.textSecondary}
                             onChangeText={text => {
                               const value = sanitizeIngredientAmountInput(text);
@@ -2248,7 +2249,7 @@ export const MealLogFormScreen = () => {
                             ]}
                             placeholder="0"
                             value={manualMacroInputs.protein_g_100}
-                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            {...DECIMAL_INPUT_PROPS}
                             placeholderTextColor={themeColors.textSecondary}
                             onChangeText={text => {
                               const value = sanitizeIngredientAmountInput(text);
@@ -2275,7 +2276,7 @@ export const MealLogFormScreen = () => {
                             ]}
                             placeholder="0"
                             value={manualMacroInputs.carbs_g_100}
-                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            {...DECIMAL_INPUT_PROPS}
                             placeholderTextColor={themeColors.textSecondary}
                             onChangeText={text => {
                               const value = sanitizeIngredientAmountInput(text);
@@ -2302,7 +2303,7 @@ export const MealLogFormScreen = () => {
                             ]}
                             placeholder="0"
                             value={manualMacroInputs.fat_g_100}
-                            keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                            {...DECIMAL_INPUT_PROPS}
                             placeholderTextColor={themeColors.textSecondary}
                             onChangeText={text => {
                               const value = sanitizeIngredientAmountInput(text);

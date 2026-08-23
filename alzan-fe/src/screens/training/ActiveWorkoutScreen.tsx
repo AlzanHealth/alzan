@@ -56,6 +56,7 @@ import {
   parseGymSetModeRecord,
   parseWarmupSetRecordAsGymSetModes,
 } from './helpers/gymSetMode.helper';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 
 export type WorkoutTemplateExerciseWithDetails = WorkoutTemplateExercise & { exercise: ExerciseWithType | null };
 type AutoPlayQueue = {
@@ -1595,8 +1596,7 @@ export const ActiveWorkoutScreen = () => {
 
                                   <TextInput
                                     style={[styles.input, dynamicStyles.input]}
-                                    keyboardType={Platform.OS === 'web' ? 'default' : 'decimal-pad'}
-                                    inputMode="decimal"
+                                    {...DECIMAL_INPUT_PROPS}
                                     placeholder={item.target_weight_kg?.toString() || '0'}
                                     placeholderTextColor={themeColors.textSecondary + '50'}
                                     onChangeText={v => handleInput(key, 'weight', v)}
@@ -1612,7 +1612,7 @@ export const ActiveWorkoutScreen = () => {
                               )}
                               <TextInput
                                 style={[styles.input, dynamicStyles.input, isTimeBased && { flex: 2 }]}
-                                keyboardType="numeric"
+                                {...INTEGER_INPUT_PROPS}
                                 placeholder={
                                   isTimeBased
                                     ? (item.target_reps_min || 0).toString()

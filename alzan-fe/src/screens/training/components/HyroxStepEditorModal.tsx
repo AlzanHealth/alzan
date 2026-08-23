@@ -19,6 +19,7 @@ import { colors, spacing, borderRadius } from '../../../theme';
 import { BuilderStep } from '../../../hooks/useEnduranceWorkoutBuilder';
 import { SportCatalogOption } from '../../../hooks/useSportCatalog';
 import { formatPaceTime } from '../../../utils/unitConversionUtils';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../../utils/numericInput';
 
 type HyroxStepType = 'run' | 'station' | 'rest';
 
@@ -227,7 +228,7 @@ export const HyroxStepEditorModal = ({
               <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>{t('settings.distance')}</Text>
               <TextInput
                 style={[styles.input, { color: themeColors.textPrimary }]}
-                keyboardType="numeric"
+                {...INTEGER_INPUT_PROPS}
                 value={distanceM}
                 onChangeText={setDistanceM}
                 placeholder={stepType === 'run' ? '1000' : '0'}
@@ -246,7 +247,7 @@ export const HyroxStepEditorModal = ({
             </Text>
             <TextInput
               style={[styles.input, { color: themeColors.textPrimary }]}
-              keyboardType="numeric"
+              {...INTEGER_INPUT_PROPS}
               value={durationMin}
               onChangeText={setDurationMin}
               placeholder={stepType === 'rest' ? '2' : '0'}
@@ -266,7 +267,7 @@ export const HyroxStepEditorModal = ({
               <View style={styles.paceRow}>
                 <TextInput
                   style={[styles.paceInput, { color: themeColors.textPrimary }]}
-                  keyboardType="numeric"
+                  {...INTEGER_INPUT_PROPS}
                   value={paceMin}
                   onChangeText={setPaceMin}
                   placeholder="5"
@@ -275,7 +276,7 @@ export const HyroxStepEditorModal = ({
                 <Text style={[styles.paceSeparator, { color: themeColors.textSecondary }]}>:</Text>
                 <TextInput
                   style={[styles.paceInput, { color: themeColors.textPrimary }]}
-                  keyboardType="numeric"
+                  {...INTEGER_INPUT_PROPS}
                   value={paceSec}
                   onChangeText={setPaceSec}
                   placeholder="00"
@@ -297,7 +298,7 @@ export const HyroxStepEditorModal = ({
                 </Text>
                 <TextInput
                   style={[styles.input, { color: themeColors.textPrimary }]}
-                  keyboardType="numeric"
+                  {...DECIMAL_INPUT_PROPS}
                   value={loadKg}
                   onChangeText={setLoadKg}
                   placeholder="0"
@@ -313,7 +314,7 @@ export const HyroxStepEditorModal = ({
                 <Text style={[styles.inputLabel, { color: themeColors.textSecondary }]}>{t('training.hyroxReps')}</Text>
                 <TextInput
                   style={[styles.input, { color: themeColors.textPrimary }]}
-                  keyboardType="numeric"
+                  {...INTEGER_INPUT_PROPS}
                   value={reps}
                   onChangeText={setReps}
                   placeholder={stationKey === 'wall_balls' ? '100' : '0'}

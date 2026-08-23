@@ -18,6 +18,7 @@ import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { getCurrentAppLocale, getLocalizedExerciseName } from '../../services/localization';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
 import { WorkoutSet } from '../../types/requests.types';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 
 interface DraftSet {
   key: string;
@@ -327,7 +328,7 @@ export const CompleteExercisesScreen = () => {
                   </Text>
                   <TextInput
                     style={[styles.setInput, { color: themeColors.textPrimary, borderColor: themeColors.border }]}
-                    keyboardType="number-pad"
+                    {...INTEGER_INPUT_PROPS}
                     placeholder={t('training.repsColon')}
                     placeholderTextColor={themeColors.textSecondary}
                     value={draft.reps}
@@ -335,7 +336,7 @@ export const CompleteExercisesScreen = () => {
                   />
                   <TextInput
                     style={[styles.setInput, { color: themeColors.textPrimary, borderColor: themeColors.border }]}
-                    keyboardType="decimal-pad"
+                    {...DECIMAL_INPUT_PROPS}
                     placeholder={preferences.weight_unit}
                     placeholderTextColor={themeColors.textSecondary}
                     value={draft.weight}

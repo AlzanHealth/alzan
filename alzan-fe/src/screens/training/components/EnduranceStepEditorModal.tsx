@@ -21,6 +21,7 @@ import { DurationType, PhaseType, TargetType } from '../../../types/requests.typ
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from '../helpers/phase.helper';
 import { formatPaceTime } from '../../../utils/unitConversionUtils';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS, parseLocalizedDecimal } from '../../../utils/numericInput';
 
 interface Step {
   id: string;
@@ -250,8 +251,8 @@ export const EnduranceStepEditorModal = ({
     };
 
     if (durationType === 'distance') {
-      const major = parseFloat(distMajor) || 0;
-      const minor = parseFloat(distMinor) || 0;
+      const major = parseLocalizedDecimal(distMajor) ?? 0;
+      const minor = parseLocalizedDecimal(distMinor) ?? 0;
 
       if (isMetricDist) {
         // Major=km, Minor=m
@@ -385,7 +386,7 @@ export const EnduranceStepEditorModal = ({
                   <View style={[styles.suffixInputContainer, dynamicStyles.suffixInputContainer]}>
                     <TextInput
                       style={[styles.input, dynamicStyles.input]}
-                      keyboardType="numeric"
+                      {...DECIMAL_INPUT_PROPS}
                       value={distMajor}
                       onChangeText={setDistMajor}
                     />
@@ -401,7 +402,7 @@ export const EnduranceStepEditorModal = ({
                   <View style={[styles.suffixInputContainer, dynamicStyles.suffixInputContainer]}>
                     <TextInput
                       style={[styles.input, dynamicStyles.input]}
-                      keyboardType="numeric"
+                      {...INTEGER_INPUT_PROPS}
                       value={distMinor}
                       onChangeText={setDistMinor}
                     />

@@ -66,6 +66,7 @@ import {
   resolveOneOffDate,
   shouldShowScheduleDays,
 } from '../../modules/training/helpers/templateScheduling.helper';
+import { INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 
 export const GymRoutineEditorScreen = () => {
   const { t } = useTranslation();
@@ -1337,7 +1338,7 @@ export const GymRoutineEditorScreen = () => {
                                   </Text>
                                   <TextInput
                                     style={[styles.targetInput, dynamicStyles.input]}
-                                    keyboardType="numeric"
+                                    {...INTEGER_INPUT_PROPS}
                                     value={String(item.target_sets || '')}
                                     onChangeText={v => updateExerciseTarget(index, 'target_sets', v)}
                                     inputAccessoryViewID={inputAccessoryViewID}
@@ -1350,7 +1351,7 @@ export const GymRoutineEditorScreen = () => {
                                     </Text>
                                     <TextInput
                                       style={[styles.targetInput, dynamicStyles.input]}
-                                      keyboardType="numeric"
+                                      {...INTEGER_INPUT_PROPS}
                                       placeholder="30"
                                       placeholderTextColor={themeColors.textSecondary + '50'}
                                       value={String(item.target_reps_min || '')}
@@ -1365,7 +1366,7 @@ export const GymRoutineEditorScreen = () => {
                                     </Text>
                                     <TextInput
                                       style={[styles.targetInput, dynamicStyles.input]}
-                                      keyboardType="numeric"
+                                      {...INTEGER_INPUT_PROPS}
                                       value={String(item.target_reps_min || '')}
                                       onChangeText={v => updateExerciseTarget(index, 'target_reps_min', v)}
                                       inputAccessoryViewID={inputAccessoryViewID}
@@ -1399,7 +1400,7 @@ export const GymRoutineEditorScreen = () => {
                                   </Text>
                                   <TextInput
                                     style={[styles.targetInput, dynamicStyles.input]}
-                                    keyboardType="numeric"
+                                    {...INTEGER_INPUT_PROPS}
                                     placeholder="60"
                                     placeholderTextColor={themeColors.textSecondary + '50'}
                                     value={String(item.rest_seconds || '')}

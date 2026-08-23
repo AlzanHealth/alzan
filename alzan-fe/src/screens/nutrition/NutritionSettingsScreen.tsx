@@ -63,6 +63,7 @@ import { LiquidGlassNativeCard } from '../../components/common/LiquidGlassNative
 import { MealType, NutritionSettingsJson, RecipeSearchScope } from '../../types/requests.types';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 import { buildTimePickerDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import {
   DEFAULT_NEXT_MEAL_CUTOFF_HOURS,
@@ -1127,7 +1128,7 @@ export const NutritionSettingsScreen = () => {
                       onChangeText={handleNextMealCutoffInputChange}
                       placeholder={t('nutrition.nextMealTimingPlaceholder')}
                       placeholderTextColor={themeColors.textSecondary}
-                      keyboardType="decimal-pad"
+                      {...DECIMAL_INPUT_PROPS}
                       autoCapitalize="none"
                       autoCorrect={false}
                       maxLength={5}
@@ -1287,7 +1288,7 @@ export const NutritionSettingsScreen = () => {
                       onChangeText={handleDefaultHydrationInputChange}
                       placeholder={t('nutrition.defaultHydrationPlaceholder')}
                       placeholderTextColor={themeColors.textSecondary}
-                      keyboardType="number-pad"
+                      {...INTEGER_INPUT_PROPS}
                       autoCapitalize="none"
                       autoCorrect={false}
                       maxLength={5}

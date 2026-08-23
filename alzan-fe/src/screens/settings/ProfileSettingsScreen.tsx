@@ -41,6 +41,7 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { convertLengthToUi, parseLengthToCm } from '../../utils/unitConversionUtils';
 import { SettingsStackParamList } from '../../navigation/SettingsNavigator';
+import { DECIMAL_INPUT_PROPS } from '../../utils/numericInput';
 
 // --- Helper Components ---
 
@@ -752,7 +753,7 @@ export default function ProfileSettingsScreen() {
                   onChangeText={value => setHeight(sanitizeNumericInput(value))}
                   placeholder={t('onboarding.exampleValue', { value: heightPlaceholder })}
                   placeholderTextColor={dynamicStyles.inputPlaceholder}
-                  keyboardType="decimal-pad"
+                  {...DECIMAL_INPUT_PROPS}
                 />
               </View>
             </View>

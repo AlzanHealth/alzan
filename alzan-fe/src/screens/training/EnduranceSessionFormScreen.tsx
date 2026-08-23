@@ -52,6 +52,7 @@ import {
 import { fetchTemplateWithProgressedSteps } from '../../modules/training/services/enduranceProgressionService';
 import { Alert } from '../../components/common/Alert';
 import { RouteMap } from '../../components/common/RouteMap';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 import { useTranslation } from 'react-i18next';
 import { AdvancedEnduranceSessionEditor } from '../../modules/training/components/AdvancedEnduranceSessionEditor';
 import { useCreateManualEnduranceActivity } from '../../modules/training/hooks/useCreateManualEnduranceActivity';
@@ -1619,7 +1620,7 @@ export const EnduranceSessionFormScreen = () => {
         <Text style={styles.label}>{t('training.caloriesKcal')}</Text>
         <TextInput
           style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-          keyboardType="numeric"
+          {...DECIMAL_INPUT_PROPS}
           placeholder="0"
           placeholderTextColor={themeColors.textSecondary}
           value={calories}
@@ -1634,7 +1635,7 @@ export const EnduranceSessionFormScreen = () => {
         <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.perceivedEffortRpe')}</Text>
         <TextInput
           style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-          keyboardType="numeric"
+          {...INTEGER_INPUT_PROPS}
           placeholder="5"
           placeholderTextColor={themeColors.textSecondary}
           value={rpe}
@@ -2401,7 +2402,7 @@ export const EnduranceSessionFormScreen = () => {
                         styles.rowValueText,
                         { color: themeColors.textPrimary, minWidth: 72, textAlign: 'right' },
                       ]}
-                      keyboardType="numeric"
+                      {...DECIMAL_INPUT_PROPS}
                       placeholder="0"
                       value={elevation}
                       placeholderTextColor={themeColors.textSecondary}
@@ -3183,7 +3184,7 @@ export const EnduranceSessionFormScreen = () => {
                         </Text>
                         <TextInput
                           style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                          keyboardType="numeric"
+                          {...DECIMAL_INPUT_PROPS}
                           placeholder="0.0"
                           placeholderTextColor={themeColors.textSecondary}
                           value={distance}
@@ -3248,7 +3249,7 @@ export const EnduranceSessionFormScreen = () => {
                             onBlur={handlePaceBlur}
                             placeholder="-"
                             placeholderTextColor={themeColors.textSecondary}
-                            keyboardType="numeric"
+                            {...DECIMAL_INPUT_PROPS}
                           />
                           <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>
                             {currentConfig?.units.speed || ''}
@@ -3264,7 +3265,7 @@ export const EnduranceSessionFormScreen = () => {
                         <Text style={styles.label}>{t('training.caloriesKcal')}</Text>
                         <TextInput
                           style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                          keyboardType="numeric"
+                          {...DECIMAL_INPUT_PROPS}
                           placeholder="0"
                           placeholderTextColor={themeColors.textSecondary}
                           value={calories}
@@ -3298,7 +3299,7 @@ export const EnduranceSessionFormScreen = () => {
                               fontWeight: '600',
                               height: '100%',
                             }}
-                            keyboardType="numeric"
+                            {...DECIMAL_INPUT_PROPS}
                             placeholder="0.0"
                             placeholderTextColor={themeColors.textSecondary}
                             value={recoveryTimeHours}
@@ -3319,7 +3320,7 @@ export const EnduranceSessionFormScreen = () => {
                       <Text style={styles.label}>{t('training.avgHeartRate')}</Text>
                       <TextInput
                         style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                        keyboardType="numeric"
+                        {...INTEGER_INPUT_PROPS}
                         placeholder="0"
                         placeholderTextColor={themeColors.textSecondary}
                         value={hr}
@@ -3337,7 +3338,7 @@ export const EnduranceSessionFormScreen = () => {
                       <Text style={styles.label}>{t('training.effortRpe')}</Text>
                       <TextInput
                         style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                        keyboardType="numeric"
+                        {...INTEGER_INPUT_PROPS}
                         placeholder={t('training.repsPlaceholder')}
                         placeholderTextColor={themeColors.textSecondary}
                         value={rpe}
@@ -3400,7 +3401,7 @@ export const EnduranceSessionFormScreen = () => {
                   <Text style={styles.label}>{t('training.vo2Max')}</Text>
                   <TextInput
                     style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                    keyboardType="numeric"
+                    {...DECIMAL_INPUT_PROPS}
                     placeholder="0.0"
                     placeholderTextColor={themeColors.textSecondary}
                     value={vo2Max}
@@ -3411,7 +3412,7 @@ export const EnduranceSessionFormScreen = () => {
                   <Text style={styles.label}>{t('training.totalSteps')}</Text>
                   <TextInput
                     style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                    keyboardType="numeric"
+                    {...INTEGER_INPUT_PROPS}
                     placeholder="0"
                     placeholderTextColor={themeColors.textSecondary}
                     value={totalSteps}
@@ -3426,7 +3427,7 @@ export const EnduranceSessionFormScreen = () => {
                     <Text style={styles.label}>{t('training.elevationM')}</Text>
                     <TextInput
                       style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                      keyboardType="numeric"
+                      {...DECIMAL_INPUT_PROPS}
                       placeholder="0"
                       placeholderTextColor={themeColors.textSecondary}
                       value={elevation}
@@ -3439,7 +3440,7 @@ export const EnduranceSessionFormScreen = () => {
                     <Text style={styles.label}>{t('training.elevationLossM')}</Text>
                     <TextInput
                       style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                      keyboardType="numeric"
+                      {...DECIMAL_INPUT_PROPS}
                       placeholder="0"
                       placeholderTextColor={themeColors.textSecondary}
                       value={elevationLoss}
