@@ -20,10 +20,9 @@ const PROVIDER_HOME_URLS: Record<TrainingAiProvider, string> = {
 };
 
 export const buildTrainingAiLaunchTarget = (provider: TrainingAiProvider, prompt: string): TrainingAiLaunchTarget => {
-  if (provider === 'chatgpt') {
-    const prefilledUrl = `${PROVIDER_HOME_URLS.chatgpt}?prompt=${encodeURIComponent(prompt)}`;
-    if (prefilledUrl.length <= MAX_PROVIDER_URL_LENGTH) return { url: prefilledUrl, mode: 'prefilled' };
-  }
+  const queryParameter = provider === 'chatgpt' ? 'prompt' : 'q';
+  const prefilledUrl = `${PROVIDER_HOME_URLS[provider]}?${queryParameter}=${encodeURIComponent(prompt)}`;
+  if (prefilledUrl.length <= MAX_PROVIDER_URL_LENGTH) return { url: prefilledUrl, mode: 'prefilled' };
 
   return { url: PROVIDER_HOME_URLS[provider], mode: 'clipboard' };
 };

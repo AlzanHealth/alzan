@@ -31,21 +31,19 @@ assert.equal(longChatGptTarget.url, 'https://chatgpt.com/');
 
 const geminiTarget = buildTrainingAiLaunchTarget('gemini', shortPrompt);
 assert.ok(geminiTarget);
-assert.equal(geminiTarget.mode, 'clipboard');
-assert.equal(geminiTarget.url, 'https://gemini.google.com/app');
-assert.ok(!geminiTarget.url.includes(encodeURIComponent(shortPrompt)));
+assert.equal(geminiTarget.mode, 'prefilled');
+assert.ok(geminiTarget.url.startsWith('https://gemini.google.com/app?q='));
+assert.ok(geminiTarget.url.includes(encodeURIComponent(shortPrompt)));
 
 const claudeTarget = buildTrainingAiLaunchTarget('claude', shortPrompt);
 assert.ok(claudeTarget);
-assert.equal(claudeTarget.mode, 'clipboard');
-assert.equal(claudeTarget.url, 'https://claude.ai/new');
-assert.ok(!claudeTarget.url.includes(encodeURIComponent(shortPrompt)));
+assert.equal(claudeTarget.mode, 'prefilled');
+assert.ok(claudeTarget.url.startsWith('https://claude.ai/new?q='));
+assert.ok(claudeTarget.url.includes(encodeURIComponent(shortPrompt)));
 
 const ingredientCatalog = 'ingredientes.csv\ningredients_rows\nname_es\nArroz';
 assert.equal(buildAiClipboardText(chatGptTarget, shortPrompt, ingredientCatalog), ingredientCatalog);
-assert.equal(
-  buildAiClipboardText(geminiTarget, shortPrompt, ingredientCatalog),
-  `ingredientes.csv\nAI_INSTRUCTIONS\n${shortPrompt}\n\ningredients_rows\nname_es\nArroz`,
-);
+assert.equal(buildAiClipboardText(geminiTarget, shortPrompt, ingredientCatalog), ingredientCatalog);
+assert.equal(buildAiClipboardText(claudeTarget, shortPrompt, ingredientCatalog), ingredientCatalog);
 
 console.log('trainingPlanAiProvider tests passed');

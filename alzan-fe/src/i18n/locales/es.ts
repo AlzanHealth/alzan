@@ -525,9 +525,9 @@ export default {
     menuImportAiChatGPT: 'ChatGPT',
     menuImportAiChatGPTHint: 'Prompt preparado; escribe o adjunta tu comida y envíala',
     menuImportAiGemini: 'Gemini',
-    menuImportAiGeminiHint: 'Instrucciones copiadas; pégalas una vez y escribe o adjunta tu comida',
+    menuImportAiGeminiHint: 'Prompt preparado; pega ingredientes.csv una vez y escribe o adjunta tu comida',
     menuImportAiClaude: 'Claude',
-    menuImportAiClaudeHint: 'Instrucciones copiadas; pégalas una vez y escribe o adjunta tu comida',
+    menuImportAiClaudeHint: 'Prompt preparado; pega ingredientes.csv una vez y escribe o adjunta tu comida',
     menuImportAiCatalogError:
       'No se pudo cargar el catálogo de ingredientes. Comprueba tu conexión e inténtalo de nuevo.',
     menuImportAiClipboardError:
@@ -1934,9 +1934,9 @@ export default {
     trainingAiChatGPT: 'ChatGPT',
     trainingAiChatGPTHint: 'Prompt preparado; pega ejercicios.csv una vez',
     trainingAiGemini: 'Gemini',
-    trainingAiGeminiHint: 'Instrucciones + ejercicios.csv copiados; pega una vez',
+    trainingAiGeminiHint: 'Prompt preparado; pega ejercicios.csv una vez',
     trainingAiClaude: 'Claude',
-    trainingAiClaudeHint: 'Instrucciones + ejercicios.csv copiados; pega una vez',
+    trainingAiClaudeHint: 'Prompt preparado; pega ejercicios.csv una vez',
     trainingAiCancel: 'Cancelar',
     trainingAiCatalogError: 'No se ha podido cargar el catálogo actual de ejercicios. Inténtalo de nuevo.',
     trainingAiClipboardError: 'No se ha podido copiar el catálogo de ejercicios. Inténtalo de nuevo.',
