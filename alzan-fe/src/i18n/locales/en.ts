@@ -1889,7 +1889,8 @@ const en = {
     analyzeTrainingPlan: 'Analyze plan',
     openTrainingWithAi: 'Open with AI',
     trainingAiSheetTitle: 'Choose an AI assistant',
-    trainingAiSheetSubtitle: 'The current exercise catalog will be copied before opening it.',
+    trainingAiSheetSubtitle:
+      'Alzan will copy the complete exercise catalog. When the AI opens, paste it with Ctrl/⌘ + V, then add your workout below.',
     trainingAiLoadingCatalog: 'Updating the exercise catalog…',
     trainingAiChatGPT: 'ChatGPT',
     trainingAiChatGPTHint: 'Open a new ChatGPT conversation',
@@ -1898,13 +1899,9 @@ const en = {
     trainingAiClaude: 'Claude',
     trainingAiClaudeHint: 'Open a new Claude conversation',
     trainingAiCancel: 'Cancel',
-    trainingAiOpenedPrefilled:
-      'The prompt was copied and a pre-filled conversation was opened. Paste your workout and send it when ready.',
-    trainingAiOpenedClipboard:
-      'The prompt was copied. Paste it into the conversation, add your workout, and send it when ready.',
     trainingAiCatalogError: 'The current exercise catalog could not be loaded. Please try again.',
-    trainingAiClipboardError: 'The AI prompt could not be copied. Please try again.',
-    trainingAiOpenError: 'The AI assistant could not be opened. The prompt was not sent.',
+    trainingAiClipboardError: 'The exercise catalog could not be copied. Please try again.',
+    trainingAiOpenError: 'The AI assistant could not be opened with the prompt. Please try again.',
     importTrainingPlanAction: 'Add to calendar',
     trainingPlanAnalyzing: 'Analyzing plan…',
     trainingPlanImporting: 'Adding workouts…',

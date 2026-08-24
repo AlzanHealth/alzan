@@ -24,6 +24,8 @@ const CATALOG_HEADERS = [
   'is_custom',
 ] as const;
 
+const AI_CLIPBOARD_CATALOG_HEADERS = ['exercise_name_es', 'primary_muscle', 'equipment'] as const;
+
 const normalizeSortValue = (value: string | null): string =>
   (value ?? '')
     .normalize('NFD')
@@ -68,21 +70,28 @@ export const serializeTrainingExerciseCatalogCsv = (catalog: TrainingExerciseAiC
   return [CATALOG_HEADERS.join(','), ...rows].join('\n');
 };
 
-export const buildTrainingPlanAiPrompt = (catalog: TrainingExerciseAiCatalogRow[]): string => {
-  const csv = serializeTrainingExerciseCatalogCsv(catalog);
+export const serializeTrainingExerciseAiClipboardCsv = (catalog: TrainingExerciseAiCatalogRow[]): string => {
+  const rows = sortTrainingExerciseAiCatalog(catalog).map(exercise =>
+    [exercise.exercise_name_es, exercise.primary_muscle, exercise.equipment].map(escapeCsvCell).join(','),
+  );
 
+  return ['exercises_rows', AI_CLIPBOARD_CATALOG_HEADERS.join(','), ...rows].join('\n');
+};
+
+export const buildTrainingPlanAiPrompt = (catalog: TrainingExerciseAiCatalogRow[]): string => {
   return `${TRAINING_PLAN_IMPORT_PROMPT.trim()}
 
 ADAPTACIÓN PARA ESTA CONVERSACIÓN
-- No necesitas un DOCX ni un CSV adjunto: el catálogo de ejercicios aparece al final de este mensaje.
-- El catálogo incluido sustituye al CSV adjunto mencionado en las instrucciones anteriores.
-- El usuario pegará ahora el texto de su entrenamiento. Convierte ese entrenamiento, sin inventar datos, al JSON alzan-training-plan v1.
-- Si un ejercicio no aparece en el catálogo, no inventes su UUID: devuelve un informe de bloqueo explicando qué ejercicio falta.
-- Tras recibir el entrenamiento, responde únicamente con JSON válido o con el informe de bloqueo definido arriba.
+- No necesitas un DOCX ni un CSV adjunto. El catálogo completo y actualizado se pegará como una sección llamada exercises_rows.
+- Para ejercicios de strength, selecciona exactamente exercise_name_es de una fila real de exercises_rows usando el nombre, el músculo principal y el equipamiento.
+- Omite exercise_id. No inventes UUID: Alzan resolverá el UUID al importar el JSON mediante el nombre canónico seleccionado.
+- Si no existe una coincidencia segura, devuelve un informe de bloqueo e identifica el ejercicio que falta.
+- Convierte el entrenamiento pegado, sin inventar datos, al JSON alzan-training-plan v1.
+- Tras recibir el entrenamiento, responde únicamente con JSON válido.
 
-Pega ahora el texto de tu entrenamiento después de este documento.
-
-CATÁLOGO DE EJERCICIOS DE ALZAN (CSV ACTUALIZADO)
-${csv}
+PASOS PARA EL USUARIO
+1. El catálogo completo de ${catalog.length} ejercicios ya está copiado. Pégalo aquí con Ctrl+V o Cmd+V.
+2. Debajo del catálogo, pega o escribe tu entrenamiento.
+3. Envía el mensaje manualmente.
 `;
 };

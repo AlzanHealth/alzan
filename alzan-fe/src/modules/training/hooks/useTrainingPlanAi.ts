@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { copyTextToClipboard } from '../../../utils/clipboard';
 import { fetchTrainingExerciseAiCatalog } from '../services/trainingPlanAiCatalogService';
-import { buildTrainingPlanAiPrompt } from '../services/trainingPlanAiPrompt';
+import { buildTrainingPlanAiPrompt, serializeTrainingExerciseAiClipboardCsv } from '../services/trainingPlanAiPrompt';
 import {
   buildTrainingAiLaunchTarget,
   type TrainingAiLaunchResult,
@@ -12,13 +12,8 @@ import {
 
 const openTrainingAiTarget = async (url: string, reservedWindow: Window | null): Promise<void> => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    if (reservedWindow) {
-      reservedWindow.location.href = url;
-      return;
-    }
-
-    const openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!openedWindow) throw new Error('Unable to open AI provider');
+    if (!reservedWindow) throw new Error('Unable to open AI provider in a new window');
+    reservedWindow.location.href = url;
     return;
   }
 
@@ -35,9 +30,7 @@ export const useTrainingPlanAi = () => {
       if (isLaunching) return { ok: false, kind: 'open-error' };
 
       const reservedWindow =
-        Platform.OS === 'web' && typeof window !== 'undefined'
-          ? window.open('about:blank', '_blank', 'noopener,noreferrer')
-          : null;
+        Platform.OS === 'web' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null;
 
       setIsLaunching(true);
       try {
@@ -54,15 +47,19 @@ export const useTrainingPlanAi = () => {
           return { ok: false, kind: 'catalog-error' };
         }
 
-        const prompt = buildTrainingPlanAiPrompt(catalog);
         try {
-          await copyTextToClipboard(prompt);
+          await copyTextToClipboard(serializeTrainingExerciseAiClipboardCsv(catalog));
         } catch {
           reservedWindow?.close();
           return { ok: false, kind: 'clipboard-error' };
         }
 
+        const prompt = buildTrainingPlanAiPrompt(catalog);
         const target = buildTrainingAiLaunchTarget(provider, prompt);
+        if (!target) {
+          reservedWindow?.close();
+          return { ok: false, kind: 'open-error' };
+        }
         try {
           await openTrainingAiTarget(target.url, reservedWindow);
         } catch {

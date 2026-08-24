@@ -1907,7 +1907,8 @@ export default {
     analyzeTrainingPlan: 'Analizar plan',
     openTrainingWithAi: 'Abrir con IA',
     trainingAiSheetTitle: 'Elige un asistente de IA',
-    trainingAiSheetSubtitle: 'El catálogo actual de ejercicios se copiará antes de abrirlo.',
+    trainingAiSheetSubtitle:
+      'Alzan copiará el catálogo completo de ejercicios. Cuando se abra la IA, pégalo con Ctrl/⌘ + V y añade debajo tu entrenamiento.',
     trainingAiLoadingCatalog: 'Actualizando el catálogo de ejercicios…',
     trainingAiChatGPT: 'ChatGPT',
     trainingAiChatGPTHint: 'Abrir una conversación nueva en ChatGPT',
@@ -1916,13 +1917,9 @@ export default {
     trainingAiClaude: 'Claude',
     trainingAiClaudeHint: 'Abrir una conversación nueva en Claude',
     trainingAiCancel: 'Cancelar',
-    trainingAiOpenedPrefilled:
-      'El prompt se ha copiado y se ha abierto una conversación preparada. Pega tu entreno y envíalo cuando quieras.',
-    trainingAiOpenedClipboard:
-      'El prompt se ha copiado. Pégalo en la conversación, añade tu entreno y envíalo cuando quieras.',
     trainingAiCatalogError: 'No se ha podido cargar el catálogo actual de ejercicios. Inténtalo de nuevo.',
-    trainingAiClipboardError: 'No se ha podido copiar el prompt de IA. Inténtalo de nuevo.',
-    trainingAiOpenError: 'No se ha podido abrir el asistente de IA. El prompt no se ha enviado.',
+    trainingAiClipboardError: 'No se ha podido copiar el catálogo de ejercicios. Inténtalo de nuevo.',
+    trainingAiOpenError: 'No se ha podido abrir el asistente de IA con el prompt. Inténtalo de nuevo.',
     importTrainingPlanAction: 'Añadir al calendario',
     trainingPlanAnalyzing: 'Analizando plan…',
     trainingPlanImporting: 'Añadiendo entrenamientos…',

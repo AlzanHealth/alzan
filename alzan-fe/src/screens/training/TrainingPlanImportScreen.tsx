@@ -106,10 +106,6 @@ export const TrainingPlanImportScreen = () => {
       }
 
       setIsAiSheetVisible(false);
-      Alert.alert(
-        t('common.done'),
-        t(result.mode === 'prefilled' ? 'training.trainingAiOpenedPrefilled' : 'training.trainingAiOpenedClipboard'),
-      );
     },
     [launchWithAi, t],
   );

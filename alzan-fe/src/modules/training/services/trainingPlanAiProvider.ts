@@ -1,32 +1,27 @@
 export type TrainingAiProvider = 'chatgpt' | 'gemini' | 'claude';
 
 export type TrainingAiLaunchResult =
-  | { ok: true; provider: TrainingAiProvider; mode: 'prefilled' | 'clipboard' }
+  | { ok: true; provider: TrainingAiProvider; mode: 'prefilled' }
   | { ok: false; kind: 'catalog-error' | 'clipboard-error' | 'open-error' };
 
 export type TrainingAiLaunchTarget = {
   url: string;
-  mode: 'prefilled' | 'clipboard';
+  mode: 'prefilled';
 };
 
-export const AI_PREFILL_URL_MAX_LENGTH = 6000;
+const MAX_PROVIDER_URL_LENGTH = 12_000;
 
 const PROVIDER_HOME_URLS: Record<TrainingAiProvider, string> = {
-  chatgpt: 'https://chatgpt.com/',
-  gemini: 'https://gemini.google.com/app',
-  claude: 'https://claude.ai/new',
+  chatgpt: 'https://chatgpt.com/?prompt=',
+  gemini: 'https://gemini.google.com/app?prompt=',
+  claude: 'https://claude.ai/new?q=',
 };
 
-const buildChatGptPrefillUrl = (prompt: string): string =>
-  `${PROVIDER_HOME_URLS.chatgpt}?q=${encodeURIComponent(prompt)}`;
-
-export const buildTrainingAiLaunchTarget = (provider: TrainingAiProvider, prompt: string): TrainingAiLaunchTarget => {
-  if (provider === 'chatgpt') {
-    const prefilledUrl = buildChatGptPrefillUrl(prompt);
-    if (prefilledUrl.length <= AI_PREFILL_URL_MAX_LENGTH) {
-      return { url: prefilledUrl, mode: 'prefilled' };
-    }
-  }
-
-  return { url: PROVIDER_HOME_URLS[provider], mode: 'clipboard' };
+export const buildTrainingAiLaunchTarget = (
+  provider: TrainingAiProvider,
+  prompt: string,
+): TrainingAiLaunchTarget | null => {
+  const url = `${PROVIDER_HOME_URLS[provider]}${encodeURIComponent(prompt)}`;
+  if (url.length > MAX_PROVIDER_URL_LENGTH) return null;
+  return { url, mode: 'prefilled' };
 };
