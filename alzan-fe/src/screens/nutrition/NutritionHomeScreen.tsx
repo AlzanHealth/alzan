@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, Plus, BookOpen, CalendarCheck, ShoppingBasket } from 'lucide-react-native';
+import { Utensils, Settings, Plus, BookOpen, CalendarCheck } from 'lucide-react-native';
 import { addDays, format, isValid, parseISO, subDays } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -33,6 +33,7 @@ import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { getNutritionDayDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
 import { CopyMealModal, CopyMealDestination } from '../../modules/nutrition/components/CopyMealModal';
+import { getNutritionHomeMenuImportTarget, getNutritionHomeRecipeLibraryTarget } from './nutritionHeaderActions';
 
 // Helper to group meals
 const groupMealsByType = (meals: DailyMealItem[]) => {
@@ -306,15 +307,18 @@ export const NutritionHomeScreen = () => {
           <View style={styles.topActions}>
             <TouchableOpacity
               style={styles.topAction}
-              onPress={() => navigation.navigate('ShoppingList', { date: formattedDate })}
+              onPress={() => navigation.navigate(getNutritionHomeMenuImportTarget().screen)}
               accessibilityRole="button"
-              accessibilityLabel={t('nutrition.shoppingListAccessibility')}
+              accessibilityLabel={t('nutrition.menuImportOpenAccessibility')}
             >
-              <ShoppingBasket color={themeColors.textPrimary} size={24} />
+              <Utensils color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.topAction}
-              onPress={() => navigation.navigate('RecipeLibrary', { date: formattedDate })}
+              onPress={() => {
+                const target = getNutritionHomeRecipeLibraryTarget(formattedDate);
+                navigation.navigate(target.screen, target.params);
+              }}
               accessibilityRole="button"
               accessibilityLabel={t('nutrition.recipeLibraryTitle')}
             >

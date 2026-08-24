@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Activity
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, Search, Star, Plus, Info, Flame, Pencil, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Search, Star, Plus, Info, Flame, Pencil, Trash2, ShoppingBasket } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
@@ -39,6 +39,7 @@ import {
   formatNutritionDayDate,
   normalizeNutritionDayRolloverTime,
 } from '../../modules/nutrition/services/nutritionDay';
+import { getRecipeLibraryShoppingListTarget } from './nutritionHeaderActions';
 
 type LibraryTab = 'discover' | 'mine' | 'favorites';
 
@@ -444,7 +445,18 @@ export const RecipeLibraryScreen = () => {
           <Text style={[styles.headerTitle, { color: themeColors.textPrimary }]}>
             {t('nutrition.recipeLibraryTitle')}
           </Text>
-          <View style={styles.backBtn} />
+          <TouchableOpacity
+            onPress={() => {
+              const target = getRecipeLibraryShoppingListTarget(targetDate);
+              navigation.navigate(target.screen, target.params);
+            }}
+            style={styles.backBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('nutrition.shoppingListAccessibility')}
+          >
+            <ShoppingBasket size={22} color={themeColors.textPrimary} strokeWidth={2.3} />
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.tabRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}>
