@@ -4,6 +4,7 @@ import {
   MENU_IMPORT_MEAL_TYPES,
   parseMenuImportJson,
   type MenuImportDocument,
+  type MenuImportMealType,
 } from './menuImportContract';
 import {
   buildMenuImportPreview,
@@ -125,7 +126,7 @@ async function testFourWeeksWithEveryConflictDecision() {
     day.meals.map(meal => ({
       id: `existing-${day.date}-${meal.meal_type}`,
       date: day.date,
-      meal_type: meal.meal_type,
+      meal_type: meal.meal_type as MenuImportMealType,
       name: `Existente ${meal.meal_type}`,
     })),
   );

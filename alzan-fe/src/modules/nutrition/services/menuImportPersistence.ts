@@ -60,23 +60,29 @@ export function createSecureUuidV4(fillRandomValues: SecureRandomValues = getSec
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-const buildMealInsert = (userId: string, mealId: string, meal: MenuImportPreviewMeal): MenuImportMealInsert => ({
-  id: mealId,
-  user_id: userId,
-  date: meal.date,
-  meal_type: meal.meal_type,
-  name: meal.name,
-  kcal: meal.macros.kcal,
-  protein_g: meal.macros.protein_g,
-  carbs_g: meal.macros.carbs_g,
-  fats_g: meal.macros.fats_g,
-  adherence_status: 'done_as_planned',
-  source: 'menu_import_v1',
-  data_quality: 'computed',
-  calc_version: 'nutrition_v1',
-  origin: 'imported',
-  source_recipe_id: null,
-});
+const buildMealInsert = (userId: string, mealId: string, meal: MenuImportPreviewMeal): MenuImportMealInsert => {
+  if (meal.meal_type === 'unspecified') {
+    throw new Error('Menu import contains an unspecified meal type');
+  }
+
+  return {
+    id: mealId,
+    user_id: userId,
+    date: meal.date,
+    meal_type: meal.meal_type,
+    name: meal.name,
+    kcal: meal.macros.kcal,
+    protein_g: meal.macros.protein_g,
+    carbs_g: meal.macros.carbs_g,
+    fats_g: meal.macros.fats_g,
+    adherence_status: 'done_as_planned',
+    source: 'menu_import_v1',
+    data_quality: 'computed',
+    calc_version: 'nutrition_v1',
+    origin: 'imported',
+    source_recipe_id: null,
+  };
+};
 
 const buildMealItemInserts = (
   userId: string,
@@ -114,6 +120,9 @@ const validateMealsToImport = (meals: MenuImportPreviewMeal[]): void => {
   }
 
   for (const meal of meals) {
+    if (meal.meal_type === 'unspecified') {
+      throw new Error('Menu import contains an unspecified meal type');
+    }
     if (meal.conflict !== null && meal.conflict.decision === null) {
       throw new Error('Menu import preview is incomplete');
     }
@@ -150,6 +159,10 @@ export async function executeMenuImport(
 ): Promise<{ createdMealIds: string[]; firstDate: string }> {
   if (userId.trim().length === 0) {
     throw new Error('Authenticated user is required');
+  }
+
+  if (preview.meals.some(meal => meal.meal_type === 'unspecified')) {
+    throw new Error('Menu import contains an unspecified meal type');
   }
 
   validateConflictDecisions(preview.meals);

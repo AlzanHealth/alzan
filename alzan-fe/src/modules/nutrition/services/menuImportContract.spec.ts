@@ -208,6 +208,18 @@ assertFirstError(
   'invalid_meal_type',
   'days[0].meals[0].meal_type',
 );
+assertValid(menu({ days: [day({ meals: [meal({ meal_type: 'unspecified' })] })] }));
+assertFirstError(
+  menu({
+    days: [
+      day({
+        meals: [meal({ meal_type: 'unspecified' }), meal({ meal_type: 'dinner', name: 'Cena' })],
+      }),
+    ],
+  }),
+  'invalid_meal_type',
+  'days[0].meals[0].meal_type',
+);
 assertFirstError(
   menu({ days: [day({ meals: [{ ...meal(), name: undefined } as unknown as MealInput] })] }),
   'missing_field',

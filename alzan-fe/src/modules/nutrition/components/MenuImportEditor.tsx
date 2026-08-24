@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Sparkles } from 'lucide-react-native';
 
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
 import type { TranslationKey } from '../../../i18n/locales/en';
@@ -39,8 +40,11 @@ interface MenuImportEditorProps {
   analysisProgress: MenuImportAnalysisProgress | null;
   isInputDisabled: boolean;
   isAnalyzeDisabled: boolean;
+  isAiLaunching: boolean;
+  isAiDisabled: boolean;
   onChangeText: (value: string) => void;
   onAnalyze: () => void;
+  onOpenWithAi: () => void;
   translate: Translate;
 }
 
@@ -51,8 +55,11 @@ export const MenuImportEditor = memo(function MenuImportEditor({
   analysisProgress,
   isInputDisabled,
   isAnalyzeDisabled,
+  isAiLaunching,
+  isAiDisabled,
   onChangeText,
   onAnalyze,
+  onOpenWithAi,
   translate,
 }: MenuImportEditorProps) {
   const { styles: dynamicStyles, colors } = useNutritionStyles();
@@ -143,6 +150,31 @@ export const MenuImportEditor = memo(function MenuImportEditor({
           </Text>
         </TouchableOpacity>
       )}
+
+      <TouchableOpacity
+        style={[
+          styles.aiButton,
+          {
+            borderColor: isAiDisabled ? colors.disabledButton : colors.primary,
+            backgroundColor: colors.background,
+          },
+        ]}
+        onPress={onOpenWithAi}
+        disabled={isAiDisabled}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={translate('nutrition.menuImportOpenWithAiAccessibility')}
+        accessibilityState={{ busy: isAiLaunching, disabled: isAiDisabled }}
+      >
+        {isAiLaunching ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <Sparkles size={19} color={isAiDisabled ? colors.textSecondary : colors.primary} strokeWidth={2.2} />
+        )}
+        <Text style={[styles.aiButtonText, { color: isAiDisabled ? colors.textSecondary : colors.primary }]}>
+          {translate(isAiLaunching ? 'nutrition.menuImportAiLoadingCatalog' : 'nutrition.menuImportOpenWithAi')}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 });
@@ -198,6 +230,22 @@ const styles = StyleSheet.create({
   },
   analyzeButtonText: {
     fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  aiButton: {
+    minHeight: 48,
+    marginTop: 10,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  aiButtonText: {
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
   },

@@ -47,7 +47,7 @@ assert.match(csv, /"legs\nquads"/);
 assert.ok(csv.includes(',true'), 'custom exercises must be represented without owner data');
 
 const clipboardCsv = serializeTrainingExerciseAiClipboardCsv(catalog);
-assert.match(clipboardCsv, /^exercises_rows\nexercise_name_es,primary_muscle,equipment\n/);
+assert.match(clipboardCsv, /^ejercicios\.csv\nexercises_rows\nexercise_name_es,primary_muscle,equipment\n/);
 assert.ok(clipboardCsv.includes('"Press, inclinado",chest,barbell'));
 assert.ok(clipboardCsv.includes('Sentadilla catálogo privada,"legs\nquads",'));
 assert.ok(

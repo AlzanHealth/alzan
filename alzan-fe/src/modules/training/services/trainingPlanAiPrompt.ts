@@ -75,7 +75,7 @@ export const serializeTrainingExerciseAiClipboardCsv = (catalog: TrainingExercis
     [exercise.exercise_name_es, exercise.primary_muscle, exercise.equipment].map(escapeCsvCell).join(','),
   );
 
-  return ['exercises_rows', AI_CLIPBOARD_CATALOG_HEADERS.join(','), ...rows].join('\n');
+  return ['ejercicios.csv', 'exercises_rows', AI_CLIPBOARD_CATALOG_HEADERS.join(','), ...rows].join('\n');
 };
 
 export const buildTrainingPlanAiPrompt = (catalog: TrainingExerciseAiCatalogRow[]): string => {

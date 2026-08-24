@@ -7,6 +7,7 @@ import { formatLocalizedDate } from '../../../i18n/dateLocale';
 import type { TranslationKey } from '../../../i18n/locales/en';
 import { borderRadius } from '../../../theme';
 import { MEAL_TYPE_LABELS } from '../constants';
+import { MENU_IMPORT_MEAL_TYPES, type MenuImportMealType } from '../services/menuImportContract';
 import type {
   MenuImportConflictDecision,
   MenuImportIngredientCandidate,
@@ -20,6 +21,7 @@ interface MenuImportMealCardProps {
   candidatesByIngredient: ReadonlyMap<string, MenuImportIngredientCandidate[]>;
   onSelectIngredient: (ingredientKey: string, ingredientId: string) => void;
   onSetConflictDecision: (mealKey: string, decision: MenuImportConflictDecision) => void;
+  onSetMealType: (mealKey: string, mealType: MenuImportMealType) => void;
   translate: Translate;
 }
 
@@ -37,6 +39,7 @@ export const MenuImportMealCard = memo(function MenuImportMealCard({
   candidatesByIngredient,
   onSelectIngredient,
   onSetConflictDecision,
+  onSetMealType,
   translate,
 }: MenuImportMealCardProps) {
   const { styles: dynamicStyles, colors } = useNutritionStyles();
@@ -58,9 +61,11 @@ export const MenuImportMealCard = memo(function MenuImportMealCard({
         <View style={styles.headingCopy}>
           <Text style={[styles.date, { color: colors.textSecondary }]}>{formattedDate}</Text>
           <Text style={[styles.title, { color: colors.textPrimary }]}>{meal.name}</Text>
-          <Text style={[styles.mealType, { color: colors.primary }]}>
-            {translate(MEAL_TYPE_LABELS[meal.meal_type])}
-          </Text>
+          {meal.meal_type !== 'unspecified' ? (
+            <Text style={[styles.mealType, { color: colors.primary }]}>
+              {translate(MEAL_TYPE_LABELS[meal.meal_type])}
+            </Text>
+          ) : null}
         </View>
         <Text style={[styles.macros, { color: colors.textSecondary }]}>
           {translate('nutrition.menuImportMacros', {
@@ -71,6 +76,38 @@ export const MenuImportMealCard = memo(function MenuImportMealCard({
           })}
         </Text>
       </View>
+
+      {meal.meal_type === 'unspecified' ? (
+        <View
+          style={[styles.mealTypeRequired, { backgroundColor: colors.warning + '14', borderColor: colors.warning }]}
+        >
+          <Text style={[styles.mealTypeRequiredTitle, { color: colors.textPrimary }]}>
+            {translate('nutrition.menuImportMealTypeRequiredTitle')}
+          </Text>
+          <Text style={[styles.mealTypeRequiredHelp, { color: colors.textSecondary }]}>
+            {translate('nutrition.menuImportMealTypeRequiredHelp')}
+          </Text>
+          <View style={styles.mealTypeOptions}>
+            {MENU_IMPORT_MEAL_TYPES.map(mealType => (
+              <TouchableOpacity
+                key={mealType}
+                style={[styles.mealTypeButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => onSetMealType(meal.key, mealType)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={translate('nutrition.menuImportMealTypeAccessibility', {
+                  meal: meal.name,
+                  type: translate(MEAL_TYPE_LABELS[mealType]),
+                })}
+              >
+                <Text style={[styles.mealTypeButtonText, { color: colors.textPrimary }]}>
+                  {translate(MEAL_TYPE_LABELS[mealType])}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -227,6 +264,40 @@ const styles = StyleSheet.create({
   macros: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  mealTypeRequired: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    padding: 12,
+  },
+  mealTypeRequiredTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  mealTypeRequiredHelp: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  mealTypeOptions: {
+    marginTop: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mealTypeButton: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mealTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   divider: {
     height: StyleSheet.hairlineWidth,

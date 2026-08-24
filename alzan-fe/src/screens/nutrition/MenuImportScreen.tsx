@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,8 +18,11 @@ import { Alert } from '../../components/common/Alert';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import type { TranslationKey } from '../../i18n/locales/en';
 import { MenuImportEditor } from '../../modules/nutrition/components/MenuImportEditor';
+import { MenuImportAiProviderSheet } from '../../modules/nutrition/components/MenuImportAiProviderSheet';
 import { MenuImportPreview } from '../../modules/nutrition/components/MenuImportPreview';
 import { useMenuImport } from '../../modules/nutrition/hooks/useMenuImport';
+import { useMenuImportAi } from '../../modules/nutrition/hooks/useMenuImportAi';
+import type { MenuImportAiProvider } from '../../modules/nutrition/services/menuImportAiProvider';
 import { MENU_IMPORT_CLIPBOARD_TEXT } from '../../modules/nutrition/services/menuImportTemplate';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import type { NutritionScreenNavigationProp } from '../../types/navigation.types';
@@ -49,6 +52,7 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
 export const MenuImportScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
+  const [isAiSheetVisible, setIsAiSheetVisible] = useState(false);
   const { topFromScreenBottom } = useTabBarLayout();
   const { styles: dynamicStyles, colors } = useNutritionStyles();
   const {
@@ -66,7 +70,9 @@ export const MenuImportScreen = () => {
     importMenu,
     selectIngredient,
     setConflictDecision,
+    setMealType,
   } = useMenuImport();
+  const { isLaunching: isLaunchingAi, launchWithAi } = useMenuImportAi();
 
   const translate = useCallback(
     (key: TranslationKey, options?: TranslationOptions): string => String(t(key, options)),
@@ -120,6 +126,29 @@ export const MenuImportScreen = () => {
     }
   }, [translate]);
 
+  const handleAiProvider = useCallback(
+    async (provider: MenuImportAiProvider) => {
+      const result = await launchWithAi(provider);
+      if (result.ok) {
+        setIsAiSheetVisible(false);
+        return;
+      }
+
+      const messageKey: TranslationKey =
+        result.kind === 'catalog-error'
+          ? 'nutrition.menuImportAiCatalogError'
+          : result.kind === 'clipboard-error'
+            ? 'nutrition.menuImportAiClipboardError'
+            : 'nutrition.menuImportAiOpenError';
+      Alert.alert(translate('common.error'), translate(messageKey));
+    },
+    [launchWithAi, translate],
+  );
+
+  const handleOpenWithAi = useCallback(() => {
+    setIsAiSheetVisible(true);
+  }, []);
+
   const editor = useMemo(
     () => (
       <MenuImportEditor
@@ -128,13 +157,27 @@ export const MenuImportScreen = () => {
         isAnalyzing={isAnalyzing}
         analysisProgress={analysisProgress}
         isInputDisabled={isLoading}
-        isAnalyzeDisabled={isLoading || rawJson.length === 0}
+        isAnalyzeDisabled={isLoading || isLaunchingAi || rawJson.length === 0}
+        isAiLaunching={isLaunchingAi}
+        isAiDisabled={isLoading || isLaunchingAi}
         onChangeText={setRawJson}
         onAnalyze={handleAnalyzePress}
+        onOpenWithAi={handleOpenWithAi}
         translate={translate}
       />
     ),
-    [analysisProgress, handleAnalyzePress, isAnalyzing, isLoading, rawJson, setRawJson, translate, validationErrors],
+    [
+      analysisProgress,
+      handleAnalyzePress,
+      handleOpenWithAi,
+      isAnalyzing,
+      isLaunchingAi,
+      isLoading,
+      rawJson,
+      setRawJson,
+      translate,
+      validationErrors,
+    ],
   );
 
   return (
@@ -205,10 +248,17 @@ export const MenuImportScreen = () => {
             onImport={handleImportPress}
             onSelectIngredient={selectIngredient}
             onSetConflictDecision={setConflictDecision}
+            onSetMealType={setMealType}
             translate={translate}
           />
         </KeyboardAvoidingView>
       </SafeAreaView>
+      <MenuImportAiProviderSheet
+        visible={isAiSheetVisible}
+        isLoading={isLaunchingAi}
+        onClose={() => setIsAiSheetVisible(false)}
+        onSelect={provider => void handleAiProvider(provider)}
+      />
     </LinearGradient>
   );
 };

@@ -7,6 +7,7 @@ import {
   resolveMenuImportIngredients,
   selectMenuImportIngredient,
   setMenuImportConflictDecision,
+  setMenuImportMealType,
 } from './menuImportPlanner';
 
 const banana: MenuImportIngredientCandidate = {
@@ -396,6 +397,35 @@ async function testIgnoredMealsDoNotRequireIngredientResolution() {
   assert.equal(isMenuImportPreviewReady(ignored), true);
 }
 
+async function testUnspecifiedMealRequiresSelectionAndRecalculatesConflict() {
+  const document = createDocument(['Arroz integral']);
+  document.days[0].meals[0].meal_type = 'unspecified';
+  const resolutions = await resolveMenuImportIngredients(document, async () => [rice]);
+  const existingDinner = {
+    id: 'existing-dinner',
+    date: '2026-08-03',
+    meal_type: 'dinner' as const,
+    name: 'Cena existente',
+  };
+  const preview = buildMenuImportPreview(document, resolutions, [existingDinner], calendarSnapshot);
+
+  assert.equal(preview.meals[0].meal_type, 'unspecified');
+  assert.equal(preview.meals[0].conflict, null);
+  assert.equal(isMenuImportPreviewReady(preview), false);
+
+  const selected = setMenuImportMealType(preview, preview.meals[0].key, 'dinner');
+  assert.equal(selected.meals[0].meal_type, 'dinner');
+  assert.deepEqual(
+    selected.meals[0].conflict?.existingLogs.map(log => log.id),
+    ['existing-dinner'],
+  );
+  assert.equal(selected.meals[0].conflict?.decision, null);
+  assert.equal(isMenuImportPreviewReady(selected), false);
+
+  const decided = setMenuImportConflictDecision(selected, selected.meals[0].key, 'keep_both');
+  assert.equal(isMenuImportPreviewReady(decided), true);
+}
+
 async function main() {
   await testUniqueSearchAndExactSelection();
   await testRejectsMalformedNutritionCandidates();
@@ -407,6 +437,7 @@ async function main() {
   await testReadinessRequiresResolutionAndConflictDecision();
   await testConflictDecisionAppliesToEveryMealInTheSameSlot();
   await testIgnoredMealsDoNotRequireIngredientResolution();
+  await testUnspecifiedMealRequiresSelectionAndRecalculatesConflict();
   console.log('menuImportPlanner: all assertions passed');
 }
 

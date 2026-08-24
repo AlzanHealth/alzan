@@ -67,6 +67,7 @@ const createMeal = (
 
 const createPreview = (meals: MenuImportPreviewMeal[]): MenuImportPreview => ({
   menuName: 'Menu persistence test',
+  existingLogs: [],
   calendarSnapshot: {
     token: '0123456789abcdef0123456789abcdef',
     dates: Array.from(new Set(meals.map(meal => meal.date))).sort(),
@@ -176,6 +177,13 @@ async function testRejectsInvalidPreviewsWithoutCallingPersistence() {
     { message: 'Menu import contains conflicting decisions for the same time slot' },
   );
   assert.equal(contradictoryAdapter.calls.length, 0);
+
+  const unspecifiedAdapter = new InMemoryAdapter();
+  const unspecifiedMeal = { ...createMeal('unspecified', '2026-08-03'), meal_type: 'unspecified' as const };
+  await assert.rejects(executeWithTestIds('user-1', createPreview([unspecifiedMeal]), unspecifiedAdapter), {
+    message: 'Menu import contains an unspecified meal type',
+  });
+  assert.equal(unspecifiedAdapter.calls.length, 0);
 }
 
 async function testSupportsMaximumIngredientPayload() {

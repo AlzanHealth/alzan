@@ -1,4 +1,4 @@
-import { MenuImportDocument, MenuImportMealType } from './menuImportContract';
+import { MenuImportDocument, MenuImportMealType, MenuImportMealTypeInput } from './menuImportContract';
 
 export type MenuImportConflictDecision = 'replace' | 'keep_both' | 'ignore';
 
@@ -53,7 +53,7 @@ export type MenuImportMealConflict = {
 export type MenuImportPreviewMeal = {
   key: string;
   date: string;
-  meal_type: MenuImportMealType;
+  meal_type: MenuImportMealTypeInput;
   name: string;
   ingredients: MenuImportPreviewIngredient[];
   macros: MenuImportMacros;
@@ -63,6 +63,7 @@ export type MenuImportPreviewMeal = {
 export type MenuImportPreview = {
   menuName: string;
   calendarSnapshot: MenuImportCalendarSnapshotRef;
+  existingLogs: MenuImportExistingLog[];
   resolutions: MenuImportIngredientResolution[];
   meals: MenuImportPreviewMeal[];
 };
@@ -94,7 +95,7 @@ const normalizeIngredientName = (name: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
-const getMealSlotKey = (date: string, mealType: MenuImportMealType): string => `${date}:${mealType}`;
+const getMealSlotKey = (date: string, mealType: MenuImportMealTypeInput): string => `${date}:${mealType}`;
 
 const getUniqueIngredientNames = (document: MenuImportDocument): Map<string, string> => {
   const names = new Map<string, string>();
@@ -244,9 +245,12 @@ export function buildMenuImportPreview(
         const ingredientKey = normalizeIngredientName(ingredient.name);
         return buildPreviewIngredient(ingredient.name, ingredient.quantity_g, resolutionsByKey.get(ingredientKey));
       });
-      const conflictingLogs = existingLogs.filter(
-        existingLog => existingLog.date === day.date && existingLog.meal_type === meal.meal_type,
-      );
+      const conflictingLogs =
+        meal.meal_type === 'unspecified'
+          ? []
+          : existingLogs.filter(
+              existingLog => existingLog.date === day.date && existingLog.meal_type === meal.meal_type,
+            );
 
       meals.push({
         key: `days[${dayIndex}].meals[${mealIndex}]`,
@@ -263,9 +267,34 @@ export function buildMenuImportPreview(
   return {
     menuName: document.menu_name,
     calendarSnapshot,
+    existingLogs,
     resolutions,
     meals,
   };
+}
+
+export function setMenuImportMealType(
+  preview: MenuImportPreview,
+  mealKey: string,
+  mealType: MenuImportMealType,
+): MenuImportPreview {
+  const selectedMeal = preview.meals.find(meal => meal.key === mealKey);
+  if (!selectedMeal) return preview;
+
+  const conflictingLogs = preview.existingLogs.filter(
+    existingLog => existingLog.date === selectedMeal.date && existingLog.meal_type === mealType,
+  );
+  const meals = preview.meals.map(meal =>
+    meal.key === mealKey
+      ? {
+          ...meal,
+          meal_type: mealType,
+          conflict: conflictingLogs.length > 0 ? { existingLogs: conflictingLogs, decision: null } : null,
+        }
+      : meal,
+  );
+
+  return { ...preview, meals };
 }
 
 export function selectMenuImportIngredient(
@@ -338,6 +367,7 @@ export function setMenuImportConflictDecision(
 }
 
 export function isMenuImportPreviewReady(preview: MenuImportPreview): boolean {
+  const everyMealTypeIsResolved = preview.meals.every(meal => meal.meal_type !== 'unspecified');
   const everyIngredientIsResolved = preview.meals.every(meal =>
     meal.conflict?.decision === 'ignore'
       ? true
@@ -347,5 +377,5 @@ export function isMenuImportPreviewReady(preview: MenuImportPreview): boolean {
     meal => meal.conflict === null || meal.conflict.decision !== null,
   );
 
-  return everyIngredientIsResolved && everyConflictHasDecision;
+  return everyMealTypeIsResolved && everyIngredientIsResolved && everyConflictHasDecision;
 }

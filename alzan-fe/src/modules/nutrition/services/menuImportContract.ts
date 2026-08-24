@@ -5,8 +5,10 @@ export const MENU_IMPORT_MAX_TEXT_LENGTH = 500_000;
 export const MENU_IMPORT_MAX_TOTAL_INGREDIENTS = 3_000;
 export const MENU_IMPORT_MAX_UNIQUE_INGREDIENTS = 500;
 export const MENU_IMPORT_MEAL_TYPES = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'] as const;
+export const MENU_IMPORT_UNSPECIFIED_MEAL_TYPE = 'unspecified' as const;
 
 export type MenuImportMealType = (typeof MENU_IMPORT_MEAL_TYPES)[number];
+export type MenuImportMealTypeInput = MenuImportMealType | typeof MENU_IMPORT_UNSPECIFIED_MEAL_TYPE;
 
 export type MenuImportIngredient = {
   name: string;
@@ -14,7 +16,7 @@ export type MenuImportIngredient = {
 };
 
 export type MenuImportMeal = {
-  meal_type: MenuImportMealType;
+  meal_type: MenuImportMealTypeInput;
   name: string;
   ingredients: MenuImportIngredient[];
 };
@@ -70,7 +72,7 @@ const ROOT_KEYS = ['format', 'version', 'menu_name', 'days'];
 const DAY_KEYS = ['date', 'weekday', 'meals'];
 const MEAL_KEYS = ['meal_type', 'name', 'ingredients'];
 const INGREDIENT_KEYS = ['name', 'quantity_g'];
-const MEAL_TYPE_VALUES: ReadonlySet<string> = new Set(MENU_IMPORT_MEAL_TYPES);
+const MEAL_TYPE_VALUES: ReadonlySet<string> = new Set([...MENU_IMPORT_MEAL_TYPES, MENU_IMPORT_UNSPECIFIED_MEAL_TYPE]);
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const WEEKDAY_ALIASES: Record<string, string> = {
   domingo: 'domingo',
@@ -163,7 +165,7 @@ const isIsoDate = (value: string): boolean => {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
 
-const isMenuImportMealType = (value: string): value is MenuImportMealType => MEAL_TYPE_VALUES.has(value);
+const isMenuImportMealTypeInput = (value: string): value is MenuImportMealTypeInput => MEAL_TYPE_VALUES.has(value);
 
 const parseIngredient = (value: unknown, path: string, context: ValidationContext): MenuImportIngredient | null => {
   if (!isRecord(value)) {
@@ -201,12 +203,12 @@ const parseMeal = (value: unknown, path: string, context: ValidationContext): Me
   addUnknownPropertyErrors(value, MEAL_KEYS, path, context);
 
   const rawMealType = value.meal_type;
-  let mealType: MenuImportMealType | null = null;
+  let mealType: MenuImportMealTypeInput | null = null;
   if (rawMealType === undefined) {
     addError(context, 'missing_field', `${path}.meal_type`, 'Required field is missing');
   } else if (typeof rawMealType !== 'string') {
     addError(context, 'invalid_type', `${path}.meal_type`, 'Expected a string');
-  } else if (!isMenuImportMealType(rawMealType)) {
+  } else if (!isMenuImportMealTypeInput(rawMealType)) {
     addError(context, 'invalid_meal_type', `${path}.meal_type`, 'Unknown meal type');
   } else {
     mealType = rawMealType;
@@ -368,6 +370,21 @@ const parseDocument = (value: unknown, context: ValidationContext): MenuImportDo
         days.push(parsedDay);
       }
     });
+    const meals = days.flatMap(day => day.meals);
+    if (meals.length !== 1) {
+      days.forEach((day, dayIndex) => {
+        day.meals.forEach((meal, mealIndex) => {
+          if (meal.meal_type === MENU_IMPORT_UNSPECIFIED_MEAL_TYPE) {
+            addError(
+              context,
+              'invalid_meal_type',
+              `days[${dayIndex}].meals[${mealIndex}].meal_type`,
+              'Unspecified meal type is only allowed for a single meal',
+            );
+          }
+        });
+      });
+    }
     if (days.length > 1) {
       const sortedDates = days.map(day => day.date).sort();
       const firstDate = new Date(`${sortedDates[0]}T00:00:00.000Z`).getTime();

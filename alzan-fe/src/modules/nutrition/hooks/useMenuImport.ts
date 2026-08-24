@@ -3,7 +3,11 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../../../context/AuthContext';
 import { searchIngredients } from '../../../services/ingredientsService';
-import { parseMenuImportJson, type MenuImportValidationError } from '../services/menuImportContract';
+import {
+  parseMenuImportJson,
+  type MenuImportMealType,
+  type MenuImportValidationError,
+} from '../services/menuImportContract';
 import {
   createSupabaseMenuImportAdapter,
   executeMenuImport,
@@ -16,6 +20,7 @@ import {
   resolveMenuImportIngredients,
   selectMenuImportIngredient,
   setMenuImportConflictDecision,
+  setMenuImportMealType,
   type MenuImportConflictDecision,
   type MenuImportIngredientProgress,
   type MenuImportPreview,
@@ -149,6 +154,10 @@ export function useMenuImport() {
     setPreview(current => (current === null ? current : setMenuImportConflictDecision(current, mealKey, decision)));
   }, []);
 
+  const setMealType = useCallback((mealKey: string, mealType: MenuImportMealType) => {
+    setPreview(current => (current === null ? current : setMenuImportMealType(current, mealKey, mealType)));
+  }, []);
+
   const hasMealToImport =
     preview?.meals.some(meal => meal.conflict === null || meal.conflict.decision !== 'ignore') ?? false;
   const canImport =
@@ -210,5 +219,6 @@ export function useMenuImport() {
     importMenu,
     selectIngredient,
     setConflictDecision,
+    setMealType,
   };
 }

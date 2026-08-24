@@ -10,6 +10,7 @@ import type {
   MenuImportPreview as MenuImportPreviewData,
   MenuImportPreviewMeal,
 } from '../services/menuImportPlanner';
+import type { MenuImportMealType } from '../services/menuImportContract';
 import { MenuImportMealCard } from './MenuImportMealCard';
 
 type Translate = (key: TranslationKey, options?: Record<string, unknown>) => string;
@@ -24,6 +25,7 @@ interface MenuImportPreviewProps {
   onImport: () => void;
   onSelectIngredient: (ingredientKey: string, ingredientId: string) => void;
   onSetConflictDecision: (mealKey: string, decision: MenuImportConflictDecision) => void;
+  onSetMealType: (mealKey: string, mealType: MenuImportMealType) => void;
   translate: Translate;
 }
 
@@ -37,6 +39,7 @@ export const MenuImportPreview = memo(function MenuImportPreview({
   onImport,
   onSelectIngredient,
   onSetConflictDecision,
+  onSetMealType,
   translate,
 }: MenuImportPreviewProps) {
   const { styles: dynamicStyles, colors } = useNutritionStyles();
@@ -53,10 +56,11 @@ export const MenuImportPreview = memo(function MenuImportPreview({
         candidatesByIngredient={candidatesByIngredient}
         onSelectIngredient={onSelectIngredient}
         onSetConflictDecision={onSetConflictDecision}
+        onSetMealType={onSetMealType}
         translate={translate}
       />
     ),
-    [candidatesByIngredient, onSelectIngredient, onSetConflictDecision, translate],
+    [candidatesByIngredient, onSelectIngredient, onSetConflictDecision, onSetMealType, translate],
   );
 
   const listHeader = useMemo(
