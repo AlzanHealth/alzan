@@ -172,7 +172,7 @@ export const MenuImportEditor = memo(function MenuImportEditor({
           <Sparkles size={19} color={isAiDisabled ? colors.textSecondary : colors.primary} strokeWidth={2.2} />
         )}
         <Text style={[styles.aiButtonText, { color: isAiDisabled ? colors.textSecondary : colors.primary }]}>
-          {translate(isAiLaunching ? 'nutrition.menuImportAiLoadingCatalog' : 'nutrition.menuImportOpenWithAi')}
+          {translate(isAiLaunching ? 'nutrition.menuImportAiPreparing' : 'nutrition.menuImportOpenWithAi')}
         </Text>
       </TouchableOpacity>
     </View>

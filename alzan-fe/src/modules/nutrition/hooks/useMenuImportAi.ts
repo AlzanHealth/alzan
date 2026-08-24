@@ -53,7 +53,6 @@ export const useMenuImportAi = () => {
 
         const prompt = buildMenuImportAiPrompt({
           currentDate: format(new Date(), 'yyyy-MM-dd'),
-          ingredientCount: catalog.length,
         });
         const target = buildMenuImportAiLaunchTarget(provider, prompt);
 

@@ -3,18 +3,15 @@ import { MENU_IMPORT_TEMPLATE } from './menuImportTemplate';
 
 export type MenuImportAiPromptOptions = {
   currentDate: string;
-  ingredientCount: number;
 };
 
 export const buildMenuImportAiPrompt = ({
   currentDate,
-  ingredientCount,
 }: MenuImportAiPromptOptions): string => `Convierte comidas o menús en un JSON alzan-menu-plan v1 listo para importar.
 
 CONTEXTO
 - La fecha local actual es ${currentDate}.
-- El catálogo actualizado de ${ingredientCount} ingredientes se pegará después como ingredientes.csv, en una sección llamada ingredients_rows.
-- Tras recibir el catálogo, espera a que el usuario escriba una comida, adjunte una fotografía, pegue una receta o aporte un menú completo.
+- Espera a que el usuario escriba una comida, adjunte una fotografía, pegue una receta o aporte un menú completo.
 
 ENTRADAS POSIBLES
 - Una única comida escrita con o sin cantidades.
@@ -23,11 +20,10 @@ ENTRADAS POSIBLES
 - Un menú completo y extenso de hasta ${MENU_IMPORT_MAX_DAYS} días.
 
 INGREDIENTES Y CANTIDADES
-- Para cada ingrediente usa exactamente name_es de una fila real de ingredients_rows. No inventes nombres ni IDs.
-- Usa name_en, category, unit_basis y los valores por 100 g solo para distinguir candidatos; en el JSON devuelve únicamente name y quantity_g.
+- Para cada ingrediente usa el nombre más claro y común en español. No inventes alimentos ni IDs.
 - Conserva toda cantidad explícita. Si no hay cantidad, estima una cantidad razonable en gramos.
 - No añadas alimentos que no estén visibles, escritos o incluidos en la receta.
-- Si ningún nombre del catálogo conserva con seguridad la identidad del alimento, devuelve un informe de bloqueo que identifique el ingrediente; no inventes una coincidencia.
+- Si no puedes identificar con seguridad un alimento, devuelve un informe de bloqueo que identifique el ingrediente; no inventes una coincidencia.
 
 FECHAS Y TIPO DE COMIDA
 - Si la entrada contiene exactamente una comida y no indica fecha, usa ${currentDate}.
@@ -53,7 +49,6 @@ PLANTILLA
 ${MENU_IMPORT_TEMPLATE.trim()}
 
 PASOS PARA EL USUARIO
-1. El catálogo ingredientes.csv ya está copiado. Pégalo aquí con Ctrl+V o Cmd+V.
-2. Debajo escribe tu comida o menú, o adjunta una foto o documento.
-3. Envía el mensaje manualmente.
+1. Escribe tu comida o menú, o adjunta una foto o documento.
+2. Envía el mensaje manualmente.
 `;

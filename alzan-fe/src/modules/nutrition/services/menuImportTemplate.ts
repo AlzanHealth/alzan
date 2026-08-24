@@ -33,7 +33,6 @@ export const MENU_IMPORT_PROMPT = `Convierte el DOCX de nutrición adjunto en un
 
 ARCHIVOS
 - Usa como fuente principal el DOCX que contiene el plan de nutrición y léelo completo, aunque tenga otro nombre.
-- Usa el CSV adjunto de ingredientes (puede llamarse ingredients_rows.csv, ingredients_rows o similar) solo para resolver nombres canónicos.
 - Si también hay un DOCX de entrenamiento o un CSV de ejercicios, ignóralos por completo. No bloquees por la ausencia de un DOCX de entrenamiento, exercises_rows o cualquier otro archivo que no sea necesario para nutrición.
 
 SALIDA
@@ -57,13 +56,12 @@ FIDELIDAD
 - No diseñes, optimices, corrijas raciones, mezcles recetas ni añadas comidas o ingredientes.
 - Expande las recetas del documento; no conviertas una lista de la compra en una comida.
 - Conserva el texto de alternativas y condiciones en el nombre de la comida solo cuando forme parte de la asignación del día; no combines alternativas ni elijas una por tu cuenta.
-- Convierte unidades a gramos solo con una equivalencia explícita del DOCX o del CSV. Para intervalos, usa un único número únicamente si el DOCX fija cuál corresponde a ese día; no uses medias, extremos ni estimaciones.
+- Convierte unidades a gramos solo con una equivalencia explícita del DOCX. Para intervalos, usa un único número únicamente si el DOCX fija cuál corresponde a ese día; no uses medias, extremos ni estimaciones.
 - Si una comida no tiene una opción o cantidad única explícita y no puede representarse con quantity_g sin inventar, no fabriques datos: devuelve un informe de bloqueo que indique la fecha y la comida concretas. No bloquees todo el menú por documentos de entrenamiento irrelevantes.
 
 INGREDIENTES
-- Busca primero coincidencia exacta normalizada en el CSV y copia su nombre canónico.
-- Si no existe, elige automáticamente el nombre canónico más parecido del CSV (el ingrediente más parecido), priorizando que conserve el alimento, estado (crudo/cocido/escurrido), categoría y unidad. Acepta diferencias de ortografía, acentos, singular/plural, sinónimos y variantes de nombre sin bloquear por diferencias de ortografía. No confundas alimentos distintos.
-- No bloquees por una coincidencia no exacta: bloquea únicamente si ningún ingrediente del CSV conserva la identidad del alimento. Conserva siempre la cantidad original.
+- Conserva el nombre del ingrediente tal como aparece en el documento y no inventes alimentos distintos. Acepta diferencias de ortografía, acentos, singular/plural y sinónimos sin cambiar la identidad del alimento.
+- Conserva siempre la cantidad original.
 - Mantén meal_type entre breakfast, almuerzo, lunch, merienda, dinner y snack.
 - No inventes nombres, IDs, calorías ni macronutrientes. No superes ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} ingredientes totales ni ${MENU_IMPORT_MAX_UNIQUE_INGREDIENTS} nombres distintos.
 

@@ -45,7 +45,7 @@ export const MenuImportAiProviderSheet = ({
             <View style={styles.headerCopy}>
               <Text style={[styles.title, { color: colors.textPrimary }]}>{t('nutrition.menuImportAiSheetTitle')}</Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                {isLoading ? t('nutrition.menuImportAiLoadingCatalog') : t('nutrition.menuImportAiSheetSubtitle')}
+                {isLoading ? t('nutrition.menuImportAiPreparing') : t('nutrition.menuImportAiSheetSubtitle')}
               </Text>
             </View>
             <TouchableOpacity
