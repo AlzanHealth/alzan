@@ -12,13 +12,16 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, Copy, Dumbbell, Upload } from 'lucide-react-native';
+import { ChevronLeft, Copy, Dumbbell, Sparkles, Upload } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
 import { GlassCard } from '../../components/GlassCard';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTrainingPlanImport } from '../../hooks/useTrainingPlanImport';
+import { useTrainingPlanAi } from '../../modules/training/hooks/useTrainingPlanAi';
+import { TrainingAiProviderSheet } from './components/TrainingAiProviderSheet';
+import type { TrainingAiProvider } from '../../modules/training/services/trainingPlanAiProvider';
 import {
   TRAINING_PLAN_IMPORT_TEMPLATE,
   TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT,
@@ -51,6 +54,8 @@ export const TrainingPlanImportScreen = () => {
   const showCopyLabel = width >= 720;
   const [isCopyingTemplate, setIsCopyingTemplate] = useState(false);
   const isCopyingTemplateRef = useRef(false);
+  const [isAiSheetVisible, setIsAiSheetVisible] = useState(false);
+  const { isLaunching: isLaunchingAi, launchWithAi } = useTrainingPlanAi();
   const {
     rawJson,
     setRawJson,
@@ -85,6 +90,29 @@ export const TrainingPlanImportScreen = () => {
   const handleAnalyze = useCallback(async () => {
     await analyze();
   }, [analyze]);
+
+  const handleAiProvider = useCallback(
+    async (provider: TrainingAiProvider) => {
+      const result = await launchWithAi(provider);
+      if (!result.ok) {
+        const messageKey =
+          result.kind === 'catalog-error'
+            ? 'training.trainingAiCatalogError'
+            : result.kind === 'clipboard-error'
+              ? 'training.trainingAiClipboardError'
+              : 'training.trainingAiOpenError';
+        Alert.alert(t('common.error'), t(messageKey));
+        return;
+      }
+
+      setIsAiSheetVisible(false);
+      Alert.alert(
+        t('common.done'),
+        t(result.mode === 'prefilled' ? 'training.trainingAiOpenedPrefilled' : 'training.trainingAiOpenedClipboard'),
+      );
+    },
+    [launchWithAi, t],
+  );
 
   const handleImport = useCallback(async () => {
     const result = await importPlan();
@@ -215,6 +243,28 @@ export const TrainingPlanImportScreen = () => {
                 </View>
               </View>
             )}
+            <TouchableOpacity
+              onPress={() => setIsAiSheetVisible(true)}
+              disabled={isLaunchingAi || isAnalyzing || isImporting}
+              style={[
+                styles.aiButton,
+                {
+                  borderColor: colors.primary,
+                  backgroundColor: dynamicStyles.secondaryButton.backgroundColor,
+                  opacity: isLaunchingAi || isAnalyzing || isImporting ? 0.5 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.openTrainingWithAi')}
+              accessibilityState={{ disabled: isLaunchingAi || isAnalyzing || isImporting, busy: isLaunchingAi }}
+            >
+              {isLaunchingAi ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Sparkles size={18} color={colors.primary} strokeWidth={2.4} />
+              )}
+              <Text style={[styles.aiButtonText, { color: colors.primary }]}>{t('training.openTrainingWithAi')}</Text>
+            </TouchableOpacity>
           </GlassCard>
 
           {document && (
@@ -269,6 +319,12 @@ export const TrainingPlanImportScreen = () => {
             </GlassCard>
           )}
         </ScrollView>
+        <TrainingAiProviderSheet
+          visible={isAiSheetVisible}
+          isLoading={isLaunchingAi}
+          onClose={() => setIsAiSheetVisible(false)}
+          onSelect={handleAiProvider}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -318,6 +374,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  aiButton: {
+    minHeight: 52,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    marginTop: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  aiButtonText: { fontSize: 16, fontWeight: '800' },
   progressBlock: { marginTop: 12, gap: 7 },
   progressLabel: { fontSize: 13, fontWeight: '600' },
   importProgress: { marginTop: 14, gap: 7 },
