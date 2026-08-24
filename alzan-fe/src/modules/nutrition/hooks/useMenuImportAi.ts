@@ -8,6 +8,7 @@ import { serializeMenuImportAiIngredientCsv } from '../services/menuImportAiCata
 import { fetchMenuImportAiIngredientCatalog } from '../services/menuImportAiCatalogService';
 import { buildMenuImportAiPrompt } from '../services/menuImportAiPrompt';
 import {
+  buildMenuImportAiClipboardText,
   buildMenuImportAiLaunchTarget,
   type MenuImportAiLaunchResult,
   type MenuImportAiProvider,
@@ -50,21 +51,18 @@ export const useMenuImportAi = () => {
           return { ok: false, kind: 'catalog-error' };
         }
 
-        try {
-          await copyTextToClipboard(serializeMenuImportAiIngredientCsv(catalog));
-        } catch {
-          reservedWindow?.close();
-          return { ok: false, kind: 'clipboard-error' };
-        }
-
         const prompt = buildMenuImportAiPrompt({
           currentDate: format(new Date(), 'yyyy-MM-dd'),
           ingredientCount: catalog.length,
         });
         const target = buildMenuImportAiLaunchTarget(provider, prompt);
-        if (!target) {
+
+        try {
+          const ingredientCsv = serializeMenuImportAiIngredientCsv(catalog);
+          await copyTextToClipboard(buildMenuImportAiClipboardText(target, prompt, ingredientCsv));
+        } catch {
           reservedWindow?.close();
-          return { ok: false, kind: 'open-error' };
+          return { ok: false, kind: 'clipboard-error' };
         }
 
         try {

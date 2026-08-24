@@ -1,4 +1,5 @@
 import {
+  buildAiClipboardText,
   buildTrainingAiLaunchTarget,
   type TrainingAiLaunchResult,
   type TrainingAiProvider,
@@ -8,3 +9,4 @@ export type MenuImportAiProvider = TrainingAiProvider;
 export type MenuImportAiLaunchResult = TrainingAiLaunchResult;
 
 export const buildMenuImportAiLaunchTarget = buildTrainingAiLaunchTarget;
+export const buildMenuImportAiClipboardText = buildAiClipboardText;

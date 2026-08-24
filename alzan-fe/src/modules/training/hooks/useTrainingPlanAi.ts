@@ -5,6 +5,7 @@ import { copyTextToClipboard } from '../../../utils/clipboard';
 import { fetchTrainingExerciseAiCatalog } from '../services/trainingPlanAiCatalogService';
 import { buildTrainingPlanAiPrompt, serializeTrainingExerciseAiClipboardCsv } from '../services/trainingPlanAiPrompt';
 import {
+  buildAiClipboardText,
   buildTrainingAiLaunchTarget,
   type TrainingAiLaunchResult,
   type TrainingAiProvider,
@@ -47,19 +48,17 @@ export const useTrainingPlanAi = () => {
           return { ok: false, kind: 'catalog-error' };
         }
 
+        const prompt = buildTrainingPlanAiPrompt(catalog);
+        const target = buildTrainingAiLaunchTarget(provider, prompt);
+
         try {
-          await copyTextToClipboard(serializeTrainingExerciseAiClipboardCsv(catalog));
+          const exerciseCsv = serializeTrainingExerciseAiClipboardCsv(catalog);
+          await copyTextToClipboard(buildAiClipboardText(target, prompt, exerciseCsv));
         } catch {
           reservedWindow?.close();
           return { ok: false, kind: 'clipboard-error' };
         }
 
-        const prompt = buildTrainingPlanAiPrompt(catalog);
-        const target = buildTrainingAiLaunchTarget(provider, prompt);
-        if (!target) {
-          reservedWindow?.close();
-          return { ok: false, kind: 'open-error' };
-        }
         try {
           await openTrainingAiTarget(target.url, reservedWindow);
         } catch {
