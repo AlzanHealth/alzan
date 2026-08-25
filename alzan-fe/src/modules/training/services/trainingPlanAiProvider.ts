@@ -15,16 +15,18 @@ const MAX_PROVIDER_URL_LENGTH = 12_000;
 
 const PROVIDER_HOME_URLS: Record<TrainingAiProvider, string> = {
   chatgpt: 'https://chatgpt.com/',
-  gemini: 'https://gemini.google.com/app',
+  gemini: 'https://aistudio.google.com/prompts/new_chat',
   claude: 'https://claude.ai/new',
 };
 
-export const buildTrainingAiLaunchTarget = (provider: TrainingAiProvider, prompt: string): TrainingAiLaunchTarget => {
-  // Gemini currently ignores its legacy `?q=` URL parameter, leaving the composer empty.
-  // Keep the whole payload in the clipboard so the user can transfer it with one paste.
-  if (provider === 'gemini') return { url: PROVIDER_HOME_URLS.gemini, mode: 'clipboard' };
+const PROVIDER_PROMPT_QUERY_PARAMETERS: Record<TrainingAiProvider, string> = {
+  chatgpt: 'prompt',
+  gemini: 'prompt',
+  claude: 'q',
+};
 
-  const queryParameter = provider === 'chatgpt' ? 'prompt' : 'q';
+export const buildTrainingAiLaunchTarget = (provider: TrainingAiProvider, prompt: string): TrainingAiLaunchTarget => {
+  const queryParameter = PROVIDER_PROMPT_QUERY_PARAMETERS[provider];
   const prefilledUrl = `${PROVIDER_HOME_URLS[provider]}?${queryParameter}=${encodeURIComponent(prompt)}`;
   if (prefilledUrl.length <= MAX_PROVIDER_URL_LENGTH) return { url: prefilledUrl, mode: 'prefilled' };
 

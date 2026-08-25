@@ -525,7 +525,7 @@ export default {
     menuImportAiChatGPT: 'ChatGPT',
     menuImportAiChatGPTHint: 'Prompt preparado; escribe o adjunta tu comida y envíala',
     menuImportAiGemini: 'Gemini',
-    menuImportAiGeminiHint: 'Instrucciones e ingredientes.csv copiados; pega una vez y escribe o adjunta tu comida',
+    menuImportAiGeminiHint: 'Prompt preparado; pega ingredientes.csv una vez y escribe o adjunta tu comida',
     menuImportAiClaude: 'Claude',
     menuImportAiClaudeHint: 'Prompt preparado; pega ingredientes.csv una vez y escribe o adjunta tu comida',
     menuImportAiCatalogError:
@@ -1934,7 +1934,7 @@ export default {
     trainingAiChatGPT: 'ChatGPT',
     trainingAiChatGPTHint: 'Prompt preparado; pega ejercicios.csv una vez',
     trainingAiGemini: 'Gemini',
-    trainingAiGeminiHint: 'Instrucciones y ejercicios.csv copiados; pega una vez',
+    trainingAiGeminiHint: 'Prompt preparado; pega ejercicios.csv una vez',
     trainingAiClaude: 'Claude',
     trainingAiClaudeHint: 'Prompt preparado; pega ejercicios.csv una vez',
     trainingAiCancel: 'Cancelar',
