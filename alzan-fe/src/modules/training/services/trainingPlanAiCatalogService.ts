@@ -28,3 +28,16 @@ export const fetchTrainingExerciseAiCatalog = async (): Promise<TrainingExercise
       error,
     };
   });
+
+let trainingExerciseAiCatalogPromise: Promise<TrainingExerciseAiCatalogRow[]> | null = null;
+
+export const preloadTrainingExerciseAiCatalog = (): Promise<TrainingExerciseAiCatalogRow[]> => {
+  if (trainingExerciseAiCatalogPromise) return trainingExerciseAiCatalogPromise;
+
+  trainingExerciseAiCatalogPromise = fetchTrainingExerciseAiCatalog().catch(error => {
+    trainingExerciseAiCatalogPromise = null;
+    throw error;
+  });
+
+  return trainingExerciseAiCatalogPromise;
+};

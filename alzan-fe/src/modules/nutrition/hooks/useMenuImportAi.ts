@@ -1,24 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Platform } from 'react-native';
 import { format } from 'date-fns';
 import * as Linking from 'expo-linking';
 
 import { copyTextToClipboard } from '../../../utils/clipboard';
-import { serializeMenuImportAiIngredientCsv } from '../services/menuImportAiCatalog';
-import { fetchMenuImportAiIngredientCatalog } from '../services/menuImportAiCatalogService';
 import { buildMenuImportAiPrompt } from '../services/menuImportAiPrompt';
 import {
-  buildMenuImportAiClipboardText,
   buildMenuImportAiLaunchTarget,
-  isAiCatalogReady,
   type MenuImportAiLaunchResult,
   type MenuImportAiProvider,
 } from '../services/menuImportAiProvider';
 
 const openMenuImportAiTarget = async (url: string, reservedWindow: Window | null): Promise<void> => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    if (!reservedWindow) throw new Error('Unable to open AI provider in a new window');
-    reservedWindow.location.href = url;
+    // Open the complete URL in the click handler. Navigating an about:blank
+    // popup after awaiting the clipboard is unreliable on Safari/iOS.
+    if (!reservedWindow || reservedWindow.closed) throw new Error('Unable to open AI provider in a new window');
     return;
   }
 
@@ -29,53 +26,27 @@ const openMenuImportAiTarget = async (url: string, reservedWindow: Window | null
 
 export const useMenuImportAi = () => {
   const [isLaunching, setIsLaunching] = useState(false);
-  const [catalog, setCatalog] = useState<Awaited<ReturnType<typeof fetchMenuImportAiIngredientCatalog>> | null>(null);
-  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void fetchMenuImportAiIngredientCatalog()
-      .then(nextCatalog => {
-        if (cancelled) return;
-        setCatalog(nextCatalog);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCatalog(null);
-      })
-      .finally(() => {
-        if (!cancelled) setIsCatalogLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const launchWithAi = useCallback(
     async (provider: MenuImportAiProvider): Promise<MenuImportAiLaunchResult> => {
-      const cachedCatalog = catalog;
-      if (isLaunching || !isAiCatalogReady(cachedCatalog?.length ?? 0, isCatalogLoading) || !cachedCatalog) {
-        return { ok: false, kind: isLaunching ? 'open-error' : 'catalog-error' };
-      }
+      if (isLaunching) return { ok: false, kind: 'open-error' };
 
+      const prompt = buildMenuImportAiPrompt({
+        currentDate: format(new Date(), 'yyyy-MM-dd'),
+      });
+      const target = buildMenuImportAiLaunchTarget(provider, prompt);
       const reservedWindow =
-        Platform.OS === 'web' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null;
+        Platform.OS === 'web' && typeof window !== 'undefined' ? window.open(target.url, '_blank') : null;
 
       setIsLaunching(true);
       try {
-        const prompt = buildMenuImportAiPrompt({
-          currentDate: format(new Date(), 'yyyy-MM-dd'),
-        });
-        const target = buildMenuImportAiLaunchTarget(provider, prompt);
-
-        try {
-          const ingredientCsv = serializeMenuImportAiIngredientCsv(cachedCatalog);
-          await copyTextToClipboard(buildMenuImportAiClipboardText(target, prompt, ingredientCsv));
-        } catch {
-          reservedWindow?.close();
-          return { ok: false, kind: 'clipboard-error' };
+        if (target.mode === 'clipboard') {
+          try {
+            await copyTextToClipboard(prompt);
+          } catch {
+            reservedWindow?.close();
+            return { ok: false, kind: 'clipboard-error' };
+          }
         }
 
         try {
@@ -90,8 +61,8 @@ export const useMenuImportAi = () => {
         setIsLaunching(false);
       }
     },
-    [catalog, isCatalogLoading, isLaunching],
+    [isLaunching],
   );
 
-  return { isLaunching, isCatalogLoading, launchWithAi };
+  return { isLaunching, launchWithAi };
 };

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { copyTextToClipboard } from '../../../utils/clipboard';
-import { fetchTrainingExerciseAiCatalog } from '../services/trainingPlanAiCatalogService';
+import {
+  fetchTrainingExerciseAiCatalog,
+  preloadTrainingExerciseAiCatalog,
+} from '../services/trainingPlanAiCatalogService';
 import { buildTrainingPlanAiPrompt, serializeTrainingExerciseAiClipboardCsv } from '../services/trainingPlanAiPrompt';
 import {
   buildAiClipboardText,
@@ -14,8 +17,10 @@ import {
 
 const openTrainingAiTarget = async (url: string, reservedWindow: Window | null): Promise<void> => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    if (!reservedWindow) throw new Error('Unable to open AI provider in a new window');
-    reservedWindow.location.href = url;
+    // The complete URL is opened synchronously from the user gesture below.
+    // Navigating an about:blank popup after awaiting the clipboard is
+    // unreliable on Safari/iOS.
+    if (!reservedWindow || reservedWindow.closed) throw new Error('Unable to open AI provider in a new window');
     return;
   }
 
@@ -32,7 +37,7 @@ export const useTrainingPlanAi = () => {
   useEffect(() => {
     let cancelled = false;
 
-    void fetchTrainingExerciseAiCatalog()
+    void preloadTrainingExerciseAiCatalog()
       .then(nextCatalog => {
         if (cancelled) return;
         setCatalog(nextCatalog);
@@ -57,14 +62,13 @@ export const useTrainingPlanAi = () => {
         return { ok: false, kind: isLaunching ? 'open-error' : 'catalog-error' };
       }
 
+      const prompt = buildTrainingPlanAiPrompt(cachedCatalog);
+      const target = buildTrainingAiLaunchTarget(provider, prompt);
       const reservedWindow =
-        Platform.OS === 'web' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null;
+        Platform.OS === 'web' && typeof window !== 'undefined' ? window.open(target.url, '_blank') : null;
 
       setIsLaunching(true);
       try {
-        const prompt = buildTrainingPlanAiPrompt(cachedCatalog);
-        const target = buildTrainingAiLaunchTarget(provider, prompt);
-
         try {
           const exerciseCsv = serializeTrainingExerciseAiClipboardCsv(cachedCatalog);
           await copyTextToClipboard(buildAiClipboardText(target, prompt, exerciseCsv));

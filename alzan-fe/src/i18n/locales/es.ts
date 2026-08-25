@@ -521,15 +521,13 @@ export default {
     menuImportAiSheetTitle: 'Elige un asistente de IA',
     menuImportAiSheetSubtitle:
       'Prepararemos las instrucciones necesarias. Cuando se abra el asistente, escribe o adjunta tu comida y envíala.',
-    menuImportAiPreparing: 'Copiando el catálogo de ingredientes...',
+    menuImportAiPreparing: 'Abriendo el asistente de IA...',
     menuImportAiChatGPT: 'ChatGPT',
     menuImportAiChatGPTHint: 'Prompt preparado; escribe o adjunta tu comida y envíala',
     menuImportAiGemini: 'Gemini',
-    menuImportAiGeminiHint: 'Prompt preparado; pega ingredientes.csv una vez y escribe o adjunta tu comida',
+    menuImportAiGeminiHint: 'Prompt preparado; escribe o adjunta tu comida y envíala',
     menuImportAiClaude: 'Claude',
-    menuImportAiClaudeHint: 'Prompt preparado; pega ingredientes.csv una vez y escribe o adjunta tu comida',
-    menuImportAiCatalogError:
-      'No se pudo cargar el catálogo de ingredientes. Comprueba tu conexión e inténtalo de nuevo.',
+    menuImportAiClaudeHint: 'Prompt preparado; escribe o adjunta tu comida y envíala',
     menuImportAiClipboardError:
       'No se pudieron copiar las instrucciones. Revisa el permiso del portapapeles e inténtalo de nuevo.',
     menuImportAiOpenError: 'No se pudo abrir el asistente de IA. Permite las ventanas emergentes e inténtalo de nuevo.',

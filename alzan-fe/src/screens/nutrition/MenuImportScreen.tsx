@@ -72,7 +72,7 @@ export const MenuImportScreen = () => {
     setConflictDecision,
     setMealType,
   } = useMenuImport();
-  const { isLaunching: isLaunchingAi, isCatalogLoading: isAiCatalogLoading, launchWithAi } = useMenuImportAi();
+  const { isLaunching: isLaunchingAi, launchWithAi } = useMenuImportAi();
 
   const translate = useCallback(
     (key: TranslationKey, options?: TranslationOptions): string => String(t(key, options)),
@@ -135,11 +135,7 @@ export const MenuImportScreen = () => {
       }
 
       const messageKey: TranslationKey =
-        result.kind === 'catalog-error'
-          ? 'nutrition.menuImportAiCatalogError'
-          : result.kind === 'clipboard-error'
-            ? 'nutrition.menuImportAiClipboardError'
-            : 'nutrition.menuImportAiOpenError';
+        result.kind === 'clipboard-error' ? 'nutrition.menuImportAiClipboardError' : 'nutrition.menuImportAiOpenError';
       Alert.alert(translate('common.error'), translate(messageKey));
     },
     [launchWithAi, translate],
@@ -255,7 +251,7 @@ export const MenuImportScreen = () => {
       </SafeAreaView>
       <MenuImportAiProviderSheet
         visible={isAiSheetVisible}
-        isLoading={isLaunchingAi || isAiCatalogLoading}
+        isLoading={isLaunchingAi}
         onClose={() => setIsAiSheetVisible(false)}
         onSelect={provider => void handleAiProvider(provider)}
       />
