@@ -24,6 +24,8 @@ interface MenuImportPreviewProps {
   bottomInset: number;
   onImport: () => void;
   onSelectIngredient: (ingredientKey: string, ingredientId: string) => void;
+  onSearchIngredient: (ingredientKey: string, query: string) => Promise<void>;
+  onRemoveIngredient: (mealKey: string, ingredientIndex: number) => void;
   onSetConflictDecision: (mealKey: string, decision: MenuImportConflictDecision) => void;
   onSetMealType: (mealKey: string, mealType: MenuImportMealType) => void;
   translate: Translate;
@@ -38,6 +40,8 @@ export const MenuImportPreview = memo(function MenuImportPreview({
   bottomInset,
   onImport,
   onSelectIngredient,
+  onSearchIngredient,
+  onRemoveIngredient,
   onSetConflictDecision,
   onSetMealType,
   translate,
@@ -55,12 +59,22 @@ export const MenuImportPreview = memo(function MenuImportPreview({
         meal={item}
         candidatesByIngredient={candidatesByIngredient}
         onSelectIngredient={onSelectIngredient}
+        onSearchIngredient={onSearchIngredient}
+        onRemoveIngredient={onRemoveIngredient}
         onSetConflictDecision={onSetConflictDecision}
         onSetMealType={onSetMealType}
         translate={translate}
       />
     ),
-    [candidatesByIngredient, onSelectIngredient, onSetConflictDecision, onSetMealType, translate],
+    [
+      candidatesByIngredient,
+      onRemoveIngredient,
+      onSearchIngredient,
+      onSelectIngredient,
+      onSetConflictDecision,
+      onSetMealType,
+      translate,
+    ],
   );
 
   const listHeader = useMemo(

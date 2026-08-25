@@ -3,9 +3,11 @@ import { MENU_IMPORT_FORMAT, MENU_IMPORT_VERSION, MenuImportDocument } from './m
 import {
   buildMenuImportPreview,
   isMenuImportPreviewReady,
+  removeMenuImportIngredient,
   MenuImportIngredientCandidate,
   resolveMenuImportIngredients,
   selectMenuImportIngredient,
+  updateMenuImportIngredientCandidates,
   setMenuImportConflictDecision,
   setMenuImportMealType,
 } from './menuImportPlanner';
@@ -84,6 +86,30 @@ async function testUniqueSearchAndExactSelection() {
   const riceResolution = resolutions.find(resolution => resolution.ingredientKey === 'arroz');
   assert.equal(riceResolution?.selectedCandidate, null);
   assert.equal(riceResolution?.candidates[0]?.name, 'Arroz largo');
+}
+
+async function testSelectsSafeSingularPluralMatchesButLeavesVariantsUnresolved() {
+  const document = createDocument(['Huevo', 'Fartón', 'Galletas Digestive']);
+  const egg = { ...banana, id: 'ingredient-eggs', name: 'Huevos' };
+  const fartons = { ...banana, id: 'ingredient-fartons', name: 'Fartons' };
+  const digestive = [
+    { ...banana, id: 'ingredient-digestive-brand', name: 'Galletas Digestive Hacendado' },
+    { ...banana, id: 'ingredient-digestive-chocolate', name: 'Galletas Digestive con Chocolate' },
+  ];
+
+  const resolutions = await resolveMenuImportIngredients(document, async name => {
+    if (name === 'huevo') return [egg, { ...egg, id: 'ingredient-fried-egg', name: 'Huevo frito' }];
+    if (name === 'farton') return [fartons];
+    return digestive;
+  });
+
+  assert.equal(resolutions.find(item => item.ingredientKey === 'huevo')?.selectedCandidate?.id, egg.id);
+  assert.equal(resolutions.find(item => item.ingredientKey === 'farton')?.selectedCandidate?.id, fartons.id);
+  assert.equal(resolutions.find(item => item.ingredientKey === 'galletas digestive')?.selectedCandidate, null);
+  assert.deepEqual(
+    new Set(resolutions.find(item => item.ingredientKey === 'galletas digestive')?.candidates.map(item => item.id)),
+    new Set(digestive.map(item => item.id)),
+  );
 }
 
 async function testRejectsMalformedNutritionCandidates() {
@@ -426,8 +452,49 @@ async function testUnspecifiedMealRequiresSelectionAndRecalculatesConflict() {
   assert.equal(isMenuImportPreviewReady(decided), true);
 }
 
+async function testUpdatesCandidatesAndRemovesOnlyOneIngredientOccurrence() {
+  const document = createDocument(['Ingrediente ambiguo', 'Arroz integral']);
+  document.days.push({
+    date: '2026-08-04',
+    meals: [
+      {
+        meal_type: 'dinner',
+        name: 'Cena',
+        ingredients: [{ name: 'Ingrediente ambiguo', quantity_g: 100 }],
+      },
+    ],
+  });
+  const resolutions = await resolveMenuImportIngredients(document, async name =>
+    name === 'arroz integral' ? [rice] : [],
+  );
+  const preview = buildMenuImportPreview(document, resolutions, [], {
+    token: 'snapshot-token',
+    dates: ['2026-08-03', '2026-08-04'],
+  });
+  const replacement = { ...banana, id: 'ingredient-replacement', name: 'Ingrediente elegido' };
+  const searched = updateMenuImportIngredientCandidates(preview, 'ingrediente ambiguo', [replacement]);
+
+  assert.equal(
+    searched.resolutions.find(item => item.ingredientKey === 'ingrediente ambiguo')?.selectedCandidate,
+    null,
+  );
+  assert.deepEqual(searched.resolutions.find(item => item.ingredientKey === 'ingrediente ambiguo')?.candidates, [
+    replacement,
+  ]);
+
+  const selected = selectMenuImportIngredient(searched, 'ingrediente ambiguo', replacement.id);
+  const removed = removeMenuImportIngredient(selected, selected.meals[0]!.key, 0);
+
+  assert.equal(removed.meals[0]?.ingredients.length, 1);
+  assert.equal(removed.meals[0]?.ingredients[0]?.name, 'Arroz integral');
+  assert.equal(removed.meals[1]?.ingredients.length, 1);
+  assert.equal(removed.meals[1]?.ingredients[0]?.selectedCandidate?.id, replacement.id);
+  assert.equal(removed.meals[1]?.macros.kcal, 100);
+}
+
 async function main() {
   await testUniqueSearchAndExactSelection();
+  await testSelectsSafeSingularPluralMatchesButLeavesVariantsUnresolved();
   await testRejectsMalformedNutritionCandidates();
   await testUniqueSearchAcrossDaysAndMeals();
   await testBoundedSearchConcurrency();
@@ -438,6 +505,7 @@ async function main() {
   await testConflictDecisionAppliesToEveryMealInTheSameSlot();
   await testIgnoredMealsDoNotRequireIngredientResolution();
   await testUnspecifiedMealRequiresSelectionAndRecalculatesConflict();
+  await testUpdatesCandidatesAndRemovesOnlyOneIngredientOccurrence();
   console.log('menuImportPlanner: all assertions passed');
 }
 

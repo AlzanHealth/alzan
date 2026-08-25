@@ -69,6 +69,8 @@ export const MenuImportScreen = () => {
     analyze,
     importMenu,
     selectIngredient,
+    searchIngredient,
+    removeIngredient,
     setConflictDecision,
     setMealType,
   } = useMenuImport();
@@ -243,6 +245,8 @@ export const MenuImportScreen = () => {
             bottomInset={topFromScreenBottom}
             onImport={handleImportPress}
             onSelectIngredient={selectIngredient}
+            onSearchIngredient={searchIngredient}
+            onRemoveIngredient={removeIngredient}
             onSetConflictDecision={setConflictDecision}
             onSetMealType={setMealType}
             translate={translate}

@@ -1,6 +1,7 @@
-import React, { memo, useCallback } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { memo, useCallback, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { parseISO } from 'date-fns';
+import { Search, Trash2 } from 'lucide-react-native';
 
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
 import { formatLocalizedDate } from '../../../i18n/dateLocale';
@@ -20,6 +21,8 @@ interface MenuImportMealCardProps {
   meal: MenuImportPreviewMeal;
   candidatesByIngredient: ReadonlyMap<string, MenuImportIngredientCandidate[]>;
   onSelectIngredient: (ingredientKey: string, ingredientId: string) => void;
+  onSearchIngredient: (ingredientKey: string, query: string) => Promise<void>;
+  onRemoveIngredient: (mealKey: string, ingredientIndex: number) => void;
   onSetConflictDecision: (mealKey: string, decision: MenuImportConflictDecision) => void;
   onSetMealType: (mealKey: string, mealType: MenuImportMealType) => void;
   translate: Translate;
@@ -34,10 +37,159 @@ const CONFLICT_DECISIONS: {
   { decision: 'ignore', labelKey: 'nutrition.menuImportConflictIgnore' },
 ];
 
+interface MenuImportIngredientRowProps {
+  ingredient: MenuImportPreviewMeal['ingredients'][number];
+  ingredientIndex: number;
+  candidates: MenuImportIngredientCandidate[];
+  mealKey: string;
+  onSelectIngredient: (ingredientKey: string, ingredientId: string) => void;
+  onSearchIngredient: (ingredientKey: string, query: string) => Promise<void>;
+  onRemoveIngredient: (mealKey: string, ingredientIndex: number) => void;
+  translate: Translate;
+}
+
+const MenuImportIngredientRow = memo(function MenuImportIngredientRow({
+  ingredient,
+  ingredientIndex,
+  candidates,
+  mealKey,
+  onSelectIngredient,
+  onSearchIngredient,
+  onRemoveIngredient,
+  translate,
+}: MenuImportIngredientRowProps) {
+  const { colors } = useNutritionStyles();
+  const [query, setQuery] = useState(ingredient.name);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
+  const selected = ingredient.selectedCandidate;
+
+  const handleSearch = useCallback(async () => {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2 || isSearching) return;
+
+    setIsSearching(true);
+    setHasSearched(true);
+    setSearchFailed(false);
+    try {
+      await onSearchIngredient(ingredient.ingredientKey, trimmedQuery);
+    } catch {
+      setSearchFailed(true);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [ingredient.ingredientKey, isSearching, onSearchIngredient, query]);
+
+  return (
+    <View style={styles.ingredient}>
+      <View style={styles.ingredientHeading}>
+        <Text style={[styles.ingredientName, { color: colors.textPrimary }]}>{ingredient.name}</Text>
+        <Text style={[styles.quantity, { color: colors.textSecondary }]}>
+          {translate('nutrition.menuImportIngredientQuantity', { quantity: ingredient.quantity_g })}
+        </Text>
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => onRemoveIngredient(mealKey, ingredientIndex)}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={translate('nutrition.menuImportRemoveIngredientAccessibility', {
+            ingredient: ingredient.name,
+          })}
+        >
+          <Trash2 size={18} color={colors.danger} strokeWidth={2.2} />
+        </TouchableOpacity>
+      </View>
+
+      {selected !== null ? (
+        <Text style={[styles.selectedMatch, { color: colors.success }]}>
+          {translate('nutrition.menuImportSelectedMatch', { name: selected.name })}
+        </Text>
+      ) : (
+        <View style={styles.unresolved}>
+          <Text style={[styles.unresolvedLabel, { color: colors.warning }]}>
+            {translate('nutrition.menuImportUnresolvedIngredient')}
+          </Text>
+          <View style={[styles.searchRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Search size={18} color={colors.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.textPrimary }]}
+              value={query}
+              onChangeText={setQuery}
+              placeholder={translate('nutrition.menuImportSearchIngredientPlaceholder')}
+              placeholderTextColor={colors.textSecondary}
+              returnKeyType="search"
+              onSubmitEditing={() => void handleSearch()}
+              accessibilityLabel={translate('nutrition.menuImportSearchIngredientAccessibility', {
+                ingredient: ingredient.name,
+              })}
+            />
+            <TouchableOpacity
+              style={[styles.searchButton, { backgroundColor: colors.primary }]}
+              onPress={() => void handleSearch()}
+              disabled={isSearching || query.trim().length < 2}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={translate('nutrition.menuImportSearchIngredientButtonAccessibility')}
+              accessibilityState={{ busy: isSearching, disabled: isSearching || query.trim().length < 2 }}
+            >
+              {isSearching ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Search size={17} color={colors.white} />
+              )}
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.searchHelp, { color: colors.textSecondary }]}>
+            {translate('nutrition.menuImportSearchAllIngredients')}
+          </Text>
+          {candidates.length > 0 ? (
+            <View style={styles.candidates}>
+              {candidates.map(candidate => (
+                <TouchableOpacity
+                  key={candidate.id}
+                  style={[styles.candidateButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => onSelectIngredient(ingredient.ingredientKey, candidate.id)}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={translate('nutrition.menuImportSelectCandidateAccessibility', {
+                    ingredient: ingredient.name,
+                    candidate: candidate.name,
+                  })}
+                >
+                  <Text style={[styles.candidateName, { color: colors.textPrimary }]}>{candidate.name}</Text>
+                  <Text style={[styles.candidateMacros, { color: colors.textSecondary }]}>
+                    {translate('nutrition.menuImportCandidateMacros', {
+                      kcal: candidate.kcal_100,
+                      protein: candidate.protein_g_100,
+                      carbs: candidate.carbs_g_100,
+                      fats: candidate.fat_g_100,
+                    })}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : searchFailed ? (
+            <Text style={[styles.noCandidates, { color: colors.danger }]}>
+              {translate('nutrition.menuImportSearchError')}
+            </Text>
+          ) : hasSearched || candidates.length === 0 ? (
+            <Text style={[styles.noCandidates, { color: colors.textSecondary }]}>
+              {translate('nutrition.menuImportNoCandidates')}
+            </Text>
+          ) : null}
+        </View>
+      )}
+    </View>
+  );
+});
+
 export const MenuImportMealCard = memo(function MenuImportMealCard({
   meal,
   candidatesByIngredient,
   onSelectIngredient,
+  onSearchIngredient,
+  onRemoveIngredient,
   onSetConflictDecision,
   onSetMealType,
   translate,
@@ -113,69 +265,20 @@ export const MenuImportMealCard = memo(function MenuImportMealCard({
 
       <View style={styles.ingredients}>
         {meal.ingredients.map((ingredient, ingredientIndex) => {
-          const selected = ingredient.selectedCandidate;
           const candidates = candidatesByIngredient.get(ingredient.ingredientKey) ?? [];
 
           return (
-            <View key={`${meal.key}-${ingredient.ingredientKey}-${ingredientIndex}`} style={styles.ingredient}>
-              <View style={styles.ingredientHeading}>
-                <Text style={[styles.ingredientName, { color: colors.textPrimary }]}>{ingredient.name}</Text>
-                <Text style={[styles.quantity, { color: colors.textSecondary }]}>
-                  {translate('nutrition.menuImportIngredientQuantity', {
-                    quantity: ingredient.quantity_g,
-                  })}
-                </Text>
-              </View>
-
-              {selected !== null ? (
-                <Text style={[styles.selectedMatch, { color: colors.success }]}>
-                  {translate('nutrition.menuImportSelectedMatch', { name: selected.name })}
-                </Text>
-              ) : (
-                <View style={styles.unresolved}>
-                  <Text style={[styles.unresolvedLabel, { color: colors.warning }]}>
-                    {translate('nutrition.menuImportUnresolvedIngredient')}
-                  </Text>
-                  {candidates.length > 0 ? (
-                    <View style={styles.candidates}>
-                      {candidates.map(candidate => (
-                        <TouchableOpacity
-                          key={candidate.id}
-                          style={[
-                            styles.candidateButton,
-                            {
-                              backgroundColor: colors.background,
-                              borderColor: colors.border,
-                            },
-                          ]}
-                          onPress={() => onSelectIngredient(ingredient.ingredientKey, candidate.id)}
-                          activeOpacity={0.85}
-                          accessibilityRole="button"
-                          accessibilityLabel={translate('nutrition.menuImportSelectCandidateAccessibility', {
-                            ingredient: ingredient.name,
-                            candidate: candidate.name,
-                          })}
-                        >
-                          <Text style={[styles.candidateName, { color: colors.textPrimary }]}>{candidate.name}</Text>
-                          <Text style={[styles.candidateMacros, { color: colors.textSecondary }]}>
-                            {translate('nutrition.menuImportCandidateMacros', {
-                              kcal: candidate.kcal_100,
-                              protein: candidate.protein_g_100,
-                              carbs: candidate.carbs_g_100,
-                              fats: candidate.fat_g_100,
-                            })}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  ) : (
-                    <Text style={[styles.noCandidates, { color: colors.textSecondary }]}>
-                      {translate('nutrition.menuImportNoCandidates')}
-                    </Text>
-                  )}
-                </View>
-              )}
-            </View>
+            <MenuImportIngredientRow
+              key={`${meal.key}-${ingredient.ingredientKey}-${ingredientIndex}`}
+              ingredient={ingredient}
+              ingredientIndex={ingredientIndex}
+              candidates={candidates}
+              mealKey={meal.key}
+              onSelectIngredient={onSelectIngredient}
+              onSearchIngredient={onSearchIngredient}
+              onRemoveIngredient={onRemoveIngredient}
+              translate={translate}
+            />
           );
         })}
       </View>
@@ -315,6 +418,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  removeButton: {
+    width: 44,
+    height: 44,
+    marginTop: -10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ingredientName: {
     flex: 1,
     fontSize: 15,
@@ -337,6 +447,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
+  },
+  searchRow: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingLeft: 12,
+    paddingRight: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    minHeight: 44,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  searchButton: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.s,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchHelp: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   candidates: {
     gap: 8,

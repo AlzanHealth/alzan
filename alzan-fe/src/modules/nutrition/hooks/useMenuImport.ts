@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../../../context/AuthContext';
-import { searchIngredients } from '../../../services/ingredientsService';
+import { searchIngredients, type IngredientSearchResult } from '../../../services/ingredientsService';
 import {
   parseMenuImportJson,
   type MenuImportMealType,
@@ -18,9 +18,11 @@ import {
   buildMenuImportPreview,
   isMenuImportPreviewReady,
   resolveMenuImportIngredients,
+  removeMenuImportIngredient,
   selectMenuImportIngredient,
   setMenuImportConflictDecision,
   setMenuImportMealType,
+  updateMenuImportIngredientCandidates,
   type MenuImportConflictDecision,
   type MenuImportIngredientProgress,
   type MenuImportPreview,
@@ -28,6 +30,24 @@ import {
 import { isMenuImportOperationBlocked } from '../services/menuImportOperationGuard';
 
 const NUTRITION_QUERY_KEYS = ['mealLogs', 'mealItems', 'dayNutrition', 'personalFoodTrends', 'shoppingList'] as const;
+
+const mapIngredientSearchResultToCandidate = (
+  result: IngredientSearchResult,
+): {
+  id: string;
+  name: string;
+  kcal_100: number;
+  protein_g_100: number;
+  carbs_g_100: number;
+  fat_g_100: number;
+} => ({
+  id: result.id,
+  name: result.name,
+  kcal_100: Number(result.kcal_100 ?? 0),
+  protein_g_100: Number(result.protein_g_100 ?? 0),
+  carbs_g_100: Number(result.carbs_g_100 ?? 0),
+  fat_g_100: Number(result.fat_g_100 ?? 0),
+});
 
 export type MenuImportFailureKind = 'generic';
 
@@ -99,16 +119,9 @@ export function useMenuImport() {
         resolveMenuImportIngredients(
           parsed.value,
           async ingredientName => {
-            const results = await searchIngredients(ingredientName, undefined, 5);
+            const results = await searchIngredients(ingredientName, undefined, 10);
 
-            return results.map(result => ({
-              id: result.id,
-              name: result.name,
-              kcal_100: Number(result.kcal_100 ?? 0),
-              protein_g_100: Number(result.protein_g_100 ?? 0),
-              carbs_g_100: Number(result.carbs_g_100 ?? 0),
-              fat_g_100: Number(result.fat_g_100 ?? 0),
-            }));
+            return results.map(mapIngredientSearchResultToCandidate);
           },
           {
             onProgress: progress => {
@@ -148,6 +161,23 @@ export function useMenuImport() {
     setPreview(current =>
       current === null ? current : selectMenuImportIngredient(current, ingredientKey, ingredientId),
     );
+  }, []);
+
+  const searchIngredient = useCallback(async (ingredientKey: string, query: string) => {
+    const results = await searchIngredients(query, undefined, 10);
+    setPreview(current =>
+      current === null
+        ? current
+        : updateMenuImportIngredientCandidates(
+            current,
+            ingredientKey,
+            results.map(mapIngredientSearchResultToCandidate),
+          ),
+    );
+  }, []);
+
+  const removeIngredient = useCallback((mealKey: string, ingredientIndex: number) => {
+    setPreview(current => (current === null ? current : removeMenuImportIngredient(current, mealKey, ingredientIndex)));
   }, []);
 
   const setConflictDecision = useCallback((mealKey: string, decision: MenuImportConflictDecision) => {
@@ -218,6 +248,8 @@ export function useMenuImport() {
     analyze,
     importMenu,
     selectIngredient,
+    searchIngredient,
+    removeIngredient,
     setConflictDecision,
     setMealType,
   };
