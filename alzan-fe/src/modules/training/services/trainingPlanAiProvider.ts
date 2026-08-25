@@ -11,6 +11,8 @@ export type TrainingAiLaunchTarget = {
   mode: TrainingAiLaunchMode;
 };
 
+export const isAiCatalogReady = (catalogSize: number, isLoading: boolean): boolean => !isLoading && catalogSize > 0;
+
 const MAX_PROVIDER_URL_LENGTH = 12_000;
 
 const PROVIDER_HOME_URLS: Record<TrainingAiProvider, string> = {

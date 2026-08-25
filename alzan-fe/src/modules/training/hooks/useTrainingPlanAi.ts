@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { copyTextToClipboard } from '../../../utils/clipboard';
@@ -7,6 +7,7 @@ import { buildTrainingPlanAiPrompt, serializeTrainingExerciseAiClipboardCsv } fr
 import {
   buildAiClipboardText,
   buildTrainingAiLaunchTarget,
+  isAiCatalogReady,
   type TrainingAiLaunchResult,
   type TrainingAiProvider,
 } from '../services/trainingPlanAiProvider';
@@ -25,34 +26,47 @@ const openTrainingAiTarget = async (url: string, reservedWindow: Window | null):
 
 export const useTrainingPlanAi = () => {
   const [isLaunching, setIsLaunching] = useState(false);
+  const [catalog, setCatalog] = useState<Awaited<ReturnType<typeof fetchTrainingExerciseAiCatalog>> | null>(null);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void fetchTrainingExerciseAiCatalog()
+      .then(nextCatalog => {
+        if (cancelled) return;
+        setCatalog(nextCatalog);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCatalog(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCatalogLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const launchWithAi = useCallback(
     async (provider: TrainingAiProvider): Promise<TrainingAiLaunchResult> => {
-      if (isLaunching) return { ok: false, kind: 'open-error' };
+      const cachedCatalog = catalog;
+      if (isLaunching || !isAiCatalogReady(cachedCatalog?.length ?? 0, isCatalogLoading) || !cachedCatalog) {
+        return { ok: false, kind: isLaunching ? 'open-error' : 'catalog-error' };
+      }
 
       const reservedWindow =
         Platform.OS === 'web' && typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null;
 
       setIsLaunching(true);
       try {
-        let catalog;
-        try {
-          catalog = await fetchTrainingExerciseAiCatalog();
-        } catch {
-          reservedWindow?.close();
-          return { ok: false, kind: 'catalog-error' };
-        }
-
-        if (catalog.length === 0) {
-          reservedWindow?.close();
-          return { ok: false, kind: 'catalog-error' };
-        }
-
-        const prompt = buildTrainingPlanAiPrompt(catalog);
+        const prompt = buildTrainingPlanAiPrompt(cachedCatalog);
         const target = buildTrainingAiLaunchTarget(provider, prompt);
 
         try {
-          const exerciseCsv = serializeTrainingExerciseAiClipboardCsv(catalog);
+          const exerciseCsv = serializeTrainingExerciseAiClipboardCsv(cachedCatalog);
           await copyTextToClipboard(buildAiClipboardText(target, prompt, exerciseCsv));
         } catch {
           reservedWindow?.close();
@@ -71,8 +85,8 @@ export const useTrainingPlanAi = () => {
         setIsLaunching(false);
       }
     },
-    [isLaunching],
+    [catalog, isCatalogLoading, isLaunching],
   );
 
-  return { isLaunching, launchWithAi };
+  return { isLaunching, isCatalogLoading, launchWithAi };
 };

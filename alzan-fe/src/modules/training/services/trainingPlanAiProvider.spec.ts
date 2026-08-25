@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildAiClipboardText,
   buildTrainingAiLaunchTarget,
+  isAiCatalogReady,
   type TrainingAiLaunchResult,
   type TrainingAiProvider,
 } from './trainingPlanAiProvider';
@@ -12,6 +13,10 @@ const longPrompt = 'x'.repeat(20_000);
 const providers: TrainingAiProvider[] = ['chatgpt', 'gemini', 'claude'];
 const clipboardFailure: TrainingAiLaunchResult = { ok: false, kind: 'clipboard-error' };
 assert.equal(clipboardFailure.kind, 'clipboard-error');
+assert.equal(isAiCatalogReady(0, true), false);
+assert.equal(isAiCatalogReady(10, true), false);
+assert.equal(isAiCatalogReady(0, false), false);
+assert.equal(isAiCatalogReady(10, false), true);
 providers.forEach(provider => {
   const target = buildTrainingAiLaunchTarget(provider, shortPrompt);
   assert.ok(target, `${provider} must accept a short prompt`);

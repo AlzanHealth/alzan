@@ -55,7 +55,7 @@ export const TrainingPlanImportScreen = () => {
   const [isCopyingTemplate, setIsCopyingTemplate] = useState(false);
   const isCopyingTemplateRef = useRef(false);
   const [isAiSheetVisible, setIsAiSheetVisible] = useState(false);
-  const { isLaunching: isLaunchingAi, launchWithAi } = useTrainingPlanAi();
+  const { isLaunching: isLaunchingAi, isCatalogLoading: isAiCatalogLoading, launchWithAi } = useTrainingPlanAi();
   const {
     rawJson,
     setRawJson,
@@ -317,7 +317,7 @@ export const TrainingPlanImportScreen = () => {
         </ScrollView>
         <TrainingAiProviderSheet
           visible={isAiSheetVisible}
-          isLoading={isLaunchingAi}
+          isLoading={isLaunchingAi || isAiCatalogLoading}
           onClose={() => setIsAiSheetVisible(false)}
           onSelect={handleAiProvider}
         />

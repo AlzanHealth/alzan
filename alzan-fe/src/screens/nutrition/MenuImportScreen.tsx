@@ -72,7 +72,7 @@ export const MenuImportScreen = () => {
     setConflictDecision,
     setMealType,
   } = useMenuImport();
-  const { isLaunching: isLaunchingAi, launchWithAi } = useMenuImportAi();
+  const { isLaunching: isLaunchingAi, isCatalogLoading: isAiCatalogLoading, launchWithAi } = useMenuImportAi();
 
   const translate = useCallback(
     (key: TranslationKey, options?: TranslationOptions): string => String(t(key, options)),
@@ -255,7 +255,7 @@ export const MenuImportScreen = () => {
       </SafeAreaView>
       <MenuImportAiProviderSheet
         visible={isAiSheetVisible}
-        isLoading={isLaunchingAi}
+        isLoading={isLaunchingAi || isAiCatalogLoading}
         onClose={() => setIsAiSheetVisible(false)}
         onSelect={provider => void handleAiProvider(provider)}
       />
