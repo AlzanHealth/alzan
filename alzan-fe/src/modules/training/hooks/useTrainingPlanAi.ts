@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
-import { copyTextToClipboard } from '../../../utils/clipboard';
+import { copyTextToClipboard, copyTextToClipboardAsync, copyTextToClipboardSync } from '../../../utils/clipboard';
 import { preloadTrainingExerciseAiCatalog } from '../services/trainingPlanAiCatalogService';
 import { TrainingExerciseAiCatalogTimeoutError } from '../services/trainingPlanAiCatalog';
 import { buildTrainingPlanAiPrompt, serializeTrainingExerciseAiClipboardCsv } from '../services/trainingPlanAiPrompt';
@@ -9,19 +9,12 @@ import type { TrainingExerciseAiCatalogRow } from '../services/trainingPlanAiPro
 import {
   buildAiClipboardText,
   buildTrainingAiLaunchTarget,
+  launchTrainingAiOnWeb,
   type TrainingAiLaunchResult,
   type TrainingAiProvider,
 } from '../services/trainingPlanAiProvider';
 
-const openTrainingAiTarget = async (url: string, reservedWindow: Window | null): Promise<void> => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    // The complete URL is opened synchronously from the user gesture below.
-    // Navigating an about:blank popup after awaiting the clipboard is
-    // unreliable on Safari/iOS.
-    if (!reservedWindow || reservedWindow.closed) throw new Error('Unable to open AI provider in a new window');
-    return;
-  }
-
+const openTrainingAiTarget = async (url: string): Promise<void> => {
   const canOpen = await Linking.canOpenURL(url);
   if (!canOpen) throw new Error('Unable to open AI provider');
   await Linking.openURL(url);
@@ -74,23 +67,33 @@ export const useTrainingPlanAi = () => {
 
       const prompt = buildTrainingPlanAiPrompt(cachedCatalog);
       const target = buildTrainingAiLaunchTarget(provider, prompt);
-      const reservedWindow =
-        Platform.OS === 'web' && typeof window !== 'undefined' ? window.open(target.url, '_blank') : null;
+      const exerciseCsv = serializeTrainingExerciseAiClipboardCsv(cachedCatalog);
+      const clipboardText = buildAiClipboardText(target, prompt, exerciseCsv);
 
       setIsLaunching(true);
       try {
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const webResult = await launchTrainingAiOnWeb({
+            copySync: () => copyTextToClipboardSync(clipboardText),
+            copyAsync: () => copyTextToClipboardAsync(clipboardText),
+            openInNewTab: () => Boolean(window.open(target.url, '_blank')),
+            redirectCurrentTab: () => window.location.assign(target.url),
+          });
+
+          if (webResult === 'clipboard-error') return { ok: false, kind: 'clipboard-error' };
+          if (webResult === 'open-error') return { ok: false, kind: 'open-error' };
+          return { ok: true, provider, mode: target.mode };
+        }
+
         try {
-          const exerciseCsv = serializeTrainingExerciseAiClipboardCsv(cachedCatalog);
-          await copyTextToClipboard(buildAiClipboardText(target, prompt, exerciseCsv));
+          await copyTextToClipboard(clipboardText);
         } catch {
-          reservedWindow?.close();
           return { ok: false, kind: 'clipboard-error' };
         }
 
         try {
-          await openTrainingAiTarget(target.url, reservedWindow);
+          await openTrainingAiTarget(target.url);
         } catch {
-          reservedWindow?.close();
           return { ok: false, kind: 'open-error' };
         }
 

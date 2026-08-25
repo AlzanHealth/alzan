@@ -11,6 +11,15 @@ export type TrainingAiLaunchTarget = {
   mode: TrainingAiLaunchMode;
 };
 
+export type TrainingAiWebLaunchActions = {
+  copySync: () => boolean;
+  copyAsync: () => Promise<void>;
+  openInNewTab: () => boolean;
+  redirectCurrentTab: () => void;
+};
+
+export type TrainingAiWebLaunchResult = 'opened' | 'redirected' | 'clipboard-error' | 'open-error';
+
 export const isAiCatalogReady = (catalogSize: number, isLoading: boolean): boolean => !isLoading && catalogSize > 0;
 
 const MAX_PROVIDER_URL_LENGTH = 12_000;
@@ -44,4 +53,26 @@ export const buildAiClipboardText = (target: TrainingAiLaunchTarget, prompt: str
   const fileName = catalogCsv.slice(0, firstLineEnd);
   const catalogRows = catalogCsv.slice(firstLineEnd + 1);
   return `${fileName}\nAI_INSTRUCTIONS\n${prompt.trim()}\n\n${catalogRows}`;
+};
+
+export const launchTrainingAiOnWeb = async (
+  actions: TrainingAiWebLaunchActions,
+): Promise<TrainingAiWebLaunchResult> => {
+  try {
+    await actions.copyAsync();
+  } catch {
+    try {
+      if (!actions.copySync()) return 'clipboard-error';
+    } catch {
+      return 'clipboard-error';
+    }
+  }
+
+  try {
+    if (actions.openInNewTab()) return 'opened';
+    actions.redirectCurrentTab();
+    return 'redirected';
+  } catch {
+    return 'open-error';
+  }
 };

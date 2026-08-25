@@ -3,6 +3,7 @@ import {
   buildAiClipboardText,
   buildTrainingAiLaunchTarget,
   isAiCatalogReady,
+  launchTrainingAiOnWeb,
   type TrainingAiLaunchResult,
   type TrainingAiProvider,
 } from './trainingPlanAiProvider';
@@ -71,4 +72,107 @@ assert.equal(buildAiClipboardText(chatGptTarget, shortPrompt, ingredientCatalog)
 assert.equal(buildAiClipboardText(geminiTarget, shortPrompt, ingredientCatalog), ingredientCatalog);
 assert.equal(buildAiClipboardText(claudeTarget, shortPrompt, ingredientCatalog), ingredientCatalog);
 
-console.log('trainingPlanAiProvider tests passed');
+const testWebLaunchFlow = async (): Promise<void> => {
+  {
+    const events: string[] = [];
+    const result = await launchTrainingAiOnWeb({
+      copySync: () => {
+        events.push('copy-sync');
+        return true;
+      },
+      copyAsync: async () => {
+        events.push('copy-async');
+      },
+      openInNewTab: () => {
+        events.push('open');
+        return true;
+      },
+      redirectCurrentTab: () => {
+        events.push('redirect');
+      },
+    });
+
+    assert.equal(result, 'opened');
+    assert.deepEqual(events, ['copy-async', 'open']);
+  }
+
+  {
+    const events: string[] = [];
+    const result = await launchTrainingAiOnWeb({
+      copySync: () => {
+        events.push('copy-sync');
+        return false;
+      },
+      copyAsync: async () => {
+        events.push('copy-async');
+        throw new Error('Clipboard denied');
+      },
+      openInNewTab: () => {
+        events.push('open');
+        return true;
+      },
+      redirectCurrentTab: () => {
+        events.push('redirect');
+      },
+    });
+
+    assert.equal(result, 'clipboard-error');
+    assert.deepEqual(events, ['copy-async', 'copy-sync']);
+  }
+
+  {
+    const events: string[] = [];
+    const result = await launchTrainingAiOnWeb({
+      copySync: () => {
+        events.push('copy-sync');
+        return false;
+      },
+      copyAsync: async () => {
+        events.push('copy-async');
+      },
+      openInNewTab: () => {
+        events.push('open');
+        return false;
+      },
+      redirectCurrentTab: () => {
+        events.push('redirect');
+      },
+    });
+
+    assert.equal(result, 'redirected');
+    assert.deepEqual(events, ['copy-async', 'open', 'redirect']);
+  }
+
+  {
+    const events: string[] = [];
+    const result = await launchTrainingAiOnWeb({
+      copySync: () => {
+        events.push('copy-sync');
+        return true;
+      },
+      copyAsync: async () => {
+        events.push('copy-async');
+        throw new Error('Modern clipboard denied');
+      },
+      openInNewTab: () => {
+        events.push('open');
+        return true;
+      },
+      redirectCurrentTab: () => {
+        events.push('redirect');
+      },
+    });
+
+    assert.equal(result, 'opened');
+    assert.deepEqual(events, ['copy-async', 'copy-sync', 'open']);
+  }
+};
+
+void testWebLaunchFlow()
+  .then(() => {
+    console.log('trainingPlanAiProvider tests passed');
+  })
+  .catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
