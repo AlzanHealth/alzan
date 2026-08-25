@@ -1935,6 +1935,9 @@ export default {
     trainingAiSheetSubtitle:
       'Prepararemos ejercicios.csv y las instrucciones necesarias. Cuando se abra el asistente, pega una sola vez y sigue el mensaje que aparecerá allí.',
     trainingAiLoadingCatalog: 'Actualizando el catálogo de ejercicios…',
+    trainingAiCatalogTimeout: 'El catálogo está tardando demasiado. Puedes cerrar esta ventana o reintentar.',
+    trainingAiCatalogLoadError: 'No se ha podido cargar el catálogo de ejercicios. Puedes cerrar o reintentar.',
+    trainingAiRetryCatalog: 'Reintentar',
     trainingAiChatGPT: 'ChatGPT',
     trainingAiChatGPTHint: 'Prompt preparado; pega ejercicios.csv una vez',
     trainingAiGemini: 'Gemini',

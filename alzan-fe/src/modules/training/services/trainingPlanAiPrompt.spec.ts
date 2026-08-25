@@ -77,4 +77,22 @@ assert.ok(prompt.length < 8_000, 'the provider prompt must stay safely below pra
 assert.ok(!prompt.includes('owner_user_id'));
 assert.ok(!prompt.includes('description_es'));
 
+const largeCatalog: TrainingExerciseAiCatalogRow[] = Array.from({ length: 2_012 }, (_, index) => ({
+  exercise_id: `exercise-${index}`,
+  exercise_name_es: `Ejercicio ${String(index).padStart(4, '0')}`,
+  exercise_name_en: null,
+  exercise_type: 'reps',
+  load_type: 'external',
+  primary_muscle: 'full_body',
+  secondary_muscle: null,
+  equipment: 'barbell',
+  is_custom: false,
+}));
+const largeClipboardCsv = serializeTrainingExerciseAiClipboardCsv(largeCatalog);
+assert.ok(largeClipboardCsv.startsWith('ejercicios.csv\nexercises_rows\nexercise_name_es,primary_muscle,equipment\n'));
+assert.equal(largeClipboardCsv.split('\n').length, largeCatalog.length + 3);
+largeCatalog.forEach(exercise => {
+  assert.ok(largeClipboardCsv.includes(exercise.exercise_name_es), `${exercise.exercise_name_es} must be serialized`);
+});
+
 console.log('trainingPlanAiPrompt tests passed');

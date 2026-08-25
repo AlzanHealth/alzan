@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { fetchAllTrainingExerciseAiCatalog, type TrainingExerciseAiCatalogPage } from './trainingPlanAiCatalog';
+import {
+  createTrainingExerciseAiCatalogLoader,
+  fetchAllTrainingExerciseAiCatalog,
+  loadTrainingExerciseAiCatalogWithTimeout,
+  type TrainingExerciseAiCatalogPage,
+  TrainingExerciseAiCatalogTimeoutError,
+} from './trainingPlanAiCatalog';
+import type { TrainingExerciseAiCatalogRow } from './trainingPlanAiPrompt';
 
 const pages: TrainingExerciseAiCatalogPage[][] = [
   [
@@ -56,6 +63,53 @@ const main = async (): Promise<void> => {
       })),
     /catalog unavailable/,
   );
+
+  const timeoutRequest: { signal?: AbortSignal } = {};
+  await assert.rejects(
+    () =>
+      loadTrainingExerciseAiCatalogWithTimeout(signal => {
+        timeoutRequest.signal = signal;
+        return new Promise<TrainingExerciseAiCatalogRow[]>(() => undefined);
+      }, 5),
+    TrainingExerciseAiCatalogTimeoutError,
+  );
+  assert.equal(timeoutRequest.signal?.aborted, true, 'a timed-out catalog request must be aborted');
+
+  await assert.rejects(
+    () => loadTrainingExerciseAiCatalogWithTimeout(async () => [], 50),
+    /empty/i,
+    'an empty catalog must never be cached as ready',
+  );
+
+  let attempts = 0;
+  const successfulCatalog: TrainingExerciseAiCatalogRow[] = [
+    {
+      exercise_id: 'retry-1',
+      exercise_name_es: 'Sentadilla',
+      exercise_name_en: 'Squat',
+      exercise_type: 'reps',
+      load_type: 'external',
+      primary_muscle: 'quadriceps',
+      secondary_muscle: 'gluteus',
+      equipment: 'barbell',
+      is_custom: false,
+    },
+  ];
+  const loader = createTrainingExerciseAiCatalogLoader(async () => {
+    attempts += 1;
+    if (attempts === 1) {
+      return loadTrainingExerciseAiCatalogWithTimeout(
+        () => new Promise<TrainingExerciseAiCatalogRow[]>(() => undefined),
+        5,
+      );
+    }
+    return successfulCatalog;
+  });
+
+  await assert.rejects(() => loader.preload(), TrainingExerciseAiCatalogTimeoutError);
+  assert.deepEqual(await loader.preload(), successfulCatalog, 'retry must start a fresh request after a timeout');
+  assert.deepEqual(await loader.preload(), successfulCatalog, 'a successful catalog must be reused');
+  assert.equal(attempts, 2, 'cached catalog data must prevent an unnecessary third request');
 
   console.log('trainingPlanAiCatalogService tests passed');
 };

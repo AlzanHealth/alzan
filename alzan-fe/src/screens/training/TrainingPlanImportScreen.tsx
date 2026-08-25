@@ -55,7 +55,13 @@ export const TrainingPlanImportScreen = () => {
   const [isCopyingTemplate, setIsCopyingTemplate] = useState(false);
   const isCopyingTemplateRef = useRef(false);
   const [isAiSheetVisible, setIsAiSheetVisible] = useState(false);
-  const { isLaunching: isLaunchingAi, isCatalogLoading: isAiCatalogLoading, launchWithAi } = useTrainingPlanAi();
+  const {
+    catalogStatus: aiCatalogStatus,
+    catalogErrorKind: aiCatalogErrorKind,
+    retryCatalog: retryAiCatalog,
+    isLaunching: isLaunchingAi,
+    launchWithAi,
+  } = useTrainingPlanAi();
   const {
     rawJson,
     setRawJson,
@@ -93,6 +99,7 @@ export const TrainingPlanImportScreen = () => {
 
   const handleAiProvider = useCallback(
     async (provider: TrainingAiProvider) => {
+      setIsAiSheetVisible(false);
       const result = await launchWithAi(provider);
       if (!result.ok) {
         const messageKey =
@@ -104,8 +111,6 @@ export const TrainingPlanImportScreen = () => {
         Alert.alert(t('common.error'), t(messageKey));
         return;
       }
-
-      setIsAiSheetVisible(false);
     },
     [launchWithAi, t],
   );
@@ -317,8 +322,11 @@ export const TrainingPlanImportScreen = () => {
         </ScrollView>
         <TrainingAiProviderSheet
           visible={isAiSheetVisible}
-          isLoading={isLaunchingAi || isAiCatalogLoading}
+          catalogStatus={aiCatalogStatus}
+          catalogErrorKind={aiCatalogErrorKind}
+          isLaunching={isLaunchingAi}
           onClose={() => setIsAiSheetVisible(false)}
+          onRetry={retryAiCatalog}
           onSelect={handleAiProvider}
         />
       </SafeAreaView>

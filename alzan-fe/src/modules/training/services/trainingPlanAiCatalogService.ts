@@ -1,5 +1,10 @@
 import { supabase } from '../../../lib/supabaseClient';
-import { fetchAllTrainingExerciseAiCatalog, type TrainingExerciseAiCatalogPage } from './trainingPlanAiCatalog';
+import {
+  createTrainingExerciseAiCatalogLoader,
+  fetchAllTrainingExerciseAiCatalog,
+  loadTrainingExerciseAiCatalogWithTimeout,
+  type TrainingExerciseAiCatalogPage,
+} from './trainingPlanAiCatalog';
 import type { TrainingExerciseAiCatalogRow } from './trainingPlanAiPrompt';
 
 const EXERCISE_AI_CATALOG_SELECT = `
@@ -15,29 +20,24 @@ const EXERCISE_AI_CATALOG_SELECT = `
 `;
 
 export const fetchTrainingExerciseAiCatalog = async (): Promise<TrainingExerciseAiCatalogRow[]> =>
-  fetchAllTrainingExerciseAiCatalog(async (from, to) => {
-    const { data, error } = await supabase
-      .from('exercises')
-      .select(EXERCISE_AI_CATALOG_SELECT)
-      .order('base_name_es', { ascending: true })
-      .order('id', { ascending: true })
-      .range(from, to);
+  loadTrainingExerciseAiCatalogWithTimeout(signal =>
+    fetchAllTrainingExerciseAiCatalog(async (from, to) => {
+      const { data, error } = await supabase
+        .from('exercises')
+        .select(EXERCISE_AI_CATALOG_SELECT)
+        .order('base_name_es', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .abortSignal(signal);
 
-    return {
-      data: (data ?? []) as unknown as TrainingExerciseAiCatalogPage[],
-      error,
-    };
-  });
+      return {
+        data: (data ?? []) as unknown as TrainingExerciseAiCatalogPage[],
+        error,
+      };
+    }),
+  );
 
-let trainingExerciseAiCatalogPromise: Promise<TrainingExerciseAiCatalogRow[]> | null = null;
+const trainingExerciseAiCatalogLoader = createTrainingExerciseAiCatalogLoader(fetchTrainingExerciseAiCatalog);
 
-export const preloadTrainingExerciseAiCatalog = (): Promise<TrainingExerciseAiCatalogRow[]> => {
-  if (trainingExerciseAiCatalogPromise) return trainingExerciseAiCatalogPromise;
-
-  trainingExerciseAiCatalogPromise = fetchTrainingExerciseAiCatalog().catch(error => {
-    trainingExerciseAiCatalogPromise = null;
-    throw error;
-  });
-
-  return trainingExerciseAiCatalogPromise;
-};
+export const preloadTrainingExerciseAiCatalog = (): Promise<TrainingExerciseAiCatalogRow[]> =>
+  trainingExerciseAiCatalogLoader.preload();

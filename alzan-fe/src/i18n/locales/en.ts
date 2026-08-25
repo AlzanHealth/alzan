@@ -1916,6 +1916,9 @@ const en = {
     trainingAiSheetSubtitle:
       'We will prepare ejercicios.csv and the required instructions. After the assistant opens, paste once and follow the message shown there.',
     trainingAiLoadingCatalog: 'Updating the exercise catalog…',
+    trainingAiCatalogTimeout: 'The catalog is taking too long. You can close this window or retry.',
+    trainingAiCatalogLoadError: 'The exercise catalog could not be loaded. You can close or retry.',
+    trainingAiRetryCatalog: 'Retry',
     trainingAiChatGPT: 'ChatGPT',
     trainingAiChatGPTHint: 'Prompt ready; paste ejercicios.csv once',
     trainingAiGemini: 'Gemini',

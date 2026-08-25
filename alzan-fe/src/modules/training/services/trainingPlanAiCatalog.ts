@@ -1,5 +1,68 @@
 import type { TrainingExerciseAiCatalogRow } from './trainingPlanAiPrompt';
 
+export const TRAINING_EXERCISE_AI_CATALOG_TIMEOUT_MS = 15_000;
+
+export class TrainingExerciseAiCatalogTimeoutError extends Error {
+  constructor() {
+    super('Training exercise AI catalog request timed out');
+    this.name = 'TrainingExerciseAiCatalogTimeoutError';
+  }
+}
+
+export type TrainingExerciseAiCatalogRequest = (signal: AbortSignal) => Promise<TrainingExerciseAiCatalogRow[]>;
+
+export const loadTrainingExerciseAiCatalogWithTimeout = async (
+  fetchCatalog: TrainingExerciseAiCatalogRequest,
+  timeoutMs = TRAINING_EXERCISE_AI_CATALOG_TIMEOUT_MS,
+): Promise<TrainingExerciseAiCatalogRow[]> => {
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new TrainingExerciseAiCatalogTimeoutError());
+      controller.abort();
+    }, timeoutMs);
+  });
+
+  try {
+    const catalog = await Promise.race([fetchCatalog(controller.signal), timeout]);
+    if (catalog.length === 0) throw new Error('Training exercise AI catalog is empty');
+    return catalog;
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+};
+
+export type TrainingExerciseAiCatalogLoader = {
+  preload: () => Promise<TrainingExerciseAiCatalogRow[]>;
+};
+
+export const createTrainingExerciseAiCatalogLoader = (
+  fetchCatalog: () => Promise<TrainingExerciseAiCatalogRow[]>,
+): TrainingExerciseAiCatalogLoader => {
+  let cachedCatalog: TrainingExerciseAiCatalogRow[] | null = null;
+  let inFlightRequest: Promise<TrainingExerciseAiCatalogRow[]> | null = null;
+
+  const preload = (): Promise<TrainingExerciseAiCatalogRow[]> => {
+    if (cachedCatalog) return Promise.resolve(cachedCatalog);
+    if (inFlightRequest) return inFlightRequest;
+
+    const request = fetchCatalog()
+      .then(catalog => {
+        if (catalog.length === 0) throw new Error('Training exercise AI catalog is empty');
+        cachedCatalog = catalog;
+        return catalog;
+      })
+      .finally(() => {
+        if (inFlightRequest === request) inFlightRequest = null;
+      });
+    inFlightRequest = request;
+    return request;
+  };
+
+  return { preload };
+};
+
 export type TrainingExerciseAiCatalogRelation = { code: string } | null;
 
 export type TrainingExerciseAiCatalogPage = {

@@ -8,16 +8,28 @@ import type { TrainingAiProvider } from '../../../modules/training/services/trai
 
 type TrainingAiProviderSheetProps = {
   visible: boolean;
-  isLoading: boolean;
+  catalogStatus: 'loading' | 'ready' | 'error';
+  catalogErrorKind: 'timeout' | 'load' | null;
+  isLaunching: boolean;
   onClose: () => void;
+  onRetry: () => void;
   onSelect: (provider: TrainingAiProvider) => void;
 };
 
 const PROVIDERS: TrainingAiProvider[] = ['chatgpt', 'gemini', 'claude'];
 
-export const TrainingAiProviderSheet = ({ visible, isLoading, onClose, onSelect }: TrainingAiProviderSheetProps) => {
+export const TrainingAiProviderSheet = ({
+  visible,
+  catalogStatus,
+  catalogErrorKind,
+  isLaunching,
+  onClose,
+  onRetry,
+  onSelect,
+}: TrainingAiProviderSheetProps) => {
   const { t } = useTranslation();
   const { colors, styles: dynamicStyles } = useTrainingStyles();
+  const providersDisabled = catalogStatus !== 'ready' || isLaunching;
 
   const providerName = (provider: TrainingAiProvider): string => {
     if (provider === 'chatgpt') return t('training.trainingAiChatGPT');
@@ -31,20 +43,27 @@ export const TrainingAiProviderSheet = ({ visible, isLoading, onClose, onSelect 
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={isLoading ? undefined : onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={isLoading ? undefined : onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.sheet, dynamicStyles.modalContent]}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
               <Text style={[styles.title, { color: colors.textPrimary }]}>{t('training.trainingAiSheetTitle')}</Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                {isLoading ? t('training.trainingAiLoadingCatalog') : t('training.trainingAiSheetSubtitle')}
+                {catalogStatus === 'loading'
+                  ? t('training.trainingAiLoadingCatalog')
+                  : catalogStatus === 'error'
+                    ? t(
+                        catalogErrorKind === 'timeout'
+                          ? 'training.trainingAiCatalogTimeout'
+                          : 'training.trainingAiCatalogLoadError',
+                      )
+                    : t('training.trainingAiSheetSubtitle')}
               </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
-              disabled={isLoading}
               style={styles.closeButton}
               accessibilityRole="button"
               accessibilityLabel={t('common.cancel')}
@@ -53,16 +72,27 @@ export const TrainingAiProviderSheet = ({ visible, isLoading, onClose, onSelect 
             </TouchableOpacity>
           </View>
 
+          {catalogStatus === 'error' ? (
+            <TouchableOpacity
+              onPress={onRetry}
+              style={[styles.retryButton, { borderColor: colors.primary }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.trainingAiRetryCatalog')}
+            >
+              <Text style={[styles.retryText, { color: colors.primary }]}>{t('training.trainingAiRetryCatalog')}</Text>
+            </TouchableOpacity>
+          ) : null}
+
           <View style={styles.providerList}>
             {PROVIDERS.map(provider => (
               <TouchableOpacity
                 key={provider}
                 onPress={() => onSelect(provider)}
-                disabled={isLoading}
-                style={[styles.providerButton, { borderColor: colors.border, opacity: isLoading ? 0.55 : 1 }]}
+                disabled={providersDisabled}
+                style={[styles.providerButton, { borderColor: colors.border, opacity: providersDisabled ? 0.55 : 1 }]}
                 accessibilityRole="button"
                 accessibilityLabel={providerName(provider)}
-                accessibilityState={{ disabled: isLoading, busy: isLoading }}
+                accessibilityState={{ disabled: providersDisabled, busy: isLaunching }}
               >
                 <AiProviderLogo provider={provider} />
                 <View style={styles.providerCopy}>
@@ -75,7 +105,6 @@ export const TrainingAiProviderSheet = ({ visible, isLoading, onClose, onSelect 
 
           <TouchableOpacity
             onPress={onClose}
-            disabled={isLoading}
             style={[styles.cancelButton, { backgroundColor: dynamicStyles.secondaryButton.backgroundColor }]}
             accessibilityRole="button"
           >
@@ -102,6 +131,15 @@ const styles = StyleSheet.create({
   subtitle: { marginTop: 6, fontSize: 14, lineHeight: 20 },
   closeButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   providerList: { marginTop: 18, gap: 10 },
+  retryButton: {
+    minHeight: 48,
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryText: { fontSize: 15, fontWeight: '800' },
   providerButton: {
     minHeight: 68,
     borderWidth: 1,

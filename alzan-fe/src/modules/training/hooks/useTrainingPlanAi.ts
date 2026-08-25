@@ -1,16 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { copyTextToClipboard } from '../../../utils/clipboard';
-import {
-  fetchTrainingExerciseAiCatalog,
-  preloadTrainingExerciseAiCatalog,
-} from '../services/trainingPlanAiCatalogService';
+import { preloadTrainingExerciseAiCatalog } from '../services/trainingPlanAiCatalogService';
+import { TrainingExerciseAiCatalogTimeoutError } from '../services/trainingPlanAiCatalog';
 import { buildTrainingPlanAiPrompt, serializeTrainingExerciseAiClipboardCsv } from '../services/trainingPlanAiPrompt';
+import type { TrainingExerciseAiCatalogRow } from '../services/trainingPlanAiPrompt';
 import {
   buildAiClipboardText,
   buildTrainingAiLaunchTarget,
-  isAiCatalogReady,
   type TrainingAiLaunchResult,
   type TrainingAiProvider,
 } from '../services/trainingPlanAiProvider';
@@ -31,34 +29,46 @@ const openTrainingAiTarget = async (url: string, reservedWindow: Window | null):
 
 export const useTrainingPlanAi = () => {
   const [isLaunching, setIsLaunching] = useState(false);
-  const [catalog, setCatalog] = useState<Awaited<ReturnType<typeof fetchTrainingExerciseAiCatalog>> | null>(null);
-  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
+  const [catalog, setCatalog] = useState<TrainingExerciseAiCatalogRow[] | null>(null);
+  const [catalogStatus, setCatalogStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [catalogErrorKind, setCatalogErrorKind] = useState<'timeout' | 'load' | null>(null);
+  const catalogRequestVersionRef = useRef(0);
+
+  const loadCatalog = useCallback(async (): Promise<void> => {
+    const requestVersion = catalogRequestVersionRef.current + 1;
+    catalogRequestVersionRef.current = requestVersion;
+    setCatalogStatus('loading');
+    setCatalogErrorKind(null);
+
+    try {
+      const nextCatalog = await preloadTrainingExerciseAiCatalog();
+      if (catalogRequestVersionRef.current !== requestVersion) return;
+      setCatalog(nextCatalog);
+      setCatalogStatus('ready');
+    } catch (error) {
+      if (catalogRequestVersionRef.current !== requestVersion) return;
+      setCatalog(null);
+      setCatalogErrorKind(error instanceof TrainingExerciseAiCatalogTimeoutError ? 'timeout' : 'load');
+      setCatalogStatus('error');
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    void preloadTrainingExerciseAiCatalog()
-      .then(nextCatalog => {
-        if (cancelled) return;
-        setCatalog(nextCatalog);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCatalog(null);
-      })
-      .finally(() => {
-        if (!cancelled) setIsCatalogLoading(false);
-      });
+    void loadCatalog();
 
     return () => {
-      cancelled = true;
+      catalogRequestVersionRef.current += 1;
     };
-  }, []);
+  }, [loadCatalog]);
+
+  const retryCatalog = useCallback((): void => {
+    void loadCatalog();
+  }, [loadCatalog]);
 
   const launchWithAi = useCallback(
     async (provider: TrainingAiProvider): Promise<TrainingAiLaunchResult> => {
       const cachedCatalog = catalog;
-      if (isLaunching || !isAiCatalogReady(cachedCatalog?.length ?? 0, isCatalogLoading) || !cachedCatalog) {
+      if (isLaunching || catalogStatus !== 'ready' || !cachedCatalog || cachedCatalog.length === 0) {
         return { ok: false, kind: isLaunching ? 'open-error' : 'catalog-error' };
       }
 
@@ -89,8 +99,8 @@ export const useTrainingPlanAi = () => {
         setIsLaunching(false);
       }
     },
-    [catalog, isCatalogLoading, isLaunching],
+    [catalog, catalogStatus, isLaunching],
   );
 
-  return { isLaunching, isCatalogLoading, launchWithAi };
+  return { catalogStatus, catalogErrorKind, retryCatalog, isLaunching, launchWithAi };
 };

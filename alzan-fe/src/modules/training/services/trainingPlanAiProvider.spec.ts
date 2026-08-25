@@ -6,6 +6,7 @@ import {
   type TrainingAiLaunchResult,
   type TrainingAiProvider,
 } from './trainingPlanAiProvider';
+import { buildTrainingPlanAiPrompt, type TrainingExerciseAiCatalogRow } from './trainingPlanAiPrompt';
 
 const shortPrompt = 'Convierte este entrenamiento a JSON.';
 const longPrompt = 'x'.repeat(20_000);
@@ -28,6 +29,25 @@ assert.ok(chatGptTarget);
 assert.equal(chatGptTarget.mode, 'prefilled');
 assert.ok(chatGptTarget.url.startsWith('https://chatgpt.com/?prompt='));
 assert.ok(chatGptTarget.url.includes(encodeURIComponent(shortPrompt)));
+
+const realTrainingCatalog: TrainingExerciseAiCatalogRow[] = [
+  {
+    exercise_id: '1',
+    exercise_name_es: 'Sentadilla',
+    exercise_name_en: 'Squat',
+    exercise_type: 'reps',
+    load_type: 'external',
+    primary_muscle: 'quadriceps',
+    secondary_muscle: 'gluteus',
+    equipment: 'barbell',
+    is_custom: false,
+  },
+];
+const realTrainingPrompt = buildTrainingPlanAiPrompt(realTrainingCatalog);
+const realChatGptTarget = buildTrainingAiLaunchTarget('chatgpt', realTrainingPrompt);
+assert.equal(realChatGptTarget.mode, 'prefilled');
+assert.ok(realChatGptTarget.url.startsWith('https://chatgpt.com/?prompt='));
+assert.ok(realChatGptTarget.url.includes(encodeURIComponent(realTrainingPrompt)));
 
 const longChatGptTarget = buildTrainingAiLaunchTarget('chatgpt', longPrompt);
 assert.ok(longChatGptTarget);
