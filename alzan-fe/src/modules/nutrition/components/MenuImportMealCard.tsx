@@ -173,7 +173,7 @@ const MenuImportIngredientRow = memo(function MenuImportIngredientRow({
             <Text style={[styles.noCandidates, { color: colors.danger }]}>
               {translate('nutrition.menuImportSearchError')}
             </Text>
-          ) : hasSearched || candidates.length === 0 ? (
+          ) : hasSearched ? (
             <Text style={[styles.noCandidates, { color: colors.textSecondary }]}>
               {translate('nutrition.menuImportNoCandidates')}
             </Text>

@@ -37,9 +37,9 @@ export const MenuImportAiProviderSheet = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={isLoading ? undefined : onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={isLoading ? undefined : onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.sheet, dynamicStyles.modalContent]}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
@@ -50,7 +50,6 @@ export const MenuImportAiProviderSheet = ({
             </View>
             <TouchableOpacity
               onPress={onClose}
-              disabled={isLoading}
               style={styles.closeButton}
               accessibilityRole="button"
               accessibilityLabel={t('common.cancel')}
@@ -81,7 +80,6 @@ export const MenuImportAiProviderSheet = ({
 
           <TouchableOpacity
             onPress={onClose}
-            disabled={isLoading}
             style={[styles.cancelButton, { backgroundColor: dynamicStyles.secondaryButton.backgroundColor }]}
             accessibilityRole="button"
           >

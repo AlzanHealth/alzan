@@ -16,6 +16,7 @@ export type TrainingAiWebLaunchActions = {
   copyAsync: () => Promise<void>;
   openInNewTab: () => boolean;
   redirectCurrentTab: () => void;
+  closeOpenedWindow?: () => void;
 };
 
 export type TrainingAiWebLaunchResult = 'opened' | 'redirected' | 'clipboard-error' | 'open-error';
@@ -58,14 +59,26 @@ export const buildAiClipboardText = (target: TrainingAiLaunchTarget, prompt: str
 export const launchTrainingAiOnWeb = async (
   actions: TrainingAiWebLaunchActions,
 ): Promise<TrainingAiWebLaunchResult> => {
+  let copied = false;
+
   try {
-    await actions.copyAsync();
+    copied = actions.copySync();
   } catch {
+    copied = false;
+  }
+
+  if (!copied) {
     try {
-      if (!actions.copySync()) return 'clipboard-error';
+      await actions.copyAsync();
+      copied = true;
     } catch {
-      return 'clipboard-error';
+      copied = false;
     }
+  }
+
+  if (!copied) {
+    actions.closeOpenedWindow?.();
+    return 'clipboard-error';
   }
 
   try {
@@ -73,6 +86,7 @@ export const launchTrainingAiOnWeb = async (
     actions.redirectCurrentTab();
     return 'redirected';
   } catch {
+    actions.closeOpenedWindow?.();
     return 'open-error';
   }
 };

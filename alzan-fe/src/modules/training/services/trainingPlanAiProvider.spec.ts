@@ -93,7 +93,7 @@ const testWebLaunchFlow = async (): Promise<void> => {
     });
 
     assert.equal(result, 'opened');
-    assert.deepEqual(events, ['copy-async', 'open']);
+    assert.deepEqual(events, ['copy-sync', 'open']);
   }
 
   {
@@ -105,7 +105,6 @@ const testWebLaunchFlow = async (): Promise<void> => {
       },
       copyAsync: async () => {
         events.push('copy-async');
-        throw new Error('Clipboard denied');
       },
       openInNewTab: () => {
         events.push('open');
@@ -116,8 +115,8 @@ const testWebLaunchFlow = async (): Promise<void> => {
       },
     });
 
-    assert.equal(result, 'clipboard-error');
-    assert.deepEqual(events, ['copy-async', 'copy-sync']);
+    assert.equal(result, 'opened');
+    assert.deepEqual(events, ['copy-sync', 'copy-async', 'open']);
   }
 
   {
@@ -140,7 +139,7 @@ const testWebLaunchFlow = async (): Promise<void> => {
     });
 
     assert.equal(result, 'redirected');
-    assert.deepEqual(events, ['copy-async', 'open', 'redirect']);
+    assert.deepEqual(events, ['copy-sync', 'copy-async', 'open', 'redirect']);
   }
 
   {
@@ -148,7 +147,7 @@ const testWebLaunchFlow = async (): Promise<void> => {
     const result = await launchTrainingAiOnWeb({
       copySync: () => {
         events.push('copy-sync');
-        return true;
+        return false;
       },
       copyAsync: async () => {
         events.push('copy-async');
@@ -161,10 +160,13 @@ const testWebLaunchFlow = async (): Promise<void> => {
       redirectCurrentTab: () => {
         events.push('redirect');
       },
+      closeOpenedWindow: () => {
+        events.push('close');
+      },
     });
 
-    assert.equal(result, 'opened');
-    assert.deepEqual(events, ['copy-async', 'copy-sync', 'open']);
+    assert.equal(result, 'clipboard-error');
+    assert.deepEqual(events, ['copy-sync', 'copy-async', 'close']);
   }
 };
 
