@@ -23,8 +23,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useShoppingList } from '../../modules/nutrition/hooks/useShoppingList';
 import { useShoppingListState } from '../../modules/nutrition/hooks/useShoppingListState';
 import { ShoppingListIngredientRow } from '../../modules/nutrition/components/ShoppingListIngredientRow';
+import { ShoppingListQuantityModal } from '../../modules/nutrition/components/ShoppingListQuantityModal';
 import {
-  adjustShoppingPurchaseQuantity,
   filterShoppingIngredients,
   formatShoppingQuantity,
   formatShoppingListForExport,
@@ -40,6 +40,7 @@ import { createAppleReminders } from '../../modules/nutrition/services/appleRemi
 import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import type { NutritionScreenNavigationProp, NutritionStackParamList } from '../../types/navigation.types';
+import type { IngredientsCategory } from '../../types/requests.types';
 
 const formatPeriodDate = (date: string) => formatLocalizedDate(parseISO(date), { en: 'EEE d MMM', es: 'EEE d MMM' });
 
@@ -86,6 +87,7 @@ export const ShoppingListScreen = () => {
   const [customStartDate, setCustomStartDate] = useState(initialDate);
   const [customEndDate, setCustomEndDate] = useState(format(addDays(parseISO(initialDate), 6), 'yyyy-MM-dd'));
   const [calendarTarget, setCalendarTarget] = useState<'start' | 'end' | null>(null);
+  const [quantityIngredient, setQuantityIngredient] = useState<ShoppingListIngredient | null>(null);
   const [showPast, setShowPast] = useState(false);
   const {
     error,
@@ -106,12 +108,25 @@ export const ShoppingListScreen = () => {
     setFilter,
     isHydrated,
     isSyncing,
+    syncError,
     toggleIngredient,
     setCategoryCompleted,
     clearCompleted,
     setPurchaseQuantity,
     resetRange,
+    retrySync,
   } = useShoppingListState(user?.id, range);
+
+  const categoryLabels = useMemo(
+    () =>
+      new Map<IngredientsCategory, string>(
+        (Object.entries(CATEGORY_LABELS) as [IngredientsCategory, string][]).map(([category, labelKey]) => [
+          category,
+          String(t(labelKey as never)),
+        ]),
+      ),
+    [t],
+  );
 
   const visibleIngredients = useMemo(
     () =>
@@ -127,7 +142,10 @@ export const ShoppingListScreen = () => {
   );
   const completedCount = visibleIngredients.filter(ingredient => completedKeys.has(ingredient.key)).length;
   const exportIngredients = filteredIngredients;
-  const exportText = useMemo(() => formatShoppingListForExport(exportIngredients), [exportIngredients]);
+  const exportText = useMemo(
+    () => formatShoppingListForExport(exportIngredients, { categoryLabels }),
+    [categoryLabels, exportIngredients],
+  );
   const sections = useMemo(
     () =>
       groupShoppingIngredientsByCategory(filteredIngredients).map((group: ShoppingListCategoryGroup) => ({
@@ -165,36 +183,7 @@ export const ShoppingListScreen = () => {
     [calendarTarget, customEndDate],
   );
 
-  const adjustIngredient = useCallback(
-    (ingredient: ShoppingListIngredient) => {
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        const value = window.prompt(
-          t('nutrition.shoppingListAdjustQuantity'),
-          String(getShoppingPurchaseQuantity(ingredient)),
-        );
-        if (value === null) return;
-        const quantity = Number(value.replace(',', '.'));
-        if (Number.isFinite(quantity) && quantity > 0) setPurchaseQuantity(ingredient.key, quantity);
-        return;
-      }
-      Alert.alert(t('nutrition.shoppingListAdjustQuantity'), ingredient.name, [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('nutrition.shoppingListExactQuantity'),
-          onPress: () => setPurchaseQuantity(ingredient.key, ingredient.quantity_g),
-        },
-        {
-          text: '500 g',
-          onPress: () => setPurchaseQuantity(ingredient.key, adjustShoppingPurchaseQuantity(ingredient, 'round_500g')),
-        },
-        {
-          text: '1 kg',
-          onPress: () => setPurchaseQuantity(ingredient.key, adjustShoppingPurchaseQuantity(ingredient, 'round_1kg')),
-        },
-      ]);
-    },
-    [setPurchaseQuantity, t],
-  );
+  const adjustIngredient = useCallback((ingredient: ShoppingListIngredient) => setQuantityIngredient(ingredient), []);
   const handleResetRange = useCallback(() => {
     const reset = () => resetRange();
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -248,7 +237,7 @@ export const ShoppingListScreen = () => {
             void createAppleReminders(
               exportIngredients.map(ingredient => ({
                 title: ingredient.name,
-                notes: formatShoppingQuantity(getShoppingPurchaseQuantity(ingredient)),
+                notes: `${categoryLabels.get(ingredient.category || 'otro') || ingredient.category || 'otro'} · ${formatShoppingQuantity(getShoppingPurchaseQuantity(ingredient))}`,
               })),
               listName?.trim() || t('nutrition.shoppingListAppleRemindersDefaultList'),
             ).catch(() => Alert.alert(t('common.error'), t('nutrition.shoppingListAppleRemindersError')));
@@ -258,7 +247,7 @@ export const ShoppingListScreen = () => {
       'plain-text',
       t('nutrition.shoppingListAppleRemindersDefaultList'),
     );
-  }, [exportIngredients, t]);
+  }, [categoryLabels, exportIngredients, t]);
 
   const renderIngredient = useCallback(
     ({
@@ -465,6 +454,16 @@ export const ShoppingListScreen = () => {
       {isOffline && !isLoading && (
         <Text style={[styles.syncText, { color: colors.textSecondary }]}>{t('nutrition.shoppingListOffline')}</Text>
       )}
+      {syncError && (
+        <View style={styles.syncErrorRow}>
+          <Text style={[styles.syncText, { color: colors.textSecondary }]}>{t('nutrition.shoppingListSyncError')}</Text>
+          <TouchableOpacity onPress={() => void retrySync()} accessibilityRole="button">
+            <Text style={[styles.retrySyncText, { color: colors.primary }]}>
+              {t('nutrition.shoppingListSyncRetry')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -547,6 +546,17 @@ export const ShoppingListScreen = () => {
             onConfirm={confirmCalendar}
           />
         )}
+        <ShoppingListQuantityModal
+          visible={quantityIngredient !== null}
+          ingredient={quantityIngredient}
+          colors={colors}
+          onCancel={() => setQuantityIngredient(null)}
+          onConfirm={quantity => {
+            if (!quantityIngredient) return;
+            setPurchaseQuantity(quantityIngredient.key, quantity);
+            setQuantityIngredient(null);
+          }}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -632,6 +642,8 @@ const styles = StyleSheet.create({
   },
   exportActionText: { fontSize: 14, fontWeight: '700' },
   syncText: { textAlign: 'right', paddingHorizontal: 20, fontSize: 11, marginBottom: 2 },
+  syncErrorRow: { alignItems: 'flex-end', paddingHorizontal: 20, marginBottom: 2 },
+  retrySyncText: { fontSize: 12, fontWeight: '800', paddingVertical: 4 },
   listContent: { paddingHorizontal: 16, paddingTop: 2 },
   categoryHeader: {
     marginTop: 12,

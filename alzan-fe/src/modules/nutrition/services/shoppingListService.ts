@@ -28,6 +28,16 @@ export type ShoppingListResult = {
   hiddenMealCount: number;
 };
 
+export class ShoppingListCatalogError extends Error {
+  readonly missingIngredientIds: string[];
+
+  constructor(message: string, missingIngredientIds: string[] = []) {
+    super(message);
+    this.name = 'ShoppingListCatalogError';
+    this.missingIngredientIds = missingIngredientIds;
+  }
+}
+
 type IngredientNameLookupRow = {
   id: string;
   name_es: string;
@@ -128,13 +138,24 @@ export async function getShoppingList(
       .in('id', databaseIngredientIds)
       .returns<IngredientNameLookupRow[]>();
 
-    if (!ingredientsError && ingredients) {
-      const locale = getCurrentAppLocale();
-      ingredients.forEach(ingredient => {
-        localizedNamesById.set(ingredient.id, getLocalizedIngredientName(ingredient, locale));
-        if (ingredient.category) categoriesById.set(ingredient.id, ingredient.category);
-      });
+    if (ingredientsError) {
+      throw new ShoppingListCatalogError('Could not load the ingredients catalog');
     }
+    if (!ingredients || ingredients.length === 0) {
+      throw new ShoppingListCatalogError('The ingredients catalog returned no results', databaseIngredientIds);
+    }
+
+    const returnedIds = new Set(ingredients.map(ingredient => ingredient.id));
+    const missingIngredientIds = databaseIngredientIds.filter(id => !returnedIds.has(id));
+    if (missingIngredientIds.length > 0) {
+      throw new ShoppingListCatalogError('The ingredients catalog is incomplete', missingIngredientIds);
+    }
+
+    const locale = getCurrentAppLocale();
+    ingredients.forEach(ingredient => {
+      localizedNamesById.set(ingredient.id, getLocalizedIngredientName(ingredient, locale));
+      if (ingredient.category) categoriesById.set(ingredient.id, ingredient.category);
+    });
   }
 
   return {

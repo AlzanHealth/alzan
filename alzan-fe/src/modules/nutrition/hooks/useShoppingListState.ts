@@ -7,13 +7,22 @@ import {
 } from '../services/shoppingListCompletion';
 import {
   createShoppingListItemState,
+  areShoppingListStatesEqual,
   getShoppingListStateStorageKey,
+  getShoppingListResetStorageKey,
+  mergeShoppingListStateWithLegacy,
   mergeShoppingListStates,
   parseShoppingListState,
   resetShoppingListState,
+  serializeShoppingListState,
+  SHOPPING_LIST_RESET_PENDING_VALUE,
   type ShoppingListState,
 } from '../services/shoppingListState';
-import { loadShoppingListStateFromServer, persistShoppingListState } from '../services/shoppingListStateSync';
+import {
+  loadShoppingListStateFromServer,
+  persistShoppingListState,
+  resetShoppingListStatePersisted,
+} from '../services/shoppingListStateSync';
 import type {
   ShoppingListDateRange,
   ShoppingListIngredient,
@@ -30,13 +39,34 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
   const [filter, setFilter] = useState<ShoppingListIngredientFilter>('all');
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<Error | null>(null);
+  const mutationVersionRef = useRef(0);
+  const syncOperationRef = useRef(0);
+  const resetPendingRef = useRef<string | null>(null);
+  const resetStorageKey = useMemo(
+    () => (userId ? getShoppingListResetStorageKey(userId, range) : null),
+    [range.endDate, range.startDate, userId],
+  );
+
+  const runSync = useCallback(async (operation: () => Promise<boolean>): Promise<boolean> => {
+    const operationId = ++syncOperationRef.current;
+    setIsSyncing(true);
+    const ok = await operation().catch(() => false);
+    if (operationId === syncOperationRef.current) {
+      setIsSyncing(false);
+      setSyncError(ok ? null : new Error('Shopping list synchronization failed'));
+    }
+    return ok;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setIsHydrated(false);
     setIsSyncing(false);
+    setSyncError(null);
 
     if (!userId || !storageKey) {
+      resetPendingRef.current = null;
       stateRef.current = {};
       setState({});
       setIsHydrated(true);
@@ -45,34 +75,55 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
       };
     }
 
+    const hydrationMutationVersion = mutationVersionRef.current;
     void (async () => {
       const localValue = await AsyncStorage.getItem(storageKey).catch(() => null);
-      let localState = parseShoppingListState(localValue);
+      const localState = parseShoppingListState(localValue);
+      const legacyValue = await AsyncStorage.getItem(
+        getShoppingListCompletionStorageKey(userId, range.startDate),
+      ).catch(() => null);
+      const legacyKeys = parseShoppingListCompletionKeys(legacyValue);
+      const migratedState = mergeShoppingListStateWithLegacy(localState, legacyKeys);
+      const resetPending =
+        resetStorageKey !== null &&
+        (await AsyncStorage.getItem(resetStorageKey).catch(() => null)) === SHOPPING_LIST_RESET_PENDING_VALUE;
 
-      if (Object.keys(localState).length === 0) {
-        const legacyValue = await AsyncStorage.getItem(
-          getShoppingListCompletionStorageKey(userId, range.startDate),
-        ).catch(() => null);
-        const legacyKeys = parseShoppingListCompletionKeys(legacyValue);
-        localState = Object.fromEntries(
-          Array.from(legacyKeys, key => [
-            key,
-            createShoppingListItemState({ completed: true, updatedAt: new Date().toISOString() }),
-          ]),
+      if (cancelled) return;
+      if (resetPending) resetPendingRef.current = resetStorageKey;
+      stateRef.current = resetPending ? resetShoppingListState() : migratedState;
+      setState(stateRef.current);
+      setIsHydrated(true);
+
+      if (resetPending) {
+        const cleared = await runSync(() => resetShoppingListStatePersisted(userId, range));
+        if (cancelled || !cleared) return;
+        await AsyncStorage.removeItem(resetStorageKey!).catch(() => undefined);
+        resetPendingRef.current = null;
+        await AsyncStorage.removeItem(getShoppingListCompletionStorageKey(userId, range.startDate)).catch(
+          () => undefined,
+        );
+        return;
+      }
+
+      const migratedStorageSaved = await AsyncStorage.setItem(storageKey, serializeShoppingListState(migratedState))
+        .then(() => true)
+        .catch(() => false);
+      if (migratedStorageSaved && legacyKeys.size > 0) {
+        await AsyncStorage.removeItem(getShoppingListCompletionStorageKey(userId, range.startDate)).catch(
+          () => undefined,
         );
       }
 
-      if (cancelled) return;
-      stateRef.current = localState;
-      setState(localState);
-      setIsHydrated(true);
-
       const remoteState = await loadShoppingListStateFromServer(userId, range);
-      if (cancelled || !remoteState) return;
-      const merged = mergeShoppingListStates(stateRef.current, remoteState);
+      if (cancelled || mutationVersionRef.current !== hydrationMutationVersion || !remoteState) return;
+      const merged = mergeShoppingListStates(migratedState, remoteState);
       stateRef.current = merged;
       setState(merged);
-      void AsyncStorage.setItem(storageKey, JSON.stringify(merged));
+      if (!areShoppingListStatesEqual(merged, remoteState)) {
+        await runSync(() => persistShoppingListState(userId, range, merged));
+      } else {
+        await AsyncStorage.setItem(storageKey, serializeShoppingListState(merged)).catch(() => undefined);
+      }
     })().catch(() => {
       if (cancelled) return;
       stateRef.current = {};
@@ -83,18 +134,18 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     return () => {
       cancelled = true;
     };
-  }, [range.endDate, range.startDate, storageKey, userId]);
+  }, [range.endDate, range.startDate, resetStorageKey, runSync, storageKey, userId]);
 
   const updateState = useCallback(
     (updater: (previous: ShoppingListState) => ShoppingListState) => {
       if (!userId || !isHydrated) return;
+      mutationVersionRef.current += 1;
       const next = updater(stateRef.current);
       stateRef.current = next;
       setState(next);
-      setIsSyncing(true);
-      void persistShoppingListState(userId, range, next).finally(() => setIsSyncing(false));
+      void runSync(() => persistShoppingListState(userId, range, next));
     },
-    [isHydrated, range, userId],
+    [isHydrated, range, runSync, userId],
   );
 
   const toggleIngredient = useCallback(
@@ -150,9 +201,51 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     [updateState],
   );
 
-  const resetRange = useCallback(() => {
-    updateState(resetShoppingListState);
-  }, [updateState]);
+  const resetRange = useCallback(async (): Promise<boolean> => {
+    if (!userId || !isHydrated || !storageKey || !resetStorageKey) return false;
+    mutationVersionRef.current += 1;
+    const emptyState = resetShoppingListState();
+    stateRef.current = emptyState;
+    setState(emptyState);
+    resetPendingRef.current = resetStorageKey;
+    const markerSaved = await AsyncStorage.setItem(resetStorageKey, SHOPPING_LIST_RESET_PENDING_VALUE)
+      .then(() => true)
+      .catch(() => false);
+    const cleared = await runSync(() => resetShoppingListStatePersisted(userId, range));
+    if (!cleared || !markerSaved) return false;
+    const markerRemoved = await AsyncStorage.removeItem(resetStorageKey)
+      .then(() => true)
+      .catch(() => false);
+    if (markerRemoved) {
+      resetPendingRef.current = null;
+      await AsyncStorage.removeItem(getShoppingListCompletionStorageKey(userId, range.startDate)).catch(
+        () => undefined,
+      );
+    }
+    return markerRemoved;
+  }, [isHydrated, range, resetStorageKey, runSync, storageKey, userId]);
+
+  const retrySync = useCallback(async (): Promise<boolean> => {
+    if (!userId || !storageKey || !resetStorageKey) return false;
+    const resetPending =
+      resetPendingRef.current === resetStorageKey ||
+      (await AsyncStorage.getItem(resetStorageKey).catch(() => null)) === SHOPPING_LIST_RESET_PENDING_VALUE;
+    if (resetPending) {
+      const cleared = await runSync(() => resetShoppingListStatePersisted(userId, range));
+      if (!cleared) return false;
+      const markerRemoved = await AsyncStorage.removeItem(resetStorageKey)
+        .then(() => true)
+        .catch(() => false);
+      if (markerRemoved) {
+        resetPendingRef.current = null;
+        await AsyncStorage.removeItem(getShoppingListCompletionStorageKey(userId, range.startDate)).catch(
+          () => undefined,
+        );
+      }
+      return markerRemoved;
+    }
+    return runSync(() => persistShoppingListState(userId, range, stateRef.current));
+  }, [range, resetStorageKey, runSync, storageKey, userId]);
 
   const completedKeys = useMemo(
     () =>
@@ -180,10 +273,12 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     setFilter,
     isHydrated,
     isSyncing,
+    syncError,
     toggleIngredient,
     setCategoryCompleted,
     clearCompleted,
     setPurchaseQuantity,
     resetRange,
+    retrySync,
   };
 }

@@ -1,4 +1,5 @@
 import type { ShoppingListResult } from './shoppingListService';
+import { SHOPPING_LIST_CATEGORY_ORDER } from './shoppingListPlanner';
 
 type ShoppingListCacheDescriptor = {
   userId: string;
@@ -37,26 +38,63 @@ export const parseShoppingListResult = (value: string | null): ShoppingListResul
       typeof (range as Record<string, unknown>).endDate !== 'string' ||
       !Array.isArray(ingredients) ||
       typeof candidate.totalMealCount !== 'number' ||
+      !Number.isFinite(candidate.totalMealCount) ||
+      candidate.totalMealCount < 0 ||
       typeof candidate.visibleMealCount !== 'number' ||
-      typeof candidate.hiddenMealCount !== 'number'
+      !Number.isFinite(candidate.visibleMealCount) ||
+      candidate.visibleMealCount < 0 ||
+      typeof candidate.hiddenMealCount !== 'number' ||
+      !Number.isFinite(candidate.hiddenMealCount) ||
+      candidate.hiddenMealCount < 0
     )
       return null;
+
+    const parsedIngredients: ShoppingListResult['ingredients'] = [];
+    for (const item of ingredients) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+      const ingredient = item as Record<string, unknown>;
+      if (
+        typeof ingredient.key !== 'string' ||
+        ingredient.key.trim().length === 0 ||
+        typeof ingredient.name !== 'string' ||
+        ingredient.name.trim().length === 0 ||
+        typeof ingredient.quantity_g !== 'number' ||
+        !Number.isFinite(ingredient.quantity_g) ||
+        ingredient.quantity_g < 0 ||
+        (ingredient.category !== null &&
+          (typeof ingredient.category !== 'string' ||
+            !SHOPPING_LIST_CATEGORY_ORDER.includes(
+              ingredient.category as (typeof SHOPPING_LIST_CATEGORY_ORDER)[number],
+            ))) ||
+        (ingredient.purchase_quantity_g !== undefined &&
+          (typeof ingredient.purchase_quantity_g !== 'number' ||
+            !Number.isFinite(ingredient.purchase_quantity_g) ||
+            ingredient.purchase_quantity_g <= 0))
+      )
+        return null;
+
+      if (ingredient.sources !== undefined) {
+        if (!Array.isArray(ingredient.sources)) return null;
+        for (const source of ingredient.sources) {
+          if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+          const candidate = source as Record<string, unknown>;
+          if (
+            typeof candidate.date !== 'string' ||
+            (candidate.mealType !== null && typeof candidate.mealType !== 'string') ||
+            (candidate.mealName !== null && typeof candidate.mealName !== 'string')
+          )
+            return null;
+        }
+      }
+      parsedIngredients.push(item as ShoppingListResult['ingredients'][number]);
+    }
 
     return {
       range: {
         startDate: (range as Record<string, string>).startDate,
         endDate: (range as Record<string, string>).endDate,
       },
-      ingredients: ingredients.filter(item => {
-        if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
-        const ingredient = item as Record<string, unknown>;
-        return (
-          typeof ingredient.key === 'string' &&
-          typeof ingredient.name === 'string' &&
-          typeof ingredient.quantity_g === 'number' &&
-          (ingredient.category === null || typeof ingredient.category === 'string')
-        );
-      }) as ShoppingListResult['ingredients'],
+      ingredients: parsedIngredients,
       totalMealCount: Math.max(0, candidate.totalMealCount),
       visibleMealCount: Math.max(0, candidate.visibleMealCount),
       hiddenMealCount: Math.max(0, candidate.hiddenMealCount),

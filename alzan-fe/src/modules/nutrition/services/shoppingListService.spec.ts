@@ -16,6 +16,7 @@ import {
   filterShoppingIngredients,
   getShoppingPurchaseQuantity,
   roundShoppingPurchaseQuantity,
+  parseShoppingQuantityInput,
   type ShoppingMealLogInput,
   type ShoppingIngredientInput,
   type ShoppingListRequest,
@@ -27,15 +28,22 @@ import {
   serializeShoppingListCompletionKeys,
 } from './shoppingListCompletion';
 import {
+  createShoppingListItemState,
+  mergeShoppingListStateWithLegacy,
   mergeShoppingListStates,
   parseShoppingListState,
   resetShoppingListState,
   serializeShoppingListState,
   type ShoppingListState,
 } from './shoppingListState';
+import {
+  createShoppingListStateSyncQueue,
+  syncShoppingListStateWithAdapter,
+  type ShoppingListStateSyncAdapter,
+} from './shoppingListStateSyncCore';
 import type { IngredientsCategory } from '../../../types/requests.types';
 
-function run() {
+async function run() {
   testSupportsEveryCycleStartDay();
   testHandlesMonthAndYearBoundaries();
   testAggregatesCanonicalAndNormalizedIngredients();
@@ -48,6 +56,11 @@ function run() {
   testPlansUpcomingMealsByLocalSchedule();
   testSupportsAllShoppingRangesAndLimits();
   testSupportsPurchaseQuantitiesAndFilters();
+  testParsesCustomPurchaseQuantities();
+  testMigratesLegacyStateIncrementally();
+  await testSyncAdapterScopesClearAndSerializesOperations();
+  await testSyncQueueRecoversAfterFailure();
+  testRejectsPartialShoppingListCache();
 
   const cachedShoppingList = {
     range: { startDate: '2026-08-24', endDate: '2026-08-30' },
@@ -100,6 +113,14 @@ function testSupportsPurchaseQuantitiesAndFilters() {
   );
 }
 
+function testParsesCustomPurchaseQuantities() {
+  assert.equal(parseShoppingQuantityInput('1,25'), 1.25);
+  assert.equal(parseShoppingQuantityInput(' 500.5 '), 500.5);
+  assert.equal(parseShoppingQuantityInput('0'), null);
+  assert.equal(parseShoppingQuantityInput('-2'), null);
+  assert.equal(parseShoppingQuantityInput('not-a-number'), null);
+}
+
 function testPersistsIndependentShoppingListState() {
   const state: ShoppingListState = {
     'name:arroz': {
@@ -118,7 +139,104 @@ function testPersistsIndependentShoppingListState() {
     })['name:arroz'].completed,
     true,
   );
+  assert.equal(
+    mergeShoppingListStates(state, {
+      'name:arroz': { ...state['name:arroz'], completed: false, updatedAt: state['name:arroz'].updatedAt },
+    })['name:arroz'].completed,
+    true,
+  );
+  assert.equal(
+    mergeShoppingListStates(state, {
+      'name:arroz': { ...state['name:arroz'], completed: false, updatedAt: '2026-08-28T11:00:00.000Z' },
+    })['name:arroz'].completed,
+    false,
+  );
   assert.deepEqual(resetShoppingListState(), {});
+}
+
+function testMigratesLegacyStateIncrementally() {
+  const localState: ShoppingListState = {
+    'id:already-new': {
+      completed: false,
+      hidden: true,
+      updatedAt: '2026-08-28T12:00:00.000Z',
+    },
+  };
+  const migrated = mergeShoppingListStateWithLegacy(
+    localState,
+    new Set(['id:already-new', 'id:legacy']),
+    '2026-08-28T13:00:00.000Z',
+  );
+  assert.equal(migrated['id:already-new'].hidden, true);
+  assert.equal(migrated['id:legacy'].completed, true);
+  assert.equal(Object.keys(migrated).length, 2);
+}
+
+async function testSyncAdapterScopesClearAndSerializesOperations() {
+  const rows = new Map<string, ShoppingListState>();
+  const calls: string[] = [];
+  const adapter: ShoppingListStateSyncAdapter = {
+    async load(userId, range) {
+      return rows.get(`${userId}:${range.startDate}:${range.endDate}`) || {};
+    },
+    async upsert(userId, range, state) {
+      calls.push(`upsert:${userId}:${range.startDate}`);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      rows.set(`${userId}:${range.startDate}:${range.endDate}`, state);
+    },
+    async clear(userId, range) {
+      calls.push(`clear:${userId}:${range.startDate}`);
+      rows.delete(`${userId}:${range.startDate}:${range.endDate}`);
+    },
+  };
+  const range = { startDate: '2026-08-24', endDate: '2026-08-30' };
+  const otherRange = { startDate: '2026-08-31', endDate: '2026-09-06' };
+  const state: ShoppingListState = {
+    'id:one': createShoppingListItemState({ completed: true, updatedAt: '2026-08-28T10:00:00.000Z' }),
+  };
+  await syncShoppingListStateWithAdapter(adapter, 'user-1', range, state);
+  await syncShoppingListStateWithAdapter(adapter, 'user-1', otherRange, state);
+  await syncShoppingListStateWithAdapter(adapter, 'other-user', range, state);
+
+  const queue = createShoppingListStateSyncQueue();
+  const first = queue.enqueue('user-1:2026-08-24:2026-08-30', () => adapter.upsert('user-1', range, state));
+  const reset = queue.enqueue('user-1:2026-08-24:2026-08-30', () => adapter.clear('user-1', range));
+  await Promise.all([first, reset]);
+  assert.deepEqual(await adapter.load('user-1', range), {});
+  assert.deepEqual(await adapter.load('user-1', otherRange), state);
+  assert.deepEqual(await adapter.load('other-user', range), state);
+  assert.deepEqual(calls.slice(-2), ['upsert:user-1:2026-08-24', 'clear:user-1:2026-08-24']);
+}
+
+async function testSyncQueueRecoversAfterFailure() {
+  const queue = createShoppingListStateSyncQueue();
+  const calls: string[] = [];
+  const failed = queue.enqueue('same-range', async () => {
+    calls.push('failed');
+    throw new Error('offline');
+  });
+  const recovered = queue.enqueue('same-range', async () => {
+    calls.push('recovered');
+    return 'ok';
+  });
+
+  await assert.rejects(failed, /offline/);
+  assert.equal(await recovered, 'ok');
+  assert.deepEqual(calls, ['failed', 'recovered']);
+}
+
+function testRejectsPartialShoppingListCache() {
+  const partial = serializeShoppingListResult({
+    range: { startDate: '2026-08-24', endDate: '2026-08-30' },
+    ingredients: [
+      { key: 'valid', name: 'Arroz', quantity_g: 100, category: 'cereal' },
+      { key: 'broken', name: 'Pan', quantity_g: Number.NaN, category: 'cereal' },
+    ],
+    totalMealCount: 1,
+    visibleMealCount: 1,
+    hiddenMealCount: 0,
+  });
+  assert.equal(parseShoppingListResult(partial), null);
 }
 
 function testSupportsEveryCycleStartDay() {
@@ -204,7 +322,13 @@ function testFormatsShoppingListForExport() {
       { key: 'id:chicken', name: 'Pechuga de pollo', quantity_g: 400, category: 'proteina_animal' },
       { key: 'id:oil', name: 'Aceite de oliva', quantity_g: 1250, category: 'grasa' },
     ]),
-    'Pechuga de pollo - 400 g\nAceite de oliva - 1.25 kg',
+    'proteina_animal\nPechuga de pollo - 400 g\n\ngrasa\nAceite de oliva - 1.25 kg',
+  );
+  assert.equal(
+    formatShoppingListForExport([{ key: 'id:rice', name: 'Arroz', quantity_g: 100, category: 'cereal' }], {
+      categoryLabels: new Map([['cereal', 'Cereales']]),
+    }),
+    'Cereales\nArroz - 100 g',
   );
 }
 
@@ -323,4 +447,4 @@ function testSupportsAllShoppingRangesAndLimits() {
   assert.throws(() => getShoppingCustomRange('2026-08-26', '2026-08-25'), /after/);
 }
 
-run();
+void run();

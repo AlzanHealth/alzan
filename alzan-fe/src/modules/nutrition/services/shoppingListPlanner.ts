@@ -37,6 +37,10 @@ export type ShoppingListCategoryGroup = {
   ingredients: ShoppingListIngredient[];
 };
 
+export type ShoppingListExportOptions = {
+  categoryLabels?: ReadonlyMap<IngredientsCategory, string>;
+};
+
 export type ShoppingListMode = 'upcoming' | 'cycle' | 'custom';
 
 export type ShoppingMealType = Extract<MealType, 'breakfast' | 'almuerzo' | 'lunch' | 'merienda' | 'dinner' | 'snack'>;
@@ -336,6 +340,13 @@ export const adjustShoppingPurchaseQuantity = (
   return ingredient.quantity_g;
 };
 
+export const parseShoppingQuantityInput = (value: string): number | null => {
+  const normalized = value.trim().replace(',', '.');
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) return null;
+  const quantity = Number(normalized);
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : null;
+};
+
 export const filterShoppingIngredients = (
   ingredients: ShoppingListIngredient[],
   completedKeys: ReadonlySet<string>,
@@ -381,7 +392,16 @@ export const formatShoppingQuantity = (quantityGrams: number): string => {
   return `${roundedGrams} g`;
 };
 
-export const formatShoppingListForExport = (ingredients: ShoppingListIngredient[]): string =>
-  ingredients
-    .map(ingredient => `${ingredient.name} - ${formatShoppingQuantity(getShoppingPurchaseQuantity(ingredient))}`)
-    .join('\n');
+export const formatShoppingListForExport = (
+  ingredients: ShoppingListIngredient[],
+  options: ShoppingListExportOptions = {},
+): string =>
+  groupShoppingIngredientsByCategory(ingredients)
+    .map(group => {
+      const categoryLabel = options.categoryLabels?.get(group.category) || group.category;
+      const lines = group.ingredients.map(
+        ingredient => `${ingredient.name} - ${formatShoppingQuantity(getShoppingPurchaseQuantity(ingredient))}`,
+      );
+      return [categoryLabel, ...lines].join('\n');
+    })
+    .join('\n\n');

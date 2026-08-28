@@ -10,9 +10,15 @@ export type ShoppingListItemState = {
 export type ShoppingListState = Record<string, ShoppingListItemState>;
 
 const SHOPPING_LIST_STATE_STORAGE_PREFIX = 'alzan.shopping-list.state';
+const SHOPPING_LIST_RESET_STORAGE_PREFIX = 'alzan.shopping-list.reset';
+
+export const SHOPPING_LIST_RESET_PENDING_VALUE = '1';
 
 export const getShoppingListStateStorageKey = (userId: string, range: ShoppingListDateRange): string =>
   `${SHOPPING_LIST_STATE_STORAGE_PREFIX}.${userId}.${range.startDate}.${range.endDate}`;
+
+export const getShoppingListResetStorageKey = (userId: string, range: ShoppingListDateRange): string =>
+  `${SHOPPING_LIST_RESET_STORAGE_PREFIX}.${userId}.${range.startDate}.${range.endDate}`;
 
 export const createShoppingListItemState = (overrides: Partial<ShoppingListItemState> = {}): ShoppingListItemState => ({
   completed: false,
@@ -32,7 +38,10 @@ export const parseShoppingListState = (value: string | null): ShoppingListState 
       Object.entries(parsed).flatMap(([key, rawState]) => {
         if (!rawState || typeof rawState !== 'object' || Array.isArray(rawState)) return [];
         const candidate = rawState as Record<string, unknown>;
-        const updatedAt = typeof candidate.updatedAt === 'string' ? candidate.updatedAt : new Date(0).toISOString();
+        const updatedAt =
+          typeof candidate.updatedAt === 'string' && Number.isFinite(Date.parse(candidate.updatedAt))
+            ? candidate.updatedAt
+            : new Date(0).toISOString();
         const purchaseQuantityGrams = candidate.purchaseQuantityGrams;
         return [
           [
@@ -41,7 +50,9 @@ export const parseShoppingListState = (value: string | null): ShoppingListState 
               completed: candidate.completed === true,
               hidden: candidate.hidden === true,
               purchaseQuantityGrams:
-                typeof purchaseQuantityGrams === 'number' && Number.isFinite(purchaseQuantityGrams)
+                typeof purchaseQuantityGrams === 'number' &&
+                Number.isFinite(purchaseQuantityGrams) &&
+                purchaseQuantityGrams > 0
                   ? purchaseQuantityGrams
                   : undefined,
               updatedAt,
@@ -59,6 +70,18 @@ export const serializeShoppingListState = (state: ShoppingListState): string => 
 
 export const resetShoppingListState = (): ShoppingListState => ({});
 
+export const mergeShoppingListStateWithLegacy = (
+  local: ShoppingListState,
+  legacyKeys: ReadonlySet<string>,
+  updatedAt = new Date().toISOString(),
+): ShoppingListState => {
+  const merged = { ...local };
+  legacyKeys.forEach(key => {
+    if (!merged[key]) merged[key] = createShoppingListItemState({ completed: true, updatedAt });
+  });
+  return merged;
+};
+
 export const mergeShoppingListStates = (local: ShoppingListState, remote: ShoppingListState): ShoppingListState => {
   const merged: ShoppingListState = { ...local };
   Object.entries(remote).forEach(([key, remoteState]) => {
@@ -66,4 +89,22 @@ export const mergeShoppingListStates = (local: ShoppingListState, remote: Shoppi
     if (!localState || remoteState.updatedAt > localState.updatedAt) merged[key] = remoteState;
   });
   return merged;
+};
+
+export const areShoppingListStatesEqual = (left: ShoppingListState, right: ShoppingListState): boolean => {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+
+  return leftKeys.every(key => {
+    const leftItem = left[key];
+    const rightItem = right[key];
+    return (
+      !!rightItem &&
+      leftItem.completed === rightItem.completed &&
+      leftItem.hidden === rightItem.hidden &&
+      leftItem.purchaseQuantityGrams === rightItem.purchaseQuantityGrams &&
+      leftItem.updatedAt === rightItem.updatedAt
+    );
+  });
 };
