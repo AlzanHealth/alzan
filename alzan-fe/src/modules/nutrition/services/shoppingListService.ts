@@ -1,11 +1,20 @@
 import { getLocalizedIngredientName, getCurrentAppLocale } from '../../../services/localization';
 import { supabase } from '../../../lib/supabaseClient';
 import type { IngredientsCategory } from '../../../types/requests.types';
-import type { ShoppingIngredientInput, ShoppingListDateRange, ShoppingListIngredient } from './shoppingListPlanner';
+import type {
+  ShoppingIngredientInput,
+  ShoppingListDateRange,
+  ShoppingListIngredient,
+  ShoppingListRequest,
+  ShoppingMealLogInput,
+  ShoppingMealTimes,
+} from './shoppingListPlanner';
 import {
   aggregateShoppingIngredients,
   getActiveShoppingMealLogIds,
-  getShoppingCycleRange,
+  getShoppingMealState,
+  getShoppingRange,
+  planShoppingMealLogs,
 } from './shoppingListPlanner';
 
 export type { ShoppingListDateRange, ShoppingListIngredient } from './shoppingListPlanner';
@@ -13,6 +22,9 @@ export type { ShoppingListDateRange, ShoppingListIngredient } from './shoppingLi
 export type ShoppingListResult = {
   range: ShoppingListDateRange;
   ingredients: ShoppingListIngredient[];
+  totalMealCount: number;
+  visibleMealCount: number;
+  hiddenMealCount: number;
 };
 
 type IngredientNameLookupRow = {
@@ -26,21 +38,55 @@ export async function getShoppingList(
   userId: string,
   selectedDate: Date | string,
   startDay: number,
+  options: {
+    mode?: ShoppingListRequest['mode'];
+    customStartDate?: string;
+    customEndDate?: string;
+    now?: Date;
+    timezone?: string;
+    mealTimes?: ShoppingMealTimes;
+    showPast?: boolean;
+  } = {},
 ): Promise<ShoppingListResult> {
   if (!userId) throw new Error('No authenticated user');
 
-  const range = getShoppingCycleRange(selectedDate, startDay);
+  const selectedDateKey = typeof selectedDate === 'string' ? selectedDate : selectedDate.toISOString().slice(0, 10);
+  const request: ShoppingListRequest = {
+    mode: options.mode || 'upcoming',
+    selectedDate: selectedDateKey,
+    customStartDate: options.customStartDate,
+    customEndDate: options.customEndDate,
+    now: options.now || new Date(),
+    timezone: options.timezone,
+    mealTimes: options.mealTimes,
+    showPast: options.showPast,
+  };
+  const range = getShoppingRange(request, startDay);
   const { data: logs, error: logsError } = await supabase
     .from('meal_logs')
-    .select('id, adherence_status')
+    .select('id, date, meal_type, adherence_status, source, origin')
     .eq('user_id', userId)
     .gte('date', range.startDate)
     .lte('date', range.endDate);
 
   if (logsError) throw logsError;
 
-  const mealLogIds = getActiveShoppingMealLogIds(logs || []);
-  if (mealLogIds.length === 0) return { range, ingredients: [] };
+  const allLogs = (logs || []) as ShoppingMealLogInput[];
+  const visibleLogs = planShoppingMealLogs(allLogs, request);
+  const mealLogIds = getActiveShoppingMealLogIds(visibleLogs);
+  const hiddenMealCount =
+    request.mode === 'upcoming' && !request.showPast
+      ? allLogs.filter(log => getShoppingMealState(log, request) === 'past').length
+      : 0;
+  if (mealLogIds.length === 0) {
+    return {
+      range,
+      ingredients: [],
+      totalMealCount: allLogs.length,
+      visibleMealCount: 0,
+      hiddenMealCount,
+    };
+  }
 
   const { data: items, error: itemsError } = await supabase
     .from('meal_items')
@@ -83,5 +129,8 @@ export async function getShoppingList(
   return {
     range,
     ingredients: aggregateShoppingIngredients(items || [], localizedNamesById, categoriesById),
+    totalMealCount: allLogs.length,
+    visibleMealCount: visibleLogs.length,
+    hiddenMealCount,
   };
 }

@@ -3590,6 +3590,50 @@ export type Database = {
           },
         ];
       };
+      shopping_list_states: {
+        Row: {
+          completed: boolean;
+          hidden: boolean;
+          id: string;
+          ingredient_key: string;
+          purchase_quantity_g: number | null;
+          range_end: string;
+          range_start: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          completed?: boolean;
+          hidden?: boolean;
+          id?: string;
+          ingredient_key: string;
+          purchase_quantity_g?: number | null;
+          range_end: string;
+          range_start: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          completed?: boolean;
+          hidden?: boolean;
+          id?: string;
+          ingredient_key?: string;
+          purchase_quantity_g?: number | null;
+          range_end?: string;
+          range_start?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'shopping_list_states_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       sleep_biomarker_samples: {
         Row: {
           confidence: number | null;
