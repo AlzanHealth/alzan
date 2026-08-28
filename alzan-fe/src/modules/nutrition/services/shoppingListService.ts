@@ -8,6 +8,7 @@ import type {
   ShoppingListRequest,
   ShoppingMealLogInput,
   ShoppingMealTimes,
+  ShoppingListIngredientSource,
 } from './shoppingListPlanner';
 import {
   aggregateShoppingIngredients,
@@ -64,7 +65,7 @@ export async function getShoppingList(
   const range = getShoppingRange(request, startDay);
   const { data: logs, error: logsError } = await supabase
     .from('meal_logs')
-    .select('id, date, meal_type, adherence_status, source, origin')
+    .select('id, date, meal_type, name, adherence_status, source, origin')
     .eq('user_id', userId)
     .gte('date', range.startDate)
     .lte('date', range.endDate);
@@ -73,6 +74,16 @@ export async function getShoppingList(
 
   const allLogs = (logs || []) as ShoppingMealLogInput[];
   const visibleLogs = planShoppingMealLogs(allLogs, request);
+  const sourcesByMealLogId = new Map<string, ShoppingListIngredientSource>(
+    visibleLogs.map(log => [
+      log.id,
+      {
+        date: log.date || range.startDate,
+        mealType: log.meal_type || null,
+        mealName: log.name?.trim() || null,
+      },
+    ]),
+  );
   const mealLogIds = getActiveShoppingMealLogIds(visibleLogs);
   const hiddenMealCount =
     request.mode === 'upcoming' && !request.showPast
@@ -90,7 +101,7 @@ export async function getShoppingList(
 
   const { data: items, error: itemsError } = await supabase
     .from('meal_items')
-    .select('name, quantity_g, source, source_ref')
+    .select('name, quantity_g, source, source_ref, meal_log_id')
     .eq('user_id', userId)
     .in('meal_log_id', mealLogIds)
     .returns<ShoppingIngredientInput[]>();
@@ -128,7 +139,7 @@ export async function getShoppingList(
 
   return {
     range,
-    ingredients: aggregateShoppingIngredients(items || [], localizedNamesById, categoriesById),
+    ingredients: aggregateShoppingIngredients(items || [], localizedNamesById, categoriesById, sourcesByMealLogId),
     totalMealCount: allLogs.length,
     visibleMealCount: visibleLogs.length,
     hiddenMealCount,

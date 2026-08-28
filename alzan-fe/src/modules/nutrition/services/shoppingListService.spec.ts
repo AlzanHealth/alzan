@@ -39,6 +39,7 @@ function run() {
   testSupportsEveryCycleStartDay();
   testHandlesMonthAndYearBoundaries();
   testAggregatesCanonicalAndNormalizedIngredients();
+  testKeepsMealSourcesForAggregatedIngredients();
   testFormatsShoppingQuantities();
   testFormatsShoppingListForExport();
   testPersistsShoppingListCompletionKeys();
@@ -166,6 +167,28 @@ function testAggregatesCanonicalAndNormalizedIngredients() {
       { name: 'Tomato', quantity_g: 200 },
     ],
   );
+}
+
+function testKeepsMealSourcesForAggregatedIngredients() {
+  const ingredients = aggregateShoppingIngredients(
+    [
+      { name: 'Avena', quantity_g: 50, source: 'database', source_ref: 'oats-id', meal_log_id: 'breakfast-id' },
+      { name: 'Avena', quantity_g: 30, source: 'database', source_ref: 'oats-id', meal_log_id: 'snack-id' },
+      { name: 'Avena', quantity_g: 20, source: 'database', source_ref: 'oats-id', meal_log_id: 'breakfast-id' },
+    ],
+    new Map([['oats-id', 'Avena']]),
+    new Map([['oats-id', 'cereal' as IngredientsCategory]]),
+    new Map([
+      ['breakfast-id', { date: '2026-08-28', mealType: 'breakfast' as const, mealName: 'Avena con plátano' }],
+      ['snack-id', { date: '2026-08-28', mealType: 'snack' as const, mealName: null }],
+    ]),
+  );
+
+  assert.equal(ingredients[0].quantity_g, 100);
+  assert.deepEqual(ingredients[0].sources, [
+    { date: '2026-08-28', mealType: 'breakfast', mealName: 'Avena con plátano' },
+    { date: '2026-08-28', mealType: 'snack', mealName: null },
+  ]);
 }
 
 function testFormatsShoppingQuantities() {

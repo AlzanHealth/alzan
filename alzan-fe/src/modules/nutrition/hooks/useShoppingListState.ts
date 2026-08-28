@@ -135,34 +135,6 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     });
   }, [updateState]);
 
-  const hideIngredient = useCallback(
-    (ingredientKey: string) => {
-      updateState(previous => ({
-        ...previous,
-        [ingredientKey]: createShoppingListItemState({
-          ...previous[ingredientKey],
-          hidden: true,
-          updatedAt: new Date().toISOString(),
-        }),
-      }));
-    },
-    [updateState],
-  );
-
-  const undoHideIngredient = useCallback(
-    (ingredientKey: string) => {
-      updateState(previous => ({
-        ...previous,
-        [ingredientKey]: createShoppingListItemState({
-          ...previous[ingredientKey],
-          hidden: false,
-          updatedAt: new Date().toISOString(),
-        }),
-      }));
-    },
-    [updateState],
-  );
-
   const setPurchaseQuantity = useCallback(
     (ingredientKey: string, quantityGrams: number) => {
       if (!Number.isFinite(quantityGrams) || quantityGrams <= 0) return;
@@ -191,15 +163,6 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
       ),
     [state],
   );
-  const hiddenKeys = useMemo(
-    () =>
-      new Set(
-        Object.entries(state)
-          .filter(([, item]) => item.hidden)
-          .map(([key]) => key),
-      ),
-    [state],
-  );
   const purchaseQuantities = useMemo(
     () =>
       new Map(
@@ -212,7 +175,6 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
 
   return {
     completedKeys,
-    hiddenKeys,
     purchaseQuantities,
     filter,
     setFilter,
@@ -221,8 +183,6 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     toggleIngredient,
     setCategoryCompleted,
     clearCompleted,
-    hideIngredient,
-    undoHideIngredient,
     setPurchaseQuantity,
     resetRange,
   };

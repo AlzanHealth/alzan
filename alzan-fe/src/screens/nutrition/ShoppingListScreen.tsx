@@ -87,7 +87,6 @@ export const ShoppingListScreen = () => {
   const [customEndDate, setCustomEndDate] = useState(format(addDays(parseISO(initialDate), 6), 'yyyy-MM-dd'));
   const [calendarTarget, setCalendarTarget] = useState<'start' | 'end' | null>(null);
   const [showPast, setShowPast] = useState(false);
-  const [lastHiddenKey, setLastHiddenKey] = useState<string | null>(null);
   const {
     error,
     isLoading,
@@ -102,7 +101,6 @@ export const ShoppingListScreen = () => {
   } = useShoppingList(selectedDate, { mode, customStartDate, customEndDate, showPast });
   const {
     completedKeys,
-    hiddenKeys,
     purchaseQuantities,
     filter,
     setFilter,
@@ -111,25 +109,17 @@ export const ShoppingListScreen = () => {
     toggleIngredient,
     setCategoryCompleted,
     clearCompleted,
-    hideIngredient,
-    undoHideIngredient,
     setPurchaseQuantity,
     resetRange,
   } = useShoppingListState(user?.id, range);
 
   const visibleIngredients = useMemo(
     () =>
-      ingredients
-        .filter(ingredient => !hiddenKeys.has(ingredient.key))
-        .map(ingredient => ({
-          ...ingredient,
-          purchase_quantity_g: purchaseQuantities.get(ingredient.key) ?? ingredient.purchase_quantity_g,
-        })),
-    [hiddenKeys, ingredients, purchaseQuantities],
-  );
-  const hiddenIngredientCount = useMemo(
-    () => ingredients.filter(ingredient => hiddenKeys.has(ingredient.key)).length,
-    [hiddenKeys, ingredients],
+      ingredients.map(ingredient => ({
+        ...ingredient,
+        purchase_quantity_g: purchaseQuantities.get(ingredient.key) ?? ingredient.purchase_quantity_g,
+      })),
+    [ingredients, purchaseQuantities],
   );
   const filteredIngredients = useMemo(
     () => filterShoppingIngredients(visibleIngredients, completedKeys, filter),
@@ -205,18 +195,6 @@ export const ShoppingListScreen = () => {
     },
     [setPurchaseQuantity, t],
   );
-  const handleHide = useCallback(
-    (ingredientKey: string) => {
-      hideIngredient(ingredientKey);
-      setLastHiddenKey(ingredientKey);
-    },
-    [hideIngredient],
-  );
-  const undoLastHide = useCallback(() => {
-    if (!lastHiddenKey) return;
-    undoHideIngredient(lastHiddenKey);
-    setLastHiddenKey(null);
-  }, [lastHiddenKey, undoHideIngredient]);
   const handleResetRange = useCallback(() => {
     const reset = () => resetRange();
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -300,10 +278,9 @@ export const ShoppingListScreen = () => {
         colors={colors}
         onToggle={toggleIngredient}
         onAdjust={adjustIngredient}
-        onHide={handleHide}
       />
     ),
-    [adjustIngredient, colors, completedKeys, handleHide, isHydrated, toggleIngredient],
+    [adjustIngredient, colors, completedKeys, isHydrated, toggleIngredient],
   );
   const renderSectionHeader = useCallback(
     ({ section }: { section: ShoppingListCategoryGroup & { title: string; data: ShoppingListIngredient[] } }) => {
@@ -404,17 +381,7 @@ export const ShoppingListScreen = () => {
           <Text style={[styles.noticeAction, { color: colors.primary }]}>{t('nutrition.shoppingListShowPast')}</Text>
         </TouchableOpacity>
       )}
-      {lastHiddenKey && (
-        <View style={styles.undoNotice}>
-          <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
-            {t('nutrition.shoppingListIngredientsHidden', { count: hiddenIngredientCount })}
-          </Text>
-          <TouchableOpacity onPress={undoLastHide} style={styles.undoButton} accessibilityRole="button">
-            <Text style={[styles.noticeAction, { color: colors.primary }]}>{t('nutrition.shoppingListUndo')}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      <View style={[styles.filterPanel, dynamicStyles.glassCard]}>
+      <View style={styles.filterPanel}>
         <Text style={[styles.progressText, { color: colors.textSecondary }]}>
           {t('nutrition.shoppingListProgress', { completed: completedCount, total: visibleIngredients.length })}
         </Text>
@@ -514,9 +481,7 @@ export const ShoppingListScreen = () => {
                 ? 'nutrition.shoppingListEmpty'
                 : visibleMealCount === 0
                   ? 'nutrition.shoppingListNoPendingMeals'
-                  : ingredients.length === 0
-                    ? 'nutrition.shoppingListNoIngredients'
-                    : 'nutrition.shoppingListNoVisibleIngredients',
+                  : 'nutrition.shoppingListNoIngredients',
         )}
       </Text>
     </View>
@@ -628,14 +593,20 @@ const styles = StyleSheet.create({
   dateCaption: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
   dateValue: { fontSize: 16, fontWeight: '700', marginTop: 2 },
   pastNotice: { marginHorizontal: 20, marginBottom: 4, flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  undoNotice: { marginHorizontal: 20, marginBottom: 4, flexDirection: 'row', justifyContent: 'space-between' },
   noticeText: { flex: 1, fontSize: 12 },
   noticeAction: { fontSize: 12, fontWeight: '800' },
-  undoButton: { minHeight: 32, justifyContent: 'center' },
-  filterPanel: { marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 16, gap: 8 },
-  progressText: { fontSize: 13, fontWeight: '600' },
-  filterRow: { flexDirection: 'row', gap: 4 },
-  filterButton: { flex: 1, minHeight: 38, paddingHorizontal: 7, borderRadius: 10, justifyContent: 'center' },
+  filterPanel: {
+    marginHorizontal: 16,
+    marginBottom: 6,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  progressText: { flex: 1, minWidth: 112, fontSize: 13, fontWeight: '600' },
+  filterRow: { flex: 2, minWidth: 210, flexDirection: 'row', gap: 4 },
+  filterButton: { flex: 1, minHeight: 34, paddingHorizontal: 7, borderRadius: 10, justifyContent: 'center' },
   filterText: { fontSize: 11, fontWeight: '800', textAlign: 'center' },
   actionsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 4 },
   secondaryAction: {

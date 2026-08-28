@@ -1,7 +1,8 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Check, EyeOff, Pencil } from 'lucide-react-native';
+import { Check, Pencil } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { format, parseISO } from 'date-fns';
 
 import {
   formatShoppingQuantity,
@@ -24,7 +25,6 @@ type ShoppingListIngredientRowProps = {
   };
   onToggle: (key: string) => void;
   onAdjust: (item: ShoppingListIngredient) => void;
-  onHide: (key: string) => void;
 };
 
 export const ShoppingListIngredientRow = ({
@@ -35,10 +35,13 @@ export const ShoppingListIngredientRow = ({
   colors,
   onToggle,
   onAdjust,
-  onHide,
 }: ShoppingListIngredientRowProps) => {
   const { t } = useTranslation();
   const handlePress = useCallback(() => onToggle(item.key), [item.key, onToggle]);
+  const sourceLabels = (item.sources || []).map(source => {
+    const mealLabel = source.mealName || (source.mealType ? String(t(`settings.${source.mealType}` as never)) : null);
+    return `${mealLabel || t('nutrition.shoppingListUnknownMeal')} · ${format(parseISO(source.date), 'd MMM')}`;
+  });
   return (
     <View
       style={[
@@ -71,6 +74,11 @@ export const ShoppingListIngredientRow = ({
               ? `· ${formatShoppingQuantity(item.purchase_quantity_g)} ${t('nutrition.shoppingListPurchaseQuantity')}`
               : ''}
           </Text>
+          {sourceLabels.length > 0 && (
+            <Text style={[styles.sources, { color: colors.textSecondary }]} numberOfLines={2}>
+              {t('nutrition.shoppingListUsedIn', { meals: sourceLabels.join(' · ') })}
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
       <View style={styles.actions}>
@@ -83,15 +91,6 @@ export const ShoppingListIngredientRow = ({
         >
           <Pencil size={15} color={colors.primary} />
           <Text style={[styles.actionText, { color: colors.primary }]}>{t('nutrition.shoppingListAdjustShort')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => onHide(item.key)}
-          disabled={disabled}
-          accessibilityRole="button"
-          accessibilityLabel={`${t('nutrition.shoppingListHideIngredient')} ${item.name}`}
-        >
-          <EyeOff size={15} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -121,6 +120,7 @@ const styles = StyleSheet.create({
   copy: { flex: 1 },
   name: { fontSize: 16, fontWeight: '600' },
   needed: { fontSize: 12, marginTop: 3 },
+  sources: { fontSize: 11, marginTop: 3 },
   completedText: { opacity: 0.52, textDecorationLine: 'line-through' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButton: {

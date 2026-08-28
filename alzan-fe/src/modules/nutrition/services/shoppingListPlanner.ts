@@ -9,7 +9,15 @@ export type ShoppingListDateRange = {
   endDate: string;
 };
 
-export type ShoppingIngredientInput = Pick<MealItem, 'name' | 'quantity_g' | 'source' | 'source_ref'>;
+export type ShoppingIngredientInput = Pick<MealItem, 'name' | 'quantity_g' | 'source' | 'source_ref'> & {
+  meal_log_id?: string;
+};
+
+export type ShoppingListIngredientSource = {
+  date: string;
+  mealType: ShoppingMealType | null;
+  mealName: string | null;
+};
 
 export type ShoppingListIngredient = {
   key: string;
@@ -17,6 +25,7 @@ export type ShoppingListIngredient = {
   quantity_g: number;
   category: IngredientsCategory | null;
   purchase_quantity_g?: number;
+  sources?: ShoppingListIngredientSource[];
 };
 
 export type ShoppingListIngredientFilter = 'all' | 'pending' | 'purchased';
@@ -51,6 +60,7 @@ export type ShoppingMealLogInput = {
   id: string;
   date?: string;
   meal_type?: ShoppingMealType;
+  name?: string | null;
   adherence_status: string | null;
   source?: string | null;
   origin?: string | null;
@@ -245,6 +255,7 @@ export const aggregateShoppingIngredients = (
   items: ShoppingIngredientInput[],
   localizedNamesById: ReadonlyMap<string, string> = new Map(),
   categoriesById: ReadonlyMap<string, IngredientsCategory> = new Map(),
+  sourcesByMealLogId: ReadonlyMap<string, ShoppingListIngredientSource> = new Map(),
 ): ShoppingListIngredient[] => {
   const aggregated = new Map<string, ShoppingListIngredient>();
 
@@ -254,12 +265,24 @@ export const aggregateShoppingIngredients = (
 
     const sourceRef = item.source_ref?.trim();
     const name = sourceRef ? localizedNamesById.get(sourceRef) || item.name.trim() : item.name.trim();
+    const source = item.meal_log_id ? sourcesByMealLogId.get(item.meal_log_id) : undefined;
     const existing = aggregated.get(key);
 
     if (existing) {
+      const sources =
+        source &&
+        !(existing.sources || []).some(
+          existingSource =>
+            existingSource.date === source.date &&
+            existingSource.mealType === source.mealType &&
+            existingSource.mealName === source.mealName,
+        )
+          ? [...(existing.sources || []), source]
+          : existing.sources;
       aggregated.set(key, {
         ...existing,
         quantity_g: existing.quantity_g + (Number(item.quantity_g) || 0),
+        ...(sources ? { sources } : {}),
       });
     } else {
       aggregated.set(key, {
@@ -267,6 +290,7 @@ export const aggregateShoppingIngredients = (
         name,
         quantity_g: Number(item.quantity_g) || 0,
         category: sourceRef ? categoriesById.get(sourceRef) || null : null,
+        ...(source ? { sources: [source] } : {}),
       });
     }
   }
