@@ -29,6 +29,7 @@ import {
 import {
   mergeShoppingListStates,
   parseShoppingListState,
+  resetShoppingListState,
   serializeShoppingListState,
   type ShoppingListState,
 } from './shoppingListState';
@@ -116,6 +117,7 @@ function testPersistsIndependentShoppingListState() {
     })['name:arroz'].completed,
     true,
   );
+  assert.deepEqual(resetShoppingListState(), {});
 }
 
 function testSupportsEveryCycleStartDay() {

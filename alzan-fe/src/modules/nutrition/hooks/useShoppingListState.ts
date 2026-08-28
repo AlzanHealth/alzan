@@ -10,6 +10,7 @@ import {
   getShoppingListStateStorageKey,
   mergeShoppingListStates,
   parseShoppingListState,
+  resetShoppingListState,
   type ShoppingListState,
 } from '../services/shoppingListState';
 import { loadShoppingListStateFromServer, persistShoppingListState } from '../services/shoppingListStateSync';
@@ -178,13 +179,7 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
   );
 
   const resetRange = useCallback(() => {
-    updateState(previous => {
-      const next = { ...previous };
-      Object.entries(next).forEach(([key, item]) => {
-        if (item.completed) next[key] = { ...item, completed: false, updatedAt: new Date().toISOString() };
-      });
-      return next;
-    });
+    updateState(resetShoppingListState);
   }, [updateState]);
 
   const completedKeys = useMemo(

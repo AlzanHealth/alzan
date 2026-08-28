@@ -57,6 +57,8 @@ export const parseShoppingListState = (value: string | null): ShoppingListState 
 
 export const serializeShoppingListState = (state: ShoppingListState): string => JSON.stringify(state);
 
+export const resetShoppingListState = (): ShoppingListState => ({});
+
 export const mergeShoppingListStates = (local: ShoppingListState, remote: ShoppingListState): ShoppingListState => {
   const merged: ShoppingListState = { ...local };
   Object.entries(remote).forEach(([key, remoteState]) => {

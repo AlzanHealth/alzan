@@ -87,7 +87,6 @@ export const ShoppingListScreen = () => {
   const [customEndDate, setCustomEndDate] = useState(format(addDays(parseISO(initialDate), 6), 'yyyy-MM-dd'));
   const [calendarTarget, setCalendarTarget] = useState<'start' | 'end' | null>(null);
   const [showPast, setShowPast] = useState(false);
-  const [includePurchasedInExport, setIncludePurchasedInExport] = useState(false);
   const [lastHiddenKey, setLastHiddenKey] = useState<string | null>(null);
   const {
     error,
@@ -136,12 +135,8 @@ export const ShoppingListScreen = () => {
     () => filterShoppingIngredients(visibleIngredients, completedKeys, filter),
     [completedKeys, filter, visibleIngredients],
   );
-  const pendingIngredients = useMemo(
-    () => visibleIngredients.filter(ingredient => !completedKeys.has(ingredient.key)),
-    [completedKeys, visibleIngredients],
-  );
   const completedCount = visibleIngredients.filter(ingredient => completedKeys.has(ingredient.key)).length;
-  const exportIngredients = includePurchasedInExport ? visibleIngredients : pendingIngredients;
+  const exportIngredients = filteredIngredients;
   const exportText = useMemo(() => formatShoppingListForExport(exportIngredients), [exportIngredients]);
   const sections = useMemo(
     () =>
@@ -222,6 +217,23 @@ export const ShoppingListScreen = () => {
     undoHideIngredient(lastHiddenKey);
     setLastHiddenKey(null);
   }, [lastHiddenKey, undoHideIngredient]);
+  const handleResetRange = useCallback(() => {
+    const reset = () => resetRange();
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (
+        window.confirm(
+          `${t('nutrition.shoppingListResetPeriodTitle')}\n\n${t('nutrition.shoppingListResetPeriodMessage')}`,
+        )
+      ) {
+        reset();
+      }
+      return;
+    }
+    Alert.alert(t('nutrition.shoppingListResetPeriodTitle'), t('nutrition.shoppingListResetPeriodMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('nutrition.shoppingListResetPeriodConfirm'), style: 'destructive', onPress: reset },
+    ]);
+  }, [resetRange, t]);
   const handleCopy = useCallback(async () => {
     if (!exportText || Platform.OS !== 'web') return;
     try {
@@ -322,6 +334,193 @@ export const ShoppingListScreen = () => {
   const calendarValue = parseISO(calendarTarget === 'start' ? customStartDate : customEndDate);
   const calendarMinimum = calendarTarget === 'end' ? parseISO(customStartDate) : undefined;
   const calendarMaximum = calendarTarget === 'end' ? addDays(parseISO(customStartDate), 29) : parseISO(customEndDate);
+  const controlsHeader = (
+    <View style={styles.controlsHeader}>
+      <View style={[styles.modeCard, dynamicStyles.glassCard]}>
+        {modes.map(option => (
+          <TouchableOpacity
+            key={option.value}
+            style={[styles.modeButton, mode === option.value && { backgroundColor: colors.primary }]}
+            onPress={() => {
+              setMode(option.value);
+              setShowPast(false);
+            }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: mode === option.value }}
+          >
+            <Text style={[styles.modeText, { color: mode === option.value ? colors.white : colors.textPrimary }]}>
+              {t(option.labelKey)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {mode === 'custom' ? (
+        <View style={[styles.customCard, dynamicStyles.glassCard]}>
+          <Text style={[styles.customHint, { color: colors.textSecondary }]}>
+            {t('nutrition.shoppingListCustomHint')}
+          </Text>
+          <TouchableOpacity
+            style={styles.dateChoice}
+            onPress={() => setCalendarTarget('start')}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.dateCaption, { color: colors.textSecondary }]}>
+              {t('nutrition.shoppingListStartDate')}
+            </Text>
+            <Text style={[styles.dateValue, { color: colors.textPrimary }]}>{formatPeriodDate(customStartDate)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.dateChoice}
+            onPress={() => setCalendarTarget('end')}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.dateCaption, { color: colors.textSecondary }]}>
+              {t('nutrition.shoppingListEndDate')}
+            </Text>
+            <Text style={[styles.dateValue, { color: colors.textPrimary }]}>{formatPeriodDate(customEndDate)}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={[styles.periodCard, dynamicStyles.glassCard]}>
+          <TouchableOpacity style={styles.periodButton} onPress={() => movePeriod(-1)} accessibilityRole="button">
+            <ChevronLeft size={20} color={colors.primary} />
+          </TouchableOpacity>
+          <View style={styles.periodCopy}>
+            <Text style={[styles.periodLabel, { color: colors.textSecondary }]}>{periodLabel}</Text>
+            <Text style={[styles.periodCount, { color: colors.textPrimary }]}>
+              {t('nutrition.shoppingListIngredientCount', { count: visibleIngredients.length })}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.periodButton} onPress={() => movePeriod(1)} accessibilityRole="button">
+            <ChevronRight size={20} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
+      )}
+      {hiddenMealCount > 0 && mode === 'upcoming' && !showPast && (
+        <TouchableOpacity style={styles.pastNotice} onPress={() => setShowPast(true)} accessibilityRole="button">
+          <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
+            {t('nutrition.shoppingListPastHidden', { count: hiddenMealCount })}
+          </Text>
+          <Text style={[styles.noticeAction, { color: colors.primary }]}>{t('nutrition.shoppingListShowPast')}</Text>
+        </TouchableOpacity>
+      )}
+      {lastHiddenKey && (
+        <View style={styles.undoNotice}>
+          <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
+            {t('nutrition.shoppingListIngredientsHidden', { count: hiddenIngredientCount })}
+          </Text>
+          <TouchableOpacity onPress={undoLastHide} style={styles.undoButton} accessibilityRole="button">
+            <Text style={[styles.noticeAction, { color: colors.primary }]}>{t('nutrition.shoppingListUndo')}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      <View style={[styles.filterPanel, dynamicStyles.glassCard]}>
+        <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+          {t('nutrition.shoppingListProgress', { completed: completedCount, total: visibleIngredients.length })}
+        </Text>
+        <View style={styles.filterRow}>
+          {(['all', 'pending', 'purchased'] as ShoppingListIngredientFilter[]).map(value => (
+            <TouchableOpacity
+              key={value}
+              onPress={() => setFilter(value)}
+              style={[styles.filterButton, filter === value && { backgroundColor: colors.primary }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: filter === value }}
+            >
+              <Text style={[styles.filterText, { color: filter === value ? colors.white : colors.primary }]}>
+                {t(filterLabelKeys[value] as never)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+      {visibleIngredients.length > 0 && (
+        <>
+          <View style={styles.actionsRow}>
+            {completedCount > 0 && (
+              <TouchableOpacity style={styles.secondaryAction} onPress={clearCompleted} accessibilityRole="button">
+                <RotateCcw size={15} color={colors.primary} />
+                <Text style={[styles.secondaryActionText, { color: colors.primary }]}>
+                  {t('nutrition.shoppingListClearCompleted')}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.secondaryAction} onPress={handleResetRange} accessibilityRole="button">
+              <RotateCcw size={15} color={colors.primary} />
+              <Text style={[styles.secondaryActionText, { color: colors.primary }]}>
+                {t('nutrition.shoppingListResetRange')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {filteredIngredients.length > 0 && (
+            <View style={styles.exportActions}>
+              {Platform.OS === 'ios' && (
+                <TouchableOpacity
+                  style={styles.exportAction}
+                  onPress={handleCreateAppleReminders}
+                  accessibilityRole="button"
+                >
+                  <ListPlus size={17} color={colors.primary} />
+                  <Text style={[styles.exportActionText, { color: colors.primary }]}>
+                    {t('nutrition.shoppingListAppleReminders')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {Platform.OS === 'web' && (
+                <TouchableOpacity
+                  style={styles.exportAction}
+                  onPress={() => void handleCopy()}
+                  accessibilityRole="button"
+                >
+                  <Copy size={17} color={colors.primary} />
+                  <Text style={[styles.exportActionText, { color: colors.primary }]}>
+                    {t('nutrition.shoppingListCopy')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.exportAction}
+                onPress={() => void handleShare()}
+                accessibilityRole="button"
+              >
+                <Share2 size={17} color={colors.primary} />
+                <Text style={[styles.exportActionText, { color: colors.primary }]}>
+                  {t('nutrition.shoppingListShare')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
+      )}
+      {isSyncing && (
+        <Text style={[styles.syncText, { color: colors.textSecondary }]}>{t('nutrition.shoppingListSyncing')}</Text>
+      )}
+      {isOffline && !isLoading && (
+        <Text style={[styles.syncText, { color: colors.textSecondary }]}>{t('nutrition.shoppingListOffline')}</Text>
+      )}
+    </View>
+  );
+
+  const emptyState = (
+    <View style={styles.centerState}>
+      <ShoppingBasket size={42} color={colors.textSecondary} strokeWidth={1.8} />
+      <Text style={[styles.stateText, { color: colors.textSecondary }]}>
+        {t(
+          filter === 'pending'
+            ? 'nutrition.shoppingListNoPending'
+            : filter === 'purchased'
+              ? 'nutrition.shoppingListNoPurchased'
+              : totalMealCount === 0
+                ? 'nutrition.shoppingListEmpty'
+                : visibleMealCount === 0
+                  ? 'nutrition.shoppingListNoPendingMeals'
+                  : ingredients.length === 0
+                    ? 'nutrition.shoppingListNoIngredients'
+                    : 'nutrition.shoppingListNoVisibleIngredients',
+        )}
+      </Text>
+    </View>
+  );
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.container}>
@@ -340,174 +539,6 @@ export const ShoppingListScreen = () => {
           </View>
           <View style={styles.headerButton} />
         </View>
-        <View style={[styles.modeCard, dynamicStyles.glassCard]}>
-          {modes.map(option => (
-            <TouchableOpacity
-              key={option.value}
-              style={[styles.modeButton, mode === option.value && { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setMode(option.value);
-                setShowPast(false);
-              }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: mode === option.value }}
-            >
-              <Text style={[styles.modeText, { color: mode === option.value ? colors.white : colors.textPrimary }]}>
-                {t(option.labelKey)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        {mode === 'custom' ? (
-          <View style={[styles.customCard, dynamicStyles.glassCard]}>
-            <Text style={[styles.customHint, { color: colors.textSecondary }]}>
-              {t('nutrition.shoppingListCustomHint')}
-            </Text>
-            <TouchableOpacity
-              style={styles.dateChoice}
-              onPress={() => setCalendarTarget('start')}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.dateCaption, { color: colors.textSecondary }]}>
-                {t('nutrition.shoppingListStartDate')}
-              </Text>
-              <Text style={[styles.dateValue, { color: colors.textPrimary }]}>{formatPeriodDate(customStartDate)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.dateChoice}
-              onPress={() => setCalendarTarget('end')}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.dateCaption, { color: colors.textSecondary }]}>
-                {t('nutrition.shoppingListEndDate')}
-              </Text>
-              <Text style={[styles.dateValue, { color: colors.textPrimary }]}>{formatPeriodDate(customEndDate)}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={[styles.periodCard, dynamicStyles.glassCard]}>
-            <TouchableOpacity style={styles.periodButton} onPress={() => movePeriod(-1)} accessibilityRole="button">
-              <ChevronLeft size={20} color={colors.primary} />
-            </TouchableOpacity>
-            <View style={styles.periodCopy}>
-              <Text style={[styles.periodLabel, { color: colors.textSecondary }]}>{periodLabel}</Text>
-              <Text style={[styles.periodCount, { color: colors.textPrimary }]}>
-                {t('nutrition.shoppingListIngredientCount', { count: visibleIngredients.length })}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.periodButton} onPress={() => movePeriod(1)} accessibilityRole="button">
-              <ChevronRight size={20} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-        )}
-        {hiddenMealCount > 0 && mode === 'upcoming' && !showPast && (
-          <TouchableOpacity style={styles.pastNotice} onPress={() => setShowPast(true)} accessibilityRole="button">
-            <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
-              {t('nutrition.shoppingListPastHidden', { count: hiddenMealCount })}
-            </Text>
-            <Text style={[styles.noticeAction, { color: colors.primary }]}>{t('nutrition.shoppingListShowPast')}</Text>
-          </TouchableOpacity>
-        )}
-        {lastHiddenKey && (
-          <View style={styles.undoNotice}>
-            <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
-              {t('nutrition.shoppingListIngredientsHidden', { count: hiddenIngredientCount })}
-            </Text>
-            <TouchableOpacity onPress={undoLastHide} style={styles.undoButton} accessibilityRole="button">
-              <Text style={[styles.noticeAction, { color: colors.primary }]}>{t('nutrition.shoppingListUndo')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {visibleIngredients.length > 0 && (
-          <View style={styles.progressRow}>
-            <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-              {t('nutrition.shoppingListProgress', { completed: completedCount, total: visibleIngredients.length })}
-            </Text>
-            <View style={styles.filterRow}>
-              {(['all', 'pending', 'purchased'] as ShoppingListIngredientFilter[]).map(value => (
-                <TouchableOpacity
-                  key={value}
-                  onPress={() => setFilter(value)}
-                  style={[styles.filterButton, filter === value && { backgroundColor: colors.primary }]}
-                  accessibilityRole="button"
-                >
-                  <Text style={[styles.filterText, { color: filter === value ? colors.white : colors.primary }]}>
-                    {t(filterLabelKeys[value] as never)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-        {visibleIngredients.length > 0 && (
-          <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.secondaryAction} onPress={clearCompleted} accessibilityRole="button">
-              <RotateCcw size={15} color={colors.primary} />
-              <Text style={[styles.secondaryActionText, { color: colors.primary }]}>
-                {t('nutrition.shoppingListClearCompleted')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryAction} onPress={resetRange} accessibilityRole="button">
-              <Text style={[styles.secondaryActionText, { color: colors.primary }]}>
-                {t('nutrition.shoppingListResetRange')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {visibleIngredients.length > 0 && (
-          <View style={styles.exportActions}>
-            <TouchableOpacity
-              style={styles.exportToggle}
-              onPress={() => setIncludePurchasedInExport(value => !value)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: includePurchasedInExport }}
-            >
-              <Text style={[styles.exportToggleText, { color: colors.primary }]}>
-                {t(
-                  includePurchasedInExport
-                    ? 'nutrition.shoppingListOnlyPending'
-                    : 'nutrition.shoppingListIncludePurchased',
-                )}
-              </Text>
-            </TouchableOpacity>
-            {Platform.OS === 'ios' && (
-              <TouchableOpacity
-                style={styles.exportAction}
-                onPress={handleCreateAppleReminders}
-                accessibilityRole="button"
-              >
-                <ListPlus size={17} color={colors.primary} />
-                <Text style={[styles.exportActionText, { color: colors.primary }]}>
-                  {t('nutrition.shoppingListAppleReminders')}
-                </Text>
-              </TouchableOpacity>
-            )}
-            {Platform.OS === 'web' && (
-              <TouchableOpacity
-                style={styles.exportAction}
-                onPress={() => void handleCopy()}
-                accessibilityRole="button"
-              >
-                <Copy size={17} color={colors.primary} />
-                <Text style={[styles.exportActionText, { color: colors.primary }]}>
-                  {t('nutrition.shoppingListCopy')}
-                </Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={styles.exportAction} onPress={() => void handleShare()} accessibilityRole="button">
-              <Share2 size={17} color={colors.primary} />
-              <Text style={[styles.exportActionText, { color: colors.primary }]}>
-                {t('nutrition.shoppingListShare')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {isSyncing && (
-          <Text style={[styles.syncText, { color: colors.textSecondary }]}>{t('nutrition.shoppingListSyncing')}</Text>
-        )}
-        {isOffline && !isLoading && (
-          <Text style={[styles.syncText, { color: colors.textSecondary }]}>{t('nutrition.shoppingListOffline')}</Text>
-        )}
         {isLoading ? (
           <View style={styles.centerState}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -526,28 +557,11 @@ export const ShoppingListScreen = () => {
               <Text style={[styles.retryButtonText, { color: colors.white }]}>{t('nutrition.retry')}</Text>
             </TouchableOpacity>
           </View>
-        ) : filteredIngredients.length === 0 ? (
-          <View style={styles.centerState}>
-            <ShoppingBasket size={42} color={colors.textSecondary} strokeWidth={1.8} />
-            <Text style={[styles.stateText, { color: colors.textSecondary }]}>
-              {t(
-                filter === 'pending'
-                  ? 'nutrition.shoppingListNoPending'
-                  : filter === 'purchased'
-                    ? 'nutrition.shoppingListNoPurchased'
-                    : totalMealCount === 0
-                      ? 'nutrition.shoppingListEmpty'
-                      : visibleMealCount === 0
-                        ? 'nutrition.shoppingListNoPendingMeals'
-                        : ingredients.length === 0
-                          ? 'nutrition.shoppingListNoIngredients'
-                          : 'nutrition.shoppingListNoVisibleIngredients',
-              )}
-            </Text>
-          </View>
         ) : (
           <SectionList
             sections={sections}
+            ListHeaderComponent={controlsHeader}
+            ListEmptyComponent={emptyState}
             renderItem={renderIngredient}
             renderSectionHeader={renderSectionHeader}
             keyExtractor={item => item.key}
@@ -579,20 +593,21 @@ const styles = StyleSheet.create({
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: 22, fontWeight: '800' },
-  modeCard: { marginHorizontal: 16, marginBottom: 10, padding: 4, borderRadius: 16, flexDirection: 'row' },
+  controlsHeader: { paddingTop: 2 },
+  modeCard: { marginHorizontal: 16, marginBottom: 8, padding: 3, borderRadius: 14, flexDirection: 'row' },
   modeButton: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 38,
     paddingHorizontal: 5,
-    borderRadius: 12,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modeText: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  modeText: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
   periodCard: {
     marginHorizontal: 16,
-    marginBottom: 14,
-    padding: 10,
+    marginBottom: 10,
+    padding: 6,
     borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
@@ -601,7 +616,7 @@ const styles = StyleSheet.create({
   periodCopy: { flex: 1, alignItems: 'center' },
   periodLabel: { fontSize: 15, fontWeight: '700' },
   periodCount: { fontSize: 13, marginTop: 3 },
-  customCard: { marginHorizontal: 16, marginBottom: 12, padding: 12, borderRadius: 18, gap: 8 },
+  customCard: { marginHorizontal: 16, marginBottom: 10, padding: 10, borderRadius: 18, gap: 7 },
   customHint: { fontSize: 13, marginBottom: 2 },
   dateChoice: {
     minHeight: 52,
@@ -617,23 +632,15 @@ const styles = StyleSheet.create({
   noticeText: { flex: 1, fontSize: 12 },
   noticeAction: { fontSize: 12, fontWeight: '800' },
   undoButton: { minHeight: 32, justifyContent: 'center' },
-  progressRow: {
-    minHeight: 40,
-    paddingHorizontal: 20,
-    marginBottom: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  progressText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  filterPanel: { marginHorizontal: 16, marginBottom: 8, padding: 10, borderRadius: 16, gap: 8 },
+  progressText: { fontSize: 13, fontWeight: '600' },
   filterRow: { flexDirection: 'row', gap: 4 },
-  filterButton: { minHeight: 32, paddingHorizontal: 7, borderRadius: 10, justifyContent: 'center' },
-  filterText: { fontSize: 11, fontWeight: '800' },
+  filterButton: { flex: 1, minHeight: 38, paddingHorizontal: 7, borderRadius: 10, justifyContent: 'center' },
+  filterText: { fontSize: 11, fontWeight: '800', textAlign: 'center' },
   actionsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 4 },
   secondaryAction: {
     flex: 1,
-    minHeight: 36,
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -641,8 +648,6 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: { fontSize: 12, fontWeight: '700' },
   exportActions: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginBottom: 4, flexWrap: 'wrap' },
-  exportToggle: { minHeight: 42, paddingHorizontal: 10, justifyContent: 'center' },
-  exportToggleText: { fontSize: 12, fontWeight: '700' },
   exportAction: {
     flex: 1,
     minHeight: 42,
