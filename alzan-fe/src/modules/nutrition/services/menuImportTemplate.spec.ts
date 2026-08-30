@@ -32,6 +32,7 @@ assert.doesNotMatch(MENU_IMPORT_PROMPT, /Adapta el objetivo de proteína/);
 assert.doesNotMatch(MENU_IMPORT_PROMPT, /Genera 4–5 comidas/);
 assert.doesNotMatch(MENU_IMPORT_PROMPT, /\d+\s*[–-]\s*\d+\s*g\/día/);
 assert.ok(MENU_IMPORT_CLIPBOARD_TEXT.includes(MENU_IMPORT_PROMPT));
+assert.doesNotMatch(MENU_IMPORT_CLIPBOARD_TEXT, /[“”‘’]/, 'copyable prompt must use ASCII quotes');
 assert.equal(
   MENU_IMPORT_TEMPLATE,
   readFileSync(new URL('../../../../../docs/templates/alzan-menu-plan-v1.template.json', import.meta.url), 'utf8'),

@@ -73,6 +73,7 @@ assert.ok(prompt.includes('rutinas de gimnasio'));
 assert.ok(prompt.includes('comillas ASCII'));
 assert.ok(prompt.includes('frontend lo marcará como pendiente'));
 assert.ok(prompt.includes('conserva el nombre fuente; el frontend pedirá selección'));
+assert.doesNotMatch(prompt, /[“”‘’]/, 'AI prompt must use ASCII quotes');
 assert.ok(prompt.includes('exercises_rows'));
 assert.ok(!prompt.includes('exercise_id,exercise_name_es,exercise_name_en'));
 assert.ok(!prompt.includes('Press, inclinado'));

@@ -84,7 +84,7 @@ SALIDA
 FIDELIDAD
 - Copia exactamente fechas, días, sesiones, orden, objetivos, intervalos, recuperaciones, distancias, duraciones, series, repeticiones, pesos y descansos del DOCX.
 - No inventes ni modifiques entrenamientos.
-- Un día de descanso, paseo o movilidad sin entrenamiento no crea una sesión artificial. Una sesión opcional conserva “Opcional” en name.
+- Un día de descanso, paseo o movilidad sin entrenamiento no crea una sesión artificial. Una sesión opcional conserva "Opcional" en name.
 - Para rangos de peso, descanso, distancia o duración usa el límite inferior; para repeticiones usa reps_min y reps_max.
 - Lee todas las páginas y tablas del DOCX: la tabla de calendario fija fechas y nombres; las tablas de rutinas fijan ejercicios. No conviertas una tabla en sesión.
 - Asocia las rutinas de gimnasio del calendario con sus tablas y reutiliza cada una en sus fechas.
@@ -92,7 +92,7 @@ FIDELIDAD
 RUNNING
 - Fases permitidas: warmup, interval, recovery, cooldown y relax.
 - Duraciones permitidas: time, distance y lap_button.
-- Un calentamiento “10 min” es un único warmup de 600 segundos. Omite movilidad, activación o técnica sin duración/distancia concreta.
+- Un calentamiento "10 min" es un único warmup de 600 segundos. Omite movilidad, activación o técnica sin duración/distancia concreta.
 - Las series repetidas usan repetitions y children. Los ritmos se expresan en segundos por kilómetro.
 - Cada running_step usa solo phase_type, duration_type, duration_s, distance_m, target_type, target_min, target_max, repetitions, progression_key y children.
 - No uses target_type: "rpe" ni añadas rpe a los pasos; si el documento prescribe RPE, omite ese dato.
@@ -101,7 +101,7 @@ GIMNASIO
 - No inventes UUID: Alzan resolverá el UUID al importar usando el exercise_name canónico.
 - Usa exercise_name de una fila real de exercises_rows. Busca primero coincidencia exacta normalizada; si no existe, elige solo una alternativa más parecida y de alta confianza usando el mismo patrón de movimiento, músculo principal, equipamiento y agarre/posición.
 - Sin alternativa segura, conserva el nombre fuente; frontend lo marcará como pendiente para selección manual. No inventes UUID ni metadatos.
-- Para “A o B”/“polea/máquina” elige la mejor opción del CSV; “2+2” son dos filas consecutivas.
+- Para "A o B"/"polea/máquina" elige la mejor opción del CSV; "2+2" son dos filas consecutivas.
 - Cada exercise solo puede usar exercise_id, exercise_name, order_index, is_warmup, sets, reps, reps_min, reps_max, weight_kg y rest_seconds.
 - Conserva series, repeticiones, pesos, descansos y orden; cambia solo la referencia.
 

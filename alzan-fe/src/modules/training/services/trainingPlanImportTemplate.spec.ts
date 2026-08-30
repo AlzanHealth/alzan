@@ -46,6 +46,7 @@ assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"phase_type": "recovery"'));
 assert.ok(!TRAINING_PLAN_IMPORT_TEMPLATE.includes('REEMPLAZAR_UUID'));
 assert.equal(parseTrainingPlanJson(TRAINING_PLAN_IMPORT_TEMPLATE).ok, true);
 assert.ok(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT.includes(TRAINING_PLAN_IMPORT_TEMPLATE));
+assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /[“”‘’]/, 'copyable prompt must use ASCII quotes');
 assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /CATÁLOGO DE EJERCICIOS DE ALZAN/);
 assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /11111111-1111-4111-8111-111111111111/);
 assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"workout_goal": "speed"'));
