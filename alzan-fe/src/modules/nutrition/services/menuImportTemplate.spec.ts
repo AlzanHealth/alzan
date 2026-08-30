@@ -12,8 +12,11 @@ assert.equal((template.days as Array<Record<string, unknown>>)[0]?.weekday, 'lun
 assert.ok(MENU_IMPORT_PROMPT.includes('45 días'));
 assert.ok(MENU_IMPORT_PROMPT.includes('DOCX'));
 assert.ok(MENU_IMPORT_PROMPT.includes('aunque tenga otro nombre'));
-assert.ok(!MENU_IMPORT_PROMPT.includes('CSV adjunto de ingredientes'));
-assert.ok(!MENU_IMPORT_PROMPT.includes('ingredients_rows'));
+assert.ok(MENU_IMPORT_PROMPT.includes('CSV de ejercicios'));
+assert.ok(MENU_IMPORT_PROMPT.includes('name_es'));
+assert.ok(MENU_IMPORT_PROMPT.includes('CSV de ingredientes'));
+assert.ok(MENU_IMPORT_PROMPT.includes('coincidencia segura'));
+assert.ok(!MENU_IMPORT_PROMPT.includes('exercise_name_es'));
 assert.ok(MENU_IMPORT_PROMPT.includes('No bloquees por la ausencia de un DOCX de entrenamiento'));
 assert.ok(MENU_IMPORT_PROMPT.includes('Procesa todos los días del DOCX'));
 assert.ok(MENU_IMPORT_PROMPT.includes('un día completo por fecha'));

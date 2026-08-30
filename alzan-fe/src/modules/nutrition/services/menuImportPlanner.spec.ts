@@ -112,6 +112,124 @@ async function testSelectsSafeSingularPluralMatchesButLeavesVariantsUnresolved()
   );
 }
 
+async function testSelectsClearCatalogVariantsAndSemanticEquivalents() {
+  const document = createDocument([
+    'Clara de huevo pasteurizada',
+    'Atún al natural',
+    'Salsa de soja reducida en sal',
+    'Fiambre de pavo alto en carne',
+  ]);
+  const resolutions = await resolveMenuImportIngredients(document, async name => {
+    if (name === 'clara de huevo pasteurizada') {
+      return [
+        { ...banana, id: 'egg-white', name: 'Clara de huevo líquida pasteurizada' },
+        { ...banana, id: 'plain-egg-white', name: 'Clara de huevo' },
+        { ...banana, id: 'powdered-egg-white', name: 'Clara de huevo en polvo' },
+      ];
+    }
+    if (name === 'atun al natural') {
+      return [
+        { ...banana, id: 'tuna-pack', name: 'Atún al natural (Pack 6)' },
+        { ...banana, id: 'tuna-can', name: 'Atún en lata al natural' },
+      ];
+    }
+    if (name === 'salsa de soja reducida en sal') {
+      return [
+        { ...banana, id: 'soy-sauce', name: 'Salsa de soja' },
+        { ...banana, id: 'low-sodium-soy-sauce', name: 'Salsa de soja baja en sodio' },
+      ];
+    }
+    return [
+      { ...banana, id: 'mixed-poultry', name: 'Carne picada de pollo y pavo' },
+      { ...banana, id: 'turkey-cold-cut', name: 'Fiambre de pavo' },
+    ];
+  });
+
+  assert.equal(
+    resolutions.find(item => item.ingredientKey === 'clara de huevo pasteurizada')?.selectedCandidate?.id,
+    'egg-white',
+  );
+  assert.equal(resolutions.find(item => item.ingredientKey === 'atun al natural')?.selectedCandidate?.id, 'tuna-pack');
+  assert.equal(
+    resolutions.find(item => item.ingredientKey === 'salsa de soja reducida en sal')?.selectedCandidate?.id,
+    'low-sodium-soy-sauce',
+  );
+  assert.equal(
+    resolutions.find(item => item.ingredientKey === 'fiambre de pavo alto en carne')?.selectedCandidate?.id,
+    'turkey-cold-cut',
+  );
+}
+
+async function testDoesNotAutoSelectNutritionallyMeaningfulVariants() {
+  const document = createDocument(['Arroz integral']);
+  const resolutions = await resolveMenuImportIngredients(document, async () => [
+    { ...rice, id: 'brown-rice', name: 'Arroz integral cocido' },
+    { ...rice, id: 'long-rice', name: 'Arroz largo' },
+  ]);
+
+  assert.equal(resolutions[0]?.selectedCandidate, null);
+}
+
+async function testResolvesEquivalentCornCerealTerminology() {
+  const document = createDocument(['Cereales de maíz sin relleno']);
+  const resolutions = await resolveMenuImportIngredients(document, async () => [
+    { ...banana, id: 'corn-flakes', name: 'Copos de Maíz (Cereales)' },
+    { ...banana, id: 'filled-cereal', name: 'Cereales rellenos de Leche' },
+  ]);
+
+  assert.equal(resolutions[0]?.selectedCandidate?.id, 'corn-flakes');
+}
+
+async function testLeavesSafeVariantUnresolvedWhenACompetingVariantIsMeaningful() {
+  const document = createDocument(['Atún al natural']);
+  const resolutions = await resolveMenuImportIngredients(document, async () => [
+    { ...banana, id: 'tuna-pack', name: 'Atún al natural (Pack 6)' },
+    { ...banana, id: 'tuna-oil', name: 'Atún al natural en aceite' },
+  ]);
+
+  assert.equal(resolutions[0]?.selectedCandidate, null);
+}
+
+async function testResolvesCommonPreparationAndProductQualifiers() {
+  const document = createDocument(['Pepinillos encurtidos', 'HSN creatina monohidrato 200 mesh']);
+  const resolutions = await resolveMenuImportIngredients(document, async name => {
+    if (name === 'pepinillos encurtidos') {
+      return [
+        { ...banana, id: 'pickles', name: 'Pepinillos' },
+        { ...banana, id: 'pickles-vinegar', name: 'Pepinillos en vinagre' },
+      ];
+    }
+    return [{ ...banana, id: 'creatine', name: 'Creatina monohidrato' }];
+  });
+
+  assert.equal(
+    resolutions.find(item => item.ingredientKey === 'pepinillos encurtidos')?.selectedCandidate?.id,
+    'pickles-vinegar',
+  );
+  assert.equal(
+    resolutions.find(item => item.ingredientKey === 'hsn creatina monohidrato 200 mesh')?.selectedCandidate?.id,
+    'creatine',
+  );
+}
+
+async function testDoesNotConfuseSaltWithSodiumWithoutAReductionQualifier() {
+  const document = createDocument(['Sal']);
+  const resolutions = await resolveMenuImportIngredients(document, async () => [
+    { ...banana, id: 'sodium', name: 'Sodio' },
+  ]);
+
+  assert.equal(resolutions[0]?.selectedCandidate, null);
+}
+
+async function testDoesNotDropNutritionallyMeaningfulNumericQualifiers() {
+  const document = createDocument(['Queso fresco batido 0%']);
+  const resolutions = await resolveMenuImportIngredients(document, async () => [
+    { ...banana, id: 'plain-whipped-cheese', name: 'Queso fresco batido' },
+  ]);
+
+  assert.equal(resolutions[0]?.selectedCandidate, null);
+}
+
 async function testRejectsMalformedNutritionCandidates() {
   const document = createDocument(['Arroz integral']);
   const invalidCandidates: MenuImportIngredientCandidate[] = [
@@ -495,6 +613,13 @@ async function testUpdatesCandidatesAndRemovesOnlyOneIngredientOccurrence() {
 async function main() {
   await testUniqueSearchAndExactSelection();
   await testSelectsSafeSingularPluralMatchesButLeavesVariantsUnresolved();
+  await testSelectsClearCatalogVariantsAndSemanticEquivalents();
+  await testDoesNotAutoSelectNutritionallyMeaningfulVariants();
+  await testResolvesEquivalentCornCerealTerminology();
+  await testLeavesSafeVariantUnresolvedWhenACompetingVariantIsMeaningful();
+  await testResolvesCommonPreparationAndProductQualifiers();
+  await testDoesNotConfuseSaltWithSodiumWithoutAReductionQualifier();
+  await testDoesNotDropNutritionallyMeaningfulNumericQualifiers();
   await testRejectsMalformedNutritionCandidates();
   await testUniqueSearchAcrossDaysAndMeals();
   await testBoundedSearchConcurrency();

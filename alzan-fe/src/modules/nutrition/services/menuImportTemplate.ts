@@ -35,6 +35,7 @@ export const MENU_IMPORT_PROMPT = `Convierte el DOCX de nutrición adjunto en un
 ARCHIVOS
 - Usa como fuente principal el DOCX que contiene el plan de nutrición y léelo completo, aunque tenga otro nombre.
 - Si también hay un DOCX de entrenamiento o un CSV de ejercicios, ignóralos por completo. No bloquees por la ausencia de un DOCX de entrenamiento, exercises_rows o cualquier otro archivo que no sea necesario para nutrición.
+- Si se adjunta un CSV de ingredientes (distinto de un CSV de ejercicios), úsalo únicamente como catálogo de nombres: cuando exista una coincidencia segura, copia exactamente el valor name_es de la fila correspondiente. No inventes nombres ni uses el CSV de ejercicios para resolver ingredientes.
 
 SALIDA
 - Devuelve únicamente JSON válido, sin markdown, comentarios ni texto adicional.
@@ -62,6 +63,7 @@ FIDELIDAD
 
 INGREDIENTES
 - Conserva el nombre del ingrediente tal como aparece en el documento y no inventes alimentos distintos. Acepta diferencias de ortografía, acentos, singular/plural y sinónimos sin cambiar la identidad del alimento.
+- Si el CSV de ingredientes contiene una coincidencia segura, prioriza su nombre canónico exacto en name_es sin cambiar la identidad ni la cantidad del ingrediente.
 - Conserva siempre la cantidad original.
 - Mantén meal_type entre breakfast, almuerzo, lunch, merienda, dinner y snack.
 - No inventes nombres, IDs, calorías ni macronutrientes. No superes ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} ingredientes totales ni ${MENU_IMPORT_MAX_UNIQUE_INGREDIENTS} nombres distintos.

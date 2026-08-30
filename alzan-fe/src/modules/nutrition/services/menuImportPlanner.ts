@@ -79,6 +79,7 @@ export type ResolveMenuImportIngredientsOptions = {
 
 const MAX_CANDIDATES = 5;
 const SEARCH_CONCURRENCY = 4;
+const MIN_SAFE_VARIANT_SCORE_MARGIN = 200;
 
 const EMPTY_MACROS: MenuImportMacros = {
   kcal: 0,
@@ -88,6 +89,61 @@ const EMPTY_MACROS: MenuImportMacros = {
 };
 
 const SEARCH_STOP_WORDS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'y', 'e', 'en', 'con', 'por', 'para']);
+const INGREDIENT_TOKEN_ALIASES: Record<string, string> = {
+  baja: 'bajo',
+  bajas: 'bajo',
+  bajo: 'bajo',
+  bajos: 'bajo',
+  reducida: 'bajo',
+  reducidas: 'bajo',
+  reducido: 'bajo',
+  reducidos: 'bajo',
+  encurtido: 'vinagre',
+  encurtida: 'vinagre',
+  copo: 'cereal',
+};
+const SAL_REDUCTION_TOKENS = new Set([
+  'baja',
+  'bajo',
+  'bajas',
+  'bajos',
+  'reducida',
+  'reducidas',
+  'reducido',
+  'reducidos',
+]);
+const NON_DISCRIMINATING_VARIANT_TOKENS = new Set([
+  'alto',
+  'alta',
+  'botella',
+  'botellas',
+  'carne',
+  'gallina',
+  'hsn',
+  'lata',
+  'latas',
+  'liquida',
+  'liquido',
+  'pack',
+  'packs',
+  'pasteurizada',
+  'pasteurizado',
+  'mesh',
+  'unidad',
+  'unidades',
+]);
+const PACKAGING_OR_TECHNICAL_TOKENS = new Set([
+  'botella',
+  'botellas',
+  'hsn',
+  'lata',
+  'latas',
+  'mesh',
+  'pack',
+  'packs',
+  'unidad',
+  'unidades',
+]);
 
 const normalizeIngredientName = (name: string): string =>
   name
@@ -99,7 +155,7 @@ const normalizeIngredientName = (name: string): string =>
     .trim();
 
 const tokenizeIngredientName = (name: string): string[] => {
-  const tokens = normalizeIngredientName(name)
+  const stemmedTokens = normalizeIngredientName(name)
     .split(' ')
     .filter(Boolean)
     .map(token => {
@@ -107,6 +163,11 @@ const tokenizeIngredientName = (name: string): string[] => {
       if (token.length > 3 && token.endsWith('s')) return token.slice(0, -1);
       return token;
     });
+  const hasSaltReductionQualifier = stemmedTokens.some(token => SAL_REDUCTION_TOKENS.has(token));
+  const tokens = stemmedTokens.map(token => {
+    if (token === 'sal' && hasSaltReductionQualifier) return 'sodio';
+    return INGREDIENT_TOKEN_ALIASES[token] ?? token;
+  });
   const meaningfulTokens = tokens.filter(token => !SEARCH_STOP_WORDS.has(token));
   return Array.from(new Set(meaningfulTokens.length > 0 ? meaningfulTokens : tokens));
 };
@@ -205,6 +266,82 @@ const hasEquivalentMeaningfulTokens = (first: string, second: string): boolean =
   );
 };
 
+const getExtraTokens = (container: string[], contained: string[]): string[] | null => {
+  let containedIndex = 0;
+  const extraTokens: string[] = [];
+
+  for (const token of container) {
+    if (token === contained[containedIndex]) {
+      containedIndex += 1;
+    } else {
+      extraTokens.push(token);
+    }
+  }
+
+  return containedIndex === contained.length ? extraTokens : null;
+};
+
+const isSafeAdditionalToken = (token: string, contextTokens: string[]): boolean =>
+  NON_DISCRIMINATING_VARIANT_TOKENS.has(token) ||
+  (/^\d+$/.test(token) && contextTokens.some(contextToken => PACKAGING_OR_TECHNICAL_TOKENS.has(contextToken)));
+
+const areSafeVariantTokens = (extras: string[], sourceTokens: string[], candidateTokens: string[]): boolean => {
+  const contextTokens = [...new Set([...sourceTokens, ...candidateTokens])];
+  if (extras.every(token => isSafeAdditionalToken(token, contextTokens))) return true;
+
+  const isCornCereal = sourceTokens.includes('cereal') && sourceTokens.includes('maiz');
+  const isNoFillingQualifier = extras.includes('sin') && extras.includes('relleno');
+  return isCornCereal && isNoFillingQualifier && extras.every(token => token === 'sin' || token === 'relleno');
+};
+
+const isSafeVariantMatch = (sourceName: string, candidateName: string): boolean => {
+  const sourceTokens = tokenizeIngredientName(sourceName);
+  const candidateTokens = tokenizeIngredientName(candidateName);
+  if (sourceTokens.length < 2 || candidateTokens.length < 2) return false;
+
+  const candidateExtras = getExtraTokens(candidateTokens, sourceTokens);
+  if (candidateExtras !== null && areSafeVariantTokens(candidateExtras, sourceTokens, candidateTokens)) {
+    return true;
+  }
+
+  const sourceExtras = getExtraTokens(sourceTokens, candidateTokens);
+  return sourceExtras !== null && areSafeVariantTokens(sourceExtras, sourceTokens, candidateTokens);
+};
+
+const matchesEverySourceToken = (sourceName: string, candidateName: string): boolean => {
+  const sourceTokens = tokenizeIngredientName(sourceName);
+  const candidateTokens = tokenizeIngredientName(candidateName);
+  return sourceTokens.length >= 2 && getExtraTokens(candidateTokens, sourceTokens) !== null;
+};
+
+const selectBestSafeVariant = (
+  ingredientKey: string,
+  safeVariants: MenuImportIngredientCandidate[],
+): MenuImportIngredientCandidate | null => {
+  const sourceTokens = tokenizeIngredientName(ingredientKey);
+  const candidatesPreservingSource = safeVariants.filter(
+    candidate => getExtraTokens(tokenizeIngredientName(candidate.name), sourceTokens) !== null,
+  );
+
+  if (candidatesPreservingSource.length === 1) return candidatesPreservingSource[0] ?? null;
+  if (candidatesPreservingSource.length === 0) {
+    return safeVariants.length === 1 ? (safeVariants[0] ?? null) : null;
+  }
+
+  const rankedCandidates = [...candidatesPreservingSource].sort(
+    (first, second) =>
+      getIngredientCandidateScore(ingredientKey, second.name) - getIngredientCandidateScore(ingredientKey, first.name),
+  );
+  const bestCandidate = rankedCandidates[0];
+  const secondCandidate = rankedCandidates[1];
+  if (!bestCandidate || !secondCandidate) return null;
+
+  const scoreMargin =
+    getIngredientCandidateScore(ingredientKey, bestCandidate.name) -
+    getIngredientCandidateScore(ingredientKey, secondCandidate.name);
+  return scoreMargin >= MIN_SAFE_VARIANT_SCORE_MARGIN ? bestCandidate : null;
+};
+
 const selectSafeCandidate = (
   ingredientKey: string,
   candidates: MenuImportIngredientCandidate[],
@@ -216,7 +353,20 @@ const selectSafeCandidate = (
   const equivalentCandidates = candidates.filter(candidate =>
     hasEquivalentMeaningfulTokens(ingredientKey, candidate.name),
   );
-  return equivalentCandidates.length === 1 ? (equivalentCandidates[0] ?? null) : null;
+  if (equivalentCandidates.length === 1) return equivalentCandidates[0] ?? null;
+  if (equivalentCandidates.length > 1) return null;
+
+  const safeVariants = candidates.filter(candidate => isSafeVariantMatch(ingredientKey, candidate.name));
+  const selectedVariant = selectBestSafeVariant(ingredientKey, safeVariants);
+  if (!selectedVariant) return null;
+
+  const hasMeaningfulCompetingVariant = candidates.some(
+    candidate =>
+      candidate.id !== selectedVariant.id &&
+      matchesEverySourceToken(ingredientKey, candidate.name) &&
+      !isSafeVariantMatch(ingredientKey, candidate.name),
+  );
+  return hasMeaningfulCompetingVariant ? null : selectedVariant;
 };
 
 export async function resolveMenuImportIngredients(
