@@ -233,8 +233,10 @@ function getIntensityKey(sport: AdvancedSport): 'paceSPerKm' | 'paceSPer100m' | 
 
 /**
  * Fills the missing value among duration, distance and pace/speed.
- * When a field is edited while all three values exist, that edit is treated as
- * the source value and the most directly dependent value is recalculated.
+ * Distance is the authoritative value whenever it exists. Editing duration
+ * recalculates intensity, and editing intensity recalculates duration. The
+ * only situation in which distance is derived is when it was left empty and
+ * the other two metrics are available.
  */
 export function deriveAdvancedSectionMetrics(
   section: AdvancedSectionDraft,
@@ -269,20 +271,24 @@ export function deriveAdvancedSectionMetrics(
         : distance / duration;
 
   if (changedField === 'duration' && durationS != null) {
-    if (intensity != null) next.distanceM = calculateDistance(durationS, intensity);
-    else if (distanceM != null) next[intensityKey] = calculateIntensity(durationS, distanceM);
+    if (distanceM != null) next[intensityKey] = calculateIntensity(durationS, distanceM);
+    else if (intensity != null) next.distanceM = calculateDistance(durationS, intensity);
     return next;
   }
 
-  if (changedField === 'distance' && distanceM != null) {
-    if (durationS != null) next[intensityKey] = calculateIntensity(durationS, distanceM);
-    else if (intensity != null) next.durationS = calculateDuration(distanceM, intensity);
+  if (changedField === 'distance') {
+    if (distanceM != null) {
+      if (durationS != null) next[intensityKey] = calculateIntensity(durationS, distanceM);
+      else if (intensity != null) next.durationS = calculateDuration(distanceM, intensity);
+    } else if (durationS != null && intensity != null) {
+      next.distanceM = calculateDistance(durationS, intensity);
+    }
     return next;
   }
 
   if (changedField === 'intensity' && intensity != null) {
-    if (durationS != null) next.distanceM = calculateDistance(durationS, intensity);
-    else if (distanceM != null) next.durationS = calculateDuration(distanceM, intensity);
+    if (distanceM != null) next.durationS = calculateDuration(distanceM, intensity);
+    else if (durationS != null) next.distanceM = calculateDistance(durationS, intensity);
     return next;
   }
 

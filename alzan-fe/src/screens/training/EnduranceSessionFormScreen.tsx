@@ -73,6 +73,7 @@ import {
   shouldRenderModalitySelector,
 } from './helpers/sessionModality.helper';
 import { parsePaceInput } from '../../modules/training/helpers/paceInput.helper';
+import { deriveEnduranceMetricValues } from '../../modules/training/helpers/enduranceMetricPriority.helper';
 
 export type PopulatedEnduranceWorkoutTemplate = EnduranceWorkoutTemplate & { steps: EnduranceWorkoutStep[] };
 
@@ -456,6 +457,7 @@ export const EnduranceSessionFormScreen = () => {
 
   // Resolve derived state
   const currentConfig = SPORTS_CONFIG[sportType] || SPORTS_CONFIG.other;
+  const simpleSpeedUnit = currentConfig.units.speed;
   const advancedAvailable = !isGymMode && ['running', 'cycling', 'swimming'].includes(sportType);
   const advancedSport: AdvancedSport | null =
     sportType === 'running' || sportType === 'cycling' || sportType === 'swimming' ? sportType : null;
@@ -986,23 +988,23 @@ export const EnduranceSessionFormScreen = () => {
         : safeParseFloat(distance) * 1.60934
       : 0;
 
-    if (dist > 0 && totalDurationMin > 0 && !isEditingPace && !paceError && currentConfig?.units?.speed) {
-      if (currentConfig.units.speed === 'km/h') {
+    if (dist > 0 && totalDurationMin > 0 && !isEditingPace && !paceError && simpleSpeedUnit) {
+      if (simpleSpeedUnit === 'km/h') {
         const kmh = (dist / totalDurationMin) * 60;
         setPace(`${kmh.toFixed(1)}`);
-      } else if (currentConfig.units.speed === 'min/100m') {
+      } else if (simpleSpeedUnit === 'min/100m') {
         const distMeters = dist * 1000;
         const minPer100m = (totalDurationMin / distMeters) * 100;
         const mins = Math.floor(minPer100m);
         const secs = Math.round((minPer100m - mins) * 60);
         setPace(`${mins}:${secs.toString().padStart(2, '0')}`);
-      } else if (currentConfig.units.speed === 'min/km') {
+      } else if (simpleSpeedUnit === 'min/km') {
         const minPerKm = totalDurationMin / dist;
         const mins = Math.floor(minPerKm);
         const secs = Math.round((minPerKm - mins) * 60);
         setPace(`${mins}:${secs.toString().padStart(2, '0')}`);
       }
-    } else if (!isEditingPace && (dist <= 0 || totalDurationMin <= 0 || !currentConfig?.units?.speed)) {
+    } else if (!isEditingPace && !simpleSpeedUnit) {
       setPace('');
     }
 
@@ -1074,22 +1076,63 @@ export const EnduranceSessionFormScreen = () => {
     paceError,
     isCaloriesLockedFromRouteImport,
     hasAppliedStrengthImport,
+    simpleSpeedUnit,
+  ]);
+
+  // Keep a user-entered pace available while distance is empty so that the
+  // only allowed distance derivation (duration + pace) can be completed.
+  useEffect(() => {
+    if (isEditingPace || paceError || safeParseFloat(distance) > 0 || !pace || !simpleSpeedUnit) return;
+
+    const totalDurationSeconds =
+      (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
+      (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
+      (Number.parseInt(durationSeconds || '0', 10) || 0);
+    if (totalDurationSeconds <= 0) return;
+
+    let intensity: number | null = null;
+    if (simpleSpeedUnit.startsWith('min/')) {
+      const parsedPace = parsePaceInput(pace);
+      if (parsedPace.ok) intensity = parsedPace.totalSeconds;
+    } else {
+      const parsedSpeed = safeParseFloat(pace);
+      if (parsedSpeed > 0) intensity = parsedSpeed;
+    }
+    if (intensity == null) return;
+
+    const derived = deriveEnduranceMetricValues(
+      { distanceM: null, durationS: totalDurationSeconds, intensity },
+      simpleSpeedUnit,
+      'intensity',
+    );
+    if (derived.distanceM != null && derived.distanceM > 0) {
+      setDistance(formatNumberForInput(toDisplayDistance(derived.distanceM), 2));
+    }
+  }, [
+    distance,
+    durationHours,
+    durationMinutes,
+    durationSeconds,
+    formatNumberForInput,
+    isEditingPace,
+    pace,
+    paceError,
+    simpleSpeedUnit,
+    toDisplayDistance,
   ]);
 
   // Handle manual pace editing
   const handlePaceBlur = () => {
     setIsEditingPace(false);
-    if (!pace || !distance) {
+    if (!pace) {
       setPaceError(null);
       return;
     }
 
-    const dist = preferences.distance_unit === 'km' ? safeParseFloat(distance) : safeParseFloat(distance) * 1.60934;
-    if (dist <= 0) return;
+    if (!simpleSpeedUnit) return;
 
-    let totalMin = 0;
-
-    if (currentConfig?.units?.speed === 'min/km' || currentConfig?.units?.speed === 'min/100m') {
+    let intensity: number | null = null;
+    if (simpleSpeedUnit === 'min/km' || simpleSpeedUnit === 'min/100m') {
       const parsedPace = parsePaceInput(pace);
       if (!parsedPace.ok) {
         setPaceError(t('training.invalidPaceFormat'));
@@ -1098,24 +1141,66 @@ export const EnduranceSessionFormScreen = () => {
 
       setPaceError(null);
       setPace(parsedPace.normalized);
-      const paceVal = parsedPace.totalSeconds / 60;
-      if (currentConfig.units.speed === 'min/km') totalMin = paceVal * dist;
-      else totalMin = paceVal * ((dist * 1000) / 100);
-    } else if (currentConfig?.units?.speed === 'km/h') {
+      intensity = parsedPace.totalSeconds;
+    } else {
       const speedKmh = safeParseFloat(pace);
-      setPaceError(null);
-      if (speedKmh > 0) {
-        const hours = dist / speedKmh;
-        totalMin = hours * 60;
+      if (speedKmh <= 0 || !Number.isFinite(speedKmh)) {
+        setPaceError(t('training.invalidPaceFormat'));
+        return;
       }
+      setPaceError(null);
+      intensity = speedKmh;
     }
 
-    if (totalMin > 0) {
-      const totalSecs = Math.round(totalMin * 60);
+    const distanceM = safeParseFloat(distance) > 0 ? toDbDistanceFromDisplay(safeParseFloat(distance)) : null;
+    const totalDurationSeconds =
+      (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
+      (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
+      (Number.parseInt(durationSeconds || '0', 10) || 0);
+    const derived = deriveEnduranceMetricValues(
+      { distanceM, durationS: totalDurationSeconds > 0 ? totalDurationSeconds : null, intensity },
+      simpleSpeedUnit,
+      'intensity',
+    );
+
+    if (distanceM == null && derived.distanceM != null && derived.distanceM > 0) {
+      setDistance(formatNumberForInput(toDisplayDistance(derived.distanceM), 2));
+      return;
+    }
+
+    if (derived.durationS != null && derived.durationS > 0) {
+      const totalSecs = Math.round(derived.durationS);
       setDurationHours(Math.floor(totalSecs / 3600).toString());
       setDurationMinutes(Math.floor((totalSecs % 3600) / 60).toString());
       setDurationSeconds((totalSecs % 60).toString());
     }
+  };
+
+  const handleDistanceBlur = () => {
+    if (!simpleSpeedUnit || safeParseFloat(distance) <= 0 || !pace) return;
+
+    let intensity: number | null = null;
+    if (simpleSpeedUnit === 'min/km' || simpleSpeedUnit === 'min/100m') {
+      const parsedPace = parsePaceInput(pace);
+      if (!parsedPace.ok) return;
+      intensity = parsedPace.totalSeconds;
+    } else {
+      const parsedSpeed = safeParseFloat(pace);
+      if (parsedSpeed <= 0 || !Number.isFinite(parsedSpeed)) return;
+      intensity = parsedSpeed;
+    }
+
+    const derived = deriveEnduranceMetricValues(
+      { distanceM: toDbDistanceFromDisplay(safeParseFloat(distance)), durationS: null, intensity },
+      simpleSpeedUnit,
+      'distance',
+    );
+    if (derived.durationS == null || derived.durationS <= 0) return;
+
+    const totalSecs = Math.round(derived.durationS);
+    setDurationHours(Math.floor(totalSecs / 3600).toString());
+    setDurationMinutes(Math.floor((totalSecs % 3600) / 60).toString());
+    setDurationSeconds((totalSecs % 60).toString());
   };
 
   const persistParsedRouteDetails = React.useCallback(
@@ -1134,6 +1219,54 @@ export const EnduranceSessionFormScreen = () => {
   const handleSave = async () => {
     // --- VALIDATION ---
     const isAdvancedRegistration = registrationMode === 'advanced' && advancedAvailable;
+    const rawDurationSeconds =
+      (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
+      (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
+      (Number.parseInt(durationSeconds || '0', 10) || 0);
+    const rawDistanceM =
+      sportType !== 'gym' && safeParseFloat(distance) > 0 ? toDbDistanceFromDisplay(safeParseFloat(distance)) : null;
+    let effectiveDistanceM = rawDistanceM;
+    let effectiveDurationSeconds = rawDurationSeconds;
+
+    if (!isAdvancedRegistration && sportType !== 'gym' && simpleSpeedUnit && pace) {
+      let intensity: number | null = null;
+      if (simpleSpeedUnit === 'min/km' || simpleSpeedUnit === 'min/100m') {
+        const parsedPace = parsePaceInput(pace);
+        if (!parsedPace.ok) {
+          setPaceError(t('training.invalidPaceFormat'));
+          return;
+        }
+        intensity = parsedPace.totalSeconds;
+      } else {
+        const parsedSpeed = safeParseFloat(pace);
+        if (parsedSpeed <= 0 || !Number.isFinite(parsedSpeed)) {
+          setPaceError(t('training.invalidPaceFormat'));
+          return;
+        }
+        intensity = parsedSpeed;
+      }
+
+      const derived = deriveEnduranceMetricValues(
+        {
+          distanceM: rawDistanceM,
+          durationS: rawDurationSeconds > 0 ? rawDurationSeconds : null,
+          intensity,
+        },
+        simpleSpeedUnit,
+        'intensity',
+      );
+      effectiveDistanceM = derived.distanceM;
+      effectiveDurationSeconds = derived.durationS ?? rawDurationSeconds;
+
+      if (rawDistanceM == null && effectiveDistanceM != null) {
+        setDistance(formatNumberForInput(toDisplayDistance(effectiveDistanceM), 2));
+      }
+      if (effectiveDurationSeconds !== rawDurationSeconds) {
+        setDurationHours(Math.floor(effectiveDurationSeconds / 3600).toString());
+        setDurationMinutes(Math.floor((effectiveDurationSeconds % 3600) / 60).toString());
+        setDurationSeconds((effectiveDurationSeconds % 60).toString());
+      }
+    }
 
     // 1. Gym Mode specific
     if (isAdvancedRegistration) {
@@ -1150,12 +1283,8 @@ export const EnduranceSessionFormScreen = () => {
     } else {
       // 2. Endurance Sports Logic
       const isEndurance = ['running', 'cycling', 'swimming'].includes(sportType);
-      const hasDist = !!distance && safeParseFloat(distance) > 0;
-      const totalDurationMin =
-        (durationHours ? parseInt(durationHours) * 60 : 0) +
-        (durationMinutes ? parseInt(durationMinutes) : 0) +
-        (durationSeconds ? parseInt(durationSeconds) / 60 : 0);
-      const hasDur = totalDurationMin > 0;
+      const hasDist = effectiveDistanceM != null && effectiveDistanceM > 0;
+      const hasDur = effectiveDurationSeconds > 0;
 
       if (isEndurance) {
         if (!hasDist && !hasDur) {
@@ -1258,11 +1387,7 @@ export const EnduranceSessionFormScreen = () => {
       }
 
       // Prepare payload
-      const totalDurationMin =
-        (durationHours ? parseInt(durationHours) * 60 : 0) +
-        (durationMinutes ? parseInt(durationMinutes) : 0) +
-        (durationSeconds ? parseInt(durationSeconds) / 60 : 0);
-      const durationInSeconds = Math.round(totalDurationMin * 60);
+      const durationInSeconds = effectiveDurationSeconds;
       // Ensure end_time is set. If duration is calculated, use it. Otherwise, if we are saving, the session is finished.
       // For Gym Sessions, use the passed endTime or current time.
       let endTime =
@@ -1341,7 +1466,6 @@ export const EnduranceSessionFormScreen = () => {
       }
 
       if (sportType !== 'gym') {
-        const distVal = safeParseFloat(distance);
         const elevVal = safeParseFloat(elevation);
         const elevLossVal = safeParseFloat(elevationLoss);
         const hrVal = hr ? parseInt(hr) : null;
@@ -1349,7 +1473,7 @@ export const EnduranceSessionFormScreen = () => {
         const totalStepsVal = totalSteps ? parseInt(totalSteps, 10) : null;
         const recoveryTimeHoursVal = recoveryTimeHours ? safeParseFloat(recoveryTimeHours) : null;
 
-        payload.distance_m = distance ? toDbDistanceFromDisplay(distVal) : null;
+        payload.distance_m = effectiveDistanceM;
         payload.elev_gain_m = elevation ? elevVal : null;
         payload.elev_loss_m = elevationLoss ? elevLossVal : null;
         payload.avg_heart_rate = hrVal;
@@ -3184,6 +3308,7 @@ export const EnduranceSessionFormScreen = () => {
                           placeholderTextColor={themeColors.textSecondary}
                           value={distance}
                           onChangeText={setDistance}
+                          onBlur={handleDistanceBlur}
                         />
                       </View>
                     )}

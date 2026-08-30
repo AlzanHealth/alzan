@@ -211,7 +211,8 @@ const editedRunning = deriveAdvancedSectionMetrics(
   'running',
   'duration',
 );
-assert.equal(editedRunning.distanceM, 1000);
+assert.equal(editedRunning.distanceM, 2000);
+assert.equal(editedRunning.paceSPerKm, 150);
 
 const editedDistance = deriveAdvancedSectionMetrics(
   {
@@ -231,7 +232,30 @@ const editedIntensity = deriveAdvancedSectionMetrics(
   'running',
   'intensity',
 );
-assert.equal(editedIntensity.distanceM, 1000);
+assert.equal(editedIntensity.distanceM, 2000);
+assert.equal(editedIntensity.durationS, 1200);
+
+const distanceMayBeDerivedOnlyWhenEmpty = deriveAdvancedSectionMetrics(
+  {
+    ...createEmptyAdvancedSection('running-distance-empty'),
+    durationS: 600,
+    paceSPerKm: 600,
+  },
+  'running',
+  'intensity',
+);
+assert.equal(distanceMayBeDerivedOnlyWhenEmpty.distanceM, 1000);
+
+const editedDistanceKeepsUserDistance = deriveAdvancedSectionMetrics(
+  {
+    ...runningByTimeAndDistance,
+    distanceM: 1000,
+  },
+  'running',
+  'distance',
+);
+assert.equal(editedDistanceKeepsUserDistance.distanceM, 1000);
+assert.equal(editedDistanceKeepsUserDistance.paceSPerKm, 600);
 
 const cyclingDerived = deriveAdvancedSectionMetrics(
   {
