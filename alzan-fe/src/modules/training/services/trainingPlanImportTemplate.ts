@@ -65,10 +65,11 @@ export const TRAINING_PLAN_IMPORT_PROMPT = `Convierte los documentos adjuntos en
 ARCHIVOS
 - Lee completo el DOCX del plan de entrenamiento, aunque tenga otro nombre.
 - Usa el CSV adjunto solo para resolver ejercicios de gimnasio. Si también hay un DOCX de nutrición, ignóralo.
-- El CSV puede aparecer como archivo adjunto o como una sección llamada exercises_rows. No inventes ejercicios ni UUID.
+- El CSV puede aparecer como archivo adjunto o como una sección llamada exercises_rows. No inventes ejercicios.
 
 SALIDA
 - Devuelve únicamente JSON válido, sin markdown, comentarios ni texto adicional.
+- Usa exclusivamente comillas ASCII ("). No uses comillas tipográficas, aunque la interfaz móvil las sugiera.
 - No generes el campo notes en ningún objeto.
 - La raíz solo contiene format, version, plan_name, start_date, end_date y weeks.
 - Cada week solo contiene week_number y sessions. Cada session solo contiene date, weekday, sport, name, template_key, workout_goal, modality, distance_km, duration_min, running_steps y exercises.
@@ -78,34 +79,37 @@ SALIDA
 - No generes rpe, rir, rir_min ni rir_max en ninguna parte. Si el DOCX contiene RPE o RIR, omítelo: esos campos no deben aparecer en el JSON de importación.
 - No escribas duration_s, distance_m, target_type, target_min, target_max, progression_key ni children dentro de exercises de strength. Esas propiedades solo pertenecen a running_steps.
 - Fechas YYYY-MM-DD, weekday correcto y rango inclusivo máximo de 45 días.
-- Los números son valores JSON, nunca texto con unidades. Usa reps o reps_min + reps_max, nunca ambos.
+- Números JSON, nunca texto con unidades. Usa reps o reps_min + reps_max, nunca ambos.
 
 FIDELIDAD
 - Copia exactamente fechas, días, sesiones, orden, objetivos, intervalos, recuperaciones, distancias, duraciones, series, repeticiones, pesos y descansos del DOCX.
-- No diseñes, optimices, corrijas, resumas, traslades ni inventes entrenamientos.
+- No inventes ni modifiques entrenamientos.
 - Un día de descanso, paseo o movilidad sin entrenamiento no crea una sesión artificial. Una sesión opcional conserva “Opcional” en name.
-- Si el esquema necesita un único número para un rango de peso, descanso, distancia o duración, usa el límite inferior. Para un rango de repeticiones usa reps_min y reps_max.
+- Para rangos de peso, descanso, distancia o duración usa el límite inferior; para repeticiones usa reps_min y reps_max.
+- Lee todas las páginas y tablas del DOCX: la tabla de calendario fija fechas y nombres; las tablas de rutinas fijan ejercicios. No conviertas una tabla en sesión.
+- Asocia las rutinas de gimnasio del calendario con sus tablas y reutiliza cada una en sus fechas.
 
 RUNNING
 - Fases permitidas: warmup, interval, recovery, cooldown y relax.
 - Duraciones permitidas: time, distance y lap_button.
 - Un calentamiento “10 min” es un único warmup de 600 segundos. Omite movilidad, activación o técnica sin duración/distancia concreta.
 - Las series repetidas usan repetitions y children. Los ritmos se expresan en segundos por kilómetro.
-- Cada running_step solo puede usar phase_type, duration_type, duration_s, distance_m, target_type, target_min, target_max, repetitions, progression_key y children.
+- Cada running_step usa solo phase_type, duration_type, duration_s, distance_m, target_type, target_min, target_max, repetitions, progression_key y children.
 - No uses target_type: "rpe" ni añadas rpe a los pasos; si el documento prescribe RPE, omite ese dato.
 
 GIMNASIO
-- Usa exercise_id y exercise_name de una fila real del CSV. Si no puedes verificar el UUID, omite exercise_id y usa el exercise_name canónico exacto para que la aplicación lo resuelva.
-- Busca primero coincidencia exacta normalizada. Si no existe, elige la alternativa más parecida con el mismo patrón de movimiento, músculo principal, equipamiento y agarre/posición. No inventes UUID ni nombres.
-- Si el DOCX indica “A o B” o “polea/máquina”, elige la opción del CSV que mejor encaje. Si indica dos ejercicios con series separadas (“2+2”), crea dos filas consecutivas.
+- No inventes UUID: Alzan resolverá el UUID al importar usando el exercise_name canónico.
+- Usa exercise_name de una fila real de exercises_rows. Busca primero coincidencia exacta normalizada; si no existe, elige solo una alternativa más parecida y de alta confianza usando el mismo patrón de movimiento, músculo principal, equipamiento y agarre/posición.
+- Sin alternativa segura, conserva el nombre fuente; frontend lo marcará como pendiente para selección manual. No inventes UUID ni metadatos.
+- Para “A o B”/“polea/máquina” elige la mejor opción del CSV; “2+2” son dos filas consecutivas.
 - Cada exercise solo puede usar exercise_id, exercise_name, order_index, is_warmup, sets, reps, reps_min, reps_max, weight_kg y rest_seconds.
-- Mantén intactas series, repeticiones, pesos, descansos y orden; solo cambia la referencia de catálogo.
+- Conserva series, repeticiones, pesos, descansos y orden; cambia solo la referencia.
 
 PLANTILLAS Y VALIDACIÓN
 - Reutiliza template_key solo cuando la estructura sea la misma; usa otra si cambia la estructura o la progresión.
 - En running, progression_key debe ser estable y único dentro de cada sesión.
-- Comprueba fechas, weekday, propiedades permitidas, order_index consecutivo, un bloque válido por deporte y ejercicios resueltos en el CSV.
-- Si no hay una alternativa segura, devuelve un informe de bloqueo. Si todo es válido, devuelve solo el JSON:
+- Comprueba fechas, weekday, propiedades permitidas, order_index consecutivo y un bloque válido por deporte. Los ejercicios de gimnasio deben proceder del CSV; si una coincidencia no es segura, conserva el nombre fuente para que Alzan lo deje pendiente de selección manual.
+- Si los datos del entrenamiento no permiten construir la estructura, devuelve un informe de bloqueo breve; no generes JSON truncado. Si la estructura sí es válida, devuelve solo el JSON:
 
 PLANTILLA
 ${TRAINING_PLAN_IMPORT_TEMPLATE}`;

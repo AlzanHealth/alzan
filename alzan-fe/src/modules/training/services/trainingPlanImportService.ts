@@ -14,10 +14,15 @@ import { logTrainingPlanImport, logTrainingPlanImportError } from './trainingPla
 import { buildImportedWorkoutPlans } from './trainingPlanImportCalendar.helper';
 import { toImportedProgressionKey } from './trainingPlanImportProgressionKey';
 import {
+  areTrainingPlanExerciseResolutionsReady,
   getTrainingExerciseResolutionKey,
+  resolveTrainingPlanExerciseResolutions as buildTrainingPlanExerciseResolutions,
   resolveTrainingPlanExercisesFromCatalog,
+  searchTrainingExerciseCandidates,
   type TrainingExerciseCatalogRow,
+  type TrainingExerciseResolution,
 } from './trainingPlanImportExerciseResolver';
+import { fetchTrainingExerciseAiCatalog } from './trainingPlanAiCatalogService';
 import type {
   TrainingPlanImportDocument,
   TrainingPlanRunningStep,
@@ -33,6 +38,7 @@ export type TrainingPlanImportProgress = {
 type TrainingPlanImportOptions = {
   autoDeleteExpiredTemplates?: boolean;
   onProgress?: (progress: TrainingPlanImportProgress) => void;
+  exerciseResolutions?: TrainingExerciseResolution[];
 };
 
 const reportImportProgress = (
@@ -178,10 +184,41 @@ const buildTemplateSummaryProgressions = (
   return [...summariesByWeek.values()];
 };
 
-const resolveExercises = async (exercises: TrainingPlanStrengthExercise[]): Promise<Map<string, string>> => {
+const resolveExercises = async (
+  exercises: TrainingPlanStrengthExercise[],
+  selectedResolutions?: TrainingExerciseResolution[],
+): Promise<Map<string, string>> => {
   logTrainingPlanImport('resolve-exercises:start', { requested: exercises.length });
   if (exercises.length === 0) return new Map();
   const catalog = await fetchTrainingExerciseCatalog();
+  if (selectedResolutions) {
+    if (!areTrainingPlanExerciseResolutionsReady(selectedResolutions)) {
+      throw new Error('Todos los ejercicios de fuerza deben estar asociados al catálogo');
+    }
+    const catalogById = new Map(catalog.map(exercise => [exercise.id, exercise] as const));
+    const expectedKeys = new Set(exercises.map(exercise => getTrainingExerciseResolutionKey(exercise)));
+    const providedKeys = new Set(selectedResolutions.map(resolution => resolution.resolutionKey));
+    if (
+      [...expectedKeys].some(key => !providedKeys.has(key)) ||
+      [...providedKeys].some(key => !expectedKeys.has(key))
+    ) {
+      throw new Error('Faltan asociaciones de ejercicios de fuerza para este plan');
+    }
+    const resolved = new Map<string, string>();
+    selectedResolutions.forEach(resolution => {
+      const selected = resolution.selectedCandidate;
+      if (
+        !selected ||
+        !catalogById.has(selected.id) ||
+        !resolution.candidates.some(candidate => candidate.id === selected.id)
+      ) {
+        throw new Error(`No se ha encontrado el ejercicio "${resolution.sourceName}"`);
+      }
+      resolved.set(resolution.resolutionKey, selected.id);
+    });
+    logTrainingPlanImport('resolve-exercises:complete', { resolved: resolved.size });
+    return resolved;
+  }
   try {
     const resolved = resolveTrainingPlanExercisesFromCatalog(exercises, catalog);
     logTrainingPlanImport('resolve-exercises:complete', { resolved: resolved.size });
@@ -193,32 +230,44 @@ const resolveExercises = async (exercises: TrainingPlanStrengthExercise[]): Prom
 };
 
 export const fetchTrainingExerciseCatalog = async (): Promise<TrainingExerciseCatalogRow[]> => {
-  const catalog: TrainingExerciseCatalogRow[] = [];
-  const pageSize = 1000;
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase
-      .from('exercises')
-      .select('id, base_name_es, base_name_en')
-      .range(offset, offset + pageSize - 1);
-    if (error) {
-      logTrainingPlanImportError('resolve-exercises:query-failed', error, { offset, pageSize });
-      throw error;
-    }
-    catalog.push(...(data ?? []));
-    logTrainingPlanImport('resolve-exercises:page-loaded', {
-      offset,
-      rows: data?.length ?? 0,
-    });
-    if (!data || data.length < pageSize) break;
-  }
+  const catalog = await fetchTrainingExerciseAiCatalog();
   logTrainingPlanImport('resolve-exercises:catalog-loaded', { catalogSize: catalog.length });
-  return catalog;
+  return catalog.map(exercise => ({
+    id: exercise.exercise_id,
+    base_name_es: exercise.exercise_name_es,
+    base_name_en: exercise.exercise_name_en,
+    exercise_type: exercise.exercise_type,
+    load_type: exercise.load_type,
+    primary_muscle: exercise.primary_muscle,
+    secondary_muscle: exercise.secondary_muscle,
+    equipment: exercise.equipment,
+  }));
+};
+
+const getStrengthExercises = (document: TrainingPlanImportDocument): TrainingPlanStrengthExercise[] =>
+  document.weeks.flatMap(week =>
+    week.sessions.flatMap(session => (session.sport === 'strength' ? (session.exercises ?? []) : [])),
+  );
+
+export const resolveTrainingPlanExerciseResolutions = async (
+  document: TrainingPlanImportDocument,
+): Promise<TrainingExerciseResolution[]> => {
+  const exercises = getStrengthExercises(document);
+  if (exercises.length === 0) return [];
+  const catalog = await fetchTrainingExerciseCatalog();
+  const resolutions = buildTrainingPlanExerciseResolutions(exercises, catalog);
+  return [...new Map(resolutions.map(resolution => [resolution.resolutionKey, resolution])).values()];
+};
+
+export const searchTrainingPlanExerciseCandidates = async (
+  query: string,
+): Promise<TrainingExerciseResolution['candidates']> => {
+  const catalog = await fetchTrainingExerciseCatalog();
+  return searchTrainingExerciseCandidates(query, catalog);
 };
 
 export const preflightTrainingPlanExercises = async (document: TrainingPlanImportDocument): Promise<void> => {
-  const exercises = document.weeks.flatMap(week =>
-    week.sessions.flatMap(session => (session.sport === 'strength' ? (session.exercises ?? []) : [])),
-  );
+  const exercises = getStrengthExercises(document);
   if (exercises.length > 0) await resolveExercises(exercises);
 };
 
@@ -599,11 +648,7 @@ export const importTrainingPlan = async (
   const range = getDateRange(document);
   const families = groupTrainingPlanSessions(document);
   reportImportProgress(options, 'exercises', 10);
-  const resolvedExercises = await resolveExercises(
-    families.flatMap(family =>
-      family.sport === 'strength' ? family.sessions.flatMap(session => session.exercises ?? []) : [],
-    ),
-  );
+  const resolvedExercises = await resolveExercises(getStrengthExercises(document), options.exerciseResolutions);
   reportImportProgress(options, 'exercises', 25);
   await expireTrainingTemplates(userId);
   logTrainingPlanImport('families:grouped', {

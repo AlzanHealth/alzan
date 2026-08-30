@@ -7,9 +7,15 @@ import {
 } from '../modules/training/services/trainingPlanImportContract';
 import {
   importTrainingPlan,
-  preflightTrainingPlanExercises,
+  resolveTrainingPlanExerciseResolutions,
+  searchTrainingPlanExerciseCandidates,
   type TrainingPlanImportProgress,
 } from '../modules/training/services/trainingPlanImportService';
+import {
+  areTrainingPlanExerciseResolutionsReady,
+  selectTrainingPlanExerciseCandidate,
+  type TrainingExerciseResolution,
+} from '../modules/training/services/trainingPlanImportExerciseResolver';
 import { analyzeTrainingPlanJson } from '../modules/training/services/trainingPlanImportAnalysis';
 import { useAuth } from '../context/AuthContext';
 import { useTrainingSettings } from './useTrainingSettings';
@@ -29,6 +35,7 @@ export const useTrainingPlanImport = () => {
   const rawJsonRef = useRef('');
   const [analyzedDocument, setAnalyzedDocument] = useState<TrainingPlanImportDocument | null>(null);
   const [analysisErrors, setAnalysisErrors] = useState<TrainingPlanValidationError[]>([]);
+  const [exerciseResolutions, setExerciseResolutions] = useState<TrainingExerciseResolution[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
@@ -43,6 +50,7 @@ export const useTrainingPlanImport = () => {
     setRawJson(value);
     setAnalyzedDocument(null);
     setAnalysisErrors([]);
+    setExerciseResolutions([]);
   }, []);
 
   const analyze = useCallback(async () => {
@@ -59,7 +67,10 @@ export const useTrainingPlanImport = () => {
       setAnalysisProgress(12);
       await new Promise(resolve => setTimeout(resolve, 80));
       setAnalysisProgress(42);
-      const result = await analyzeTrainingPlanJson(sourceText, preflightTrainingPlanExercises);
+      let nextExerciseResolutions: TrainingExerciseResolution[] = [];
+      const result = await analyzeTrainingPlanJson(sourceText, async trainingDocument => {
+        nextExerciseResolutions = await resolveTrainingPlanExerciseResolutions(trainingDocument);
+      });
       setAnalysisProgress(88);
       if (rawJsonRef.current !== sourceText) {
         setAnalyzedDocument(null);
@@ -69,9 +80,11 @@ export const useTrainingPlanImport = () => {
       if (result.ok) {
         setAnalyzedDocument(result.value);
         setAnalysisErrors([]);
+        setExerciseResolutions(nextExerciseResolutions);
       } else {
         setAnalyzedDocument(null);
         setAnalysisErrors(result.errors);
+        setExerciseResolutions([]);
       }
       setAnalysisProgress(100);
       logTrainingPlanImport('analyze:complete', {
@@ -85,9 +98,27 @@ export const useTrainingPlanImport = () => {
     }
   }, [parsed, rawJson]);
 
+  const selectExerciseCandidate = useCallback((resolutionKey: string, candidateId: string) => {
+    setExerciseResolutions(current => selectTrainingPlanExerciseCandidate(current, resolutionKey, candidateId));
+  }, []);
+
+  const searchExerciseCandidates = useCallback(async (resolutionKey: string, query: string) => {
+    const candidates = await searchTrainingPlanExerciseCandidates(query);
+    setExerciseResolutions(current =>
+      current.map(resolution =>
+        resolution.resolutionKey === resolutionKey
+          ? { ...resolution, candidates, selectedCandidate: null }
+          : resolution,
+      ),
+    );
+  }, []);
+
   const importPlan = useCallback(async () => {
     if (!user || !document || importInFlightRef.current || analyzeInFlightRef.current)
       return { ok: false as const, kind: 'busy' as const };
+    if (!areTrainingPlanExerciseResolutionsReady(exerciseResolutions)) {
+      return { ok: false as const, kind: 'unresolved-exercises' as const };
+    }
     logTrainingPlanImport('import:start', {
       planName: document.plan_name,
       weeks: document.weeks.length,
@@ -100,6 +131,7 @@ export const useTrainingPlanImport = () => {
     try {
       const result = await importTrainingPlan(user.id, document, {
         autoDeleteExpiredTemplates: settings.autoDeleteExpiredTemplates,
+        exerciseResolutions,
         onProgress: setImportProgress,
       });
       invalidateTrainingCalendar(queryClient);
@@ -117,7 +149,9 @@ export const useTrainingPlanImport = () => {
       setIsImporting(false);
       setImportProgress(null);
     }
-  }, [document, queryClient, settings.autoDeleteExpiredTemplates, user]);
+  }, [document, exerciseResolutions, queryClient, settings.autoDeleteExpiredTemplates, user]);
+
+  const exerciseResolutionReady = areTrainingPlanExerciseResolutionsReady(exerciseResolutions);
 
   return {
     rawJson,
@@ -128,7 +162,10 @@ export const useTrainingPlanImport = () => {
     analysisProgress,
     isImporting,
     importProgress,
-    canImport: !!document && !isAnalyzing && !isImporting,
+    canImport: !!document && exerciseResolutionReady && !isAnalyzing && !isImporting,
+    exerciseResolutions,
+    selectExerciseCandidate,
+    searchExerciseCandidates,
     analyze,
     importPlan,
   };

@@ -21,6 +21,7 @@ import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTrainingPlanImport } from '../../hooks/useTrainingPlanImport';
 import { useTrainingPlanAi } from '../../modules/training/hooks/useTrainingPlanAi';
 import { TrainingAiProviderSheet } from './components/TrainingAiProviderSheet';
+import { TrainingExerciseResolutionPreview } from './components/TrainingExerciseResolutionPreview';
 import type { TrainingAiProvider } from '../../modules/training/services/trainingPlanAiProvider';
 import {
   TRAINING_PLAN_IMPORT_TEMPLATE,
@@ -72,6 +73,9 @@ export const TrainingPlanImportScreen = () => {
     isImporting,
     importProgress,
     canImport,
+    exerciseResolutions,
+    selectExerciseCandidate,
+    searchExerciseCandidates,
     analyze,
     importPlan,
   } = useTrainingPlanImport();
@@ -119,6 +123,10 @@ export const TrainingPlanImportScreen = () => {
     const result = await importPlan();
     if (!result.ok) {
       if (result.kind === 'busy') return;
+      if (result.kind === 'unresolved-exercises') {
+        Alert.alert(t('common.error'), t('training.trainingExerciseSelectionRequired'));
+        return;
+      }
       Alert.alert(t('common.error'), t('training.trainingPlanImportError'));
       return;
     }
@@ -281,6 +289,14 @@ export const TrainingPlanImportScreen = () => {
                   workoutLabel: t('training.trainingPlanWorkouts'),
                 })}
               </Text>
+              {exerciseResolutions.length > 0 ? (
+                <TrainingExerciseResolutionPreview
+                  resolutions={exerciseResolutions}
+                  onSelect={selectExerciseCandidate}
+                  onSearch={searchExerciseCandidates}
+                  translate={t}
+                />
+              ) : null}
               <TouchableOpacity
                 onPress={handleImport}
                 disabled={!canImport}

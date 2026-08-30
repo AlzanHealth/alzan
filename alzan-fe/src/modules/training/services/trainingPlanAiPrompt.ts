@@ -85,7 +85,7 @@ ADAPTACIÓN PARA ESTA CONVERSACIÓN
 - No necesitas un DOCX ni un CSV adjunto. El catálogo completo y actualizado se pegará como una sección llamada exercises_rows.
 - Para ejercicios de strength, selecciona exactamente exercise_name_es de una fila real de exercises_rows usando el nombre, el músculo principal y el equipamiento.
 - Omite exercise_id. No inventes UUID: Alzan resolverá el UUID al importar el JSON mediante el nombre canónico seleccionado.
-- Si no existe una coincidencia segura, devuelve un informe de bloqueo e identifica el ejercicio que falta.
+- Si no hay coincidencia segura, conserva el nombre fuente; el frontend pedirá selección y no importará hasta resolverlo.
 - Convierte el entrenamiento pegado, sin inventar datos, al JSON alzan-training-plan v1.
 - Tras recibir el entrenamiento, responde únicamente con JSON válido.
 
