@@ -3,6 +3,43 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { expireTrainingTemplates } from '../modules/training/services/templateLifecycleService';
 
+const emptyUsageCounts: Record<string, number> = {};
+
+const getEnduranceTemplateUsageCounts = async (
+  userId: string,
+  templateIds: readonly string[],
+): Promise<Record<string, number>> => {
+  const counts = Object.fromEntries(templateIds.map(id => [id, 0]));
+  if (templateIds.length === 0) return counts;
+
+  const [{ data: plans, error: plansError }, { data: sessions, error: sessionsError }] = await Promise.all([
+    supabase
+      .from('workout_plans')
+      .select('endurance_template_id')
+      .eq('user_id', userId)
+      .in('endurance_template_id', templateIds),
+    supabase
+      .from('activity_sessions')
+      .select('endurance_template_id')
+      .eq('user_id', userId)
+      .in('endurance_template_id', templateIds),
+  ]);
+
+  if (plansError) throw plansError;
+  if (sessionsError) throw sessionsError;
+
+  plans?.forEach(plan => {
+    if (plan.endurance_template_id) counts[plan.endurance_template_id] = (counts[plan.endurance_template_id] ?? 0) + 1;
+  });
+  sessions?.forEach(session => {
+    if (session.endurance_template_id) {
+      counts[session.endurance_template_id] = (counts[session.endurance_template_id] ?? 0) + 1;
+    }
+  });
+
+  return counts;
+};
+
 export interface EnduranceTemplate {
   id: string;
   user_id: string;
@@ -14,6 +51,7 @@ export interface EnduranceTemplate {
   total_distance_m: number | null;
   created_at: string;
   updated_at: string;
+  usage_count?: number;
 }
 
 export const useEnduranceTemplates = () => {
@@ -36,8 +74,18 @@ export const useEnduranceTemplates = () => {
         console.error('[useEnduranceTemplates.fetch] Error:', error);
         throw error;
       }
+      const usageCounts = await getEnduranceTemplateUsageCounts(
+        user.id,
+        (data ?? []).map(template => template.id),
+      ).catch(usageError => {
+        console.error('[useEnduranceTemplates.fetch] Error loading usage counts:', usageError);
+        return emptyUsageCounts;
+      });
       console.log('[useEnduranceTemplates.fetch] Éxito - templates:', data?.length);
-      return data as EnduranceTemplate[];
+      return (data ?? []).map(template => ({
+        ...template,
+        usage_count: usageCounts[template.id] ?? 0,
+      })) as EnduranceTemplate[];
     } catch (err) {
       console.error('[useEnduranceTemplates.fetch] Exception:', err);
       throw err;

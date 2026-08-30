@@ -20,9 +20,11 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { TemplateListManagementMenu } from './components/TemplateListManagementMenu';
+import { getTemplateIdsForBulkDelete, sortTemplateList, TemplateListSort } from './helpers/templateList.helper';
 
 export const SportTemplatesListScreen = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'SportTemplatesList'>>();
@@ -32,6 +34,22 @@ export const SportTemplatesListScreen = () => {
   const { templates, isLoading, deleteTemplate } = useEnduranceTemplates();
   const { getOptionLabel } = useSportCatalog();
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [sortOrder, setSortOrder] = React.useState<TemplateListSort>('created');
+
+  const sortedTemplates = React.useMemo(
+    () =>
+      sortTemplateList(
+        templates.map(template => ({
+          ...template,
+          name: template.base_name,
+          createdAt: template.created_at,
+          usageCount: template.usage_count ?? 0,
+        })),
+        sortOrder,
+        i18n.language,
+      ),
+    [i18n.language, sortOrder, templates],
+  );
 
   const getSportLabel = React.useCallback(
     (sportType: string) => {
@@ -61,12 +79,29 @@ export const SportTemplatesListScreen = () => {
             await deleteTemplate.mutateAsync(id);
           } catch (err) {
             console.error('Error deleting template:', err);
+            Alert.alert(t('common.error'), t('training.deleteTemplateError'), [{ text: t('common.ok') }]);
           } finally {
             setIsDeleting(false);
           }
         },
       },
     ]);
+  };
+
+  const handleDeleteAll = async () => {
+    if (isDeleting) return;
+    const ids = getTemplateIdsForBulkDelete(sortedTemplates);
+    if (ids.length === 0) return;
+
+    setIsDeleting(true);
+    try {
+      for (const id of ids) await deleteTemplate.mutateAsync(id);
+    } catch (error) {
+      console.error('Error deleting all templates:', error);
+      Alert.alert(t('common.error'), t('training.deleteTemplateError'), [{ text: t('common.ok') }]);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleEdit = (id: string) => {
@@ -116,9 +151,18 @@ export const SportTemplatesListScreen = () => {
             {assignToDate ? t('training.selectTemplate') : t('training.myTemplates')}
           </Text>
           {!assignToDate && (
-            <TouchableOpacity style={styles.addButton} onPress={handleCreate}>
-              <Plus size={24} color={themeColors.primary} />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TemplateListManagementMenu
+                itemCount={templates.length}
+                sort={sortOrder}
+                isDeleting={isDeleting}
+                onSortChange={setSortOrder}
+                onDeleteAll={handleDeleteAll}
+              />
+              <TouchableOpacity style={styles.addButton} onPress={handleCreate}>
+                <Plus size={24} color={themeColors.primary} />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -137,7 +181,7 @@ export const SportTemplatesListScreen = () => {
             </View>
           )}
 
-          {templates?.map(template => {
+          {sortedTemplates.map(template => {
             const goalLabel = template.workout_goal
               ? getOptionLabel(template.sport_type, template.workout_goal, 'goal')
               : t('training.noGoal');
@@ -276,6 +320,7 @@ const styles = StyleSheet.create({
   addButton: {
     padding: spacing.s,
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
   content: {
     padding: spacing.l,
     paddingBottom: 100,

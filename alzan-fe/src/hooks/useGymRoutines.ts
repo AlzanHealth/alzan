@@ -3,6 +3,38 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { expireTrainingTemplates } from '../modules/training/services/templateLifecycleService';
 
+const emptyUsageCounts: Record<string, number> = {};
+
+const getGymTemplateUsageCounts = async (
+  userId: string,
+  templateIds: readonly string[],
+): Promise<Record<string, number>> => {
+  const counts = Object.fromEntries(templateIds.map(id => [id, 0]));
+  if (templateIds.length === 0) return counts;
+
+  const [{ data: plans, error: plansError }, { data: sessions, error: sessionsError }] = await Promise.all([
+    supabase.from('workout_plans').select('gym_template_id').eq('user_id', userId).in('gym_template_id', templateIds),
+    supabase
+      .from('activity_sessions')
+      .select('workout_template_id')
+      .eq('user_id', userId)
+      .in('workout_template_id', templateIds),
+  ]);
+
+  if (plansError) throw plansError;
+  if (sessionsError) throw sessionsError;
+
+  plans?.forEach(plan => {
+    if (plan.gym_template_id) counts[plan.gym_template_id] = (counts[plan.gym_template_id] ?? 0) + 1;
+  });
+  sessions?.forEach(session => {
+    if (session.workout_template_id)
+      counts[session.workout_template_id] = (counts[session.workout_template_id] ?? 0) + 1;
+  });
+
+  return counts;
+};
+
 export const useGymRoutines = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -23,8 +55,15 @@ export const useGymRoutines = () => {
         console.error('[useGymRoutines.fetch] Error:', error);
         throw error;
       }
+      const usageCounts = await getGymTemplateUsageCounts(
+        user.id,
+        (data ?? []).map(routine => routine.id),
+      ).catch(usageError => {
+        console.error('[useGymRoutines.fetch] Error loading usage counts:', usageError);
+        return emptyUsageCounts;
+      });
       console.log('[useGymRoutines.fetch] Éxito - rutinas:', data?.length);
-      return data;
+      return (data ?? []).map(routine => ({ ...routine, usage_count: usageCounts[routine.id] ?? 0 }));
     } catch (err) {
       console.error('[useGymRoutines.fetch] Exception:', err);
       throw err;

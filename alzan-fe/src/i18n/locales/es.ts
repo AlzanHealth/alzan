@@ -1955,6 +1955,16 @@ export default {
     createFirstTemplatePrompt:
       'Crea tu primera plantilla de entrenamiento para deportes como running, ciclismo o natación.',
     noTemplates: 'No tienes plantillas',
+    templateListOptions: 'Opciones de plantillas',
+    sortTemplates: 'Ordenar plantillas',
+    sortTemplatesByName: 'Por nombre',
+    sortTemplatesByCreation: 'Por creación',
+    sortTemplatesByUsage: 'Por uso',
+    deleteAllTemplatesTitle: 'Borrar todas las plantillas',
+    deleteAllTemplatesMessage:
+      'Se borrarán {{count}} plantillas y sus entrenamientos futuros programados. Los entrenamientos completados se conservarán.',
+    deleteAllTemplatesAction: 'Borrar todas',
+    deleteTemplateError: 'No se pudo borrar la plantilla. Inténtalo de nuevo.',
     selectDate: 'Seleccionar Fecha',
     preview: 'Vista previa',
     previewLoading: 'Cargando plan de entreno...',

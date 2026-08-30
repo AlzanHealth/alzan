@@ -34,9 +34,11 @@ import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { TemplateListManagementMenu } from './components/TemplateListManagementMenu';
+import { getTemplateIdsForBulkDelete, sortTemplateList, TemplateListSort } from './helpers/templateList.helper';
 
 export const GymRoutinesListScreen = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const { getOptionLabel } = useSportCatalog();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
@@ -46,6 +48,7 @@ export const GymRoutinesListScreen = () => {
   const { user } = useAuth();
   const { routines, isLoading, deleteRoutine } = useGymRoutines();
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [sortOrder, setSortOrder] = React.useState<TemplateListSort>('created');
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<'my' | 'templates'>('my');
   const [showInfoModal, setShowInfoModal] = React.useState(false);
@@ -90,6 +93,21 @@ export const GymRoutinesListScreen = () => {
     [t],
   );
 
+  const sortedRoutines = React.useMemo(
+    () =>
+      sortTemplateList(
+        (routines ?? []).map(routine => ({
+          ...routine,
+          name: routine.base_name,
+          createdAt: routine.created_at,
+          usageCount: routine.usage_count ?? 0,
+        })),
+        sortOrder,
+        i18n.language,
+      ),
+    [i18n.language, routines, sortOrder],
+  );
+
   const handleDelete = (id: string, name: string) => {
     Alert.alert(t('training.deleteRoutineTitle'), t('training.confirmDeleteNamed', { name }), [
       { text: t('common.cancel'), style: 'cancel' },
@@ -102,12 +120,29 @@ export const GymRoutinesListScreen = () => {
             await deleteRoutine.mutateAsync(id);
           } catch (err) {
             console.error('Error deleting routine:', err);
+            Alert.alert(t('common.error'), t('training.deleteTemplateError'), [{ text: t('common.ok') }]);
           } finally {
             setIsDeleting(false);
           }
         },
       },
     ]);
+  };
+
+  const handleDeleteAll = async () => {
+    if (isDeleting) return;
+    const ids = getTemplateIdsForBulkDelete(sortedRoutines);
+    if (ids.length === 0) return;
+
+    setIsDeleting(true);
+    try {
+      for (const id of ids) await deleteRoutine.mutateAsync(id);
+    } catch (error) {
+      console.error('Error deleting all routines:', error);
+      Alert.alert(t('common.error'), t('training.deleteTemplateError'), [{ text: t('common.ok') }]);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleCreate = () => {
@@ -216,9 +251,18 @@ export const GymRoutinesListScreen = () => {
           </Text>
           {!assignToDate &&
             (activeTab === 'my' ? (
-              <TouchableOpacity style={styles.addButton} onPress={handleCreate}>
-                <Plus size={24} color={themeColors.primary} />
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                <TemplateListManagementMenu
+                  itemCount={routines?.length ?? 0}
+                  sort={sortOrder}
+                  isDeleting={isDeleting}
+                  onSortChange={setSortOrder}
+                  onDeleteAll={handleDeleteAll}
+                />
+                <TouchableOpacity style={styles.addButton} onPress={handleCreate}>
+                  <Plus size={24} color={themeColors.primary} />
+                </TouchableOpacity>
+              </View>
             ) : (
               <TouchableOpacity style={styles.addButton} onPress={() => setShowInfoModal(true)}>
                 <Info size={24} color={themeColors.primary} />
@@ -294,7 +338,7 @@ export const GymRoutinesListScreen = () => {
                 </View>
               )}
 
-              {routines?.map(routine => (
+              {sortedRoutines.map(routine => (
                 <View key={routine.id} style={styles.cardWrapper}>
                   <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
                     <View style={styles.cardContent}>
@@ -733,6 +777,7 @@ const styles = StyleSheet.create({
   addButton: {
     padding: spacing.s,
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
   content: {
     padding: spacing.l,
     paddingTop: spacing.m,
