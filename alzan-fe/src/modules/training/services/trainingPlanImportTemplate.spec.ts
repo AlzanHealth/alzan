@@ -58,5 +58,27 @@ assert.ok(datedTemplate.includes('"end_date": "2026-08-09"'));
 
 for (const fileName of ['alzan-training-plan-v1.template.json', 'alzan-training-plan-v1.example.json']) {
   const fileContent = readFileSync(new URL(`../../../../../docs/templates/${fileName}`, import.meta.url), 'utf8');
-  assert.equal(parseTrainingPlanJson(fileContent).ok, true, `${fileName} must remain importable`);
+  const parsedFile = parseTrainingPlanJson(fileContent);
+  assert.equal(parsedFile.ok, true, `${fileName} must remain importable`);
+
+  if (fileName === 'alzan-training-plan-v1.example.json' && parsedFile.ok) {
+    const sessions = parsedFile.value.weeks.flatMap(week => week.sessions);
+    assert.equal(parsedFile.value.start_date, '2026-08-31');
+    assert.equal(parsedFile.value.end_date, '2026-10-04');
+    assert.equal(sessions.length, 40);
+    assert.equal(sessions.filter(session => session.sport === 'running').length, 20);
+    assert.equal(sessions.filter(session => session.sport === 'strength').length, 20);
+    assert.ok(sessions.every(session => session.workout_goal));
+    assert.equal(sessions.filter(session => session.date === '2026-09-01').length, 2);
+    assert.equal(sessions.filter(session => session.date === '2026-09-03').length, 2);
+    assert.ok(sessions.some(session => session.date === '2026-09-25'));
+    assert.ok(sessions.some(session => session.date === '2026-09-28'));
+
+    const serialized = JSON.stringify(parsedFile.value).toLowerCase();
+    assert.doesNotMatch(serialized, /"(?:notes|rpe|rir|rir_min|rir_max)"/);
+    assert.ok(sessions.some(session => session.name === 'PUSH'));
+    assert.ok(sessions.some(session => session.name === 'PULL'));
+    assert.ok(sessions.some(session => session.name === 'PIERNA RUNNER'));
+    assert.ok(sessions.some(session => session.name === 'FULL UPPER + CORE'));
+  }
 }
