@@ -52,7 +52,7 @@ import {
 import { fetchTemplateWithProgressedSteps } from '../../modules/training/services/enduranceProgressionService';
 import { Alert } from '../../components/common/Alert';
 import { RouteMap } from '../../components/common/RouteMap';
-import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
+import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS, TIME_INPUT_PROPS } from '../../utils/numericInput';
 import { useTranslation } from 'react-i18next';
 import { AdvancedEnduranceSessionEditor } from '../../modules/training/components/AdvancedEnduranceSessionEditor';
 import { useCreateManualEnduranceActivity } from '../../modules/training/hooks/useCreateManualEnduranceActivity';
@@ -72,6 +72,7 @@ import {
   resetSportSubtypeForSportChange,
   shouldRenderModalitySelector,
 } from './helpers/sessionModality.helper';
+import { parsePaceInput } from '../../modules/training/helpers/paceInput.helper';
 
 export type PopulatedEnduranceWorkoutTemplate = EnduranceWorkoutTemplate & { steps: EnduranceWorkoutStep[] };
 
@@ -384,6 +385,7 @@ export const EnduranceSessionFormScreen = () => {
   // calories is just for display if we wanted manual override, but here we use calculated
   const [, setCalculatedCalories] = useState<number | null>(null);
   const [pace, setPace] = useState(''); // Calculated pace/rhythm (value only)
+  const [paceError, setPaceError] = useState<string | null>(null);
   const [isEditingPace, setIsEditingPace] = useState(false);
   const [rpe, setRpe] = useState('');
   const [vo2Max, setVo2Max] = useState('');
@@ -632,6 +634,10 @@ export const EnduranceSessionFormScreen = () => {
   useEffect(() => {
     if (!advancedAvailable && registrationMode === 'advanced') setRegistrationMode('simple');
   }, [advancedAvailable, registrationMode]);
+
+  useEffect(() => {
+    setPaceError(null);
+  }, [sportType]);
 
   // Helper for safe number parsing (handles commas and dots)
   const safeParseFloat = (str: string) => {
@@ -980,7 +986,7 @@ export const EnduranceSessionFormScreen = () => {
         : safeParseFloat(distance) * 1.60934
       : 0;
 
-    if (dist > 0 && totalDurationMin > 0 && !isEditingPace && currentConfig?.units?.speed) {
+    if (dist > 0 && totalDurationMin > 0 && !isEditingPace && !paceError && currentConfig?.units?.speed) {
       if (currentConfig.units.speed === 'km/h') {
         const kmh = (dist / totalDurationMin) * 60;
         setPace(`${kmh.toFixed(1)}`);
@@ -1065,6 +1071,7 @@ export const EnduranceSessionFormScreen = () => {
     preferences.distance_unit,
     manualWeight,
     isEditingPace,
+    paceError,
     isCaloriesLockedFromRouteImport,
     hasAppliedStrengthImport,
   ]);
@@ -1072,7 +1079,10 @@ export const EnduranceSessionFormScreen = () => {
   // Handle manual pace editing
   const handlePaceBlur = () => {
     setIsEditingPace(false);
-    if (!pace || !distance) return;
+    if (!pace || !distance) {
+      setPaceError(null);
+      return;
+    }
 
     const dist = preferences.distance_unit === 'km' ? safeParseFloat(distance) : safeParseFloat(distance) * 1.60934;
     if (dist <= 0) return;
@@ -1080,30 +1090,20 @@ export const EnduranceSessionFormScreen = () => {
     let totalMin = 0;
 
     if (currentConfig?.units?.speed === 'min/km' || currentConfig?.units?.speed === 'min/100m') {
-      // Parse mm:ss format
-      const parts = pace.split(':');
-      if (parts.length === 2) {
-        const mins = parseInt(parts[0]) || 0;
-        const secs = parseInt(parts[1]) || 0;
-        const paceVal = mins + secs / 60;
-
-        if (currentConfig.units.speed === 'min/km') {
-          totalMin = paceVal * dist;
-        } else {
-          // min/100m
-          const dist100m = (dist * 1000) / 100;
-          totalMin = paceVal * dist100m;
-        }
-      } else {
-        // Try parsing as simple number (min)
-        const val = safeParseFloat(pace);
-        if (val > 0) {
-          if (currentConfig.units.speed === 'min/km') totalMin = val * dist;
-          else totalMin = val * ((dist * 1000) / 100);
-        }
+      const parsedPace = parsePaceInput(pace);
+      if (!parsedPace.ok) {
+        setPaceError(t('training.invalidPaceFormat'));
+        return;
       }
+
+      setPaceError(null);
+      setPace(parsedPace.normalized);
+      const paceVal = parsedPace.totalSeconds / 60;
+      if (currentConfig.units.speed === 'min/km') totalMin = paceVal * dist;
+      else totalMin = paceVal * ((dist * 1000) / 100);
     } else if (currentConfig?.units?.speed === 'km/h') {
       const speedKmh = safeParseFloat(pace);
+      setPaceError(null);
       if (speedKmh > 0) {
         const hours = dist / speedKmh;
         totalMin = hours * 60;
@@ -3239,17 +3239,32 @@ export const EnduranceSessionFormScreen = () => {
                               height: '100%',
                             }}
                             value={pace}
-                            onChangeText={setPace}
+                            onChangeText={value => {
+                              setPace(value);
+                              setPaceError(null);
+                            }}
                             onFocus={() => setIsEditingPace(true)}
                             onBlur={handlePaceBlur}
                             placeholder="-"
                             placeholderTextColor={themeColors.textSecondary}
-                            {...DECIMAL_INPUT_PROPS}
+                            {...(currentConfig?.units?.speed?.startsWith('min/')
+                              ? TIME_INPUT_PROPS
+                              : DECIMAL_INPUT_PROPS)}
                           />
                           <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>
                             {currentConfig?.units.speed || ''}
                           </Text>
                         </View>
+                        {currentConfig?.units?.speed?.startsWith('min/') && !paceError && (
+                          <Text style={{ color: themeColors.textSecondary, fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                            {t('training.paceDecimalHint')}
+                          </Text>
+                        )}
+                        {paceError && (
+                          <Text style={{ color: colors.danger, fontSize: 12, marginTop: 4, marginLeft: 4 }}>
+                            {paceError}
+                          </Text>
+                        )}
                       </View>
                     </View>
                   )}

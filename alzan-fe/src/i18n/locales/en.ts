@@ -1668,6 +1668,8 @@ const en = {
     whatTrainingToday: 'What are you training today?',
     chooseSport: 'Choose Sport',
     pace: 'Pace',
+    paceDecimalHint: 'You can also enter 3,5 = 3:50 or 3,05 = 3:05',
+    invalidPaceFormat: 'Invalid format. Use M:SS or a comma with seconds from 00 to 59 (for example, 3,5).',
     paceAllCaps: 'PACE',
     laps: 'Laps',
     seriesSingular: 'Set',

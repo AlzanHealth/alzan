@@ -1685,6 +1685,8 @@ export default {
     whatTrainingToday: '¿Qué vas a entrenar hoy?',
     chooseSport: 'Elige Deporte',
     pace: 'Ritmo',
+    paceDecimalHint: 'También puedes escribir 3,5 = 3:50 o 3,05 = 3:05',
+    invalidPaceFormat: 'Formato inválido. Usa M:SS o una coma con segundos entre 00 y 59 (por ejemplo, 3,5).',
     paceAllCaps: 'RITMO',
     laps: 'Vueltas',
     seriesSingular: 'Serie',

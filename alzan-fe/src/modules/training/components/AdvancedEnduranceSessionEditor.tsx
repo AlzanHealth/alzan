@@ -25,6 +25,7 @@ import {
   type AdvancedSectionDraft,
   type AdvancedSport,
 } from '../helpers/advancedEnduranceSession.helper';
+import { parsePaceInput } from '../helpers/paceInput.helper';
 
 type Props = {
   sport: AdvancedSport;
@@ -160,6 +161,7 @@ function SectionEditor({
 }) {
   const { t } = useTranslation();
   const { colors: themeColors, styles: dynamicStyles } = useTrainingStyles();
+  const [intensityError, setIntensityError] = useState(false);
   const accent = phaseColor(section.phaseType, themeColors);
   const distanceLabel = sport === 'swimming' ? 'm' : distanceUnit;
   const intensityKey = sport === 'running' ? 'paceSPerKm' : sport === 'swimming' ? 'paceSPer100m' : 'speedMPerS';
@@ -382,10 +384,38 @@ function SectionEditor({
               }
               placeholder={sport === 'cycling' ? '0' : '0:00'}
               placeholderTextColor={themeColors.textSecondary}
-              onCommit={value =>
-                updateMetric('intensity', sport === 'cycling' ? parseNumber(value) : parseDuration(value))
-              }
+              onFocus={() => setIntensityError(false)}
+              onCommit={value => {
+                if (sport === 'cycling') {
+                  setIntensityError(false);
+                  updateMetric('intensity', parseNumber(value));
+                  return;
+                }
+
+                if (!value.trim()) {
+                  setIntensityError(false);
+                  updateMetric('intensity', null);
+                  return;
+                }
+
+                const parsedPace = parsePaceInput(value);
+                if (!parsedPace.ok) {
+                  setIntensityError(true);
+                  return;
+                }
+
+                setIntensityError(false);
+                updateMetric('intensity', parsedPace.totalSeconds);
+              }}
             />
+            {sport !== 'cycling' && !intensityError && (
+              <Text style={[styles.choiceHint, { color: themeColors.textSecondary }]}>
+                {t('training.paceDecimalHint')}
+              </Text>
+            )}
+            {intensityError && (
+              <Text style={[styles.choiceHint, { color: themeColors.danger }]}>{t('training.invalidPaceFormat')}</Text>
+            )}
           </View>
         </View>
       )}
