@@ -14,6 +14,7 @@ import type {
   MenuImportIngredientCandidate,
   MenuImportPreviewMeal,
 } from '../services/menuImportPlanner';
+import { getVisibleMenuImportIngredients } from '../services/menuImportConflictFilter';
 
 type Translate = (key: TranslationKey, options?: Record<string, unknown>) => string;
 
@@ -25,6 +26,7 @@ interface MenuImportMealCardProps {
   onRemoveIngredient: (mealKey: string, ingredientIndex: number) => void;
   onSetConflictDecision: (mealKey: string, decision: MenuImportConflictDecision) => void;
   onSetMealType: (mealKey: string, mealType: MenuImportMealType) => void;
+  showOnlyConflicts: boolean;
   translate: Translate;
 }
 
@@ -192,6 +194,7 @@ export const MenuImportMealCard = memo(function MenuImportMealCard({
   onRemoveIngredient,
   onSetConflictDecision,
   onSetMealType,
+  showOnlyConflicts,
   translate,
 }: MenuImportMealCardProps) {
   const { styles: dynamicStyles, colors } = useNutritionStyles();
@@ -199,6 +202,7 @@ export const MenuImportMealCard = memo(function MenuImportMealCard({
     en: 'EEEE, MMMM d',
     es: "EEEE, d 'de' MMMM",
   });
+  const visibleIngredients = getVisibleMenuImportIngredients(meal.ingredients, showOnlyConflicts);
 
   const handleConflictDecision = useCallback(
     (decision: MenuImportConflictDecision) => {
@@ -264,7 +268,8 @@ export const MenuImportMealCard = memo(function MenuImportMealCard({
       <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
       <View style={styles.ingredients}>
-        {meal.ingredients.map((ingredient, ingredientIndex) => {
+        {visibleIngredients.map(ingredient => {
+          const ingredientIndex = meal.ingredients.indexOf(ingredient);
           const candidates = candidatesByIngredient.get(ingredient.ingredientKey) ?? [];
 
           return (

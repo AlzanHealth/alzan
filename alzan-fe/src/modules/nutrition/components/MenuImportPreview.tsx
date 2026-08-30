@@ -1,5 +1,14 @@
 import React, { memo, useCallback, useMemo } from 'react';
-import { ActivityIndicator, FlatList, ListRenderItem, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  ListRenderItem,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
 import type { TranslationKey } from '../../../i18n/locales/en';
@@ -12,6 +21,7 @@ import type {
 } from '../services/menuImportPlanner';
 import type { MenuImportMealType } from '../services/menuImportContract';
 import { MenuImportMealCard } from './MenuImportMealCard';
+import { getMenuImportConflictSummary, getVisibleMenuImportMeals } from '../services/menuImportConflictFilter';
 
 type Translate = (key: TranslationKey, options?: Record<string, unknown>) => string;
 
@@ -28,6 +38,8 @@ interface MenuImportPreviewProps {
   onRemoveIngredient: (mealKey: string, ingredientIndex: number) => void;
   onSetConflictDecision: (mealKey: string, decision: MenuImportConflictDecision) => void;
   onSetMealType: (mealKey: string, mealType: MenuImportMealType) => void;
+  showOnlyConflicts: boolean;
+  onToggleConflictFilter: (value: boolean) => void;
   translate: Translate;
 }
 
@@ -44,6 +56,8 @@ export const MenuImportPreview = memo(function MenuImportPreview({
   onRemoveIngredient,
   onSetConflictDecision,
   onSetMealType,
+  showOnlyConflicts,
+  onToggleConflictFilter,
   translate,
 }: MenuImportPreviewProps) {
   const { styles: dynamicStyles, colors } = useNutritionStyles();
@@ -52,11 +66,17 @@ export const MenuImportPreview = memo(function MenuImportPreview({
     () => new Map((preview?.resolutions ?? []).map(resolution => [resolution.ingredientKey, resolution.candidates])),
     [preview?.resolutions],
   );
+  const visibleMeals = useMemo(
+    () => (preview === null ? [] : getVisibleMenuImportMeals(preview.meals, showOnlyConflicts)),
+    [preview, showOnlyConflicts],
+  );
+  const conflictSummary = useMemo(() => (preview === null ? null : getMenuImportConflictSummary(preview)), [preview]);
 
   const renderItem = useCallback<ListRenderItem<MenuImportPreviewMeal>>(
     ({ item }) => (
       <MenuImportMealCard
         meal={item}
+        showOnlyConflicts={showOnlyConflicts}
         candidatesByIngredient={candidatesByIngredient}
         onSelectIngredient={onSelectIngredient}
         onSearchIngredient={onSearchIngredient}
@@ -73,6 +93,7 @@ export const MenuImportPreview = memo(function MenuImportPreview({
       onSelectIngredient,
       onSetConflictDecision,
       onSetMealType,
+      showOnlyConflicts,
       translate,
     ],
   );
@@ -106,6 +127,26 @@ export const MenuImportPreview = memo(function MenuImportPreview({
                 </Text>
               </View>
             ) : null}
+            {conflictSummary !== null ? (
+              <View style={[styles.filter, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                <View style={styles.filterCopy}>
+                  <Text style={[styles.filterTitle, { color: colors.textPrimary }]}>
+                    {translate('nutrition.menuImportShowOnlyConflicts')}
+                  </Text>
+                  <Text style={[styles.filterMeta, { color: colors.textSecondary }]}>
+                    {translate('nutrition.menuImportPendingConflicts', { count: conflictSummary.total })}
+                  </Text>
+                </View>
+                <Switch
+                  value={showOnlyConflicts}
+                  onValueChange={onToggleConflictFilter}
+                  trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                  thumbColor={showOnlyConflicts ? colors.primary : colors.textSecondary}
+                  accessibilityLabel={translate('nutrition.menuImportShowOnlyConflictsAccessibility')}
+                  accessibilityRole="switch"
+                />
+              </View>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -118,7 +159,10 @@ export const MenuImportPreview = memo(function MenuImportPreview({
       dynamicStyles.card,
       editor,
       preview,
+      conflictSummary,
       requiresReanalysis,
+      showOnlyConflicts,
+      onToggleConflictFilter,
       translate,
     ],
   );
@@ -154,11 +198,18 @@ export const MenuImportPreview = memo(function MenuImportPreview({
   return (
     <FlatList
       style={styles.list}
-      data={preview?.meals ?? []}
+      data={visibleMeals}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       ListHeaderComponent={listHeader}
       ListFooterComponent={listFooter}
+      ListEmptyComponent={
+        preview !== null && showOnlyConflicts ? (
+          <Text style={[styles.empty, { color: colors.textSecondary }]}>
+            {translate('nutrition.menuImportNoPendingConflicts')}
+          </Text>
+        ) : null
+      }
       contentContainerStyle={[styles.listContent, { paddingBottom: bottomInset + 96 }]}
       ItemSeparatorComponent={MealSeparator}
       keyboardShouldPersistTaps="handled"
@@ -206,6 +257,37 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontSize: 14,
     lineHeight: 20,
+  },
+  empty: {
+    paddingHorizontal: 16,
+    paddingVertical: 32,
+    fontSize: 15,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  filter: {
+    minHeight: 56,
+    marginTop: 14,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  filterCopy: {
+    flex: 1,
+  },
+  filterTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  filterMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 17,
   },
   staleBanner: {
     marginTop: 12,

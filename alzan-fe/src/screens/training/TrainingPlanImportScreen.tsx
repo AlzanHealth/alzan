@@ -56,6 +56,7 @@ export const TrainingPlanImportScreen = () => {
   const [isCopyingTemplate, setIsCopyingTemplate] = useState(false);
   const isCopyingTemplateRef = useRef(false);
   const [isAiSheetVisible, setIsAiSheetVisible] = useState(false);
+  const [showOnlyConflicts, setShowOnlyConflicts] = useState(true);
   const {
     catalogStatus: aiCatalogStatus,
     catalogErrorKind: aiCatalogErrorKind,
@@ -294,6 +295,8 @@ export const TrainingPlanImportScreen = () => {
                   resolutions={exerciseResolutions}
                   onSelect={selectExerciseCandidate}
                   onSearch={searchExerciseCandidates}
+                  showOnlyConflicts={showOnlyConflicts}
+                  onToggleConflictFilter={setShowOnlyConflicts}
                   translate={t}
                 />
               ) : null}

@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Search } from 'lucide-react-native';
 
 import { useTrainingStyles } from '../../../hooks/useTrainingStyles';
@@ -8,6 +8,10 @@ import type {
   TrainingExerciseCandidate,
   TrainingExerciseResolution,
 } from '../../../modules/training/services/trainingPlanImportExerciseResolver';
+import {
+  getTrainingExercisePendingCount,
+  getVisibleTrainingExerciseResolutions,
+} from '../../../modules/training/services/trainingPlanImportConflictFilter';
 
 type Translate = (key: TranslationKey, options?: Record<string, unknown>) => string;
 
@@ -15,6 +19,8 @@ type TrainingExerciseResolutionPreviewProps = {
   resolutions: TrainingExerciseResolution[];
   onSelect: (resolutionKey: string, candidateId: string) => void;
   onSearch: (resolutionKey: string, query: string) => Promise<void>;
+  showOnlyConflicts: boolean;
+  onToggleConflictFilter: (value: boolean) => void;
   translate: Translate;
 };
 
@@ -146,9 +152,13 @@ export const TrainingExerciseResolutionPreview = memo(function TrainingExerciseR
   resolutions,
   onSelect,
   onSearch,
+  showOnlyConflicts,
+  onToggleConflictFilter,
   translate,
 }: TrainingExerciseResolutionPreviewProps) {
   const { colors } = useTrainingStyles();
+  const visibleResolutions = getVisibleTrainingExerciseResolutions(resolutions, showOnlyConflicts);
+  const pendingCount = getTrainingExercisePendingCount(resolutions);
   const renderItem = useCallback(
     ({ item }: { item: TrainingExerciseResolution }) => (
       <TrainingExerciseResolutionRow resolution={item} onSelect={onSelect} onSearch={onSearch} translate={translate} />
@@ -164,12 +174,35 @@ export const TrainingExerciseResolutionPreview = memo(function TrainingExerciseR
       <Text style={[styles.help, { color: colors.textSecondary }]}>
         {translate('training.trainingExerciseMatchesHelp')}
       </Text>
+      <View style={[styles.filter, { borderColor: colors.border, backgroundColor: colors.background }]}>
+        <View style={styles.filterCopy}>
+          <Text style={[styles.filterTitle, { color: colors.textPrimary }]}>
+            {translate('training.trainingExerciseShowOnlyConflicts')}
+          </Text>
+          <Text style={[styles.filterMeta, { color: colors.textSecondary }]}>
+            {translate('training.trainingExercisePendingConflicts', { count: pendingCount })}
+          </Text>
+        </View>
+        <Switch
+          value={showOnlyConflicts}
+          onValueChange={onToggleConflictFilter}
+          trackColor={{ false: colors.border, true: colors.primary + '80' }}
+          thumbColor={showOnlyConflicts ? colors.primary : colors.textSecondary}
+          accessibilityLabel={translate('training.trainingExerciseShowOnlyConflictsAccessibility')}
+          accessibilityRole="switch"
+        />
+      </View>
       <FlatList
-        data={resolutions}
+        data={visibleResolutions}
         renderItem={renderItem}
         keyExtractor={item => item.resolutionKey}
         scrollEnabled={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={
+          <Text style={[styles.empty, { color: colors.textSecondary }]}>
+            {translate('training.trainingExerciseNoPendingConflicts')}
+          </Text>
+        }
       />
     </View>
   );
@@ -179,6 +212,21 @@ const styles = StyleSheet.create({
   container: { marginTop: 18 },
   title: { fontSize: 18, fontWeight: '800' },
   help: { marginTop: 5, fontSize: 14, lineHeight: 20 },
+  filter: {
+    minHeight: 56,
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  filterCopy: { flex: 1 },
+  filterTitle: { fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  filterMeta: { marginTop: 2, fontSize: 12, lineHeight: 17 },
+  empty: { marginTop: 14, fontSize: 14, lineHeight: 20 },
   separator: { height: 12 },
   row: { borderWidth: 1, borderRadius: 16, padding: 14 },
   rowHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },

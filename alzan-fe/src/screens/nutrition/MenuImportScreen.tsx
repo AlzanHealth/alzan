@@ -53,6 +53,7 @@ export const MenuImportScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
   const [isAiSheetVisible, setIsAiSheetVisible] = useState(false);
+  const [showOnlyConflicts, setShowOnlyConflicts] = useState(true);
   const { topFromScreenBottom } = useTabBarLayout();
   const { styles: dynamicStyles, colors } = useNutritionStyles();
   const {
@@ -249,6 +250,8 @@ export const MenuImportScreen = () => {
             onRemoveIngredient={removeIngredient}
             onSetConflictDecision={setConflictDecision}
             onSetMealType={setMealType}
+            showOnlyConflicts={showOnlyConflicts}
+            onToggleConflictFilter={setShowOnlyConflicts}
             translate={translate}
           />
         </KeyboardAvoidingView>
