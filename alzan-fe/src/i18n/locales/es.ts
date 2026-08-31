@@ -176,6 +176,13 @@ export default {
     linearPlanExplanation: 'Cada nueva semana recibe automáticamente la dieta de la semana anterior.',
     copyWeekly: 'Copia semanal',
     deleteFutureData: 'Borrar datos futuros',
+    deleteAllFutureMeals: 'Borrar todas las comidas futuras',
+    deleteFutureRange: 'Borrar rango futuro',
+    selectFutureDateRangeDelete:
+      'Elige las fechas futuras que quieres borrar. Hoy y los días anteriores quedan protegidos.',
+    confirmDeleteFutureRangeMessage: '¿Eliminar comidas del {{start}} al {{end}}?',
+    futureRangeDeletedSuccessfully: 'Se han eliminado las comidas futuras de este rango.',
+    futureDeleteRangeInvalidMessage: 'Elige un rango futuro que empiece mañana o más adelante.',
     pastDataSafeNote: 'Los datos de hoy y los días anteriores no se verán afectados.',
     deleteFutureDataWarning: 'Esta acción eliminará todas las comidas y planificaciones creadas a partir de mañana.',
     keepFutureDiets: 'Mantener dietas futuras',

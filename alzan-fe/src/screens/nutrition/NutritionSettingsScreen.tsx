@@ -87,6 +87,11 @@ import {
   toggleVacationDraftDate,
   type VacationDraftSelectionState,
 } from '../../modules/nutrition/services/nutritionVacation';
+import {
+  buildFutureMealDeleteRange,
+  getDefaultFutureMealDeleteRange,
+  getFutureMealDeleteRangeBounds,
+} from '../../modules/nutrition/services/mealDeleteRangePlanner';
 
 // Default meal types (fixed, not editable)
 const MEAL_TYPES: MealType[] = ['breakfast', 'almuerzo', 'lunch', 'merienda', 'dinner', 'snack'];
@@ -349,6 +354,10 @@ export const NutritionSettingsScreen = () => {
   const [deleteStart, setDeleteStart] = useState(new Date());
   const [deleteEnd, setDeleteEnd] = useState(new Date());
   const [activeDeleteDatePicker, setActiveDeleteDatePicker] = useState<'start' | 'end' | null>(null);
+  const [showCleanFutureRangeMode, setShowCleanFutureRangeMode] = useState(false);
+  const [futureDeleteStart, setFutureDeleteStart] = useState(() => getDefaultFutureMealDeleteRange().start);
+  const [futureDeleteEnd, setFutureDeleteEnd] = useState(() => getDefaultFutureMealDeleteRange().end);
+  const [activeFutureDeleteDatePicker, setActiveFutureDeleteDatePicker] = useState<'start' | 'end' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Track loading state for each meal toggle
@@ -843,12 +852,78 @@ export const NutritionSettingsScreen = () => {
   const handleCleanFuture = async () => {
     setIsLoadingCopy(true);
     setShowCleanFutureModal(false);
+    setShowCleanFutureRangeMode(false);
+    setActiveFutureDeleteDatePicker(null);
 
     if (user) {
       await deleteFutureWeeks(user.id);
       Alert.alert(t('nutrition.futureCleanTitle'), t('nutrition.futureCleanMessage'));
     }
     setIsLoadingCopy(false);
+  };
+
+  const openCleanFutureModal = () => {
+    const defaultRange = getDefaultFutureMealDeleteRange();
+    setFutureDeleteStart(defaultRange.start);
+    setFutureDeleteEnd(defaultRange.end);
+    setShowCleanFutureRangeMode(false);
+    setActiveFutureDeleteDatePicker(null);
+    setShowCleanFutureModal(true);
+  };
+
+  const closeCleanFutureModal = () => {
+    setShowCleanFutureModal(false);
+    setShowCleanFutureRangeMode(false);
+    setActiveFutureDeleteDatePicker(null);
+  };
+
+  const handleCleanFutureRange = () => {
+    let range: { start: string; end: string };
+    try {
+      range = buildFutureMealDeleteRange(futureDeleteStart, futureDeleteEnd);
+    } catch {
+      Alert.alert(t('common.error'), t('nutrition.futureDeleteRangeInvalidMessage'));
+      return;
+    }
+
+    Alert.alert(
+      t('nutrition.confirmDeletionTitle'),
+      t('nutrition.confirmDeleteFutureRangeMessage', {
+        start: format(futureDeleteStart, 'dd/MM/yyyy'),
+        end: format(futureDeleteEnd, 'dd/MM/yyyy'),
+      }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            if (!user || isLoadingCopy) return;
+
+            setIsLoadingCopy(true);
+            closeCleanFutureModal();
+            try {
+              const result = await deleteMealLogsInRange(user.id, range);
+              if (!result.success) {
+                Alert.alert(t('common.error'), result.error || t('nutrition.deleteRecordsErrorMessage'));
+                return;
+              }
+
+              Alert.alert(
+                t('nutrition.deletedTitle'),
+                result.deletedCount > 0
+                  ? t('nutrition.futureRangeDeletedSuccessfully')
+                  : t('nutrition.noRecordsToDeleteMessage'),
+              );
+            } catch (error) {
+              Alert.alert(t('common.error'), getErrorMessage(error));
+            } finally {
+              setIsLoadingCopy(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleApplyCopyMode = async (mode: typeof dietCopyMode, overwrite: boolean) => {
@@ -1064,6 +1139,7 @@ export const NutritionSettingsScreen = () => {
 
   const hydrationDraftMl = getHydrationDraftMl();
   const isDefaultHydrationSaveDisabled = isDefaultHydrationSaving || hydrationDraftMl === defaultHydrationMl;
+  const futureDeleteBounds = getFutureMealDeleteRangeBounds();
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
@@ -1609,13 +1685,7 @@ export const NutritionSettingsScreen = () => {
             {renderSectionTitle(t('nutrition.dataAllCaps'), 'data')}
             <View style={[styles.card, dynamicStyles.glassCard]}>
               {/* Borrar datos futuros */}
-              <TouchableOpacity
-                style={styles.actionRow}
-                onPress={() => {
-                  setShowCleanFutureModal(true);
-                }}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity style={styles.actionRow} onPress={openCleanFutureModal} activeOpacity={0.7}>
                 <Trash2 size={20} color={themeColors.textSecondary} />
                 <Text style={[styles.actionText, { color: themeColors.textPrimary }]}>
                   {t('nutrition.deleteFutureData')}
@@ -2252,6 +2322,26 @@ export const NutritionSettingsScreen = () => {
           />
         ) : null}
 
+        {Platform.OS === 'web' && activeFutureDeleteDatePicker ? (
+          <CalendarDatePickerModal
+            visible
+            value={activeFutureDeleteDatePicker === 'start' ? futureDeleteStart : futureDeleteEnd}
+            title={activeFutureDeleteDatePicker === 'start' ? t('nutrition.startDate') : t('nutrition.endDate')}
+            minimumDate={activeFutureDeleteDatePicker === 'start' ? futureDeleteBounds.minimumDate : futureDeleteStart}
+            maximumDate={futureDeleteBounds.maximumDate}
+            onCancel={() => setActiveFutureDeleteDatePicker(null)}
+            onConfirm={date => {
+              if (activeFutureDeleteDatePicker === 'start') {
+                setFutureDeleteStart(date);
+                if (date > futureDeleteEnd) setFutureDeleteEnd(date);
+              } else {
+                setFutureDeleteEnd(date);
+              }
+              setActiveFutureDeleteDatePicker(null);
+            }}
+          />
+        ) : null}
+
         {/* Overwrite Warning Modal */}
         <Modal visible={showOverwriteModal} animationType="fade" transparent>
           <View style={styles.modalOverlayBlur}>
@@ -2381,50 +2471,153 @@ export const NutritionSettingsScreen = () => {
         <Modal visible={showCleanFutureModal} animationType="fade" transparent>
           <View style={styles.modalOverlayBlur}>
             <BlurView intensity={isDark ? 40 : 30} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={() => setShowCleanFutureModal(false)}
-            />
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeCleanFutureModal} />
             <LiquidGlassNativeCard style={styles.glassModalCard}>
               <View style={styles.glassModalContent}>
-                <Trash2 size={48} color={themeColors.danger} style={{ alignSelf: 'center', marginBottom: spacing.m }} />
-                <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
-                  {t('nutrition.deleteFutureData')}
-                </Text>
-                <Text style={[styles.modalSubtitle, { color: themeColors.textSecondary }]}>
-                  {t('nutrition.deleteFutureDataWarning')}
-                </Text>
-
-                <Text style={[styles.infoModalText, { color: themeColors.textPrimary }]}>
-                  {t('nutrition.pastDataSafeNote')}
-                </Text>
-
-                <View style={{ gap: spacing.s, marginTop: spacing.m }}>
-                  <TouchableOpacity
-                    onPress={handleCleanFuture}
-                    style={{
-                      paddingVertical: spacing.m,
-                      paddingHorizontal: spacing.l,
-                      borderRadius: 12,
-                      borderWidth: 1.5,
-                      borderColor: themeColors.danger,
-                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.06)',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text style={{ color: themeColors.danger, fontWeight: '600', fontSize: 16 }}>
+                {!showCleanFutureRangeMode ? (
+                  <>
+                    <Trash2
+                      size={48}
+                      color={themeColors.danger}
+                      style={{ alignSelf: 'center', marginBottom: spacing.m }}
+                    />
+                    <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
                       {t('nutrition.deleteFutureData')}
                     </Text>
-                  </TouchableOpacity>
+                    <Text style={[styles.modalSubtitle, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.deleteFutureDataWarning')}
+                    </Text>
 
-                  <TouchableOpacity
-                    onPress={() => setShowCleanFutureModal(false)}
-                    style={[styles.cancelButton, { marginTop: 0 }]}
-                  >
-                    <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
-                  </TouchableOpacity>
-                </View>
+                    <Text style={[styles.infoModalText, { color: themeColors.textPrimary }]}>
+                      {t('nutrition.pastDataSafeNote')}
+                    </Text>
+
+                    <View style={{ gap: spacing.s, marginTop: spacing.m }}>
+                      <TouchableOpacity
+                        onPress={handleCleanFuture}
+                        style={{
+                          paddingVertical: spacing.m,
+                          paddingHorizontal: spacing.l,
+                          borderRadius: 12,
+                          borderWidth: 1.5,
+                          borderColor: themeColors.danger,
+                          backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.06)',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: themeColors.danger, fontWeight: '600', fontSize: 16 }}>
+                          {t('nutrition.deleteAllFutureMeals')}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => setShowCleanFutureRangeMode(true)}
+                        style={{
+                          paddingVertical: spacing.m,
+                          paddingHorizontal: spacing.l,
+                          borderRadius: 12,
+                          borderWidth: 1.5,
+                          borderColor: themeColors.primary,
+                          backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.06)',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ color: themeColors.primary, fontWeight: '600', fontSize: 16 }}>
+                          {t('nutrition.deleteFutureRange')}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity onPress={closeCleanFutureModal} style={[styles.cancelButton, { marginTop: 0 }]}>
+                        <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                      {t('nutrition.deleteFutureRange')}
+                    </Text>
+                    <Text style={[styles.modalSubtitle, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.selectFutureDateRangeDelete')}
+                    </Text>
+
+                    <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('nutrition.startDate')}</Text>
+                    {Platform.OS === 'web' ? (
+                      <TouchableOpacity
+                        style={[styles.webDateInput, dynamicStyles.input, { justifyContent: 'center' }]}
+                        onPress={() => setActiveFutureDeleteDatePicker('start')}
+                        accessibilityRole="button"
+                      >
+                        <Text style={{ color: themeColors.textPrimary }}>
+                          {format(futureDeleteStart, 'dd/MM/yyyy')}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <DateTimePicker
+                        value={futureDeleteStart}
+                        mode="date"
+                        display="default"
+                        themeVariant={isDark ? 'dark' : 'light'}
+                        minimumDate={futureDeleteBounds.minimumDate}
+                        maximumDate={futureDeleteBounds.maximumDate}
+                        onChange={(_event, date) => {
+                          if (!date) return;
+                          setFutureDeleteStart(date);
+                          if (date > futureDeleteEnd) setFutureDeleteEnd(date);
+                        }}
+                      />
+                    )}
+
+                    <Text style={[styles.label, { color: themeColors.textSecondary }]}>{t('nutrition.endDate')}</Text>
+                    {Platform.OS === 'web' ? (
+                      <TouchableOpacity
+                        style={[styles.webDateInput, dynamicStyles.input, { justifyContent: 'center' }]}
+                        onPress={() => setActiveFutureDeleteDatePicker('end')}
+                        accessibilityRole="button"
+                      >
+                        <Text style={{ color: themeColors.textPrimary }}>{format(futureDeleteEnd, 'dd/MM/yyyy')}</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <DateTimePicker
+                        value={futureDeleteEnd}
+                        mode="date"
+                        display="default"
+                        themeVariant={isDark ? 'dark' : 'light'}
+                        minimumDate={futureDeleteStart}
+                        maximumDate={futureDeleteBounds.maximumDate}
+                        onChange={(_event, date) => date && setFutureDeleteEnd(date)}
+                      />
+                    )}
+
+                    <Text style={[styles.infoModalText, { color: themeColors.textPrimary }]}>
+                      {t('nutrition.pastDataSafeNote')}
+                    </Text>
+
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        onPress={() => setShowCleanFutureRangeMode(false)}
+                        style={styles.modalBtnCancel}
+                      >
+                        <Text style={styles.modalBtnTextCancel}>{t('nutrition.backButton')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleCleanFutureRange}
+                        disabled={isLoadingCopy}
+                        style={[
+                          styles.modalBtnConfirm,
+                          { backgroundColor: themeColors.danger },
+                          isLoadingCopy && { opacity: 0.6 },
+                        ]}
+                      >
+                        {isLoadingCopy ? (
+                          <ActivityIndicator size="small" color={colors.white} />
+                        ) : (
+                          <Text style={styles.modalBtnTextConfirm}>{t('common.delete')}</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </View>
             </LiquidGlassNativeCard>
           </View>
