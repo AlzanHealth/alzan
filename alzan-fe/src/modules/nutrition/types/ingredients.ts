@@ -49,6 +49,7 @@ export interface MealComponent extends Omit<Partial<DbIngredient>, 'source_prima
   recipe_visibility?: 'private' | 'public';
   recipe_public_slug?: string | null;
   recipe_origin_id?: string | null;
+  recipe_created_at?: string | null;
   recipe_updated_at?: string | null;
   recipe_popularity_score?: number;
   recipe_favorites_total?: number;

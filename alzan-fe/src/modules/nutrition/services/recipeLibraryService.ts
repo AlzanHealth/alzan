@@ -10,12 +10,24 @@ import { getLocalizedRecipeDescription, getLocalizedRecipeName } from '../../../
 import { normalizeInput } from '../../../services/ingredientsService';
 import { MealComponent } from '../types/ingredients';
 import { buildRecipeSoftDeletePayload } from './recipeEditing';
+export { PersonalRecipeSort } from './recipeLibraryPlanner';
+
+export type RecipeLibraryErrorCode = 'not_authenticated' | 'load_failed' | 'invalid_data';
+
+export class RecipeLibraryError extends Error {
+  readonly code: RecipeLibraryErrorCode;
+
+  constructor(code: RecipeLibraryErrorCode, message: string) {
+    super(message);
+    this.name = 'RecipeLibraryError';
+    this.code = code;
+  }
+}
 
 // Discovery sorting lens (all backed by aggregate columns already on `recipes`).
 export type DiscoverSort = 'recommended' | 'week' | 'month' | 'saved';
 // Macro-based category filter (derived from the per-100g columns on `recipes`).
 export type DiscoverCategory = 'all' | 'high_protein' | 'low_cal' | 'high_carb';
-export type PersonalRecipeSort = 'recently_used' | 'most_used' | 'alphabetical';
 
 const HIGH_PROTEIN_MIN_G = 15;
 const LOW_CAL_MAX_KCAL = 120;
@@ -41,6 +53,7 @@ interface RecipeRow {
   uses_7d: number | null;
   uses_30d: number | null;
   uses_total: number | null;
+  created_at: string;
 }
 
 export interface RankedRecipeRow extends RecipeRow {
@@ -89,7 +102,7 @@ export interface RecipePersonalUsageSummary {
 }
 
 const RECIPE_CARD_FIELDS =
-  'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, updated_at, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total';
+  'id, name_es, name_en, description_es, description_en, source, owner_user_id, visibility, created_at, updated_at, kcal_100, protein_g_100, carbs_g_100, fat_g_100, popularity_score, favorites_total, saves_total, uses_7d, uses_30d, uses_total';
 
 const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10;
 
@@ -115,6 +128,7 @@ const mapRecipeRow = (row: RecipeRow): MealComponent => ({
   recipe_source: row.source,
   recipe_owner_user_id: row.owner_user_id,
   recipe_visibility: row.visibility,
+  recipe_created_at: row.created_at,
   recipe_updated_at: row.updated_at,
   recipe_popularity_score: row.popularity_score ?? 0,
   recipe_favorites_total: row.favorites_total ?? 0,
@@ -249,7 +263,7 @@ export async function getDiscoverRecipes({
 
   if (error || !data) {
     if (error) console.error('[recipeLibraryService] getDiscoverRecipes error:', error);
-    return { recipes: [], total: 0 };
+    throw new RecipeLibraryError('load_failed', error?.message ?? 'Could not load recipes');
   }
 
   return { recipes: await attachAuthorNames(data.map(mapRecipeRow)), total: count ?? 0 };
@@ -283,7 +297,7 @@ export async function getMySavedRecipes(): Promise<MealComponent[]> {
 
   if (error || !data) {
     if (error) console.error('[recipeLibraryService] getMySavedRecipes error:', error);
-    return [];
+    throw new RecipeLibraryError('load_failed', error?.message ?? 'Could not load saved recipes');
   }
 
   return attachAuthorNames(data.map(mapRecipeRow));
@@ -302,7 +316,7 @@ export async function getFavoriteRecipeIds(): Promise<string[]> {
 
   if (error || !data) {
     if (error) console.error('[recipeLibraryService] getFavoriteRecipeIds error:', error);
-    return [];
+    throw new RecipeLibraryError('load_failed', error?.message ?? 'Could not load favorites');
   }
 
   return data.map(row => row.recipe_id);
@@ -321,7 +335,7 @@ export async function getFavoriteRecipes(favoriteIds: string[]): Promise<MealCom
 
   if (error || !data) {
     if (error) console.error('[recipeLibraryService] getFavoriteRecipes error:', error);
-    return [];
+    throw new RecipeLibraryError('load_failed', error?.message ?? 'Could not load favorite recipes');
   }
 
   const byId = new Map(data.map(row => [row.id, row]));
@@ -375,13 +389,13 @@ export async function getRecipePersonalUsageSummaries(recipeIds: string[]): Prom
 /** Toggle a favorite; returns the new favorite state (true = now favorited). */
 export async function toggleFavoriteRecipe(recipeId: string, isCurrentlyFavorite: boolean): Promise<boolean> {
   const userId = await getCurrentUserId();
-  if (!userId) return isCurrentlyFavorite;
+  if (!userId) throw new RecipeLibraryError('not_authenticated', 'A signed-in user is required');
 
   if (isCurrentlyFavorite) {
     const { error } = await supabase.from('recipe_favorites').delete().eq('user_id', userId).eq('recipe_id', recipeId);
     if (error) {
       console.error('[recipeLibraryService] remove favorite error:', error);
-      return true;
+      throw new RecipeLibraryError('load_failed', error.message);
     }
     return false;
   }
@@ -389,7 +403,7 @@ export async function toggleFavoriteRecipe(recipeId: string, isCurrentlyFavorite
   const { error } = await supabase.from('recipe_favorites').insert({ user_id: userId, recipe_id: recipeId });
   if (error) {
     console.error('[recipeLibraryService] add favorite error:', error);
-    return false;
+    throw new RecipeLibraryError('load_failed', error.message);
   }
   return true;
 }

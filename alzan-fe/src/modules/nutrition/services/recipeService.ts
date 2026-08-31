@@ -48,6 +48,13 @@ export interface RecipeIngredient {
   fat_g_100: number | null;
 }
 
+export class RecipeIngredientsLoadError extends Error {
+  constructor(message = 'Could not load recipe ingredients') {
+    super(message);
+    this.name = 'RecipeIngredientsLoadError';
+  }
+}
+
 interface RecipeRow {
   id: string;
   name_es: string;
@@ -232,12 +239,16 @@ export async function getRecipeIngredients(recipeId: string, locale?: Locale) {
 
     if (error) {
       console.error('[recipeService] Error fetching recipe ingredients:', JSON.stringify(error));
-      return [];
+      throw new RecipeIngredientsLoadError(error.message);
     }
 
     if (!data || data.length === 0) {
       console.warn('[recipeService] No recipe_items found for this recipe');
       return [];
+    }
+
+    if (data.some(item => !item.ingredients)) {
+      throw new RecipeIngredientsLoadError('Recipe ingredient data is incomplete');
     }
 
     return data.map(item => ({

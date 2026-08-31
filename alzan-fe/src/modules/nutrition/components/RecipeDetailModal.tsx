@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator } from 'react-native';
-import { X, Plus, Pencil, Trash2 } from 'lucide-react-native';
+import { X, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
 import { borderRadius } from '../../../theme';
@@ -33,20 +33,29 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
   const { colors: themeColors, isDark } = useNutritionStyles();
   const [ingredients, setIngredients] = useState<RecipeIngredientItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const retryIngredients = useCallback(() => setRetryCount(current => current + 1), []);
 
   useEffect(() => {
     if (!visible || !recipe?.external_id) {
       setIngredients([]);
+      setLoadError(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     getRecipeIngredients(recipe.external_id, getCurrentAppLocale())
       .then(items => {
         if (!cancelled) setIngredients(items);
       })
-      .catch(error => console.error('[RecipeDetailModal] ingredients load error:', error))
+      .catch(error => {
+        console.error('[RecipeDetailModal] ingredients load error:', error);
+        if (!cancelled) setLoadError(true);
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -54,7 +63,7 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [visible, recipe?.external_id]);
+  }, [retryCount, visible, recipe?.external_id]);
 
   if (!recipe) return null;
 
@@ -106,6 +115,20 @@ export const RecipeDetailModal: React.FC<RecipeDetailModalProps> = ({
 
           {loading ? (
             <ActivityIndicator color={themeColors.primary} style={styles.loader} />
+          ) : loadError ? (
+            <View style={styles.errorState}>
+              <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
+                {t('nutrition.recipeDetailLoadError')}
+              </Text>
+              <TouchableOpacity
+                style={[styles.retryButton, { borderColor: themeColors.primary + '55' }]}
+                onPress={retryIngredients}
+                activeOpacity={0.85}
+              >
+                <RefreshCw size={15} color={themeColors.primary} strokeWidth={2.3} />
+                <Text style={[styles.retryButtonText, { color: themeColors.primary }]}>{t('nutrition.retry')}</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
               {ingredients.length === 0 ? (
@@ -225,6 +248,18 @@ const styles = StyleSheet.create({
   ingredientName: { flex: 1, fontSize: 15 },
   ingredientMeta: { fontSize: 13 },
   emptyText: { fontSize: 14, paddingVertical: 16 },
+  errorState: { alignItems: 'center', paddingVertical: 12 },
+  retryButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderRadius: borderRadius.m,
+  },
+  retryButtonText: { fontSize: 14, fontWeight: '700' },
   manageActionsRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
   manageButton: {
     flex: 1,

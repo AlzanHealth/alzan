@@ -4,7 +4,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft, Search, Star, Plus, Info, Flame, Pencil, Trash2, ShoppingBasket } from 'lucide-react-native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
@@ -35,6 +35,7 @@ import {
   DiscoverCategory,
   PersonalRecipeSort,
 } from '../../modules/nutrition/services/recipeLibraryService';
+import { getOptimisticFavoriteIds, sortPersonalRecipes } from '../../modules/nutrition/services/recipeLibraryPlanner';
 import {
   formatNutritionDayDate,
   normalizeNutritionDayRolloverTime,
@@ -63,14 +64,9 @@ const DISCOVER_CATEGORIES: { key: DiscoverCategory; labelKey: TranslationKey }[]
 const PERSONAL_SORTS: { key: PersonalRecipeSort; labelKey: TranslationKey }[] = [
   { key: 'recently_used', labelKey: 'nutrition.recipeSortRecentlyUsed' },
   { key: 'most_used', labelKey: 'nutrition.recipeSortMostUsed' },
+  { key: 'created', labelKey: 'nutrition.recipeSortCreated' },
   { key: 'alphabetical', labelKey: 'nutrition.recipeSortAlphabetical' },
 ];
-
-const getTimeValue = (value: string | null | undefined): number => {
-  if (!value) return 0;
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timestamp : 0;
-};
 
 export const RecipeLibraryScreen = () => {
   const { t } = useTranslation();
@@ -95,6 +91,7 @@ export const RecipeLibraryScreen = () => {
   const [discoverPage, setDiscoverPage] = useState(1);
   const [discoverTotal, setDiscoverTotal] = useState(0);
   const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverError, setDiscoverError] = useState<Error | null>(null);
   const [discoverSort, setDiscoverSort] = useState<DiscoverSort>('recommended');
   const [personalSort, setPersonalSort] = useState<PersonalRecipeSort>('recently_used');
   const [recipeCategory, setRecipeCategory] = useState<DiscoverCategory>('all');
@@ -115,6 +112,48 @@ export const RecipeLibraryScreen = () => {
     enabled: !!user,
   });
   const favoriteIds = favoriteIdsQuery.data ?? [];
+
+  const favoriteMutation = useMutation<
+    boolean,
+    Error,
+    { recipeId: string; isCurrentlyFavorite: boolean },
+    {
+      previousIds: string[] | undefined;
+      favoritesKey: readonly ['recipeFavorites', string[]];
+      previousFavorites: MealComponent[] | undefined;
+    }
+  >({
+    mutationFn: ({ recipeId, isCurrentlyFavorite }) => toggleFavoriteRecipe(recipeId, isCurrentlyFavorite),
+    onMutate: async ({ recipeId, isCurrentlyFavorite }) => {
+      await queryClient.cancelQueries({ queryKey: ['recipeFavoriteIds', user?.id] });
+      await queryClient.cancelQueries({ queryKey: ['recipeFavorites'] });
+
+      const previousIds = queryClient.getQueryData<string[]>(['recipeFavoriteIds', user?.id]);
+      const currentIds = previousIds ?? favoriteIds;
+      const favoritesKey = ['recipeFavorites', currentIds] as const;
+      const previousFavorites = queryClient.getQueryData<MealComponent[]>(favoritesKey);
+      const nextIds = getOptimisticFavoriteIds(previousIds ?? favoriteIds, recipeId, isCurrentlyFavorite);
+
+      queryClient.setQueryData(['recipeFavoriteIds', user?.id], nextIds);
+      queryClient.setQueryData<MealComponent[]>(favoritesKey, current =>
+        isCurrentlyFavorite ? current?.filter(item => item.external_id !== recipeId) : current,
+      );
+
+      return { previousIds, favoritesKey, previousFavorites };
+    },
+    onError: (_error, _variables, context) => {
+      if (!context) return;
+      queryClient.setQueryData(['recipeFavoriteIds', user?.id], context.previousIds);
+      queryClient.setQueryData(context.favoritesKey, context.previousFavorites);
+      Alert.alert(t('common.error'), t('nutrition.favoriteUpdateError'));
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['recipeFavoriteIds', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['recipeFavorites'] }),
+      ]);
+    },
+  });
 
   const favoritesQuery = useQuery({
     queryKey: ['recipeFavorites', favoriteIds],
@@ -148,8 +187,10 @@ export const RecipeLibraryScreen = () => {
         setDiscoverTotal(total);
         setDiscover(prev => (replace ? recipes : [...prev, ...recipes]));
         setDiscoverPage(page);
+        setDiscoverError(null);
       } catch (error) {
         console.error('[RecipeLibrary] discover load error:', error);
+        setDiscoverError(error instanceof Error ? error : new Error('Could not load recipes'));
       } finally {
         setDiscoverLoading(false);
       }
@@ -162,12 +203,10 @@ export const RecipeLibraryScreen = () => {
     void loadDiscover(1, true);
   }, [tab, loadDiscover]);
 
-  const handleToggleFavorite = async (recipe: MealComponent) => {
+  const handleToggleFavorite = (recipe: MealComponent) => {
     if (!recipe.external_id) return;
     const isFav = favoriteIds.includes(recipe.external_id);
-    await toggleFavoriteRecipe(recipe.external_id, isFav);
-    queryClient.invalidateQueries({ queryKey: ['recipeFavoriteIds', user?.id] });
-    queryClient.invalidateQueries({ queryKey: ['recipeFavorites'] });
+    favoriteMutation.mutate({ recipeId: recipe.external_id, isCurrentlyFavorite: isFav });
   };
 
   const openRecipeInMealLog = useCallback(
@@ -288,26 +327,7 @@ export const RecipeLibraryScreen = () => {
         : personalRecipes;
     const categorizedRecipes = searchedRecipes.filter(recipe => recipeMatchesCategory(recipe, recipeCategory));
 
-    return [...categorizedRecipes].sort((a, b) => {
-      const aUsage = a.external_id ? personalUsageById.get(a.external_id) : undefined;
-      const bUsage = b.external_id ? personalUsageById.get(b.external_id) : undefined;
-
-      if (personalSort === 'alphabetical') {
-        return a.name.localeCompare(b.name);
-      }
-
-      if (personalSort === 'most_used') {
-        const aUses = (aUsage?.useCount ?? 0) || (a.recipe_uses_total ?? 0);
-        const bUses = (bUsage?.useCount ?? 0) || (b.recipe_uses_total ?? 0);
-        if (bUses !== aUses) return bUses - aUses;
-      } else {
-        const aRecent = getTimeValue(aUsage?.lastUsedAt) || getTimeValue(a.recipe_updated_at);
-        const bRecent = getTimeValue(bUsage?.lastUsedAt) || getTimeValue(b.recipe_updated_at);
-        if (bRecent !== aRecent) return bRecent - aRecent;
-      }
-
-      return a.name.localeCompare(b.name);
-    });
+    return sortPersonalRecipes(categorizedRecipes, personalSort, personalUsageById);
   }, [debouncedQuery, personalRecipes, personalSort, personalUsageById, recipeCategory, tab]);
 
   const listData = tab === 'discover' ? discover : filteredPersonalRecipes;
@@ -316,8 +336,23 @@ export const RecipeLibraryScreen = () => {
       ? discoverLoading && discover.length === 0
       : tab === 'mine'
         ? mineQuery.isLoading
-        : favoritesQuery.isLoading;
+        : favoriteIdsQuery.isLoading || favoritesQuery.isLoading;
   const canLoadMoreDiscover = tab === 'discover' && discover.length < discoverTotal;
+  const listError =
+    tab === 'discover'
+      ? discoverError
+      : tab === 'mine'
+        ? mineQuery.error
+        : (favoriteIdsQuery.error ?? favoritesQuery.error);
+  const retryList = () => {
+    if (tab === 'discover') {
+      void loadDiscover(1, true);
+    } else if (tab === 'mine') {
+      void mineQuery.refetch();
+    } else {
+      void favoritesQuery.refetch();
+    }
+  };
 
   const renderCard = ({ item }: { item: MealComponent }) => {
     const isFav = item.external_id ? favoriteIds.includes(item.external_id) : false;
@@ -340,9 +375,11 @@ export const RecipeLibraryScreen = () => {
               <Info size={20} color={themeColors.textSecondary} strokeWidth={2} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => handleToggleFavorite(item)}
+              onPress={() => void handleToggleFavorite(item)}
+              disabled={favoriteMutation.isPending && favoriteMutation.variables?.recipeId === item.external_id}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
+              accessibilityLabel={t(isFav ? 'nutrition.removeFavoriteAction' : 'nutrition.addFavoriteAction')}
             >
               <Star
                 size={20}
@@ -512,6 +549,22 @@ export const RecipeLibraryScreen = () => {
           <View style={styles.centerState}>
             <ActivityIndicator color={themeColors.primary} />
           </View>
+        ) : listError ? (
+          <View style={styles.centerState}>
+            <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
+              {t('nutrition.recipeLibraryLoadErrorTitle')}
+            </Text>
+            <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
+              {t('nutrition.recipeLibraryLoadErrorMessage')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { borderColor: themeColors.primary + '55' }]}
+              onPress={retryList}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.loadMoreText, { color: themeColors.primary }]}>{t('nutrition.retry')}</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <FlatList
             data={listData}
@@ -522,8 +575,23 @@ export const RecipeLibraryScreen = () => {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.centerState}>
+                <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>
+                  {t(
+                    tab === 'mine'
+                      ? 'nutrition.savedRecipesEmptyTitle'
+                      : tab === 'favorites'
+                        ? 'nutrition.favoriteRecipesEmptyTitle'
+                        : 'nutrition.recipeLibraryEmpty',
+                  )}
+                </Text>
                 <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                  {t('nutrition.recipeLibraryEmpty')}
+                  {t(
+                    tab === 'mine'
+                      ? 'nutrition.savedRecipesEmptyMessage'
+                      : tab === 'favorites'
+                        ? 'nutrition.favoriteRecipesEmptyMessage'
+                        : 'nutrition.recipeLibraryEmpty',
+                  )}
                 </Text>
               </View>
             }
@@ -701,7 +769,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   centerState: { paddingTop: 60, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { fontSize: 14 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  emptyText: { fontSize: 14, textAlign: 'center', marginTop: 8, maxWidth: 300 },
+  retryButton: {
+    marginTop: 16,
+    minHeight: 44,
+    paddingHorizontal: 20,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   loadMore: {
     marginTop: 4,
     paddingVertical: 12,
