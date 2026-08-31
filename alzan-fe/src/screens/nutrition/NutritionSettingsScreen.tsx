@@ -856,7 +856,12 @@ export const NutritionSettingsScreen = () => {
     setActiveFutureDeleteDatePicker(null);
 
     if (user) {
-      await deleteFutureWeeks(user.id);
+      const result = await deleteFutureWeeks(user.id);
+      if (!result.success) {
+        Alert.alert(t('common.error'), result.error || t('nutrition.deleteRecordsErrorMessage'));
+        setIsLoadingCopy(false);
+        return;
+      }
       Alert.alert(t('nutrition.futureCleanTitle'), t('nutrition.futureCleanMessage'));
     }
     setIsLoadingCopy(false);
