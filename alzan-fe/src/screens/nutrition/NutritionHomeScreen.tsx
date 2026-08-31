@@ -13,8 +13,10 @@ import { useDayNutrition } from '../../modules/nutrition/hooks/useDayNutritionLo
 import {
   useUpsertMealLog,
   useDeleteMealLog,
+  useRestoreMealLog,
   useCopyMeal,
   useMoveMeal,
+  useMoveMealById,
   useWaterIntake,
   useVacationDateSet,
 } from '../../modules/nutrition/hooks/useNutritionData';
@@ -26,6 +28,14 @@ import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { DaySwitcher, DaySwitcherRef } from '../../components/common/DaySwitcher';
 import { NutritionScreenNavigationProp, NutritionStackParamList, TabParamList } from '../../types/navigation.types';
 import { MealType } from '../../types/requests.types';
+import {
+  createDeletedMealUndoAction,
+  createMovedMealUndoAction,
+  isMealUndoAvailable,
+  MEAL_UNDO_WINDOW_MS,
+  MealUndoAction,
+} from '../../modules/nutrition/services/mealUndoPlanner';
+import { UndoToast } from '../../components/common/UndoToast';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import { useTranslation } from 'react-i18next';
@@ -188,8 +198,26 @@ export const NutritionHomeScreen = () => {
   // Actions
   const upsertLog = useUpsertMealLog();
   const deleteMealLog = useDeleteMealLog();
+  const restoreMealLog = useRestoreMealLog();
   const copyMeal = useCopyMeal();
   const moveMeal = useMoveMeal();
+  const moveMealById = useMoveMealById();
+  const [undoAction, setUndoAction] = useState<MealUndoAction | null>(null);
+  const [isUndoing, setIsUndoing] = useState(false);
+  const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showUndoAction = React.useCallback((action: MealUndoAction) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoAction(action);
+    undoTimerRef.current = setTimeout(() => setUndoAction(null), MEAL_UNDO_WINDOW_MS);
+  }, []);
+
+  React.useEffect(
+    () => () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    },
+    [],
+  );
 
   // The floating "+" defaults the meal slot to the current time of day so the
   // user lands in the right section without scrolling to find it. Falls back to
@@ -229,8 +257,19 @@ export const NutritionHomeScreen = () => {
     if (!mealTransferAction) return;
 
     if (mealTransferAction.type === 'move') {
+      const sourceLog = mealTransferAction.meal.log;
+      if (!sourceLog) return;
+
       await moveMeal.mutateAsync({ source: mealTransferAction.meal, date, mealType });
       setMealTransferAction(null);
+      showUndoAction(
+        createMovedMealUndoAction({
+          logId: sourceLog.id,
+          previous: { date: sourceLog.date, mealType: sourceLog.meal_type },
+          current: { date, mealType },
+          expiresAt: Date.now() + MEAL_UNDO_WINDOW_MS,
+        }),
+      );
 
       const destinationDate = parseISO(date);
       if (isValid(destinationDate)) {
@@ -242,13 +281,6 @@ export const NutritionHomeScreen = () => {
         });
       }
 
-      Alert.alert(
-        t('nutrition.moveMealSuccessTitle'),
-        t('nutrition.moveMealSuccessMessage', {
-          date: formatLocalizedDate(destinationDate, { en: 'MMM d, yyyy', es: "d 'de' MMM yyyy" }),
-          mealType: t(MEAL_TYPE_LABELS[mealType]),
-        }),
-      );
       return;
     }
 
@@ -291,7 +323,8 @@ export const NutritionHomeScreen = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteMealLog.mutateAsync(item.logId!);
+            const snapshot = await deleteMealLog.mutateAsync(item.logId!);
+            showUndoAction(createDeletedMealUndoAction(snapshot, Date.now() + MEAL_UNDO_WINDOW_MS));
           } catch (error) {
             console.error('Error deleting meal:', error);
             Alert.alert(t('common.error'), t('nutrition.deleteMealError'));
@@ -299,6 +332,33 @@ export const NutritionHomeScreen = () => {
         },
       },
     ]);
+  };
+
+  const handleUndoMealAction = async () => {
+    const action = undoAction;
+    if (!action || !isMealUndoAvailable(action) || isUndoing) return;
+
+    setIsUndoing(true);
+    try {
+      if (action.kind === 'move') {
+        await moveMealById.mutateAsync({
+          logId: action.logId,
+          current: { date: action.current.date, meal_type: action.current.mealType },
+          date: action.previous.date,
+          mealType: action.previous.mealType,
+        });
+      } else {
+        await restoreMealLog.mutateAsync(action.snapshot);
+      }
+
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      setUndoAction(null);
+    } catch (error) {
+      console.error('Error undoing meal action:', error);
+      Alert.alert(t('common.error'), t('nutrition.undoMealError'));
+    } finally {
+      setIsUndoing(false);
+    }
   };
 
   // Derived Groups
@@ -465,6 +525,29 @@ export const NutritionHomeScreen = () => {
           onCancel={() => setMealTransferAction(null)}
           onCopy={handleMealTransferSubmit}
         />
+
+        {undoAction ? (
+          <UndoToast
+            message={
+              undoAction.kind === 'move'
+                ? t('nutrition.mealMovedUndoMessage', {
+                    date: formatLocalizedDate(parseISO(undoAction.current.date), {
+                      en: 'MMM d, yyyy',
+                      es: "d 'de' MMM yyyy",
+                    }),
+                  })
+                : t('nutrition.mealDeletedUndoMessage')
+            }
+            actionLabel={t('nutrition.undoMealAction')}
+            accessibilityLabel={t('nutrition.undoMealAccessibility')}
+            onUndo={handleUndoMealAction}
+            isBusy={isUndoing}
+            bottomOffset={topFromScreenBottom + 96}
+            backgroundColor={themeColors.textPrimary}
+            textColor={themeColors.background}
+            actionColor={themeColors.primary}
+          />
+        ) : null}
 
         {/* Quick-add FAB: opens the quick-add sheet on the meal slot matching the time of day */}
         <TouchableOpacity

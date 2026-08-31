@@ -20,6 +20,7 @@ import { IngredientInput } from '../types/db';
 import { getLocalizedIngredientName } from '../../../services/localization';
 import { Locale } from '../../../i18n';
 import { MIN_INGREDIENT_QUANTITY_G } from '../constants';
+import type { DeletedMealSnapshot } from './mealUndoPlanner';
 
 // Final gate before inserting into meal_items: any positive quantity is clamped to
 // at least MIN_INGREDIENT_QUANTITY_G so we never violate the quantity_g > 0 constraint,
@@ -197,6 +198,59 @@ export const nutritionService = {
     // 2. Delete the log
     const { error } = await supabase.from('meal_logs').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  async deleteMealLogWithSnapshot(userId: string, id: string): Promise<DeletedMealSnapshot> {
+    if (!userId || !id) throw new Error('Invalid meal to delete');
+
+    const { data: log, error: logError } = await supabase
+      .from('meal_logs')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (logError) throw logError;
+
+    const { data: items, error: itemsError } = await supabase
+      .from('meal_items')
+      .select('*')
+      .eq('meal_log_id', id)
+      .eq('user_id', userId)
+      .returns<MealItem[]>();
+
+    if (itemsError) throw itemsError;
+
+    const { error: deleteItemsError } = await supabase
+      .from('meal_items')
+      .delete()
+      .eq('meal_log_id', id)
+      .eq('user_id', userId);
+
+    if (deleteItemsError) throw deleteItemsError;
+
+    const { error: deleteLogError } = await supabase.from('meal_logs').delete().eq('id', id).eq('user_id', userId);
+
+    if (deleteLogError) throw deleteLogError;
+
+    return { log, items: items ?? [] };
+  },
+
+  async restoreDeletedMeal(userId: string, snapshot: DeletedMealSnapshot): Promise<void> {
+    if (!userId || snapshot.log.user_id !== userId) throw new Error('Invalid meal to restore');
+
+    const { error: logError } = await supabase.from('meal_logs').insert(snapshot.log);
+    if (logError) throw logError;
+
+    if (snapshot.items.length === 0) return;
+
+    const { error: itemsError } = await supabase.from('meal_items').insert(snapshot.items);
+    if (!itemsError) return;
+
+    // Avoid leaving a partial meal behind if restoring its ingredients fails.
+    await supabase.from('meal_items').delete().eq('meal_log_id', snapshot.log.id).eq('user_id', userId);
+    await supabase.from('meal_logs').delete().eq('id', snapshot.log.id).eq('user_id', userId);
+    throw itemsError;
   },
 
   // --- NEW: Atomic Save with Ingredients ---

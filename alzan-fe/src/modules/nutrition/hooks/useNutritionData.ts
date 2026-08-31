@@ -16,6 +16,7 @@ import { copyMealToDate, moveMealToDate } from '../services/dietCopyService';
 import { useAuth } from '../../../context/AuthContext';
 import { getCurrentAppLocale } from '../../../services/localization';
 import { usePreferences } from '../../../hooks/settings/usePreferences';
+import type { DeletedMealSnapshot } from '../services/mealUndoPlanner';
 
 const KEYS = {
   TEMPLATES: (userId: string) => ['dietTemplates', userId],
@@ -198,8 +199,28 @@ export function useUpsertMealLog() {
 
 export function useDeleteMealLog() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   return useMutation({
-    mutationFn: nutritionService.deleteMealLog,
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error('No user');
+      return nutritionService.deleteMealLogWithSnapshot(user.id, id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+    },
+  });
+}
+
+export function useRestoreMealLog() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (snapshot: DeletedMealSnapshot) => {
+      if (!user) throw new Error('No user');
+      await nutritionService.restoreDeletedMeal(user.id, snapshot);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
       queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
@@ -244,6 +265,37 @@ export function useMoveMeal() {
       if (!source.log) throw new Error('A registered meal is required to move it');
 
       return moveMealToDate(user.id, source.log, { date, mealType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+    },
+  });
+}
+
+export function useMoveMealById() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: {
+      logId: string;
+      current: Pick<MealLog, 'date' | 'meal_type'>;
+      date: string;
+      mealType: MealType;
+    }) => {
+      if (!user) throw new Error('No user');
+
+      return moveMealToDate(
+        user.id,
+        {
+          id: variables.logId,
+          date: variables.current.date,
+          meal_type: variables.current.meal_type,
+        },
+        { date: variables.date, mealType: variables.mealType },
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
