@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Utensils, Settings, Plus, BookOpen, CalendarCheck } from 'lucide-react-native';
+import { Settings, Plus, BookOpen, CalendarCheck, MoreVertical, Copy, MoveRight, X } from 'lucide-react-native';
 import { addDays, format, isValid, parseISO, subDays } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -17,6 +17,11 @@ import {
   useCopyMeal,
   useMoveMeal,
   useMoveMealById,
+  useCopyMealsToDate,
+  useMoveMealsToDate,
+  useCopyDayToDate,
+  useCopyMealRange,
+  useMoveMealRange,
   useWaterIntake,
   useVacationDateSet,
 } from '../../modules/nutrition/hooks/useNutritionData';
@@ -44,6 +49,14 @@ import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { getNutritionDayDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
 import { CopyMealModal, CopyMealDestination } from '../../modules/nutrition/components/CopyMealModal';
+import { MealBatchActionsMenu, MealBatchAction } from '../../modules/nutrition/components/MealBatchActionsMenu';
+import {
+  MealBatchActionModal,
+  MealBatchModalMode,
+  MealBatchModalOperation,
+  MealBatchModalValues,
+} from '../../modules/nutrition/components/MealBatchActionModal';
+import type { MealRange } from '../../modules/nutrition/services/mealBatchPlanner';
 import { getNutritionHomeMenuImportTarget, getNutritionHomeRecipeLibraryTarget } from './nutritionHeaderActions';
 
 // Helper to group meals
@@ -91,7 +104,18 @@ export const NutritionHomeScreen = () => {
   // Date Logic
   const [selectedDate, setSelectedDate] = useState(() => getNutritionDayDate(new Date(), nutritionDayRolloverTime));
   const [mealTransferAction, setMealTransferAction] = useState<MealTransferAction | null>(null);
+  const [isBatchMenuVisible, setIsBatchMenuVisible] = useState(false);
+  const [isMealSelectionMode, setIsMealSelectionMode] = useState(false);
+  const [selectedMealIds, setSelectedMealIds] = useState<Set<string>>(new Set());
+  const [batchModal, setBatchModal] = useState<{
+    mode: MealBatchModalMode;
+    operation: MealBatchModalOperation;
+  } | null>(null);
   const nutritionCalendarRange = React.useMemo(() => getNutritionCalendarRange(new Date()), []);
+  const defaultBatchDestinationDate = React.useMemo(() => {
+    const nextDate = addDays(selectedDate, 1);
+    return nextDate <= nutritionCalendarRange.maximumDate ? nextDate : selectedDate;
+  }, [nutritionCalendarRange.maximumDate, selectedDate]);
   const daySwitcherRef = React.useRef<DaySwitcherRef>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
   const isAutoSelectedDateRef = React.useRef(true);
@@ -202,6 +226,11 @@ export const NutritionHomeScreen = () => {
   const copyMeal = useCopyMeal();
   const moveMeal = useMoveMeal();
   const moveMealById = useMoveMealById();
+  const copyMeals = useCopyMealsToDate();
+  const moveMeals = useMoveMealsToDate();
+  const duplicateDay = useCopyDayToDate();
+  const copyMealRange = useCopyMealRange();
+  const moveMealRange = useMoveMealRange();
   const [undoAction, setUndoAction] = useState<MealUndoAction | null>(null);
   const [isUndoing, setIsUndoing] = useState(false);
   const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -251,6 +280,81 @@ export const NutritionHomeScreen = () => {
   const handleMoveMeal = (item: DailyMealItem) => {
     if (!item.log?.id) return;
     setMealTransferAction({ type: 'move', meal: item });
+  };
+
+  const handleBatchMenuAction = (action: MealBatchAction) => {
+    if (action === 'import-menu') {
+      navigation.navigate(getNutritionHomeMenuImportTarget().screen);
+      return;
+    }
+
+    if (action === 'select') {
+      setSelectedMealIds(new Set());
+      setIsMealSelectionMode(true);
+      return;
+    }
+
+    if (action === 'duplicate-day') {
+      setBatchModal({ mode: 'day', operation: 'copy' });
+      return;
+    }
+
+    setBatchModal({ mode: 'range', operation: action === 'copy-range' ? 'copy' : 'move' });
+  };
+
+  const toggleMealSelection = (item: DailyMealItem) => {
+    if (!item.log?.id) return;
+    setSelectedMealIds(previous => {
+      const next = new Set(previous);
+      if (next.has(item.log!.id)) next.delete(item.log!.id);
+      else next.add(item.log!.id);
+      return next;
+    });
+  };
+
+  const openSelectedMealsModal = (operation: MealBatchModalOperation) => {
+    if (selectedMealIds.size === 0) return;
+    setBatchModal({ mode: 'selection', operation });
+  };
+
+  const handleBatchSubmit = async (values: MealBatchModalValues) => {
+    if (!batchModal) return;
+    let result: { processedCount: number };
+
+    if (batchModal.mode === 'selection') {
+      if (!values.destinationDate) throw new Error('A destination date is required');
+      result = await (batchModal.operation === 'copy' ? copyMeals : moveMeals).mutateAsync({
+        mealIds: Array.from(selectedMealIds),
+        destinationDate: values.destinationDate,
+      });
+    } else if (batchModal.mode === 'day') {
+      if (!values.destinationDate) throw new Error('A destination date is required');
+      result = await duplicateDay.mutateAsync({ sourceDate: formattedDate, destinationDate: values.destinationDate });
+    } else {
+      if (!values.sourceStartDate || !values.sourceEndDate || !values.destinationStartDate) {
+        throw new Error('A complete date range is required');
+      }
+      const range: MealRange = { startDate: values.sourceStartDate, endDate: values.sourceEndDate };
+      result = await (batchModal.operation === 'copy' ? copyMealRange : moveMealRange).mutateAsync({
+        range,
+        destinationStartDate: values.destinationStartDate,
+      });
+    }
+
+    setBatchModal(null);
+    setIsMealSelectionMode(false);
+    setSelectedMealIds(new Set());
+    Alert.alert(
+      t('nutrition.batchSuccessTitle'),
+      t(
+        batchModal.operation === 'copy' || batchModal.mode === 'day'
+          ? 'nutrition.batchCopySuccess'
+          : 'nutrition.batchMoveSuccess',
+        {
+          count: result.processedCount,
+        },
+      ),
+    );
   };
 
   const handleMealTransferSubmit = async ({ date, mealType }: CopyMealDestination) => {
@@ -403,14 +507,6 @@ export const NutritionHomeScreen = () => {
           <View style={styles.topActions}>
             <TouchableOpacity
               style={styles.topAction}
-              onPress={() => navigation.navigate(getNutritionHomeMenuImportTarget().screen)}
-              accessibilityRole="button"
-              accessibilityLabel={t('nutrition.menuImportOpenAccessibility')}
-            >
-              <Utensils color={themeColors.textPrimary} size={24} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.topAction}
               onPress={() => {
                 const target = getNutritionHomeRecipeLibraryTarget(formattedDate);
                 navigation.navigate(target.screen, target.params);
@@ -427,6 +523,14 @@ export const NutritionHomeScreen = () => {
               accessibilityLabel={t('tabs.settings')}
             >
               <Settings color={themeColors.textPrimary} size={24} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.topAction}
+              onPress={() => setIsBatchMenuVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('nutrition.nutritionActions')}
+            >
+              <MoreVertical color={themeColors.textPrimary} size={24} />
             </TouchableOpacity>
           </View>
         </View>
@@ -446,6 +550,64 @@ export const NutritionHomeScreen = () => {
           ref={scrollViewRef}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: topFromScreenBottom + 96 }]}
         >
+          {isMealSelectionMode ? (
+            <View style={[styles.selectionToolbar, { backgroundColor: themeColors.surfaceSolid }]}>
+              <View style={styles.selectionToolbarHeader}>
+                <View style={styles.selectionTitleCopy}>
+                  <Text style={[styles.selectionTitle, { color: themeColors.textPrimary }]}>
+                    {t('nutrition.selectMeals')}
+                  </Text>
+                  <Text style={[styles.selectionCount, { color: themeColors.textSecondary }]}>
+                    {t('nutrition.selectedMealsCount', { count: selectedMealIds.size })}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsMealSelectionMode(false);
+                    setSelectedMealIds(new Set());
+                  }}
+                  style={styles.selectionClose}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.cancelSelection')}
+                >
+                  <X size={20} color={themeColors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.selectionActions}>
+                <TouchableOpacity
+                  onPress={() => openSelectedMealsModal('copy')}
+                  disabled={selectedMealIds.size === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.batchCopyAction')}
+                  style={[
+                    styles.selectionAction,
+                    { borderColor: themeColors.primary },
+                    selectedMealIds.size === 0 && styles.disabled,
+                  ]}
+                >
+                  <Copy size={17} color={themeColors.primary} />
+                  <Text style={[styles.selectionActionText, { color: themeColors.primary }]}>
+                    {t('nutrition.batchCopyAction')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => openSelectedMealsModal('move')}
+                  disabled={selectedMealIds.size === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.batchMoveAction')}
+                  style={[
+                    styles.selectionAction,
+                    { backgroundColor: themeColors.primary },
+                    selectedMealIds.size === 0 && styles.disabled,
+                  ]}
+                >
+                  <MoveRight size={17} color="#FFFFFF" />
+                  <Text style={styles.selectionActionTextLight}>{t('nutrition.batchMoveAction')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+
           {/* Calorie Summary Header */}
           <CalorieEquationHeader
             calories={{
@@ -495,6 +657,9 @@ export const NutritionHomeScreen = () => {
                 onMoveMeal={handleMoveMeal}
                 onCheckMeal={handleCheckMeal}
                 onDeleteMeal={handleDeleteMeal}
+                selectionMode={isMealSelectionMode}
+                isMealSelected={item => !!item.log?.id && selectedMealIds.has(item.log.id)}
+                onToggleMeal={toggleMealSelection}
                 isSecondary={isSecondary}
                 showMacros={macroDisplay === 'per_meal'}
               />
@@ -526,6 +691,26 @@ export const NutritionHomeScreen = () => {
           onCopy={handleMealTransferSubmit}
         />
 
+        <MealBatchActionsMenu
+          visible={isBatchMenuVisible}
+          onClose={() => setIsBatchMenuVisible(false)}
+          onSelect={handleBatchMenuAction}
+        />
+
+        <MealBatchActionModal
+          visible={batchModal !== null}
+          mode={batchModal?.mode ?? 'day'}
+          operation={batchModal?.operation ?? 'copy'}
+          selectedCount={selectedMealIds.size}
+          sourceDate={selectedDate}
+          initialDestinationDate={defaultBatchDestinationDate}
+          initialSourceEndDate={selectedDate}
+          minimumDate={nutritionCalendarRange.minimumDate}
+          maximumDate={nutritionCalendarRange.maximumDate}
+          onCancel={() => setBatchModal(null)}
+          onSubmit={handleBatchSubmit}
+        />
+
         {undoAction ? (
           <UndoToast
             message={
@@ -541,8 +726,13 @@ export const NutritionHomeScreen = () => {
             actionLabel={t('nutrition.undoMealAction')}
             accessibilityLabel={t('nutrition.undoMealAccessibility')}
             onUndo={handleUndoMealAction}
+            onDismiss={() => {
+              if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+              setUndoAction(null);
+            }}
+            dismissAccessibilityLabel={t('common.close')}
             isBusy={isUndoing}
-            bottomOffset={topFromScreenBottom + 96}
+            bottomOffset={topFromScreenBottom + 12}
             backgroundColor={themeColors.textPrimary}
             textColor={themeColors.background}
             actionColor={themeColors.primary}
@@ -615,6 +805,30 @@ const styles = StyleSheet.create({
   vacationCopy: {
     flex: 1,
   },
+  selectionToolbar: {
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+  },
+  selectionToolbarHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  selectionTitleCopy: { flex: 1 },
+  selectionTitle: { fontSize: 16, fontWeight: '800' },
+  selectionCount: { fontSize: 13, marginTop: 3 },
+  selectionClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  selectionActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  selectionAction: {
+    flex: 1,
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  selectionActionText: { fontSize: 13, fontWeight: '800' },
+  selectionActionTextLight: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  disabled: { opacity: 0.45 },
   vacationTitle: {
     fontSize: 16,
     fontWeight: '700',

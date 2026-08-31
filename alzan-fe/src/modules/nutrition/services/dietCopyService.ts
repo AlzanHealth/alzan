@@ -19,6 +19,14 @@ import {
   type MealCopySource,
 } from './mealCopyPlanner';
 import { buildMealMoveUpdate, type MealMoveSource } from './mealMovePlanner';
+import {
+  buildDayDuplicationPlan,
+  buildMealSelectionPlan,
+  buildRangeTransferPlan,
+  type MealBatchSource,
+  type MealRange,
+  type MealTransferPlanItem,
+} from './mealBatchPlanner';
 
 // Re-exported so existing imports keep working and callers share one source of truth.
 export { getISOWeekString, getVisibleWeekRange } from './dietCopyPlanner';
@@ -92,6 +100,169 @@ export const moveMealToDate = async (
 
   if (error) throw error;
   return data;
+};
+
+export type MealBatchOperationResult = {
+  processedCount: number;
+  totalCount: number;
+};
+
+const fetchMealLogsByIds = async (userId: string, ids: string[]): Promise<MealLog[]> => {
+  if (!userId || ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('meal_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .in('id', Array.from(new Set(ids)))
+    .returns<MealLog[]>();
+
+  if (error) throw error;
+  return data ?? [];
+};
+
+const fetchMealLogsInRange = async (userId: string, range: MealRange): Promise<MealLog[]> => {
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from('meal_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('date', range.startDate)
+    .lte('date', range.endDate)
+    .returns<MealLog[]>();
+
+  if (error) throw error;
+  return data ?? [];
+};
+
+const toBatchSources = (logs: MealLog[]): MealBatchSource[] =>
+  logs.map(log => ({ id: log.id, date: log.date, meal_type: log.meal_type }));
+
+const deleteCreatedMeal = async (userId: string, logId: string): Promise<void> => {
+  const { error: itemsError } = await supabase
+    .from('meal_items')
+    .delete()
+    .eq('meal_log_id', logId)
+    .eq('user_id', userId);
+  if (itemsError) throw itemsError;
+
+  const { error: logError } = await supabase.from('meal_logs').delete().eq('id', logId).eq('user_id', userId);
+  if (logError) throw logError;
+};
+
+const executeMealCopyPlan = async (
+  userId: string,
+  plan: MealTransferPlanItem[],
+  logs: MealLog[],
+): Promise<MealBatchOperationResult> => {
+  const logsById = new Map(logs.map(log => [log.id, log]));
+  const createdIds: string[] = [];
+
+  try {
+    for (const item of plan) {
+      const sourceLog = logsById.get(item.logId);
+      if (!sourceLog) throw new Error('A source meal could not be found');
+
+      const created = await copyMealToDate(userId, { log: sourceLog }, item.destination);
+      createdIds.push(created.id);
+    }
+  } catch (error) {
+    for (const createdId of createdIds.reverse()) {
+      try {
+        await deleteCreatedMeal(userId, createdId);
+      } catch (rollbackError) {
+        console.error('[dietCopyService] Error rolling back copied meal:', rollbackError);
+      }
+    }
+    throw error;
+  }
+
+  return { processedCount: plan.length, totalCount: plan.length };
+};
+
+const executeMealMovePlan = async (userId: string, plan: MealTransferPlanItem[]): Promise<MealBatchOperationResult> => {
+  const completed: MealTransferPlanItem[] = [];
+
+  try {
+    for (const item of plan) {
+      await moveMealToDate(
+        userId,
+        { id: item.source.id, date: item.source.date, meal_type: item.source.meal_type },
+        item.destination,
+      );
+      completed.push(item);
+    }
+  } catch (error) {
+    for (const item of completed.reverse()) {
+      try {
+        await moveMealToDate(
+          userId,
+          { id: item.source.id, date: item.destination.date, meal_type: item.destination.mealType },
+          { date: item.source.date, mealType: item.source.meal_type },
+        );
+      } catch (rollbackError) {
+        console.error('[dietCopyService] Error rolling back moved meal:', rollbackError);
+      }
+    }
+    throw error;
+  }
+
+  return { processedCount: plan.length, totalCount: plan.length };
+};
+
+export const copyMealsToDate = async (
+  userId: string,
+  mealIds: string[],
+  destinationDate: string,
+): Promise<MealBatchOperationResult> => {
+  const uniqueMealIds = Array.from(new Set(mealIds));
+  const logs = await fetchMealLogsByIds(userId, uniqueMealIds);
+  if (logs.length !== uniqueMealIds.length) throw new Error('One or more source meals could not be found');
+  const plan = buildMealSelectionPlan(toBatchSources(logs), destinationDate);
+  return executeMealCopyPlan(userId, plan, logs);
+};
+
+export const moveMealsToDate = async (
+  userId: string,
+  mealIds: string[],
+  destinationDate: string,
+): Promise<MealBatchOperationResult> => {
+  const uniqueMealIds = Array.from(new Set(mealIds));
+  const logs = await fetchMealLogsByIds(userId, uniqueMealIds);
+  if (logs.length !== uniqueMealIds.length) throw new Error('One or more source meals could not be found');
+  const plan = buildMealSelectionPlan(toBatchSources(logs), destinationDate);
+  return executeMealMovePlan(userId, plan);
+};
+
+export const copyDayToDate = async (
+  userId: string,
+  sourceDate: string,
+  destinationDate: string,
+): Promise<MealBatchOperationResult> => {
+  const logs = await fetchMealLogsInRange(userId, { startDate: sourceDate, endDate: sourceDate });
+  const plan = buildDayDuplicationPlan(toBatchSources(logs), destinationDate);
+  return executeMealCopyPlan(userId, plan, logs);
+};
+
+export const copyMealRange = async (
+  userId: string,
+  range: MealRange,
+  destinationStartDate: string,
+): Promise<MealBatchOperationResult> => {
+  const logs = await fetchMealLogsInRange(userId, range);
+  const plan = buildRangeTransferPlan(toBatchSources(logs), range, destinationStartDate);
+  return executeMealCopyPlan(userId, plan, logs);
+};
+
+export const moveMealRange = async (
+  userId: string,
+  range: MealRange,
+  destinationStartDate: string,
+): Promise<MealBatchOperationResult> => {
+  const logs = await fetchMealLogsInRange(userId, range);
+  const plan = buildRangeTransferPlan(toBatchSources(logs), range, destinationStartDate);
+  return executeMealMovePlan(userId, plan);
 };
 
 /**

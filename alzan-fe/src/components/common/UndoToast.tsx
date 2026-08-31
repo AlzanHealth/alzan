@@ -1,11 +1,14 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { X } from 'lucide-react-native';
 
 type UndoToastProps = {
   message: string;
   actionLabel: string;
   accessibilityLabel: string;
   onUndo: () => void;
+  onDismiss: () => void;
+  dismissAccessibilityLabel: string;
   isBusy?: boolean;
   bottomOffset?: number;
   backgroundColor: string;
@@ -18,6 +21,8 @@ export const UndoToast = ({
   actionLabel,
   accessibilityLabel,
   onUndo,
+  onDismiss,
+  dismissAccessibilityLabel,
   isBusy = false,
   bottomOffset = 16,
   backgroundColor,
@@ -41,6 +46,15 @@ export const UndoToast = ({
         ) : (
           <Text style={[styles.actionText, { color: actionColor }]}>{actionLabel}</Text>
         )}
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={dismissAccessibilityLabel}
+        disabled={isBusy}
+        onPress={onDismiss}
+        style={({ pressed }) => [styles.dismiss, pressed && styles.pressed]}
+      >
+        <X color={textColor} size={20} strokeWidth={2.5} />
       </Pressable>
     </View>
   </View>
@@ -84,6 +98,13 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 15,
     fontWeight: '800',
+  },
+  dismiss: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
   },
   pressed: {
     opacity: 0.7,

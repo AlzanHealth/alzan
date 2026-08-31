@@ -12,7 +12,16 @@ import {
 } from '../../../types/requests.types';
 import { IngredientInput } from '../types/db';
 import type { DailyMealItem } from '../types';
-import { copyMealToDate, moveMealToDate } from '../services/dietCopyService';
+import {
+  copyDayToDate,
+  copyMealRange,
+  copyMealToDate,
+  copyMealsToDate,
+  moveMealRange,
+  moveMealsToDate,
+  moveMealToDate,
+} from '../services/dietCopyService';
+import type { MealRange } from '../services/mealBatchPlanner';
 import { useAuth } from '../../../context/AuthContext';
 import { getCurrentAppLocale } from '../../../services/localization';
 import { usePreferences } from '../../../hooks/settings/usePreferences';
@@ -302,6 +311,77 @@ export function useMoveMealById() {
       queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
       queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
     },
+  });
+}
+
+const invalidateNutritionMealQueries = (queryClient: ReturnType<typeof useQueryClient>) => {
+  queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+  queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+  queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+};
+
+export function useCopyMealsToDate() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { mealIds: string[]; destinationDate: string }) => {
+      if (!user) throw new Error('No user');
+      return copyMealsToDate(user.id, variables.mealIds, variables.destinationDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
+  });
+}
+
+export function useMoveMealsToDate() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { mealIds: string[]; destinationDate: string }) => {
+      if (!user) throw new Error('No user');
+      return moveMealsToDate(user.id, variables.mealIds, variables.destinationDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
+  });
+}
+
+export function useCopyDayToDate() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { sourceDate: string; destinationDate: string }) => {
+      if (!user) throw new Error('No user');
+      return copyDayToDate(user.id, variables.sourceDate, variables.destinationDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
+  });
+}
+
+export function useCopyMealRange() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { range: MealRange; destinationStartDate: string }) => {
+      if (!user) throw new Error('No user');
+      return copyMealRange(user.id, variables.range, variables.destinationStartDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
+  });
+}
+
+export function useMoveMealRange() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { range: MealRange; destinationStartDate: string }) => {
+      if (!user) throw new Error('No user');
+      return moveMealRange(user.id, variables.range, variables.destinationStartDate);
+    },
+    onSuccess: () => invalidateNutritionMealQueries(queryClient),
   });
 }
 
