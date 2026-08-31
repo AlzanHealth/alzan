@@ -12,7 +12,7 @@ import {
 } from '../../../types/requests.types';
 import { IngredientInput } from '../types/db';
 import type { DailyMealItem } from '../types';
-import { copyMealToDate } from '../services/dietCopyService';
+import { copyMealToDate, moveMealToDate } from '../services/dietCopyService';
 import { useAuth } from '../../../context/AuthContext';
 import { getCurrentAppLocale } from '../../../services/localization';
 import { usePreferences } from '../../../hooks/settings/usePreferences';
@@ -223,6 +223,27 @@ export function useCopyMeal() {
       if (!user) throw new Error('No user');
 
       return copyMealToDate(user.id, { log: source.log, templateMeal: source.templateMeal }, { date, mealType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mealLogs'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+      queryClient.invalidateQueries({ queryKey: ['shoppingList'] });
+    },
+  });
+}
+
+export type MoveMealInput = CopyMealInput;
+
+export function useMoveMeal() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ source, date, mealType }: MoveMealInput) => {
+      if (!user) throw new Error('No user');
+      if (!source.log) throw new Error('A registered meal is required to move it');
+
+      return moveMealToDate(user.id, source.log, { date, mealType });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mealLogs'] });

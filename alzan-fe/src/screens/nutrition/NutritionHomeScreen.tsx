@@ -14,6 +14,7 @@ import {
   useUpsertMealLog,
   useDeleteMealLog,
   useCopyMeal,
+  useMoveMeal,
   useWaterIntake,
   useVacationDateSet,
 } from '../../modules/nutrition/hooks/useNutritionData';
@@ -59,6 +60,11 @@ const groupMealsByType = (meals: DailyMealItem[]) => {
   return groups;
 };
 
+type MealTransferAction = {
+  type: 'copy' | 'move';
+  meal: DailyMealItem;
+};
+
 export const NutritionHomeScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NutritionScreenNavigationProp>();
@@ -74,7 +80,7 @@ export const NutritionHomeScreen = () => {
 
   // Date Logic
   const [selectedDate, setSelectedDate] = useState(() => getNutritionDayDate(new Date(), nutritionDayRolloverTime));
-  const [mealToCopy, setMealToCopy] = useState<DailyMealItem | null>(null);
+  const [mealTransferAction, setMealTransferAction] = useState<MealTransferAction | null>(null);
   const nutritionCalendarRange = React.useMemo(() => getNutritionCalendarRange(new Date()), []);
   const daySwitcherRef = React.useRef<DaySwitcherRef>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
@@ -183,6 +189,7 @@ export const NutritionHomeScreen = () => {
   const upsertLog = useUpsertMealLog();
   const deleteMealLog = useDeleteMealLog();
   const copyMeal = useCopyMeal();
+  const moveMeal = useMoveMeal();
 
   // The floating "+" defaults the meal slot to the current time of day so the
   // user lands in the right section without scrolling to find it. Falls back to
@@ -210,14 +217,43 @@ export const NutritionHomeScreen = () => {
   };
 
   const handleCopyMeal = (item: DailyMealItem) => {
-    setMealToCopy(item);
+    setMealTransferAction({ type: 'copy', meal: item });
   };
 
-  const handleCopyMealSubmit = async ({ date, mealType }: CopyMealDestination) => {
-    if (!mealToCopy) return;
+  const handleMoveMeal = (item: DailyMealItem) => {
+    if (!item.log?.id) return;
+    setMealTransferAction({ type: 'move', meal: item });
+  };
 
-    await copyMeal.mutateAsync({ source: mealToCopy, date, mealType });
-    setMealToCopy(null);
+  const handleMealTransferSubmit = async ({ date, mealType }: CopyMealDestination) => {
+    if (!mealTransferAction) return;
+
+    if (mealTransferAction.type === 'move') {
+      await moveMeal.mutateAsync({ source: mealTransferAction.meal, date, mealType });
+      setMealTransferAction(null);
+
+      const destinationDate = parseISO(date);
+      if (isValid(destinationDate)) {
+        isAutoSelectedDateRef.current = false;
+        setSelectedDate(destinationDate);
+        requestAnimationFrame(() => {
+          daySwitcherRef.current?.scrollToDate(destinationDate);
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        });
+      }
+
+      Alert.alert(
+        t('nutrition.moveMealSuccessTitle'),
+        t('nutrition.moveMealSuccessMessage', {
+          date: formatLocalizedDate(destinationDate, { en: 'MMM d, yyyy', es: "d 'de' MMM yyyy" }),
+          mealType: t(MEAL_TYPE_LABELS[mealType]),
+        }),
+      );
+      return;
+    }
+
+    await copyMeal.mutateAsync({ source: mealTransferAction.meal, date, mealType });
+    setMealTransferAction(null);
 
     Alert.alert(
       t('nutrition.copyMealSuccessTitle'),
@@ -396,6 +432,7 @@ export const NutritionHomeScreen = () => {
                 onAdd={() => handleAddFood(type)}
                 onEditMeal={handleEditMeal}
                 onCopyMeal={handleCopyMeal}
+                onMoveMeal={handleMoveMeal}
                 onCheckMeal={handleCheckMeal}
                 onDeleteMeal={handleDeleteMeal}
                 isSecondary={isSecondary}
@@ -417,14 +454,16 @@ export const NutritionHomeScreen = () => {
         </ScrollView>
 
         <CopyMealModal
-          visible={mealToCopy !== null}
-          sourceName={mealToCopy?.displayName ?? ''}
-          initialDate={currentNutritionDate}
+          visible={mealTransferAction !== null}
+          variant={mealTransferAction?.type ?? 'copy'}
+          sourceName={mealTransferAction?.meal.displayName ?? ''}
+          initialDate={mealTransferAction?.type === 'move' ? selectedDate : currentNutritionDate}
+          initialMealType={mealTransferAction?.type === 'move' ? mealTransferAction.meal.mealType : undefined}
           minimumDate={nutritionCalendarRange.minimumDate}
           maximumDate={nutritionCalendarRange.maximumDate}
           mealTypes={displayMealTypes}
-          onCancel={() => setMealToCopy(null)}
-          onCopy={handleCopyMealSubmit}
+          onCancel={() => setMealTransferAction(null)}
+          onCopy={handleMealTransferSubmit}
         />
 
         {/* Quick-add FAB: opens the quick-add sheet on the meal slot matching the time of day */}

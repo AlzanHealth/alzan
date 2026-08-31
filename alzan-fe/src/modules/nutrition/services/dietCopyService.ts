@@ -18,6 +18,7 @@ import {
   type MealCopyDestination,
   type MealCopySource,
 } from './mealCopyPlanner';
+import { buildMealMoveUpdate, type MealMoveSource } from './mealMovePlanner';
 
 // Re-exported so existing imports keep working and callers share one source of truth.
 export { getISOWeekString, getVisibleWeekRange } from './dietCopyPlanner';
@@ -62,6 +63,32 @@ export const copyMealToDate = async (
     p_log: draft.log,
     p_items: draft.items,
   });
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Move one registered meal to a new date/type. This updates the existing meal
+ * log, so destination rows are never overwritten and ingredients keep the same
+ * meal_log_id.
+ */
+export const moveMealToDate = async (
+  userId: string,
+  source: MealMoveSource,
+  destination: MealCopyDestination,
+): Promise<MealLog> => {
+  if (!userId) throw new Error('No user');
+
+  const { logId, updates } = buildMealMoveUpdate(source, destination);
+
+  const { data, error } = await supabase
+    .from('meal_logs')
+    .update(updates)
+    .eq('id', logId)
+    .eq('user_id', userId)
+    .select()
+    .single();
 
   if (error) throw error;
   return data;

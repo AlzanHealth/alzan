@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { Edit2, Trash2 } from 'lucide-react-native';
+import { CalendarDays, Edit2, Trash2 } from 'lucide-react-native';
 import { DailyMealItem } from '../types';
 import { useMealItems } from '../hooks/useNutritionData';
 import { useNutritionStyles } from '../../../hooks/useNutritionStyles';
@@ -11,12 +11,13 @@ interface MealRowProps {
   onCheck: () => void;
   onEdit: () => void;
   onCopy: () => void;
+  onMove?: () => void;
   onDelete?: () => void;
   onSkip?: () => void;
   showMacros?: boolean;
 }
 
-export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onCopy, onDelete, showMacros = true }) => {
+export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onCopy, onMove, onDelete, showMacros = true }) => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useNutritionStyles();
   const isPending = item.status === 'pending';
@@ -69,8 +70,20 @@ export const MealRow: React.FC<MealRowProps> = ({ item, onEdit, onCopy, onDelete
       </View>
 
       <View style={styles.actions}>
+        {hasLog && onMove && (
+          <TouchableOpacity
+            onPress={onMove}
+            accessibilityRole="button"
+            accessibilityLabel={t('nutrition.moveMealAccessibility', { mealName: item.displayName })}
+            style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
+          >
+            <CalendarDays size={16} color={themeColors.primary} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           onPress={onEdit}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.edit')}
           style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
         >
           <Edit2 size={16} color={themeColors.textSecondary} />

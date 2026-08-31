@@ -27,8 +27,10 @@ export type CopyMealDestination = {
 
 type CopyMealModalProps = {
   visible: boolean;
+  variant?: 'copy' | 'move';
   sourceName: string;
   initialDate: Date;
+  initialMealType?: MealType;
   minimumDate: Date;
   maximumDate: Date;
   mealTypes: MealType[];
@@ -48,8 +50,10 @@ const clampDate = (date: Date, minimumDate: Date, maximumDate: Date): Date => {
 
 export const CopyMealModal = ({
   visible,
+  variant = 'copy',
   sourceName,
   initialDate,
+  initialMealType,
   minimumDate,
   maximumDate,
   mealTypes,
@@ -67,6 +71,12 @@ export const CopyMealModal = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const mealTypeKey = mealTypes.join('|');
+  const titleKey = variant === 'move' ? 'nutrition.moveMealTitle' : 'nutrition.copyMealTitle';
+  const actionKey = variant === 'move' ? 'nutrition.moveMealAction' : 'nutrition.copyMealAction';
+  const errorKey = variant === 'move' ? 'nutrition.moveMealError' : 'nutrition.copyMealError';
+  const cancelKey = variant === 'move' ? 'nutrition.moveMealCancel' : 'nutrition.copyMealCancel';
+  const selectedInitialMealType =
+    initialMealType && mealTypes.includes(initialMealType) ? initialMealType : (mealTypes[0] ?? null);
 
   useEffect(() => {
     if (!visible) {
@@ -77,9 +87,9 @@ export const CopyMealModal = ({
 
     setStep('date');
     setSelectedDate(clampDate(initialDate, minimumDate, maximumDate));
-    setSelectedMealType(mealTypes[0] ?? null);
+    setSelectedMealType(selectedInitialMealType);
     setErrorMessage(null);
-  }, [initialDate, maximumDate, mealTypeKey, minimumDate, visible]);
+  }, [initialDate, maximumDate, mealTypeKey, minimumDate, selectedInitialMealType, visible]);
 
   const selectDate = (date: Date) => {
     setSelectedDate(clampDate(date, minimumDate, maximumDate));
@@ -100,7 +110,7 @@ export const CopyMealModal = ({
     try {
       await onCopy({ date: toIsoDate(selectedDate), mealType: selectedMealType });
     } catch {
-      setErrorMessage(t('nutrition.copyMealError'));
+      setErrorMessage(t(errorKey));
     } finally {
       setIsSubmitting(false);
     }
@@ -117,7 +127,7 @@ export const CopyMealModal = ({
         <View style={[styles.content, { backgroundColor: themeColors.surfaceSolid }]}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('nutrition.copyMealTitle')}</Text>
+              <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t(titleKey)}</Text>
               <Text style={[styles.sourceName, { color: themeColors.textSecondary }]} numberOfLines={2}>
                 {sourceName}
               </Text>
@@ -125,7 +135,7 @@ export const CopyMealModal = ({
             <TouchableOpacity
               onPress={onCancel}
               accessibilityRole="button"
-              accessibilityLabel={t('nutrition.copyMealCancel')}
+              accessibilityLabel={t(cancelKey)}
               style={styles.closeButton}
             >
               <Text style={[styles.closeText, { color: themeColors.textSecondary }]}>×</Text>
@@ -191,9 +201,7 @@ export const CopyMealModal = ({
 
               <View style={styles.actions}>
                 <TouchableOpacity onPress={onCancel} style={styles.secondaryButton}>
-                  <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-                    {t('nutrition.copyMealCancel')}
-                  </Text>
+                  <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>{t(cancelKey)}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleContinue}
@@ -255,9 +263,7 @@ export const CopyMealModal = ({
 
               <View style={styles.actions}>
                 <TouchableOpacity onPress={onCancel} disabled={isSubmitting} style={styles.secondaryButton}>
-                  <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>
-                    {t('nutrition.copyMealCancel')}
-                  </Text>
+                  <Text style={[styles.secondaryButtonText, { color: themeColors.textSecondary }]}>{t(cancelKey)}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleCopy}
@@ -271,7 +277,7 @@ export const CopyMealModal = ({
                   {isSubmitting ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.primaryButtonText}>{t('nutrition.copyMealAction')}</Text>
+                    <Text style={styles.primaryButtonText}>{t(actionKey)}</Text>
                   )}
                 </TouchableOpacity>
               </View>
