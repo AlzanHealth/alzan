@@ -22,6 +22,8 @@ import {
   useCopyDayToDate,
   useCopyMealRange,
   useMoveMealRange,
+  useMealLogs,
+  useSaveMealWithIngredients,
   useWaterIntake,
   useVacationDateSet,
 } from '../../modules/nutrition/hooks/useNutritionData';
@@ -49,6 +51,7 @@ import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { getNutritionDayDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
 import { CopyMealModal, CopyMealDestination } from '../../modules/nutrition/components/CopyMealModal';
+import { QuickMealEditModal } from '../../modules/nutrition/components/QuickMealEditModal';
 import { MealBatchActionsMenu, MealBatchAction } from '../../modules/nutrition/components/MealBatchActionsMenu';
 import {
   MealBatchActionModal,
@@ -58,6 +61,7 @@ import {
 } from '../../modules/nutrition/components/MealBatchActionModal';
 import type { MealRange } from '../../modules/nutrition/services/mealBatchPlanner';
 import { getNutritionHomeMenuImportTarget, getNutritionHomeRecipeLibraryTarget } from './nutritionHeaderActions';
+import type { IngredientInput } from '../../modules/nutrition/types/db';
 
 // Helper to group meals
 const groupMealsByType = (meals: DailyMealItem[]) => {
@@ -104,6 +108,7 @@ export const NutritionHomeScreen = () => {
   // Date Logic
   const [selectedDate, setSelectedDate] = useState(() => getNutritionDayDate(new Date(), nutritionDayRolloverTime));
   const [mealTransferAction, setMealTransferAction] = useState<MealTransferAction | null>(null);
+  const [quickEditMeal, setQuickEditMeal] = useState<DailyMealItem | null>(null);
   const [isBatchMenuVisible, setIsBatchMenuVisible] = useState(false);
   const [isMealSelectionMode, setIsMealSelectionMode] = useState(false);
   const [selectedMealIds, setSelectedMealIds] = useState<Set<string>>(new Set());
@@ -112,6 +117,10 @@ export const NutritionHomeScreen = () => {
     operation: MealBatchModalOperation;
   } | null>(null);
   const nutritionCalendarRange = React.useMemo(() => getNutritionCalendarRange(new Date()), []);
+  const transferMealLogsQuery = useMealLogs(
+    format(nutritionCalendarRange.minimumDate, 'yyyy-MM-dd'),
+    format(nutritionCalendarRange.maximumDate, 'yyyy-MM-dd'),
+  );
   const defaultBatchDestinationDate = React.useMemo(() => {
     const nextDate = addDays(selectedDate, 1);
     return nextDate <= nutritionCalendarRange.maximumDate ? nextDate : selectedDate;
@@ -231,6 +240,7 @@ export const NutritionHomeScreen = () => {
   const duplicateDay = useCopyDayToDate();
   const copyMealRange = useCopyMealRange();
   const moveMealRange = useMoveMealRange();
+  const saveMeal = useSaveMealWithIngredients();
   const [undoAction, setUndoAction] = useState<MealUndoAction | null>(null);
   const [isUndoing, setIsUndoing] = useState(false);
   const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -266,6 +276,11 @@ export const NutritionHomeScreen = () => {
   };
 
   const handleEditMeal = (item: DailyMealItem) => {
+    if (item.log?.id) {
+      setQuickEditMeal(item);
+      return;
+    }
+
     navigation.navigate('MealLogForm', {
       date: formattedDate,
       mealItem: item,
@@ -422,6 +437,26 @@ export const NutritionHomeScreen = () => {
         mealType: t(MEAL_TYPE_LABELS[mealType]),
       }),
     );
+  };
+
+  const handleQuickMealSave = async (ingredients: IngredientInput[]) => {
+    if (!quickEditMeal?.log) return;
+
+    await saveMeal.mutateAsync({ log: quickEditMeal.log, ingredients });
+    setQuickEditMeal(null);
+    Alert.alert(t('nutrition.quickEditSavedTitle'), t('nutrition.quickEditSavedMessage'));
+  };
+
+  const openFullMealEditor = () => {
+    if (!quickEditMeal) return;
+
+    const item = quickEditMeal;
+    setQuickEditMeal(null);
+    navigation.navigate('MealLogForm', {
+      date: item.log?.date ?? formattedDate,
+      mealItem: item,
+      isExtra: item.status === 'extra_meal',
+    });
   };
 
   const handleCheckMeal = (item: DailyMealItem) => {
@@ -728,8 +763,18 @@ export const NutritionHomeScreen = () => {
           minimumDate={nutritionCalendarRange.minimumDate}
           maximumDate={nutritionCalendarRange.maximumDate}
           mealTypes={displayMealTypes}
+          existingMeals={transferMealLogsQuery.data ?? []}
+          sourceMealId={mealTransferAction?.type === 'move' ? mealTransferAction.meal.log?.id : undefined}
           onCancel={() => setMealTransferAction(null)}
           onCopy={handleMealTransferSubmit}
+        />
+
+        <QuickMealEditModal
+          visible={quickEditMeal !== null}
+          meal={quickEditMeal}
+          onCancel={() => setQuickEditMeal(null)}
+          onSave={handleQuickMealSave}
+          onOpenFullEditor={openFullMealEditor}
         />
 
         <MealBatchActionsMenu

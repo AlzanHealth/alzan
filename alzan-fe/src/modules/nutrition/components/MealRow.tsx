@@ -118,7 +118,9 @@ export const MealRow: React.FC<MealRowProps> = ({
             <TouchableOpacity
               onPress={onEdit}
               accessibilityRole="button"
-              accessibilityLabel={t('common.edit')}
+              accessibilityLabel={
+                hasLog ? t('nutrition.quickEditMealAccessibility', { mealName: item.displayName }) : t('common.edit')
+              }
               style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
             >
               <Edit2 size={16} color={themeColors.textSecondary} />
