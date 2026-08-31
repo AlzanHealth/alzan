@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, Plus, BookOpen, CalendarCheck, MoreVertical, Copy, MoveRight, X } from 'lucide-react-native';
+import { Settings, Plus, BookOpen, CalendarCheck, MoreVertical, Copy, MoveRight, Trash2, X } from 'lucide-react-native';
 import { addDays, format, isValid, parseISO, subDays } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -317,6 +317,30 @@ export const NutritionHomeScreen = () => {
     setBatchModal({ mode: 'selection', operation });
   };
 
+  const deleteSelectedMeals = () => {
+    if (selectedMealIds.size === 0) return;
+
+    Alert.alert(t('nutrition.batchDeleteTitle'), t('nutrition.batchDeleteConfirm', { count: selectedMealIds.size }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('nutrition.batchDeleteAction'),
+        style: 'destructive',
+        onPress: async () => {
+          const count = selectedMealIds.size;
+          try {
+            for (const mealId of selectedMealIds) await deleteMealLog.mutateAsync(mealId);
+            setIsMealSelectionMode(false);
+            setSelectedMealIds(new Set());
+            Alert.alert(t('nutrition.batchSuccessTitle'), t('nutrition.batchDeleteSuccess', { count }));
+          } catch (error) {
+            console.error('Error deleting selected meals:', error);
+            Alert.alert(t('common.error'), t('nutrition.batchDeleteError'));
+          }
+        },
+      },
+    ]);
+  };
+
   const handleBatchSubmit = async (values: MealBatchModalValues) => {
     if (!batchModal) return;
     let result: { processedCount: number };
@@ -604,6 +628,23 @@ export const NutritionHomeScreen = () => {
                   <MoveRight size={17} color="#FFFFFF" />
                   <Text style={styles.selectionActionTextLight}>{t('nutrition.batchMoveAction')}</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={deleteSelectedMeals}
+                  disabled={selectedMealIds.size === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nutrition.batchDeleteAction')}
+                  style={[
+                    styles.selectionAction,
+                    styles.selectionDeleteAction,
+                    { borderColor: themeColors.danger },
+                    selectedMealIds.size === 0 && styles.disabled,
+                  ]}
+                >
+                  <Trash2 size={17} color={themeColors.danger} />
+                  <Text style={[styles.selectionActionText, { color: themeColors.danger }]}>
+                    {t('nutrition.batchDeleteAction')}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           ) : null}
@@ -815,9 +856,11 @@ const styles = StyleSheet.create({
   selectionTitle: { fontSize: 16, fontWeight: '800' },
   selectionCount: { fontSize: 13, marginTop: 3 },
   selectionClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  selectionActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  selectionActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
   selectionAction: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 130,
     minHeight: 44,
     borderWidth: 1,
     borderRadius: 12,
@@ -826,6 +869,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
   },
+  selectionDeleteAction: { flexBasis: '100%' },
   selectionActionText: { fontSize: 13, fontWeight: '800' },
   selectionActionTextLight: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   disabled: { opacity: 0.45 },
