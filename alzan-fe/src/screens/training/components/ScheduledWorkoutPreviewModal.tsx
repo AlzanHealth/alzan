@@ -124,7 +124,18 @@ export const ScheduledWorkoutPreviewModal = ({
       return fetchEndurancePreviewTemplate(plan.templateId, plan.plannedDate);
     },
     enabled: visible && !!plan?.templateId,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
+
+  // The modal remains mounted with `enabled: false` while it is closed. When
+  // it opens again, explicitly refetch so a template edited in another screen
+  // can never leave an old step tree in the calendar preview.
+  React.useEffect(() => {
+    if (!visible || !plan?.templateId) return;
+    void refetch({ cancelRefetch: false });
+  }, [plan?.plannedDate, plan?.templateId, plan?.type, refetch, visible]);
 
   const sportType =
     plan?.type === 'gym' ? 'strength' : plan?.sportType || (data as EndurancePreviewTemplate | null)?.sport_type;

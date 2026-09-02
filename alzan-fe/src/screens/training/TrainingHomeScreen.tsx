@@ -512,9 +512,10 @@ export const TrainingHomeScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       refetchActiveSession();
-      queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['weekDots'] });
+      // Refresh every calendar-dependent query, including the preview steps.
+      // Invalidation is intentionally non-blocking so the existing screen
+      // remains visible while React Query fetches the latest data.
+      invalidateTrainingCalendar(queryClient);
     }, [refetchActiveSession, queryClient]),
   );
 

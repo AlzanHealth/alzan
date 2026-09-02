@@ -6,7 +6,9 @@ import { DurationType, PhaseType, SportType, TargetType } from '../types/request
 import { Database } from '../types/database.types';
 import {
   filterStepProgressionsBySteps,
+  rebaseStepProgressions,
   StepProgressionOverride,
+  StepProgressionSnapshot,
 } from '../modules/training/helpers/enduranceProgression.helper';
 import {
   deleteFuturePlansOutsideEnduranceRecurrence,
@@ -114,6 +116,23 @@ export const useEnduranceWorkoutBuilder = () => {
           data.source,
           data.original_template_family_key,
         );
+        let previousStepsForRebase: StepProgressionSnapshot[] = [];
+
+        // Progression rows are snapshots of the base step tree. Read the old
+        // values before replacing the tree so inherited values can follow a
+        // template edit without overwriting intentional later-week changes.
+        if (isEditMode && data.recurrence_start_date && data.recurrence_end_date && progressions?.length) {
+          const { data: existingSteps, error: existingStepsError } = await supabase
+            .from('endurance_workout_steps')
+            .select(
+              'progression_key, duration_s, distance_m, target_type, target_min, target_max, repetitions, load_kg, reps',
+            )
+            .eq('template_id', templateId)
+            .returns<StepProgressionSnapshot[]>();
+
+          if (existingStepsError) throw existingStepsError;
+          previousStepsForRebase = existingSteps ?? [];
+        }
 
         if (isEditMode) {
           const updatePayload: EnduranceWorkoutTemplateUpdatePatch = {
@@ -260,9 +279,13 @@ export const useEnduranceWorkoutBuilder = () => {
 
         await processSteps(steps);
         const currentStepProgressions = filterStepProgressionsBySteps(steps, progressions || []);
+        const progressionsToPersist =
+          previousStepsForRebase.length > 0
+            ? rebaseStepProgressions(previousStepsForRebase, steps, currentStepProgressions)
+            : currentStepProgressions;
         await replaceEnduranceStepProgressions(
           finalTemplateId,
-          data.recurrence_start_date && data.recurrence_end_date ? currentStepProgressions : [],
+          data.recurrence_start_date && data.recurrence_end_date ? progressionsToPersist : [],
         );
         await deleteFuturePlansOutsideEnduranceRecurrence({
           userId: user.id,

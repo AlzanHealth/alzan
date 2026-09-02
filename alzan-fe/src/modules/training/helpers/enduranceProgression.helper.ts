@@ -34,10 +34,40 @@ export type StepProgressionOverride = {
   reps?: number | null;
 };
 
+export type StepProgressionSnapshot = {
+  progression_key?: string | null;
+  duration_s?: number | null;
+  distance_m?: number | null;
+  target_type?: TargetType | null;
+  target_min?: number | null;
+  target_max?: number | null;
+  repetitions?: number | null;
+  load_kg?: number | null;
+  reps?: number | null;
+  children?: StepProgressionSnapshot[];
+};
+
+type TimestampedProgression = {
+  week_index: number;
+  updated_at?: string | null;
+};
+
+const REBASABLE_STEP_FIELDS = [
+  'duration_s',
+  'distance_m',
+  'target_type',
+  'target_min',
+  'target_max',
+  'repetitions',
+  'load_kg',
+  'reps',
+] as const satisfies ReadonlyArray<keyof StepProgressionSnapshot>;
+
 export type TemplateSummaryProgression = {
   week_index: number;
   total_distance_m: number | null;
   total_duration_s: number | null;
+  updated_at?: string | null;
 };
 
 export type ProgressableEnduranceTemplate = {
@@ -247,11 +277,109 @@ export const normalizeStepProgressions = (progressions: StepProgressionOverride[
   });
 };
 
+const collectStepsByProgressionKey = (steps: StepProgressionSnapshot[]) => {
+  const stepsByKey = new Map<string, StepProgressionSnapshot>();
+
+  const visit = (stepList: StepProgressionSnapshot[]) => {
+    stepList.forEach(step => {
+      if (step.progression_key) stepsByKey.set(step.progression_key, step);
+      if (step.children) visit(step.children);
+    });
+  };
+
+  visit(steps);
+  return stepsByKey;
+};
+
+/**
+ * Keeps the base template and its first recurrence week in sync after an edit.
+ *
+ * Week one is the template's base representation. Later weeks can intentionally
+ * diverge, so only values that still inherited the previous base are rebased.
+ * This prevents a stale week-one snapshot from overriding an edited step while
+ * preserving real progression choices for future weeks.
+ */
+export const rebaseStepProgressions = (
+  previousSteps: StepProgressionSnapshot[],
+  currentSteps: StepProgressionSnapshot[],
+  progressions: StepProgressionOverride[],
+): StepProgressionOverride[] => {
+  const previousByKey = collectStepsByProgressionKey(previousSteps);
+  const currentByKey = collectStepsByProgressionKey(currentSteps);
+
+  return progressions.map(progression => {
+    const previousStep = previousByKey.get(progression.progression_key);
+    const currentStep = currentByKey.get(progression.progression_key);
+    if (!currentStep) return progression;
+
+    const rebased: StepProgressionOverride = { ...progression };
+    REBASABLE_STEP_FIELDS.forEach(field => {
+      const currentValue = currentStep[field] ?? null;
+      const progressionValue = progression[field] ?? null;
+      const hasProgressionValue = progression[field] !== undefined && progressionValue !== null;
+
+      if (progression.week_index === 1 && hasProgressionValue) {
+        Object.assign(rebased, { [field]: currentValue });
+        return;
+      }
+
+      if (!previousStep || !hasProgressionValue) return;
+      const previousValue = previousStep[field] ?? null;
+      if (previousValue !== currentValue && progressionValue !== null && progressionValue === previousValue) {
+        Object.assign(rebased, { [field]: currentValue });
+      }
+    });
+
+    return rebased;
+  });
+};
+
+const isTimestampAtOrAfter = (timestamp: string | null | undefined, threshold: string): boolean => {
+  if (!timestamp) return false;
+  const timestampMs = Date.parse(timestamp);
+  const thresholdMs = Date.parse(threshold);
+  if (!Number.isFinite(timestampMs) || !Number.isFinite(thresholdMs)) return false;
+  return timestampMs >= thresholdMs;
+};
+
+/**
+ * A base template edit invalidates an older week-one snapshot. A progression
+ * saved after that edit remains authoritative, including an intentional week-one
+ * override made in the progression editor.
+ */
+export const shouldApplyProgressionForTemplateDate = (
+  templateUpdatedAt: string | null | undefined,
+  progressionUpdatedAt: string | null | undefined,
+  weekIndex: number,
+): boolean => {
+  if (weekIndex !== 1 || !templateUpdatedAt) return true;
+  if (!progressionUpdatedAt) return true;
+  return isTimestampAtOrAfter(progressionUpdatedAt, templateUpdatedAt);
+};
+
+export const filterStaleWeekOneProgressions = <TProgression extends TimestampedProgression>(
+  progressions: TProgression[],
+  templateUpdatedAt: string | null | undefined,
+  weekIndex: number,
+): TProgression[] =>
+  progressions.filter(
+    progression =>
+      shouldApplyProgressionForTemplateDate(templateUpdatedAt, progression.updated_at, weekIndex) ||
+      progression.week_index !== weekIndex,
+  );
+
 const applyProgressionToStep = <TStep extends ProgressionBuilderStep>(
   step: TStep,
   progression: StepProgressionOverride | undefined,
+  weekIndex: number,
 ): TStep => {
-  if (!progression) return step;
+  // Week one is the template's base representation. Warm-up and cooldown are
+  // not exposed by the weekly progression editor, so an imported legacy row
+  // for either phase must not replace the current base value. Later weeks can
+  // still carry an intentional progression for these phases.
+  if (!progression || (weekIndex === 1 && (step.phase_type === 'warmup' || step.phase_type === 'cooldown'))) {
+    return step;
+  }
 
   return {
     ...step,
@@ -280,7 +408,7 @@ export const applyProgressionsToSteps = <TStep extends ProgressionBuilderStep>(
 
   return steps.map(step => {
     const nextChildren = step.children ? applyProgressionsToSteps(step.children, weekIndex, normalized) : step.children;
-    const progressedStep = applyProgressionToStep(step, progressionByStep.get(step.progression_key || ''));
+    const progressedStep = applyProgressionToStep(step, progressionByStep.get(step.progression_key || ''), weekIndex);
 
     return {
       ...progressedStep,

@@ -10,8 +10,10 @@ import {
   applyProgressionsToSteps,
   applyTemplateSummaryProgression,
   filterStepProgressionsBySteps,
+  filterStaleWeekOneProgressions,
   getProgressionWeekIndex,
   normalizeStepProgressions,
+  shouldApplyProgressionForTemplateDate,
   StepProgressionOverride,
 } from '../helpers/enduranceProgression.helper';
 
@@ -117,7 +119,7 @@ export const replaceEnduranceStepProgressions = async (templateId: string, progr
 };
 
 export const applyProgressionsForPlannedDate = (
-  template: Pick<EnduranceWorkoutTemplate, 'recurrence_start_date' | 'recurrence_end_date'>,
+  template: Pick<EnduranceWorkoutTemplate, 'recurrence_start_date' | 'recurrence_end_date' | 'updated_at'>,
   steps: EnduranceWorkoutStep[],
   progressions: StepProgressionOverride[],
   plannedDate?: string | null,
@@ -129,7 +131,8 @@ export const applyProgressionsForPlannedDate = (
   const weekIndex = getProgressionWeekIndex(template.recurrence_start_date, plannedDate);
   if (weekIndex < 1) return steps;
 
-  return applyProgressionsToSteps(steps, weekIndex, filterStepProgressionsBySteps(steps, progressions));
+  const currentProgressions = filterStaleWeekOneProgressions(progressions, template.updated_at, weekIndex);
+  return applyProgressionsToSteps(steps, weekIndex, filterStepProgressionsBySteps(steps, currentProgressions));
 };
 
 export const applyTemplateProgressionForPlannedDate = <TTemplate extends EnduranceWorkoutTemplate>(
@@ -142,7 +145,12 @@ export const applyTemplateProgressionForPlannedDate = <TTemplate extends Enduran
   }
 
   const weekIndex = getProgressionWeekIndex(template.recurrence_start_date, plannedDate);
-  return applyTemplateSummaryProgression(template, weekIndex, progressions);
+  const progression = progressions.find(item => item.week_index === weekIndex);
+  if (!progression || !shouldApplyProgressionForTemplateDate(template.updated_at, progression.updated_at, weekIndex)) {
+    return template;
+  }
+
+  return applyTemplateSummaryProgression(template, weekIndex, [progression]);
 };
 
 export const fetchTemplateWithProgressedSteps = async (

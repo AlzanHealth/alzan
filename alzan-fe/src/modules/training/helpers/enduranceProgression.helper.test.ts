@@ -5,10 +5,13 @@ import {
   calculateProgressionWeeks,
   createProgressionKey,
   filterStepProgressionsBySteps,
+  filterStaleWeekOneProgressions,
   getEligibleProgressionSteps,
   getNextScheduledDateString,
   getProgressionWeekIndex,
   normalizeStepProgressions,
+  rebaseStepProgressions,
+  shouldApplyProgressionForTemplateDate,
   type ProgressionBuilderStep,
 } from './enduranceProgression.helper';
 
@@ -91,6 +94,85 @@ assert.deepEqual(
   },
 );
 assert.deepEqual(applyTemplateSummaryProgression(baseTemplateSummary, 0, []), baseTemplateSummary);
+
+const previousBaseSteps = [
+  {
+    progression_key: 'cooldown-key',
+    duration_s: null,
+    distance_m: 2800,
+    target_type: 'pace' as const,
+    target_min: 385,
+    target_max: 415,
+    repetitions: 1,
+    children: [],
+  },
+];
+const editedBaseSteps = [
+  {
+    progression_key: 'cooldown-key',
+    duration_s: null,
+    distance_m: 4000,
+    target_type: 'pace' as const,
+    target_min: 385,
+    target_max: 385,
+    repetitions: 1,
+    children: [],
+  },
+];
+
+assert.deepEqual(
+  rebaseStepProgressions(previousBaseSteps, editedBaseSteps, [
+    {
+      progression_key: 'cooldown-key',
+      week_index: 1,
+      distance_m: 2800,
+      target_min: 385,
+      target_max: 415,
+    },
+    {
+      progression_key: 'cooldown-key',
+      week_index: 2,
+      distance_m: 3200,
+      target_min: 380,
+      target_max: 400,
+    },
+  ]),
+  [
+    {
+      progression_key: 'cooldown-key',
+      week_index: 1,
+      distance_m: 4000,
+      target_min: 385,
+      target_max: 385,
+    },
+    {
+      progression_key: 'cooldown-key',
+      week_index: 2,
+      distance_m: 3200,
+      target_min: 380,
+      target_max: 400,
+    },
+  ],
+);
+
+assert.equal(shouldApplyProgressionForTemplateDate('2026-09-02T12:00:00.000Z', '2026-09-01T12:00:00.000Z', 1), false);
+assert.equal(shouldApplyProgressionForTemplateDate('2026-09-02T12:00:00.000Z', '2026-09-03T12:00:00.000Z', 1), true);
+assert.equal(shouldApplyProgressionForTemplateDate('2026-09-02T12:00:00.000Z', '2026-09-01T12:00:00.000Z', 2), true);
+assert.deepEqual(
+  filterStaleWeekOneProgressions(
+    [
+      { progression_key: 'old-week-one', week_index: 1, updated_at: '2026-09-01T12:00:00.000Z' },
+      { progression_key: 'fresh-week-one', week_index: 1, updated_at: '2026-09-03T12:00:00.000Z' },
+      { progression_key: 'future-week', week_index: 2, updated_at: '2026-09-01T12:00:00.000Z' },
+    ],
+    '2026-09-02T12:00:00.000Z',
+    1,
+  ),
+  [
+    { progression_key: 'fresh-week-one', week_index: 1, updated_at: '2026-09-03T12:00:00.000Z' },
+    { progression_key: 'future-week', week_index: 2, updated_at: '2026-09-01T12:00:00.000Z' },
+  ],
+);
 
 assert.deepEqual(
   getEligibleProgressionSteps(baseSteps, 'running').map(step => step.progression_key),
@@ -240,6 +322,46 @@ const progressedSteps = applyProgressionsToSteps(baseSteps, 1, normalized);
 assert.equal(progressedSteps[1].target_min, 270);
 assert.equal(progressedSteps[1].target_max, 270);
 assert.equal(progressedSteps[0].duration_s, 600);
+
+const baseOnlySteps: ProgressionBuilderStep[] = [
+  {
+    id: 'cooldown',
+    progression_key: 'cooldown-key',
+    phase_type: 'cooldown',
+    duration_type: 'distance',
+    distance_m: 4000,
+    target_type: 'pace',
+    target_min: 385,
+    target_max: 385,
+    repetitions: 1,
+    is_group: false,
+  },
+];
+
+const progressedBaseOnlySteps = applyProgressionsToSteps(baseOnlySteps, 1, [
+  {
+    progression_key: 'cooldown-key',
+    week_index: 1,
+    distance_m: 2800,
+    target_min: 385,
+    target_max: 415,
+  },
+]);
+assert.equal(progressedBaseOnlySteps[0].distance_m, 4000);
+assert.equal(progressedBaseOnlySteps[0].target_min, 385);
+assert.equal(progressedBaseOnlySteps[0].target_max, 385);
+assert.equal(
+  applyProgressionsToSteps(baseOnlySteps, 2, [
+    {
+      progression_key: 'cooldown-key',
+      week_index: 2,
+      distance_m: 3200,
+      target_min: 380,
+      target_max: 400,
+    },
+  ])[0].distance_m,
+  3200,
+);
 
 const durationAndTargetProgressedSteps = applyProgressionsToSteps(baseSteps, 2, [
   {
