@@ -145,4 +145,22 @@ assert.equal(
   '100 reps · Load: 9.0 kg',
 );
 
+assert.equal(
+  formatEnduranceStepTarget(
+    {
+      duration_type: 'time',
+      duration_s: 900,
+      target_type: 'pace',
+      target_min: 285,
+      target_max: 300,
+      repetitions: null,
+    },
+    'running',
+    labels,
+    'km',
+    { includeLabel: false },
+  ),
+  '4:45 min/km - 5:00 min/km',
+);
+
 console.log('scheduledWorkoutPreviewFormat.helper tests passed');

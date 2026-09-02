@@ -87,6 +87,10 @@ import {
   shouldShowScheduleDays,
 } from '../../modules/training/helpers/templateScheduling.helper';
 import { getOneOffTrainingPlanDate } from '../../modules/training/services/oneOffTrainingPlanService';
+import {
+  formatEnduranceStepTarget,
+  PreviewLabels,
+} from '../../modules/training/helpers/scheduledWorkoutPreviewFormat.helper';
 
 interface Step {
   id: string; // temp id
@@ -154,7 +158,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'EnduranceWorkoutBuilder'>>();
   const { saveWorkout } = useEnduranceWorkoutBuilder();
-  const { convertDistanceToUi, convertSpeedToUi } = useUnitConversion();
+  const { convertDistanceToUi } = useUnitConversion();
   const { preferences } = useUserPreferences();
   const { settings: trainingSettings } = useTrainingSettings();
   const { options: sportCatalogOptions, getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
@@ -321,26 +325,46 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const formatTarget = (step: Step) => {
-    if (step.target_type === 'pace') {
-      const paceSeconds = step.target_min || 0;
-      const speedMps = paceSeconds ? 1000 / paceSeconds : 0;
-      if (!speedMps) return '';
-
-      const { label } = convertSpeedToUi(speedMps, sportType ?? undefined);
-      return label;
-    }
-    if (step.target_type === 'heart_rate') {
-      return `Zona ${step.target_min || step.target_max || '?'}`;
-    }
-    if (step.target_type === 'speed') {
-      const val = step.target_min || 0;
-      const mps = val / 3.6;
-      const { label } = convertSpeedToUi(mps, sportType!);
-      return label;
-    }
     if (step.target_type === 'none') return '';
 
-    return `${step.target_min || 0} - ${step.target_max || 0} ${step.target_type}`;
+    const labels: PreviewLabels = {
+      reps: t('training.repCaps'),
+      sets: t('training.setsLabel'),
+      time: t('training.time'),
+      rest: t('common.rest'),
+      hrZone: t('training.hrZone'),
+      heartRate: t('health.heartRate'),
+      pace: t('training.pace'),
+      speed: t('training.speed'),
+      power: t('training.power'),
+      distance: t('training.distanceParenAllCaps'),
+      duration: t('training.duration'),
+      load: t('training.load'),
+    };
+
+    return (
+      formatEnduranceStepTarget(
+        { ...step, hyrox_step_type: null },
+        (sportType ?? 'other') as SportType,
+        labels,
+        preferences.distance_unit === 'miles' ? 'miles' : 'km',
+        { includeLabel: false },
+      ) ?? ''
+    );
+  };
+
+  const renderStepTarget = (step: Step) => {
+    const target = formatTarget(step);
+    if (!target) return null;
+
+    return (
+      <View style={styles.detailRow}>
+        <Zap size={16} color={themeColors.textSecondary} />
+        <Text style={[styles.detailText, { color: isDark ? themeColors.textPrimary : themeColors.textSecondary }]}>
+          {target}
+        </Text>
+      </View>
+    );
   };
 
   // Load existing template for edit mode
@@ -1397,6 +1421,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           </Text>
                         </Text>
                       </View>
+                      {renderStepTarget(child)}
                     </View>
                     {renderHyroxExtraDetails(child)}
                   </GlassCard>
@@ -1428,12 +1453,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{renderEstimatedValue(item)}</Text>
               </Text>
             </View>
-            {item.target_type !== 'none' && (
-              <View style={styles.detailRow}>
-                <Zap size={16} color={colors.textSecondary} />
-                <Text style={styles.detailText}>{formatTarget(item)}</Text>
-              </View>
-            )}
+            {renderStepTarget(item)}
             {renderHyroxExtraDetails(item)}
           </View>
         )}

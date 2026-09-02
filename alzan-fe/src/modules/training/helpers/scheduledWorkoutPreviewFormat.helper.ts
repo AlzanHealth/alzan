@@ -39,6 +39,10 @@ export type EnduranceStepPreviewInput = {
   reps?: number | null;
 };
 
+export type EnduranceStepTargetFormatOptions = {
+  includeLabel?: boolean;
+};
+
 const formatNumber = (value: number, precision = 1): string => {
   const rounded = Number(value.toFixed(precision));
   return Number.isInteger(rounded) ? `${rounded}` : `${rounded}`;
@@ -105,8 +109,10 @@ export const formatEnduranceStepTarget = (
   sportType: SportType,
   labels: PreviewLabels,
   distanceUnit: DistanceUnit = 'km',
+  options: EnduranceStepTargetFormatOptions = {},
 ): string | null => {
   const extras: string[] = [];
+  const includeLabel = options.includeLabel ?? true;
 
   if (step.target_type && step.target_type !== 'none') {
     const min = step.target_min;
@@ -114,24 +120,24 @@ export const formatEnduranceStepTarget = (
 
     if (step.target_type === 'heart_rate_zone' || (step.target_type === 'heart_rate' && (max ?? min ?? 0) <= 5)) {
       const zone = max ?? min;
-      if (zone != null) extras.push(`${labels.hrZone} ${Math.round(zone)}`);
+      if (zone != null) extras.push(`${includeLabel ? `${labels.hrZone} ` : ''}${Math.round(zone)}`);
     } else if (step.target_type === 'heart_rate') {
       const value = formatRange(min, max, item => `${Math.round(item)} bpm`);
-      if (value) extras.push(`${labels.heartRate}: ${value}`);
+      if (value) extras.push(`${includeLabel ? `${labels.heartRate}: ` : ''}${value}`);
     } else if (step.target_type === 'pace') {
       const baseDistance = sportType === 'swimming' ? 100 : 1000;
       const value = formatRange(min, max, item => convertSpeedToUi(baseDistance / item, sportType, distanceUnit).label);
-      if (value) extras.push(`${labels.pace}: ${value}`);
+      if (value) extras.push(`${includeLabel ? `${labels.pace}: ` : ''}${value}`);
     } else if (step.target_type === 'speed') {
       const value = formatRange(
         min,
         max,
         item => convertSpeedToUi((item * 1000) / 3600, sportType, distanceUnit).label,
       );
-      if (value) extras.push(`${labels.speed}: ${value}`);
+      if (value) extras.push(`${includeLabel ? `${labels.speed}: ` : ''}${value}`);
     } else if (step.target_type === 'power') {
       const value = formatRange(min, max, item => `${Math.round(item)}W`);
-      if (value) extras.push(`${labels.power}: ${value}`);
+      if (value) extras.push(`${includeLabel ? `${labels.power}: ` : ''}${value}`);
     } else if (step.target_type === 'rpe') {
       const value = formatRange(min, max, item => `RPE ${formatNumber(item)}`);
       if (value) extras.push(value);
