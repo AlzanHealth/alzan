@@ -35,7 +35,8 @@ import {
   GymPreviewTemplate,
 } from '../../../modules/training/services/scheduledWorkoutPreviewService';
 import { getPhaseLabel } from '../helpers/phase.helper';
-import { isCompactPreviewLayout } from './scheduledWorkoutPreviewLayout.helper';
+import { getScheduledWorkoutPreviewLayout, isCompactPreviewLayout } from './scheduledWorkoutPreviewLayout.helper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type ScheduledWorkoutPreviewPlan = {
   id: string;
@@ -94,8 +95,14 @@ export const ScheduledWorkoutPreviewModal = ({
   const { colors, isDark } = useTrainingStyles();
   const { units } = useUnitConversion();
   const { getOptionLabel } = useSportCatalog();
-  const { width: viewportWidth } = useWindowDimensions();
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isCompactLayout = isCompactPreviewLayout(viewportWidth);
+  const previewLayout = getScheduledWorkoutPreviewLayout({
+    viewportHeight,
+    topInset: insets.top,
+    bottomInset: insets.bottom,
+  });
   const distanceUnit = units.distance === 'mi' ? 'miles' : 'km';
 
   const labels = React.useMemo<PreviewLabels>(
@@ -277,9 +284,18 @@ export const ScheduledWorkoutPreviewModal = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
+      <Pressable
+        style={[
+          styles.overlay,
+          {
+            paddingTop: previewLayout.overlayPaddingTop,
+            paddingBottom: previewLayout.overlayPaddingBottom,
+          },
+        ]}
+        onPress={onClose}
+      >
         <Pressable
-          style={[styles.modalCard, { backgroundColor: colors.cardBackground }]}
+          style={[styles.modalCard, { backgroundColor: colors.cardBackground, height: previewLayout.modalHeight }]}
           onPress={event => event.stopPropagation()}
         >
           <View style={styles.header}>
@@ -313,7 +329,8 @@ export const ScheduledWorkoutPreviewModal = ({
           <ScrollView
             style={styles.body}
             contentContainerStyle={styles.bodyContent}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator
+            nestedScrollEnabled
           >
             {renderBody()}
           </ScrollView>
@@ -382,9 +399,9 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 520,
-    maxHeight: '84%',
     borderRadius: 26,
     padding: spacing.m,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -435,10 +452,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   body: {
-    flexGrow: 0,
+    flex: 1,
+    minHeight: 0,
   },
   bodyContent: {
-    paddingBottom: spacing.s,
+    paddingBottom: spacing.m,
   },
   section: {
     gap: spacing.xs,
@@ -567,6 +585,7 @@ const styles = StyleSheet.create({
   compactSecondaryActions: {
     flex: 0,
     width: '100%',
+    flexDirection: 'column',
   },
   secondaryButton: {
     flex: 1,
