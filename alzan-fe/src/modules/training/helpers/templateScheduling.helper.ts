@@ -11,6 +11,12 @@ export const isValidIsoDate = (value: unknown): value is string => {
 export const resolveOneOffDate = (isRecurring: boolean, date: string | null | undefined): string | null =>
   !isRecurring && isValidIsoDate(date) ? date : null;
 
+export const isValidOptionalOneOffDate = (
+  isRecurring: boolean,
+  isImportedDateDriven: boolean,
+  date: string | null | undefined,
+): boolean => isRecurring || isImportedDateDriven || date == null || isValidIsoDate(date);
+
 export const shouldShowScheduleDays = ({
   isRecurring,
   isImportedDateDriven,

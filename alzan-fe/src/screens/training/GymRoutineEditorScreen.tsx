@@ -63,6 +63,7 @@ import {
   getCurrentWeekdayForDate,
   hasValidRecurringDay,
   isScheduledWeekday,
+  isValidOptionalOneOffDate,
   isValidIsoDate,
   resolveOneOffDate,
   shouldShowScheduleDays,
@@ -739,7 +740,7 @@ export const GymRoutineEditorScreen = () => {
       return;
     }
 
-    if (!hasValidRecurringDay(isRecurring, selectedDays)) {
+    if (isRecurring && !hasValidRecurringDay(isRecurring, selectedDays)) {
       Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
       return;
     }
@@ -754,7 +755,7 @@ export const GymRoutineEditorScreen = () => {
       return;
     }
 
-    if (!isRecurring && !isImportedDateDrivenTemplate && !isValidIsoDate(oneOffDate)) {
+    if (!isValidOptionalOneOffDate(isRecurring, isImportedDateDrivenTemplate, oneOffDate)) {
       Alert.alert(t('common.error'), t('training.oneOffDateRequired'));
       return;
     }

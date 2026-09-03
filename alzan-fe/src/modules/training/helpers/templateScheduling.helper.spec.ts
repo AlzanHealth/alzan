@@ -5,6 +5,7 @@ import {
   isScheduledWeekday,
   isValidIsoDate,
   resolveOneOffDate,
+  isValidOptionalOneOffDate,
   hasValidRecurringDay,
   shouldShowScheduleDays,
 } from './templateScheduling.helper';
@@ -24,6 +25,12 @@ assert.equal(isValidIsoDate('2026-8-5'), false);
 assert.equal(resolveOneOffDate(false, '2026-08-05'), '2026-08-05');
 assert.equal(resolveOneOffDate(true, '2026-08-05'), null);
 assert.equal(resolveOneOffDate(false, null), null);
+assert.equal(isValidOptionalOneOffDate(false, false, null), true);
+assert.equal(isValidOptionalOneOffDate(false, false, undefined), true);
+assert.equal(isValidOptionalOneOffDate(false, false, '2026-08-05'), true);
+assert.equal(isValidOptionalOneOffDate(false, false, 'invalid'), false);
+assert.equal(isValidOptionalOneOffDate(true, false, null), true);
+assert.equal(isValidOptionalOneOffDate(false, true, null), true);
 
 const referenceDate = new Date('2026-08-05T12:00:00');
 assert.equal(getCurrentWeekDateForWeekday(1, referenceDate), '2026-08-03');

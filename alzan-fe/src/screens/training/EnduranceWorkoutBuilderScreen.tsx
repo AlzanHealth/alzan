@@ -80,6 +80,7 @@ import {
   getCurrentWeekdayForDate,
   hasValidRecurringDay,
   isScheduledWeekday,
+  isValidOptionalOneOffDate,
   isValidIsoDate,
   resolveOneOffDate,
   shouldShowScheduleDays,
@@ -1005,7 +1006,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
 
-    if (!hasValidRecurringDay(isRecurring, scheduledDays)) {
+    if (isRecurring && !hasValidRecurringDay(isRecurring, scheduledDays)) {
       Alert.alert(t('common.error'), t('training.repeatNeedsOneDay'));
       return;
     }
@@ -1020,7 +1021,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
 
-    if (!isRecurring && !isImportedDateDrivenTemplate && !isValidIsoDate(oneOffDate)) {
+    if (!isValidOptionalOneOffDate(isRecurring, isImportedDateDrivenTemplate, oneOffDate)) {
       Alert.alert(t('common.error'), t('training.oneOffDateRequired'));
       return;
     }
