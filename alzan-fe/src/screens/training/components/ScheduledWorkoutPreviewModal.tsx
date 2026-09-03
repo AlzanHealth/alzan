@@ -28,6 +28,7 @@ import {
   formatGymExercisePrescription,
   PreviewLabels,
 } from '../../../modules/training/helpers/scheduledWorkoutPreviewFormat.helper';
+import { sortByOrderIndex } from '../../../modules/training/helpers/advancedEnduranceSession.helper';
 import {
   EndurancePreviewTemplate,
   fetchEndurancePreviewTemplate,
@@ -78,7 +79,7 @@ const getExerciseName = (
 };
 
 const getStepChildren = (steps: EnduranceWorkoutStep[], parentId: string) =>
-  steps.filter(step => step.parent_step_id === parentId).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+  sortByOrderIndex(steps.filter(step => step.parent_step_id === parentId));
 
 const isGymTemplate = (plan: ScheduledWorkoutPreviewPlan, data: PreviewData): data is GymPreviewTemplate =>
   plan.type === 'gym' && !!data;
@@ -295,9 +296,7 @@ export const ScheduledWorkoutPreviewModal = ({
     }
 
     if (isEnduranceTemplate(plan, previewData)) {
-      const topLevelSteps = [...(previewData.steps || [])]
-        .filter(step => !step.parent_step_id)
-        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+      const topLevelSteps = sortByOrderIndex((previewData.steps || []).filter(step => !step.parent_step_id));
 
       return (
         <View style={styles.section}>

@@ -18,6 +18,7 @@ import {
   createEmptyAdvancedSection,
   deriveAdvancedSectionMetrics,
   expandGroupRepetitions,
+  insertAdvancedSectionsAfterSubtree,
   removeAdvancedSection,
   type AdvancedDurationType,
   type AdvancedMetricField,
@@ -199,13 +200,13 @@ function SectionEditor({
     <View
       style={[styles.sectionCard, dynamicStyles.glassCard, compact && styles.compactCard, { borderLeftColor: accent }]}
     >
-      <Pressable style={styles.cardHeader} onPress={onToggle} accessibilityRole="button">
-        <View style={styles.cardHeaderCopy}>
+      <View style={styles.cardHeader}>
+        <Pressable style={styles.cardHeaderCopy} onPress={onToggle} accessibilityRole="button">
           <Text style={[styles.phaseLabel, { color: accent }]}>{t(PHASE_LABEL_KEYS[section.phaseType])}</Text>
           <Text style={[styles.cardSummary, { color: themeColors.textPrimary }]} numberOfLines={1}>
             {summary || t('training.toComplete')}
           </Text>
-        </View>
+        </Pressable>
         <View style={styles.headerActions}>
           {onDelete && (
             <Pressable
@@ -217,13 +218,15 @@ function SectionEditor({
               <Trash2 size={18} color={themeColors.danger} />
             </Pressable>
           )}
-          {expanded ? (
-            <ChevronUp size={21} color={themeColors.primary} />
-          ) : (
-            <ChevronDown size={21} color={themeColors.primary} />
-          )}
+          <Pressable onPress={onToggle} accessibilityRole="button" accessibilityLabel={t('training.toggleDetails')}>
+            {expanded ? (
+              <ChevronUp size={21} color={themeColors.primary} />
+            ) : (
+              <ChevronDown size={21} color={themeColors.primary} />
+            )}
+          </Pressable>
         </View>
-      </Pressable>
+      </View>
 
       {expanded && (
         <View style={styles.cardBody}>
@@ -501,12 +504,16 @@ export const AdvancedEnduranceSessionEditor = ({
           clientId: `${clientId}-rep-${index + 1}`,
           repetitionIndex: index + 1,
         }));
-        onChange([...sections, ...expanded]);
+        onChange(insertAdvancedSectionsAfterSubtree(sections, addMode.parentClientId, expanded));
         closeAddModal();
         return;
       }
     }
-    onChange([...sections, configured]);
+    onChange(
+      addMode.parentClientId
+        ? insertAdvancedSectionsAfterSubtree(sections, addMode.parentClientId, [configured])
+        : [...sections, configured],
+    );
     closeAddModal();
   };
 
@@ -563,24 +570,24 @@ export const AdvancedEnduranceSessionEditor = ({
 
         return (
           <View key={section.clientId} style={[styles.groupCard, dynamicStyles.glassCard, { borderLeftColor: accent }]}>
-            <Pressable
-              style={styles.cardHeader}
-              onPress={() =>
-                setCollapsedGroups(previous => {
-                  const next = new Set(previous);
-                  if (next.has(section.clientId)) next.delete(section.clientId);
-                  else next.add(section.clientId);
-                  return next;
-                })
-              }
-              accessibilityRole="button"
-            >
-              <View style={styles.cardHeaderCopy}>
+            <View style={styles.cardHeader}>
+              <Pressable
+                style={styles.cardHeaderCopy}
+                onPress={() =>
+                  setCollapsedGroups(previous => {
+                    const next = new Set(previous);
+                    if (next.has(section.clientId)) next.delete(section.clientId);
+                    else next.add(section.clientId);
+                    return next;
+                  })
+                }
+                accessibilityRole="button"
+              >
                 <Text style={[styles.phaseLabel, { color: accent }]}>{t(PHASE_LABEL_KEYS[section.phaseType])}</Text>
                 <Text style={[styles.cardSummary, { color: themeColors.textPrimary }]}>
                   {groupSummary(section, commonChildren.length > 0 ? commonChildren : repeatedChildren)}
                 </Text>
-              </View>
+              </Pressable>
               <View style={styles.headerActions}>
                 <Pressable
                   onPress={() => deleteSection(section.clientId)}
@@ -596,7 +603,7 @@ export const AdvancedEnduranceSessionEditor = ({
                   <ChevronUp size={21} color={themeColors.primary} />
                 )}
               </View>
-            </Pressable>
+            </View>
 
             {!groupCollapsed && (
               <View style={styles.groupBody}>

@@ -47,6 +47,20 @@ BEGIN
     RAISE EXCEPTION 'MANUAL_ENDURANCE_SECTIONS_MISSING';
   END IF;
 
+  IF (
+    SELECT array_agg(phase_type::text ORDER BY order_index, id)
+    FROM public.activity_session_sections
+    WHERE session_id = v_running_id
+  ) <> ARRAY['warmup', 'interval', 'interval', 'recovery', 'interval', 'recovery']::text[]
+  OR (
+    SELECT array_agg(order_index ORDER BY order_index, id)
+    FROM public.activity_session_sections
+    WHERE session_id = v_running_id
+  ) <> ARRAY[0, 1, 2, 3, 4, 5]::integer[]
+  THEN
+    RAISE EXCEPTION 'MANUAL_ENDURANCE_SECTION_ORDER_INVALID';
+  END IF;
+
   v_swimming_id := public.create_manual_endurance_activity(
     jsonb_build_object(
       'sport_type', 'swimming',

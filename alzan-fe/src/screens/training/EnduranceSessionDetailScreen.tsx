@@ -74,6 +74,7 @@ import { getSessionLocalDate } from '../../modules/training/services/copyComplet
 import { getDefaultCopyTargetDate } from '../../modules/training/helpers/copyCompletedSession.helper';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 import { canDeleteActivitySession } from './helpers/trainingDetailActions.helper';
+import { sortByOrderIndex } from '../../modules/training/helpers/advancedEnduranceSession.helper';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
@@ -1400,8 +1401,9 @@ export const EnduranceSessionDetailScreen = () => {
       );
     }
 
-    const topLevelSteps = progressedSteps.filter(s => !s.parent_step_id);
-    const getChildren = (parentId: string) => progressedSteps.filter(s => s.parent_step_id === parentId);
+    const topLevelSteps = sortByOrderIndex(progressedSteps.filter(s => !s.parent_step_id));
+    const getChildren = (parentId: string) =>
+      sortByOrderIndex(progressedSteps.filter(s => s.parent_step_id === parentId));
 
     const renderStep = (step: EnduranceWorkoutStep, isChild = false) => {
       const duration = formatStepDuration(step);
@@ -1487,7 +1489,7 @@ export const EnduranceSessionDetailScreen = () => {
   const renderRecordedBreakdown = () => {
     if (activitySections.length === 0) return null;
 
-    const topLevelSections = activitySections.filter(section => section.parent_section_id == null);
+    const topLevelSections = sortByOrderIndex(activitySections.filter(section => section.parent_section_id == null));
     const formatSectionMetric = (section: ActivitySessionSection) => {
       const metrics: string[] = [];
       if (section.distance_m != null) {
@@ -1513,7 +1515,7 @@ export const EnduranceSessionDetailScreen = () => {
     };
 
     const renderSection = (section: ActivitySessionSection, nested = false) => {
-      const children = activitySections.filter(child => child.parent_section_id === section.id);
+      const children = sortByOrderIndex(activitySections.filter(child => child.parent_section_id === section.id));
       const phaseLabel = section.is_group ? t('training.repCaps') : t(getPhaseLabel(section.phase_type));
       const phaseColor = section.is_group ? themeColors.primary : getPhaseColor(section.phase_type);
       return (

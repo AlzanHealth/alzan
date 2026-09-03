@@ -7,6 +7,7 @@ import {
 } from '../../../types/requests.types';
 import { fetchTemplateWithProgressedSteps } from './enduranceProgressionService';
 import { applyStrengthProgressionsForPlannedDate } from './strengthProgressionService';
+import { sortByOrderIndex } from '../helpers/advancedEnduranceSession.helper';
 
 export type PreviewExercise = {
   id: string;
@@ -49,7 +50,7 @@ export const fetchGymPreviewTemplate = async (
   if (!data) return null;
 
   const template = data as unknown as GymPreviewTemplate;
-  const exercises = [...(template.exercises || [])].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+  const exercises = sortByOrderIndex(template.exercises || []);
   return {
     ...template,
     exercises: await applyStrengthProgressionsForPlannedDate(templateId, plannedDate, exercises),

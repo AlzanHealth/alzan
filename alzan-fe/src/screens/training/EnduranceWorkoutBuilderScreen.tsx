@@ -97,6 +97,7 @@ import {
   formatEnduranceStepTarget,
   PreviewLabels,
 } from '../../modules/training/helpers/scheduledWorkoutPreviewFormat.helper';
+import { sortByOrderIndex } from '../../modules/training/helpers/advancedEnduranceSession.helper';
 
 interface Step {
   id: string; // temp id
@@ -544,47 +545,41 @@ export const EnduranceWorkoutBuilderScreen = () => {
       // Convert DB steps to UI format
       if (existingTemplate.endurance_workout_steps) {
         const dbSteps = existingTemplate.endurance_workout_steps;
-        const uiSteps: Step[] = dbSteps
-          .filter(s => !s.parent_step_id)
-          .sort((a, b) => a.order_index - b.order_index)
-          .map(s => ({
-            id: s.id,
-            progression_key: s.progression_key,
-            phase_type: s.phase_type,
-            duration_type: s.duration_type,
-            duration_s: s.duration_s,
-            distance_m: s.distance_m,
-            target_type: s.target_type,
-            target_min: s.target_min,
-            target_max: s.target_max,
-            repetitions: s.repetitions || 1,
-            is_group: s.is_group || false,
-            hyrox_step_type: s.hyrox_step_type,
-            hyrox_station_key: s.hyrox_station_key,
-            load_kg: s.load_kg,
-            reps: s.reps,
-            children: dbSteps
-              .filter(c => c.parent_step_id === s.id)
-              .sort((a, b) => a.order_index - b.order_index)
-              .map(c => ({
-                id: c.id,
-                progression_key: c.progression_key,
-                phase_type: c.phase_type,
-                duration_type: c.duration_type,
-                duration_s: c.duration_s,
-                distance_m: c.distance_m,
-                target_type: c.target_type,
-                target_min: c.target_min,
-                target_max: c.target_max,
-                repetitions: c.repetitions || 1,
-                is_group: false,
-                parent_step_id: s.id,
-                hyrox_step_type: c.hyrox_step_type,
-                hyrox_station_key: c.hyrox_station_key,
-                load_kg: c.load_kg,
-                reps: c.reps,
-              })),
-          })) as Step[];
+        const uiSteps: Step[] = sortByOrderIndex(dbSteps.filter(s => !s.parent_step_id)).map(s => ({
+          id: s.id,
+          progression_key: s.progression_key,
+          phase_type: s.phase_type,
+          duration_type: s.duration_type,
+          duration_s: s.duration_s,
+          distance_m: s.distance_m,
+          target_type: s.target_type,
+          target_min: s.target_min,
+          target_max: s.target_max,
+          repetitions: s.repetitions || 1,
+          is_group: s.is_group || false,
+          hyrox_step_type: s.hyrox_step_type,
+          hyrox_station_key: s.hyrox_station_key,
+          load_kg: s.load_kg,
+          reps: s.reps,
+          children: sortByOrderIndex(dbSteps.filter(c => c.parent_step_id === s.id)).map(c => ({
+            id: c.id,
+            progression_key: c.progression_key,
+            phase_type: c.phase_type,
+            duration_type: c.duration_type,
+            duration_s: c.duration_s,
+            distance_m: c.distance_m,
+            target_type: c.target_type,
+            target_min: c.target_min,
+            target_max: c.target_max,
+            repetitions: c.repetitions || 1,
+            is_group: false,
+            parent_step_id: s.id,
+            hyrox_step_type: c.hyrox_step_type,
+            hyrox_station_key: c.hyrox_station_key,
+            load_kg: c.load_kg,
+            reps: c.reps,
+          })),
+        })) as Step[];
         setSteps(ensureStepProgressionKeys(uiSteps));
       }
     }

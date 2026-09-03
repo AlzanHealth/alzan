@@ -16,6 +16,7 @@ import {
   shouldApplyProgressionForTemplateDate,
   StepProgressionOverride,
 } from '../helpers/enduranceProgression.helper';
+import { sortAdvancedTemplateSteps } from '../helpers/advancedEnduranceSession.helper';
 
 export type RecurringEnduranceTemplate = {
   id: string;
@@ -171,8 +172,11 @@ export const fetchTemplateWithProgressedSteps = async (
     fetchEnduranceTemplateProgressions(templateId),
   ]);
   const progressedTemplate = applyTemplateProgressionForPlannedDate(data, templateProgressions, plannedDate);
+  const orderedSteps = sortAdvancedTemplateSteps(data.steps || []);
   return {
     ...progressedTemplate,
-    steps: applyProgressionsForPlannedDate(data, data.steps || [], stepProgressions, plannedDate),
+    steps: sortAdvancedTemplateSteps(
+      applyProgressionsForPlannedDate(data, orderedSteps, stepProgressions, plannedDate),
+    ),
   };
 };

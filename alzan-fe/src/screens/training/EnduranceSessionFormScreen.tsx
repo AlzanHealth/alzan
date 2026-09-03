@@ -74,6 +74,10 @@ import {
 } from './helpers/sessionModality.helper';
 import { parsePaceInput } from '../../modules/training/helpers/paceInput.helper';
 import { deriveEnduranceMetricValues } from '../../modules/training/helpers/enduranceMetricPriority.helper';
+import {
+  getAdvancedActivityErrorTranslationKey,
+  logAdvancedActivityError,
+} from '../../modules/training/helpers/advancedActivityError.helper';
 
 export type PopulatedEnduranceWorkoutTemplate = EnduranceWorkoutTemplate & { steps: EnduranceWorkoutStep[] };
 
@@ -1379,6 +1383,7 @@ export const EnduranceSessionFormScreen = () => {
         });
 
         persistedSessionId = createdSessionId;
+        wasSessionCreated = Boolean(persistedSessionId);
         if (persistedSessionId) await persistParsedRouteDetails(persistedSessionId);
         Alert.alert(t('training.workoutCompleted'), t('training.advancedActivitySaved'), [
           { text: t('common.ok'), onPress: () => navigation.navigate('TrainingHome') },
@@ -1530,15 +1535,18 @@ export const EnduranceSessionFormScreen = () => {
 
       // Navigate to TrainingHome after successful save
       navigation.navigate('TrainingHome');
-    } catch (_error) {
+    } catch (error) {
+      if (isAdvancedRegistration) logAdvancedActivityError(error);
       if (wasSessionCreated && persistedSessionId) {
         const { error: rollbackError } = await supabase.from('activity_sessions').delete().eq('id', persistedSessionId);
-        void rollbackError;
+        if (rollbackError) {
+          console.error('[EnduranceSessionForm.save] rollback error:', rollbackError);
+        }
       }
 
       Alert.alert(
         t('common.error'),
-        isAdvancedRegistration ? t('training.advancedActivitySaveError') : t('training.saveSessionError'),
+        isAdvancedRegistration ? t(getAdvancedActivityErrorTranslationKey(error)) : t('training.saveSessionError'),
       );
     }
   };
