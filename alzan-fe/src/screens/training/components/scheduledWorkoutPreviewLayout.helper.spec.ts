@@ -1,13 +1,33 @@
 import assert from 'node:assert/strict';
 import {
   COMPACT_PREVIEW_ACTION_BREAKPOINT,
+  getScheduledWorkoutPreviewModalHeight,
   getScheduledWorkoutPreviewLayout,
+  getScheduledWorkoutPreviewActionLayout,
   isCompactPreviewLayout,
 } from './scheduledWorkoutPreviewLayout.helper';
 
 assert.equal(isCompactPreviewLayout(COMPACT_PREVIEW_ACTION_BREAKPOINT - 1), true);
 assert.equal(isCompactPreviewLayout(COMPACT_PREVIEW_ACTION_BREAKPOINT), false);
 assert.equal(isCompactPreviewLayout(1024), false);
+
+assert.deepEqual(getScheduledWorkoutPreviewActionLayout(true), {
+  actionRowDirection: 'column',
+  secondaryActionsDirection: 'row',
+  primaryButtonFullWidth: true,
+});
+assert.deepEqual(getScheduledWorkoutPreviewActionLayout(false), {
+  actionRowDirection: 'row',
+  secondaryActionsDirection: 'row',
+  primaryButtonFullWidth: false,
+});
+
+assert.equal(getScheduledWorkoutPreviewModalHeight({ maxHeight: 743, isCompactLayout: true, contentHeight: 520 }), 520);
+assert.equal(getScheduledWorkoutPreviewModalHeight({ maxHeight: 743, isCompactLayout: true, contentHeight: 900 }), 743);
+assert.equal(
+  getScheduledWorkoutPreviewModalHeight({ maxHeight: 743, isCompactLayout: false, contentHeight: 520 }),
+  743,
+);
 
 const phoneLayout = getScheduledWorkoutPreviewLayout({
   viewportHeight: 852,

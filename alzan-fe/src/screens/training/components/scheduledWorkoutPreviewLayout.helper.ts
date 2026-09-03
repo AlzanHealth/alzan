@@ -32,3 +32,32 @@ export const getScheduledWorkoutPreviewLayout = ({
 
 export const isCompactPreviewLayout = (viewportWidth: number): boolean =>
   viewportWidth < COMPACT_PREVIEW_ACTION_BREAKPOINT;
+
+export type ScheduledWorkoutPreviewActionLayout = {
+  actionRowDirection: 'row' | 'column';
+  secondaryActionsDirection: 'row' | 'column';
+  primaryButtonFullWidth: boolean;
+};
+
+export const getScheduledWorkoutPreviewActionLayout = (
+  isCompactLayout: boolean,
+): ScheduledWorkoutPreviewActionLayout => ({
+  actionRowDirection: isCompactLayout ? 'column' : 'row',
+  secondaryActionsDirection: 'row',
+  primaryButtonFullWidth: isCompactLayout,
+});
+
+export type ScheduledWorkoutPreviewModalHeightOptions = {
+  maxHeight: number;
+  isCompactLayout: boolean;
+  contentHeight: number;
+};
+
+export const getScheduledWorkoutPreviewModalHeight = ({
+  maxHeight,
+  isCompactLayout,
+  contentHeight,
+}: ScheduledWorkoutPreviewModalHeightOptions): number => {
+  if (!isCompactLayout || contentHeight <= 0) return maxHeight;
+  return Math.min(maxHeight, contentHeight);
+};

@@ -35,7 +35,12 @@ import {
   GymPreviewTemplate,
 } from '../../../modules/training/services/scheduledWorkoutPreviewService';
 import { getPhaseLabel } from '../helpers/phase.helper';
-import { getScheduledWorkoutPreviewLayout, isCompactPreviewLayout } from './scheduledWorkoutPreviewLayout.helper';
+import {
+  getScheduledWorkoutPreviewActionLayout,
+  getScheduledWorkoutPreviewModalHeight,
+  getScheduledWorkoutPreviewLayout,
+  isCompactPreviewLayout,
+} from './scheduledWorkoutPreviewLayout.helper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type ScheduledWorkoutPreviewPlan = {
@@ -98,10 +103,30 @@ export const ScheduledWorkoutPreviewModal = ({
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isCompactLayout = isCompactPreviewLayout(viewportWidth);
+  const actionLayout = getScheduledWorkoutPreviewActionLayout(isCompactLayout);
+  const [headerHeight, setHeaderHeight] = React.useState(0);
+  const [descriptionHeight, setDescriptionHeight] = React.useState(0);
+  const [bodyContentHeight, setBodyContentHeight] = React.useState(0);
+  const [actionHeight, setActionHeight] = React.useState(0);
   const previewLayout = getScheduledWorkoutPreviewLayout({
     viewportHeight,
     topInset: insets.top,
     bottomInset: insets.bottom,
+  });
+  const measuredContentHeight =
+    headerHeight > 0 && bodyContentHeight > 0 && actionHeight > 0
+      ? spacing.m * 2 +
+        headerHeight +
+        spacing.m +
+        (descriptionHeight > 0 ? descriptionHeight + spacing.s : 0) +
+        bodyContentHeight +
+        spacing.s +
+        actionHeight
+      : 0;
+  const modalHeight = getScheduledWorkoutPreviewModalHeight({
+    maxHeight: previewLayout.modalHeight,
+    isCompactLayout,
+    contentHeight: measuredContentHeight,
   });
   const distanceUnit = units.distance === 'mi' ? 'miles' : 'km';
 
@@ -143,6 +168,13 @@ export const ScheduledWorkoutPreviewModal = ({
     if (!visible || !plan?.templateId) return;
     void refetch({ cancelRefetch: false });
   }, [plan?.plannedDate, plan?.templateId, plan?.type, refetch, visible]);
+
+  React.useEffect(() => {
+    setHeaderHeight(0);
+    setDescriptionHeight(0);
+    setBodyContentHeight(0);
+    setActionHeight(0);
+  }, [plan?.id, visible]);
 
   const sportType =
     plan?.type === 'gym' ? 'strength' : plan?.sportType || (data as EndurancePreviewTemplate | null)?.sport_type;
@@ -295,10 +327,10 @@ export const ScheduledWorkoutPreviewModal = ({
         onPress={onClose}
       >
         <Pressable
-          style={[styles.modalCard, { backgroundColor: colors.cardBackground, height: previewLayout.modalHeight }]}
+          style={[styles.modalCard, { backgroundColor: colors.cardBackground, height: modalHeight }]}
           onPress={event => event.stopPropagation()}
         >
-          <View style={styles.header}>
+          <View style={styles.header} onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}>
             <View style={[styles.heroIcon, { backgroundColor: `${sportColor}1A` }]}>
               {plan.type === 'gym' ? (
                 <Dumbbell size={24} color={sportColor} />
@@ -321,7 +353,10 @@ export const ScheduledWorkoutPreviewModal = ({
           </View>
 
           {description ? (
-            <GlassCard style={[styles.descriptionCard, { borderColor: colors.border }]}>
+            <GlassCard
+              style={[styles.descriptionCard, { borderColor: colors.border }]}
+              onLayout={event => setDescriptionHeight(event.nativeEvent.layout.height)}
+            >
               <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>{description}</Text>
             </GlassCard>
           ) : null}
@@ -331,14 +366,28 @@ export const ScheduledWorkoutPreviewModal = ({
             contentContainerStyle={styles.bodyContent}
             showsVerticalScrollIndicator
             nestedScrollEnabled
+            onContentSizeChange={(_, height) => setBodyContentHeight(height)}
           >
             {renderBody()}
           </ScrollView>
 
           {!plan.isCompleted ? (
-            <View style={[styles.actionRow, isCompactLayout && styles.compactActionRow]}>
+            <View
+              style={[
+                styles.actionRow,
+                isCompactLayout && styles.compactActionRow,
+                { flexDirection: actionLayout.actionRowDirection },
+              ]}
+              onLayout={event => setActionHeight(event.nativeEvent.layout.height)}
+            >
               {onAssociateCompletedAction || onMoveAction ? (
-                <View style={[styles.secondaryActions, isCompactLayout && styles.compactSecondaryActions]}>
+                <View
+                  style={[
+                    styles.secondaryActions,
+                    isCompactLayout && styles.compactSecondaryActions,
+                    { flexDirection: actionLayout.secondaryActionsDirection },
+                  ]}
+                >
                   {onAssociateCompletedAction ? (
                     <TouchableOpacity
                       accessibilityRole="button"
@@ -371,7 +420,7 @@ export const ScheduledWorkoutPreviewModal = ({
                   disabled={primaryActionDisabled}
                   style={[
                     styles.primaryButton,
-                    isCompactLayout && styles.compactPrimaryButton,
+                    actionLayout.primaryButtonFullWidth && styles.compactPrimaryButton,
                     { backgroundColor: primaryActionDisabled ? colors.textSecondary : colors.primary },
                   ]}
                   onPress={onPrimaryAction}
@@ -585,7 +634,7 @@ const styles = StyleSheet.create({
   compactSecondaryActions: {
     flex: 0,
     width: '100%',
-    flexDirection: 'column',
+    minHeight: 48,
   },
   secondaryButton: {
     flex: 1,
