@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import { checkAndCopyNewWeek } from '../modules/nutrition/services/dietCopyService';
 import { checkAndPlanNewWeeks } from '../modules/training/services/trainingPlanService';
+import { expireTrainingTemplates } from '../modules/training/services/templateLifecycleService';
 import { NutritionSettingsJson } from '../types/requests.types';
 
 interface AuthContextType {
@@ -60,10 +61,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Helper to check and run auto-copy if needed
     const checkAndRunAutoCopy = async (userId: string) => {
+      let templateCleanupCompleted = false;
       try {
         console.log('┌─────────────────────────────────────────────────┐');
         console.log('│ [Auth] 🔍 VERIFICANDO AUTO-COPIA DE DATOS      │');
         console.log('└─────────────────────────────────────────────────┘');
+
+        // Template lifecycle maintenance must run at app entry, independently
+        // of whether nutrition preferences exist or the user opens Training.
+        try {
+          await expireTrainingTemplates(userId);
+          templateCleanupCompleted = true;
+        } catch (error) {
+          console.error('[Auth] ❌ Error limpiando plantillas caducadas:', error);
+        }
 
         // Fetch user preferences
         const { data: prefs, error } = await supabase
@@ -102,7 +113,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // ----------------------------------------------------
         // 2. TRAINING AUTO-PLANNING
         // ----------------------------------------------------
-        const trainingResult = await checkAndPlanNewWeeks(userId, nutritionPrefs.last_planned_training_week);
+        const trainingResult = await checkAndPlanNewWeeks(userId, nutritionPrefs.last_planned_training_week, {
+          skipTemplateExpiration: templateCleanupCompleted,
+        });
 
         if (trainingResult.planned) {
           console.log(`[Auth] ✅ Entreno: Planificados ${trainingResult.createdCount} sesiones`);
@@ -213,6 +226,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Si el evento es TOKEN_REFRESHED o SIGNED_IN, confiar en la sesión nueva
       // Si es SIGNED_OUT, limpiar.
       setSession(session);
+      if (_event === 'SIGNED_IN' && session) {
+        setTimeout(() => {
+          void checkAndRunAutoCopy(session.user.id);
+        }, 0);
+      }
     });
 
     return () => {

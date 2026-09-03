@@ -3,6 +3,7 @@ import {
   applyProgressionsToSteps,
   applyTemplateSummaryProgression,
   calculateProgressionWeeks,
+  calculateStartDateFromEndAndWeeks,
   createProgressionKey,
   filterStepProgressionsBySteps,
   filterStaleWeekOneProgressions,
@@ -55,6 +56,7 @@ assert.equal(getNextScheduledDateString(new Date('2026-06-23T10:00:00'), 2), '20
 assert.equal(calculateProgressionWeeks('2026-06-23', '2026-06-23'), 1);
 assert.equal(calculateProgressionWeeks('2026-06-23', '2026-06-30'), 2);
 assert.equal(calculateProgressionWeeks('2026-06-23', '2026-07-07'), 3);
+assert.equal(calculateStartDateFromEndAndWeeks('2026-07-07', 3), '2026-06-23');
 assert.equal(calculateProgressionWeeks('2026-07-07', '2026-06-23'), 0);
 assert.equal(calculateProgressionWeeks('invalid', '2026-06-23'), 0);
 assert.equal(getProgressionWeekIndex('2026-06-23', '2026-06-23'), 1);

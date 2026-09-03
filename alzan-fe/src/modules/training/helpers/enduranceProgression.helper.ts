@@ -1,5 +1,6 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { DurationType, PhaseType, SportType, TargetType } from '../../../types/requests.types';
+import { getNextWeeklyOccurrence } from './weeklyRecurrence.helper';
 
 export type ProgressionBuilderStep = {
   id: string;
@@ -102,13 +103,8 @@ export const createProgressionKey = (): string => {
   ).toString(16)}${createUuidPart(3)}-${createUuidPart(12)}`;
 };
 
-export const getNextScheduledDateString = (fromDate: Date, dayOfWeek: number): string => {
-  const normalizedFromDate = new Date(fromDate);
-  normalizedFromDate.setHours(0, 0, 0, 0);
-
-  const daysUntilTarget = (dayOfWeek - normalizedFromDate.getDay() + 7) % 7;
-  return format(addDays(normalizedFromDate, daysUntilTarget), 'yyyy-MM-dd');
-};
+export const getNextScheduledDateString = (fromDate: Date, dayOfWeek: number | null): string | null =>
+  getNextWeeklyOccurrence(fromDate, dayOfWeek);
 
 export const calculateStartDateFromEndAndWeeks = (
   endDateStr: string | null | undefined,
@@ -118,7 +114,7 @@ export const calculateStartDateFromEndAndWeeks = (
   const endDate = parseDateOnly(endDateStr);
   if (!endDate) return null;
 
-  const startDate = addDays(endDate, -(weeks * 7 - 1));
+  const startDate = addDays(endDate, -((weeks - 1) * 7));
   return format(startDate, 'yyyy-MM-dd');
 };
 

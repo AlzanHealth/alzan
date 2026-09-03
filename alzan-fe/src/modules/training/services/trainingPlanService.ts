@@ -45,12 +45,15 @@ const getPlannedDateForWeekday = (weekStart: Date, dayOfWeek: number): Date => {
 export const checkAndPlanNewWeeks = async (
   userId: string,
   lastPlannedWeek: string | undefined, // stored in nutrition_prefs for now
+  options: { skipTemplateExpiration?: boolean } = {},
 ): Promise<{ planned: boolean; newLastPlannedWeek: string; createdCount: number }> => {
   console.log('┌─────────────────────────────────────────────────┐');
   console.log('│ [trainingPlanService] 🏋️ VERIFICANDO PLANES    │');
   console.log('└─────────────────────────────────────────────────┘');
 
-  await expireTrainingTemplates(userId, format(new Date(), 'yyyy-MM-dd'));
+  if (!options.skipTemplateExpiration) {
+    await expireTrainingTemplates(userId, format(new Date(), 'yyyy-MM-dd'));
+  }
 
   const horizonDate = getTrainingHorizonWeek();
   const horizonISO = getISOWeekString(horizonDate);

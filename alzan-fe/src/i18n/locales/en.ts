@@ -1795,6 +1795,8 @@ const en = {
     recurrenceEndDateLabel: 'End date',
     recurrenceEndDate: 'End repeat date',
     recurrenceEndDateInvalid: 'Choose an end date on or after the first planned workout.',
+    recurrenceStartDateRequired: 'Choose a valid start date for the weekly repeat.',
+    recurrenceWeeksInvalid: 'Duration must be a positive whole number of weeks.',
     weeklyProgression: 'Weekly interval progression',
     weeklyProgressionSubtitle:
       'Adjust duration or distance and target for each week. Warm-up, recovery and cooldown stay unchanged.',

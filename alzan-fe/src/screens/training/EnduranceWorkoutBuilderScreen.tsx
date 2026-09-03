@@ -65,12 +65,10 @@ import { formatPaceTime } from '../../utils/unitConversionUtils';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS, parseLocalizedDecimal } from '../../utils/numericInput';
 import {
   calculateProgressionWeeks,
-  calculateStartDateFromEndAndWeeks,
   EligibleProgressionStep,
   ensureStepProgressionKeys,
   filterStepProgressionsBySteps,
   getEligibleProgressionSteps,
-  getNextScheduledDateString,
   normalizeStepProgressions,
   ProgressionBuilderStep,
   StepProgressionOverride,
@@ -86,6 +84,13 @@ import {
   resolveOneOffDate,
   shouldShowScheduleDays,
 } from '../../modules/training/helpers/templateScheduling.helper';
+import {
+  calculateWeeklyEndDate,
+  getFirstWeeklyOccurrenceOnOrAfter,
+  getNextWeeklyOccurrence,
+  isValidDateOnly,
+  parsePositiveWholeWeeks,
+} from '../../modules/training/helpers/weeklyRecurrence.helper';
 import { getOneOffTrainingPlanDate } from '../../modules/training/services/oneOffTrainingPlanService';
 import {
   formatEnduranceStepTarget,
@@ -218,29 +223,16 @@ export const EnduranceWorkoutBuilderScreen = () => {
       // visible and persisted even though they do not repeat by weekday.
       return;
     }
-    const weeks = parseInt(recurrenceWeeks, 10);
-    if (isNaN(weeks) || weeks < 1) {
+    const scheduledDay = scheduledDays[0] ?? null;
+    const weeks = parsePositiveWholeWeeks(recurrenceWeeks);
+    const effectiveStart = getFirstWeeklyOccurrenceOnOrAfter(recurrenceStartDate, scheduledDay);
+    if (!effectiveStart || !weeks) {
       setRecurrenceEndDate('');
       return;
     }
-    const refStart = recurrenceStartDate || getNextScheduledDateString(new Date(), scheduledDays[0] ?? null);
-    if (!refStart) {
-      setRecurrenceEndDate('');
-      return;
-    }
-    try {
-      const parsedStart = new Date(`${refStart}T00:00:00`);
-      if (!isNaN(parsedStart.getTime())) {
-        const calculatedEnd = addDays(parsedStart, weeks * 7 - 1);
-        setRecurrenceEndDate(format(calculatedEnd, 'yyyy-MM-dd'));
-      } else {
-        setRecurrenceEndDate('');
-      }
-    } catch (err) {
-      console.error('[EnduranceWorkoutBuilderScreen] error calculating end date:', err);
-      setRecurrenceEndDate('');
-    }
-  }, [isEditMode, isRecurring, recurrenceWeeks, recurrenceStartDate, scheduledDays]);
+    const calculatedEnd = calculateWeeklyEndDate(effectiveStart, scheduledDay, weeks);
+    setRecurrenceEndDate(calculatedEnd || '');
+  }, [isRecurring, recurrenceWeeks, recurrenceStartDate, scheduledDays]);
 
   useEffect(() => {
     if (!isEditMode) setAutoDeleteAfterEnd(trainingSettings.autoDeleteExpiredTemplates);
@@ -416,6 +408,26 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
     setScheduledDays(days);
+    const selectedDay = days[0];
+    if (selectedDay === undefined) {
+      setRecurrenceStartDate(null);
+      setRecurrenceEndDate('');
+      return;
+    }
+
+    const baseDate = isValidDateOnly(recurrenceStartDate)
+      ? recurrenceStartDate
+      : getNextWeeklyOccurrence(new Date(), selectedDay);
+    setRecurrenceStartDate(getFirstWeeklyOccurrenceOnOrAfter(baseDate, selectedDay));
+  };
+
+  const handleRecurrenceStartDateChange = (date: string) => {
+    if (!isValidDateOnly(date)) {
+      setRecurrenceStartDate(date);
+      return;
+    }
+
+    setRecurrenceStartDate(getFirstWeeklyOccurrenceOnOrAfter(date, scheduledDays[0] ?? null));
   };
 
   const isHydratingEditTemplate =
@@ -489,17 +501,28 @@ export const EnduranceWorkoutBuilderScreen = () => {
       }
       setIsRecurring(isScheduledWeekday(existingTemplate.scheduled_day));
       setOneOffDate(null);
-      setRecurrenceStartDate(existingTemplate.recurrence_start_date || null);
-      setRecurrenceEndDate(existingTemplate.recurrence_end_date || '');
+      const existingScheduledDay = isScheduledWeekday(existingTemplate.scheduled_day)
+        ? existingTemplate.scheduled_day
+        : null;
+      const existingWeeks = calculateProgressionWeeks(
+        existingTemplate.recurrence_start_date,
+        existingTemplate.recurrence_end_date,
+      );
+      const normalizedExistingStart =
+        existingScheduledDay !== null
+          ? getFirstWeeklyOccurrenceOnOrAfter(existingTemplate.recurrence_start_date, existingScheduledDay)
+          : existingTemplate.recurrence_start_date || null;
+      setRecurrenceStartDate(normalizedExistingStart);
+      setRecurrenceEndDate(
+        existingScheduledDay !== null && existingWeeks > 0
+          ? calculateWeeklyEndDate(normalizedExistingStart, existingScheduledDay, existingWeeks) || ''
+          : existingTemplate.recurrence_end_date || '',
+      );
       const lifecycleData = existingTemplate as unknown as {
         auto_delete_after_end?: boolean | null;
       };
       setAutoDeleteAfterEnd(lifecycleData.auto_delete_after_end ?? trainingSettings.autoDeleteExpiredTemplates);
-      const weeks = calculateProgressionWeeks(
-        existingTemplate.recurrence_start_date,
-        existingTemplate.recurrence_end_date,
-      );
-      setRecurrenceWeeks(weeks > 0 ? String(weeks) : '');
+      setRecurrenceWeeks(existingWeeks > 0 ? String(existingWeeks) : '');
       setStepProgressions(
         normalizeStepProgressions(
           existingProgressions.map(progression => ({
@@ -807,15 +830,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return isImportedDateDrivenTemplate ? recurrenceStartDate || existingTemplate.recurrence_start_date : null;
     }
     if (scheduledDay === null) return null;
-    if (recurrenceStartDate) {
-      return recurrenceStartDate;
-    }
-    const weeks = parseInt(recurrenceWeeks, 10);
-    if (recurrenceEndDate.trim() && !isNaN(weeks) && weeks >= 1) {
-      const calculatedStart = calculateStartDateFromEndAndWeeks(recurrenceEndDate.trim(), weeks);
-      if (calculatedStart) return calculatedStart;
-    }
-    return getNextScheduledDateString(new Date(), scheduledDay);
+    return getFirstWeeklyOccurrenceOnOrAfter(recurrenceStartDate, scheduledDay);
   };
 
   const getValidatedRecurrenceEndDate = (): string | null => {
@@ -995,12 +1010,22 @@ export const EnduranceWorkoutBuilderScreen = () => {
       return;
     }
 
+    if (isRecurring && !isValidIsoDate(getRecurrenceStartDateForSave(scheduledDays[0] ?? null))) {
+      Alert.alert(t('common.error'), t('training.recurrenceStartDateRequired'));
+      return;
+    }
+
+    if (isRecurring && recurrenceWeeks.trim() && !parsePositiveWholeWeeks(recurrenceWeeks)) {
+      Alert.alert(t('common.error'), t('training.recurrenceWeeksInvalid'));
+      return;
+    }
+
     if (!isRecurring && !isImportedDateDrivenTemplate && !isValidIsoDate(oneOffDate)) {
       Alert.alert(t('common.error'), t('training.oneOffDateRequired'));
       return;
     }
 
-    if (recurrenceEndDate.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(recurrenceEndDate.trim())) {
+    if (recurrenceEndDate.trim() && !isValidIsoDate(recurrenceEndDate.trim())) {
       Alert.alert(t('common.error'), t('training.recurrenceEndDateInvalid'));
       return;
     }
@@ -3375,7 +3400,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           <TextInput
                             style={[styles.rowInput, { color: themeColors.textPrimary }]}
                             value={recurrenceStartDate || ''}
-                            onChangeText={setRecurrenceStartDate}
+                            onChangeText={handleRecurrenceStartDateChange}
                             placeholder="YYYY-MM-DD"
                             placeholderTextColor={themeColors.textSecondary}
                             textAlign="right"
@@ -3431,7 +3456,9 @@ export const EnduranceWorkoutBuilderScreen = () => {
                         <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 }}>
                           <Text style={{ fontSize: 13, color: themeColors.textSecondary, fontStyle: 'italic' }}>
                             {t('training.recurrenceEndDateCalculated', {
-                              date: format(new Date(`${recurrenceEndDate}T00:00:00`), 'dd/MM/yyyy'),
+                              date: format(new Date(`${recurrenceEndDate}T00:00:00`), 'EEEE, dd/MM/yyyy', {
+                                locale: getDateFnsLocale(),
+                              }),
                             })}
                           </Text>
                         </View>
@@ -3467,6 +3494,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
                           textAlign="right"
                         />
                       </View>
+                      {isValidDateOnly(recurrenceEndDate.trim()) && (
+                        <Text style={[styles.helperDescription, { color: themeColors.textSecondary }]}>
+                          {t('training.recurrenceEndDateCalculated', {
+                            date: format(new Date(`${recurrenceEndDate.trim()}T00:00:00`), 'EEEE, dd/MM/yyyy', {
+                              locale: getDateFnsLocale(),
+                            }),
+                          })}
+                        </Text>
+                      )}
                       <View style={styles.lifecycleToggleRow}>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.lifecycleToggleLabel, { color: themeColors.textPrimary }]}>
@@ -3638,7 +3674,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             onChange={(_event, selectedDate) => {
               setShowRecurrenceStartPicker(false);
               if (selectedDate) {
-                setRecurrenceStartDate(format(selectedDate, 'yyyy-MM-dd'));
+                handleRecurrenceStartDateChange(format(selectedDate, 'yyyy-MM-dd'));
               }
             }}
           />

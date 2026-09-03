@@ -1814,6 +1814,8 @@ export default {
     recurrenceEndDateLabel: 'Fecha de fin',
     recurrenceEndDate: 'Fecha fin de repetición',
     recurrenceEndDateInvalid: 'Elige una fecha fin igual o posterior al primer entreno planificado.',
+    recurrenceStartDateRequired: 'Elige una fecha de inicio válida para la repetición semanal.',
+    recurrenceWeeksInvalid: 'La duración debe ser un número entero positivo de semanas.',
     weeklyProgression: 'Progresión semanal de intervalos',
     weeklyProgressionSubtitle:
       'Ajusta duración o distancia y objetivo para cada semana. Calentamiento, recuperación y vuelta a la calma no cambian.',
