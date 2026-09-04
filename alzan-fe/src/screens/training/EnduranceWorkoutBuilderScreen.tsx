@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,7 @@ import { useUnitConversion } from '../../hooks/useUnitConversion';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { useTrainingSettings } from '../../hooks/useTrainingSettings';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { DurationType, PhaseType, SportType, TargetType } from '../../types/requests.types';
 import { Nullable } from '../../types/common.types';
 import { Alert } from '../../components/common/Alert';
@@ -98,6 +99,11 @@ import {
   PreviewLabels,
 } from '../../modules/training/helpers/scheduledWorkoutPreviewFormat.helper';
 import { sortByOrderIndex } from '../../modules/training/helpers/advancedEnduranceSession.helper';
+import {
+  cloneEditableState,
+  hasUnsavedChanges as compareUnsavedChanges,
+  serializeEditableState,
+} from '../../modules/training/helpers/unsavedChanges.helper';
 
 interface Step {
   id: string; // temp id
@@ -218,6 +224,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [recurrenceWeeks, setRecurrenceWeeks] = useState<string>('');
   const [autoDeleteAfterEnd, setAutoDeleteAfterEnd] = useState(true);
   const [showRecurrenceStartPicker, setShowRecurrenceStartPicker] = useState(false);
+  const [isFormHydrated, setIsFormHydrated] = useState(!isEditMode);
+  const initialEditableStateSnapshotRef = useRef<string | null>(null);
+  const builderInitialStateRef = useRef<{
+    steps: Step[];
+    stepProgressions: StepProgressionOverride[];
+    snapshot: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!isRecurring) {
@@ -377,7 +390,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     enabled: !!templateId,
   });
 
-  const { data: existingOneOffPlanDate = null } = useQuery({
+  const { data: existingOneOffPlanDate = null, isLoading: isExistingOneOffPlanDateLoading } = useQuery({
     queryKey: ['enduranceTemplateOneOffPlan', templateId, user?.id],
     queryFn: async () => {
       if (!templateId || !user) return null;
@@ -428,6 +441,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   useEffect(() => {
     hydratedTemplateIdRef.current = null;
+    initialEditableStateSnapshotRef.current = null;
+    setIsFormHydrated(!isEditMode);
   }, [templateId]);
 
   // Populate fields when template loads
@@ -573,6 +588,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         })) as Step[];
         setSteps(ensureStepProgressionKeys(uiSteps));
       }
+      setIsFormHydrated(true);
     }
   }, [
     existingProgressions,
@@ -584,6 +600,108 @@ export const EnduranceWorkoutBuilderScreen = () => {
   useEffect(() => {
     if (isEditMode) setOneOffDate(existingOneOffPlanDate);
   }, [existingOneOffPlanDate, isEditMode]);
+
+  const editableStateSnapshot = useMemo(
+    () =>
+      serializeEditableState({
+        name,
+        description,
+        trainingGoal,
+        sportType,
+        scheduledDays,
+        isRecurring,
+        oneOffDate,
+        recurrenceStartDate,
+        recurrenceEndDate,
+        recurrenceWeeks,
+        autoDeleteAfterEnd,
+        environmentType,
+        surface,
+        poolType,
+        stroke,
+        footballSessionType,
+        baseLoad,
+        contactLevel,
+        bootsUsed,
+        rival,
+        notes,
+        racketUsed,
+        climbingGrade,
+        wetsuit,
+        board,
+        skiType,
+        slopeType,
+        snowboardType,
+        golfClubFocus,
+        hyroxStationFocus,
+        steps,
+        stepProgressions,
+      }),
+    [
+      name,
+      description,
+      trainingGoal,
+      sportType,
+      scheduledDays,
+      isRecurring,
+      oneOffDate,
+      recurrenceStartDate,
+      recurrenceEndDate,
+      recurrenceWeeks,
+      autoDeleteAfterEnd,
+      environmentType,
+      surface,
+      poolType,
+      stroke,
+      footballSessionType,
+      baseLoad,
+      contactLevel,
+      bootsUsed,
+      rival,
+      notes,
+      racketUsed,
+      climbingGrade,
+      wetsuit,
+      board,
+      skiType,
+      slopeType,
+      snowboardType,
+      golfClubFocus,
+      hyroxStationFocus,
+      steps,
+      stepProgressions,
+    ],
+  );
+
+  useEffect(() => {
+    const editDataReady =
+      !isEditMode ||
+      (!!existingTemplate &&
+        !isExistingProgressionsLoading &&
+        (!isExistingOneOffPlanDateLoading || existingTemplate.scheduled_day !== null));
+
+    if (isFormHydrated && editDataReady && initialEditableStateSnapshotRef.current === null) {
+      initialEditableStateSnapshotRef.current = editableStateSnapshot;
+    }
+  }, [
+    editableStateSnapshot,
+    existingTemplate,
+    isEditMode,
+    isExistingOneOffPlanDateLoading,
+    isExistingProgressionsLoading,
+    isFormHydrated,
+  ]);
+
+  const hasEditableChanges = compareUnsavedChanges(initialEditableStateSnapshotRef.current, editableStateSnapshot);
+
+  const builderEditableStateSnapshot = useMemo(
+    () => serializeEditableState({ steps, stepProgressions }),
+    [stepProgressions, steps],
+  );
+  const hasBuilderChanges =
+    currentView === 'builder' &&
+    builderInitialStateRef.current !== null &&
+    compareUnsavedChanges(builderInitialStateRef.current.snapshot, builderEditableStateSnapshot);
 
   // Progression rows are stored separately from the step tree. Reconcile them
   // whenever steps are edited so deleted steps cannot keep overriding the
@@ -825,7 +943,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return trimmedEndDate.length > 0 ? trimmedEndDate : null;
   };
 
-  const executeSave = async (detachFromImport = false) => {
+  const executeSave = async (detachFromImport = false, onSaved?: () => void) => {
     try {
       const savedOneOffDate = isImportedDateDrivenTemplate ? null : resolveOneOffDate(isRecurring, oneOffDate);
       const isOneOff = !isRecurring && !!savedOneOffDate && !isImportedDateDrivenTemplate;
@@ -945,7 +1063,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
           : isEditMode
             ? t('training.workoutUpdatedSuccessfully')
             : t('training.workoutSavedSuccessfully'),
-        [{ text: t('common.ok'), onPress: () => navigation.navigate('TrainingHome') }],
+        [{ text: t('common.ok'), onPress: onSaved ?? (() => navigation.navigate('TrainingHome')) }],
       );
     } catch (e) {
       console.error(e);
@@ -953,7 +1071,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (onSaved?: () => void) => {
     const missingFields: string[] = [];
     if (!name.trim()) {
       missingFields.push('name');
@@ -1053,7 +1171,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                 await supabase.from('workout_plans').delete().in('id', idsToDelete);
               }
             }
-            await executeSave();
+            await executeSave(false, onSaved);
           },
         },
       ]);
@@ -1093,13 +1211,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   }
                 }
               }
-              await executeSave(true);
+              await executeSave(true, onSaved);
             },
           },
         ],
       );
     } else {
-      await executeSave();
+      await executeSave(false, onSaved);
     }
   };
 
@@ -1156,6 +1274,55 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const withProgressionKeys = (step: Step): Step => ensureStepProgressionKeys([step])[0];
+
+  const openWorkoutBuilder = () => {
+    const builderState = { steps: cloneEditableState(steps), stepProgressions: cloneEditableState(stepProgressions) };
+    builderInitialStateRef.current = {
+      ...builderState,
+      snapshot: serializeEditableState(builderState),
+    };
+    setCurrentView('builder');
+  };
+
+  const leaveWorkoutBuilder = () => {
+    builderInitialStateRef.current = null;
+    setCurrentView('main');
+  };
+
+  const discardWorkoutBuilderChanges = () => {
+    const initialBuilderState = builderInitialStateRef.current;
+    if (initialBuilderState) {
+      setSteps(cloneEditableState(initialBuilderState.steps));
+      setStepProgressions(cloneEditableState(initialBuilderState.stepProgressions));
+    }
+    leaveWorkoutBuilder();
+  };
+
+  const requestExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: hasEditableChanges,
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onSaveAndExit: onSaved => handleSave(onSaved),
+  });
+
+  const requestBuilderExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: hasBuilderChanges,
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onDiscard: discardWorkoutBuilderChanges,
+    onSaveAndExit: onSaved =>
+      handleSave(() => {
+        initialEditableStateSnapshotRef.current = editableStateSnapshot;
+        builderInitialStateRef.current = null;
+        onSaved();
+      }),
+  });
 
   const handleAddGroup = () => {
     const newGroup: Step = withProgressionKeys({
@@ -2163,7 +2330,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         hasSteps={steps.length > 0}
         canDesignWorkout={structuredSport && showEditorAction}
         compact={compact}
-        onDesignWorkout={structuredSport && showEditorAction ? () => setCurrentView('builder') : undefined}
+        onDesignWorkout={structuredSport && showEditorAction ? openWorkoutBuilder : undefined}
       />
     );
   };
@@ -2179,15 +2346,15 @@ export const EnduranceWorkoutBuilderScreen = () => {
           <TouchableOpacity
             onPress={() => {
               if (currentView === 'builder') {
-                setCurrentView('main');
+                requestBuilderExit(leaveWorkoutBuilder);
               } else if (!sportType) {
-                navigation.goBack();
+                requestExit(() => navigation.goBack());
               } else if (!['running', 'cycling', 'swimming', 'hyrox'].includes(sportType)) {
                 setSportType(null);
               } else if (sportType && !isEditMode) {
                 setSportType(null);
               } else {
-                navigation.goBack();
+                requestExit(() => navigation.goBack());
               }
             }}
             style={styles.headerButton}
@@ -2213,7 +2380,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             <TouchableOpacity
               onPress={() => {
                 if (currentView === 'builder') {
-                  setCurrentView('main');
+                  requestBuilderExit(leaveWorkoutBuilder);
                 } else {
                   handleSave();
                 }

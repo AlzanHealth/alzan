@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -54,10 +54,16 @@ import { useTranslation } from 'react-i18next';
 import { isTimeBasedExerciseType, getLocalizedExerciseName } from '../../services/localization';
 import { ExerciseWithDetails } from '../../types/training';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { calculateRoutineTotalSets, normalizeTargetSetsInput } from './helpers/gymRoutineEditorTotals.helper';
 import { getDefaultGymExerciseTargets } from '../../modules/training/helpers/gymExerciseDefaults.helper';
 import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { buildGymTemplateFamilySignature } from '../../modules/training/helpers/templateFamilySignature';
+import {
+  cloneEditableState,
+  hasUnsavedChanges as compareUnsavedChanges,
+  serializeEditableState,
+} from '../../modules/training/helpers/unsavedChanges.helper';
 import {
   getCurrentWeekDateForWeekday,
   getCurrentWeekdayForDate,
@@ -89,7 +95,8 @@ export const GymRoutineEditorScreen = () => {
   const { preferences, toDisplayWeight } = useUserPreferences();
   const { settings: trainingSettings } = useTrainingSettings();
 
-  const { routineData, oneOffPlanDate, saveRoutine } = useGymRoutineEditor(routineId);
+  const { routineData, oneOffPlanDate, isLoading, isOneOffPlanDateLoading, saveRoutine } =
+    useGymRoutineEditor(routineId);
   const { getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
   const isImportedDateDrivenTemplate =
     routineData?.source === 'imported' &&
@@ -112,6 +119,13 @@ export const GymRoutineEditorScreen = () => {
   const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
   const [recurrenceWeeks, setRecurrenceWeeks] = useState('');
   const [autoDeleteAfterEnd, setAutoDeleteAfterEnd] = useState(true);
+  const [isFormHydrated, setIsFormHydrated] = useState(!routineId);
+  const initialEditableStateSnapshotRef = useRef<string | null>(null);
+  const builderInitialStateRef = useRef<{
+    exercises: RoutineDataExercise[];
+    supersetLinks: number[];
+    snapshot: string;
+  } | null>(null);
   const oneOffWeekday = !isRecurring ? getCurrentWeekdayForDate(oneOffDate) : null;
 
   const handleScheduleDaysChange = (days: number[]) => {
@@ -245,6 +259,11 @@ export const GymRoutineEditorScreen = () => {
 
   // Populate state when data loads
   useEffect(() => {
+    initialEditableStateSnapshotRef.current = null;
+    setIsFormHydrated(!routineId);
+  }, [routineId]);
+
+  useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
@@ -296,12 +315,68 @@ export const GymRoutineEditorScreen = () => {
       );
       setRecurrenceWeeks(existingWeeks > 0 ? String(existingWeeks) : '');
       setAutoDeleteAfterEnd(lifecycleData.auto_delete_after_end ?? trainingSettings.autoDeleteExpiredTemplates);
+      setIsFormHydrated(true);
     }
   }, [routineData, trainingSettings.autoDeleteExpiredTemplates]);
 
   useEffect(() => {
     if (routineId) setOneOffDate(oneOffPlanDate);
   }, [oneOffPlanDate, routineId]);
+
+  const editableStateSnapshot = useMemo(
+    () =>
+      serializeEditableState({
+        name,
+        description,
+        workoutGoal,
+        modality,
+        selectedDays,
+        isRecurring,
+        oneOffDate,
+        recurrenceStartDate,
+        recurrenceEndDate,
+        recurrenceWeeks,
+        autoDeleteAfterEnd,
+        exercises,
+        supersetLinks: Array.from(supersetLinks).sort((a, b) => a - b),
+      }),
+    [
+      name,
+      description,
+      workoutGoal,
+      modality,
+      selectedDays,
+      isRecurring,
+      oneOffDate,
+      recurrenceStartDate,
+      recurrenceEndDate,
+      recurrenceWeeks,
+      autoDeleteAfterEnd,
+      exercises,
+      supersetLinks,
+    ],
+  );
+
+  useEffect(() => {
+    const editDataReady =
+      !routineId ||
+      (!!routineData && !isLoading && (!isOneOffPlanDateLoading || routineData.suggested_day_of_week !== null));
+
+    if (isFormHydrated && editDataReady && initialEditableStateSnapshotRef.current === null) {
+      initialEditableStateSnapshotRef.current = editableStateSnapshot;
+    }
+  }, [editableStateSnapshot, isFormHydrated, isLoading, isOneOffPlanDateLoading, routineData, routineId]);
+
+  const hasEditableChanges = compareUnsavedChanges(initialEditableStateSnapshotRef.current, editableStateSnapshot);
+
+  const builderEditableStateSnapshot = useMemo(
+    () => serializeEditableState({ exercises, supersetLinks: Array.from(supersetLinks).sort((a, b) => a - b) }),
+    [exercises, supersetLinks],
+  );
+  const hasBuilderChanges =
+    currentView === 'builder' &&
+    builderInitialStateRef.current !== null &&
+    compareUnsavedChanges(builderInitialStateRef.current.snapshot, builderEditableStateSnapshot);
 
   useEffect(() => {
     if (!isRecurring) return;
@@ -678,7 +753,7 @@ export const GymRoutineEditorScreen = () => {
     }
   }, [exercises.length, supersetLinks]);
 
-  const executeSave = async (detachFromImport = false) => {
+  const executeSave = async (detachFromImport = false, onSaved?: () => void) => {
     try {
       const supersetIndexes = Array.from(supersetLinks).sort((a, b) => a - b);
       const suggestedDayForSave = isRecurring && selectedDays.length > 0 ? selectedDays[0] : null;
@@ -727,14 +802,15 @@ export const GymRoutineEditorScreen = () => {
         supersetLinks: supersetIndexes,
       });
       // Navigate to TrainingHome to exit the editor flow completely
-      navigation.navigate('TrainingHome');
+      onSaved?.();
+      if (!onSaved) navigation.navigate('TrainingHome');
     } catch (e) {
       console.error(e);
       Alert.alert(t('common.error'), t('training.saveRoutineError'));
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (onSaved?: () => void) => {
     if (!name.trim()) {
       Alert.alert(t('common.error'), t('training.routineNameRequired'));
       return;
@@ -822,15 +898,67 @@ export const GymRoutineEditorScreen = () => {
                   }
                 }
               }
-              await executeSave(true);
+              await executeSave(true, onSaved);
             },
           },
         ],
       );
     } else {
-      await executeSave();
+      await executeSave(false, onSaved);
     }
   };
+
+  const requestExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: hasEditableChanges,
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onSaveAndExit: onSaved => handleSave(onSaved),
+  });
+
+  const openWorkoutBuilder = () => {
+    const builderState = {
+      exercises: cloneEditableState(exercises),
+      supersetLinks: Array.from(supersetLinks).sort((a, b) => a - b),
+    };
+    builderInitialStateRef.current = {
+      ...builderState,
+      snapshot: serializeEditableState(builderState),
+    };
+    setCurrentView('builder');
+  };
+
+  const leaveWorkoutBuilder = () => {
+    builderInitialStateRef.current = null;
+    setCurrentView('main');
+  };
+
+  const discardWorkoutBuilderChanges = () => {
+    const initialBuilderState = builderInitialStateRef.current;
+    if (initialBuilderState) {
+      setExercises(cloneEditableState(initialBuilderState.exercises));
+      setSupersetLinks(new Set(initialBuilderState.supersetLinks));
+    }
+    leaveWorkoutBuilder();
+  };
+
+  const requestBuilderExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: hasBuilderChanges,
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onDiscard: discardWorkoutBuilderChanges,
+    onSaveAndExit: onSaved =>
+      handleSave(() => {
+        initialEditableStateSnapshotRef.current = editableStateSnapshot;
+        builderInitialStateRef.current = null;
+        onSaved();
+      }),
+  });
 
   const updateExerciseTarget = (index: number, field: string, value: string) => {
     setExercises(prev => {
@@ -877,9 +1005,9 @@ export const GymRoutineEditorScreen = () => {
           <TouchableOpacity
             onPress={() => {
               if (currentView === 'builder') {
-                setCurrentView('main');
+                requestBuilderExit(leaveWorkoutBuilder);
               } else {
-                navigation.navigate('GymRoutinesList');
+                requestExit(() => navigation.navigate('GymRoutinesList'));
               }
             }}
           >
@@ -897,7 +1025,7 @@ export const GymRoutineEditorScreen = () => {
           <TouchableOpacity
             onPress={() => {
               if (currentView === 'builder') {
-                setCurrentView('main');
+                requestBuilderExit(leaveWorkoutBuilder);
               } else {
                 handleSave();
               }
@@ -1058,7 +1186,7 @@ export const GymRoutineEditorScreen = () => {
                     accessibilityLabel={exercises.length > 0 ? t('training.editWorkout') : t('training.designWorkout')}
                     activeOpacity={0.86}
                     style={[styles.designButton, { backgroundColor: themeColors.primary }]}
-                    onPress={() => setCurrentView('builder')}
+                    onPress={openWorkoutBuilder}
                   >
                     <Zap size={17} color="#FFFFFF" />
                     <Text style={styles.designButtonText}>

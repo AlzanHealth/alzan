@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -20,6 +20,11 @@ import { BuilderStep } from '../../../hooks/useEnduranceWorkoutBuilder';
 import { SportCatalogOption } from '../../../hooks/useSportCatalog';
 import { formatPaceTime } from '../../../utils/unitConversionUtils';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../../utils/numericInput';
+import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
+import {
+  hasUnsavedChanges as compareUnsavedChanges,
+  serializeEditableState,
+} from '../../../modules/training/helpers/unsavedChanges.helper';
 
 type HyroxStepType = 'run' | 'station' | 'rest';
 
@@ -62,8 +67,12 @@ export const HyroxStepEditorModal = ({
   const [paceSec, setPaceSec] = useState('');
   const [loadKg, setLoadKg] = useState('');
   const [reps, setReps] = useState('');
+  const [isFormHydrated, setIsFormHydrated] = useState(false);
+  const initialEditableStateSnapshotRef = useRef<string | null>(null);
 
   useEffect(() => {
+    initialEditableStateSnapshotRef.current = null;
+    setIsFormHydrated(false);
     if (!visible) return;
 
     const initialType = (initialStep?.hyrox_step_type as HyroxStepType | undefined) || 'run';
@@ -89,9 +98,21 @@ export const HyroxStepEditorModal = ({
 
     setLoadKg(formatNumericValue(initialStep?.load_kg));
     setReps(formatNumericValue(initialStep?.reps));
+    setIsFormHydrated(true);
   }, [initialStep, stationOptions, visible]);
 
   const selectedStationLabel = useMemo(() => getStationLabel(stationKey), [getStationLabel, stationKey]);
+
+  const editableStateSnapshot = useMemo(
+    () => serializeEditableState({ stepType, stationKey, distanceM, durationMin, paceMin, paceSec, loadKg, reps }),
+    [distanceM, durationMin, loadKg, paceMin, paceSec, reps, stationKey, stepType],
+  );
+
+  useEffect(() => {
+    if (visible && isFormHydrated && initialEditableStateSnapshotRef.current === null) {
+      initialEditableStateSnapshotRef.current = editableStateSnapshot;
+    }
+  }, [editableStateSnapshot, isFormHydrated, visible]);
 
   const handleSave = () => {
     const parsedDistance = parseNumber(distanceM);
@@ -129,6 +150,19 @@ export const HyroxStepEditorModal = ({
 
     onSave(nextStep);
   };
+
+  const requestExit = useUnsavedChangesGuard({
+    hasUnsavedChanges: visible && compareUnsavedChanges(initialEditableStateSnapshotRef.current, editableStateSnapshot),
+    title: t('training.unsavedChangesTitle'),
+    message: t('training.unsavedChangesMessage'),
+    stayLabel: t('training.keepEditing'),
+    discardLabel: t('training.discardChanges'),
+    saveLabel: t('training.saveAndExit'),
+    onSaveAndExit: onSaved => {
+      handleSave();
+      onSaved();
+    },
+  });
 
   const renderTypeChip = (type: HyroxStepType, label: string) => {
     const selected = stepType === type;
@@ -169,7 +203,7 @@ export const HyroxStepEditorModal = ({
       style={[styles.container, { backgroundColor: themeColors.background }, useCenteredModal && styles.containerWide]}
     >
       <View style={[styles.header, { borderBottomColor: themeColors.border }]}>
-        <TouchableOpacity onPress={onCancel} style={styles.headerAction} accessibilityRole="button">
+        <TouchableOpacity onPress={() => requestExit(onCancel)} style={styles.headerAction} accessibilityRole="button">
           <Text style={styles.cancelText}>{t('common.cancel')}</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: themeColors.textPrimary }]}>
@@ -337,8 +371,8 @@ export const HyroxStepEditorModal = ({
 
   if (useCenteredModal) {
     return (
-      <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
-        <Pressable style={styles.overlay} onPress={onCancel}>
+      <Modal visible={visible} animationType="fade" transparent onRequestClose={() => requestExit(onCancel)}>
+        <Pressable style={styles.overlay} onPress={() => requestExit(onCancel)}>
           <Pressable onPress={e => e.stopPropagation()}>{modalContent}</Pressable>
         </Pressable>
       </Modal>
@@ -346,7 +380,12 @@ export const HyroxStepEditorModal = ({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => requestExit(onCancel)}
+    >
       {modalContent}
     </Modal>
   );

@@ -151,7 +151,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
     enabled: !!routineId,
   });
 
-  const { data: oneOffPlanDate = null } = useQuery({
+  const { data: oneOffPlanDate = null, isLoading: isOneOffPlanDateLoading } = useQuery({
     queryKey: ['gymRoutineOneOffPlan', routineId, user?.id],
     queryFn: async () => {
       if (!routineId || !user) return null;
@@ -428,6 +428,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
   return {
     routineData,
     oneOffPlanDate,
+    isOneOffPlanDateLoading,
     isLoading,
     saveRoutine,
   };
