@@ -174,7 +174,13 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const { convertDistanceToUi } = useUnitConversion();
   const { preferences } = useUserPreferences();
   const { settings: trainingSettings } = useTrainingSettings();
-  const { options: sportCatalogOptions, getOptions, getGroupLabel, getOptionLabel } = useSportCatalog();
+  const {
+    options: sportCatalogOptions,
+    isLoading: isSportCatalogLoading,
+    getOptions,
+    getGroupLabel,
+    getOptionLabel,
+  } = useSportCatalog();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -531,21 +537,19 @@ export const EnduranceWorkoutBuilderScreen = () => {
       };
       setAutoDeleteAfterEnd(lifecycleData.auto_delete_after_end ?? trainingSettings.autoDeleteExpiredTemplates);
       setRecurrenceWeeks(existingWeeks > 0 ? String(existingWeeks) : '');
-      setStepProgressions(
-        normalizeStepProgressions(
-          existingProgressions.map(progression => ({
-            progression_key: progression.progression_key,
-            week_index: progression.week_index,
-            duration_s: progression.duration_s,
-            distance_m: progression.distance_m,
-            target_type: progression.target_type,
-            target_min: progression.target_min,
-            target_max: progression.target_max,
-            repetitions: progression.repetitions,
-            load_kg: progression.load_kg,
-            reps: progression.reps,
-          })),
-        ),
+      const normalizedProgressions = normalizeStepProgressions(
+        existingProgressions.map(progression => ({
+          progression_key: progression.progression_key,
+          week_index: progression.week_index,
+          duration_s: progression.duration_s,
+          distance_m: progression.distance_m,
+          target_type: progression.target_type,
+          target_min: progression.target_min,
+          target_max: progression.target_max,
+          repetitions: progression.repetitions,
+          load_kg: progression.load_kg,
+          reps: progression.reps,
+        })),
       );
 
       // Convert DB steps to UI format
@@ -586,7 +590,14 @@ export const EnduranceWorkoutBuilderScreen = () => {
             reps: c.reps,
           })),
         })) as Step[];
-        setSteps(ensureStepProgressionKeys(uiSteps));
+        const hydratedSteps = ensureStepProgressionKeys(uiSteps);
+        setSteps(hydratedSteps);
+        // Reconcile stale progression rows before taking the initial snapshot.
+        // Otherwise the cleanup effect below can change the form immediately
+        // after hydration and incorrectly mark an untouched template as dirty.
+        setStepProgressions(filterStepProgressionsBySteps(hydratedSteps, normalizedProgressions));
+      } else {
+        setStepProgressions([]);
       }
       setIsFormHydrated(true);
     }
@@ -675,14 +686,22 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   useEffect(() => {
     const editDataReady =
-      !isEditMode ||
-      (!!existingTemplate &&
-        !isExistingProgressionsLoading &&
-        (!isExistingOneOffPlanDateLoading || existingTemplate.scheduled_day !== null));
+      !isSportCatalogLoading &&
+      (!isEditMode ||
+        (!!existingTemplate &&
+          !isExistingProgressionsLoading &&
+          (!isExistingOneOffPlanDateLoading || existingTemplate.scheduled_day !== null)));
 
-    if (isFormHydrated && editDataReady && initialEditableStateSnapshotRef.current === null) {
+    if (!isFormHydrated || !editDataReady || initialEditableStateSnapshotRef.current !== null) return;
+
+    // Passive effects reconcile catalog values, recurrence dates and progression
+    // rows after hydration. Capture the baseline on the next tick so those
+    // automatic changes are not reported as user edits.
+    const settleTimer = setTimeout(() => {
       initialEditableStateSnapshotRef.current = editableStateSnapshot;
-    }
+    }, 0);
+
+    return () => clearTimeout(settleTimer);
   }, [
     editableStateSnapshot,
     existingTemplate,
@@ -690,6 +709,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
     isExistingOneOffPlanDateLoading,
     isExistingProgressionsLoading,
     isFormHydrated,
+    isSportCatalogLoading,
+    sportCatalogOptions.length,
   ]);
 
   const hasEditableChanges = compareUnsavedChanges(initialEditableStateSnapshotRef.current, editableStateSnapshot);
@@ -752,13 +773,28 @@ export const EnduranceWorkoutBuilderScreen = () => {
   useEffect(() => {
     if (!sportType || sportCatalogOptions.length === 0) return;
 
+    // Some sports (for example HYROX) keep a legacy modality/surface value
+    // without exposing selectable catalog options. Preserve those values
+    // instead of turning an untouched edit into a false dirty state.
     const nextEnvironmentType =
-      environmentType && modalityOptions.some(option => option.option_key === environmentType) ? environmentType : null;
-    const nextSurface = surface && terrainOptions.some(option => option.option_key === surface) ? surface : null;
+      environmentType && (!hasModalityOptions || modalityOptions.some(option => option.option_key === environmentType))
+        ? environmentType
+        : null;
+    const nextSurface =
+      surface && (!hasTerrainOptions || terrainOptions.some(option => option.option_key === surface)) ? surface : null;
 
     if (environmentType !== nextEnvironmentType) setEnvironmentType(nextEnvironmentType);
     if (surface !== nextSurface) setSurface(nextSurface);
-  }, [environmentType, modalityOptions, sportCatalogOptions.length, sportType, surface, terrainOptions]);
+  }, [
+    environmentType,
+    hasModalityOptions,
+    hasTerrainOptions,
+    modalityOptions,
+    sportCatalogOptions.length,
+    sportType,
+    surface,
+    terrainOptions,
+  ]);
 
   const getStructuredGoals = () => {
     return goalOptions.map(option => ({

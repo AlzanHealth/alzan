@@ -362,9 +362,15 @@ export const GymRoutineEditorScreen = () => {
       !routineId ||
       (!!routineData && !isLoading && (!isOneOffPlanDateLoading || routineData.suggested_day_of_week !== null));
 
-    if (isFormHydrated && editDataReady && initialEditableStateSnapshotRef.current === null) {
+    if (!isFormHydrated || !editDataReady || initialEditableStateSnapshotRef.current !== null) return;
+
+    // Wait one tick for automatic hydration/reconciliation effects before
+    // defining the untouched baseline used by the exit guard.
+    const settleTimer = setTimeout(() => {
       initialEditableStateSnapshotRef.current = editableStateSnapshot;
-    }
+    }, 0);
+
+    return () => clearTimeout(settleTimer);
   }, [editableStateSnapshot, isFormHydrated, isLoading, isOneOffPlanDateLoading, routineData, routineId]);
 
   const hasEditableChanges = compareUnsavedChanges(initialEditableStateSnapshotRef.current, editableStateSnapshot);

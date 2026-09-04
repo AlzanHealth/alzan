@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { Alert } from '../components/common/Alert';
 
@@ -24,11 +24,21 @@ export const useUnsavedChangesGuard = ({
   onSaveAndExit,
 }: UnsavedChangesGuardOptions) => {
   const navigation = useNavigation();
-  const [allowNextRemoval, setAllowNextRemoval] = useState(false);
+  const allowNextRemovalRef = useRef(false);
 
   const continueRemoval = useCallback((action: () => void) => {
-    setAllowNextRemoval(true);
-    setTimeout(action, 0);
+    // Navigation can be attempted before a React state update is committed.
+    // Keep this bypass synchronous so one confirmation click is enough.
+    allowNextRemovalRef.current = true;
+    setTimeout(() => {
+      try {
+        action();
+      } finally {
+        // Custom exits (for example switching between builder views) do not
+        // pass through usePreventRemove, so clear the bypass as well.
+        allowNextRemovalRef.current = false;
+      }
+    }, 0);
   }, []);
 
   const showExitConfirmation = useCallback(
@@ -54,7 +64,13 @@ export const useUnsavedChangesGuard = ({
     [continueRemoval, discardLabel, message, onDiscard, onSaveAndExit, saveLabel, stayLabel, title],
   );
 
-  usePreventRemove(hasUnsavedChanges && !allowNextRemoval, ({ data }) => {
+  usePreventRemove(hasUnsavedChanges, ({ data }) => {
+    if (allowNextRemovalRef.current) {
+      allowNextRemovalRef.current = false;
+      navigation.dispatch(data.action);
+      return;
+    }
+
     showExitConfirmation(() => navigation.dispatch(data.action));
   });
 
