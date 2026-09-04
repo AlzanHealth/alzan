@@ -9,7 +9,7 @@ const KCAL_TO_KJ = 4.184;
 const KJ_TO_KCAL = 0.239006;
 
 export const formatPaceTime = (secondsPerUnit: number): string => {
-  const normalizedSeconds = Math.max(0, Math.round(secondsPerUnit));
+  const normalizedSeconds = Math.max(0, Math.round(Number.isFinite(secondsPerUnit) ? secondsPerUnit : 0));
   const minutes = Math.floor(normalizedSeconds / 60);
   const seconds = normalizedSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
