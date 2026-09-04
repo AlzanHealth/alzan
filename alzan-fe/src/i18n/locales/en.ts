@@ -2540,6 +2540,14 @@ const en = {
     generalInfoModalTitle: 'General',
     generalInfoModalBody:
       'Configure how sessions behave while you train: auto timer, auto-play, sound, and vibration.\n\nThese settings affect the active workout flow and feedback during rest and set transitions.',
+    metricPriorityTitle: 'Metric priority',
+    metricPriorityDescription:
+      'The last metric is recalculated automatically when either of the other two changes. The order applies to simple and advanced registration for every distance sport.',
+    metricPriorityIntensity: 'Pace / speed',
+    metricPriorityDuration: 'Time',
+    metricPriorityDistance: 'Distance',
+    movePriorityUp: 'Move metric up',
+    movePriorityDown: 'Move metric down',
     dataInfoModalTitle: 'Data',
     dataInfoModalBody:
       'From this section you can export your workout history to PDF for review or sharing.\n\nThe file includes sessions within the date range you choose.',

@@ -13,7 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Download, Trash2, Calendar, AlertTriangle, Upload } from 'lucide-react-native';
+import { Download, Trash2, Calendar, AlertTriangle, Upload, ArrowDown, ArrowUp } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -29,6 +29,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import type { TrainingScreenNavigationProp } from '../../types/navigation.types';
+import {
+  normalizeEnduranceMetricPriority,
+  type EnduranceMetricField,
+} from '../../modules/training/helpers/enduranceMetricPriority.helper';
 
 type TrainingSectionInfoKey = 'general' | 'data' | 'danger';
 
@@ -58,7 +62,24 @@ const TrainingSettingsScreen = () => {
     setAutoDeleteExpiredTemplates,
     isLoading: isLoadingSettings,
     isSavingAutoDelete,
+    setMetricPriority,
+    isSavingMetricPriority,
   } = useTrainingSettings();
+
+  const metricPriorityLabels: Record<EnduranceMetricField, string> = {
+    intensity: t('training.metricPriorityIntensity'),
+    duration: t('training.metricPriorityDuration'),
+    distance: t('training.metricPriorityDistance'),
+  };
+
+  const moveMetricPriority = (index: number, offset: -1 | 1) => {
+    const targetIndex = index + offset;
+    if (targetIndex < 0 || targetIndex >= settings.metricPriority.length) return;
+    const nextPriority = [...settings.metricPriority];
+    const [moved] = nextPriority.splice(index, 1);
+    nextPriority.splice(targetIndex, 0, moved);
+    void setMetricPriority(normalizeEnduranceMetricPriority(nextPriority));
+  };
 
   // Toggle Row Component
   const ToggleRow = ({
@@ -338,6 +359,46 @@ const TrainingSettingsScreen = () => {
                 onValueChange={value => void setAutoDeleteExpiredTemplates(value)}
                 disabled={isLoadingSettings || isSavingAutoDelete}
               />
+              <View style={[styles.separator, dynamicStyles.divider]} />
+              <View style={styles.priorityContainer}>
+                <Text style={[styles.toggleLabel, dynamicStyles.label]}>{t('training.metricPriorityTitle')}</Text>
+                <Text style={[styles.toggleDesc, dynamicStyles.sublabel]}>
+                  {t('training.metricPriorityDescription')}
+                </Text>
+                <View style={styles.priorityList}>
+                  {settings.metricPriority.map((field, index) => (
+                    <View key={field} style={[styles.priorityRow, { borderColor: themeColors.border }]}>
+                      <Text style={[styles.priorityIndex, { color: themeColors.primary }]}>{index + 1}</Text>
+                      <Text style={[styles.priorityLabel, dynamicStyles.label]}>{metricPriorityLabels[field]}</Text>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={t('training.movePriorityUp')}
+                        disabled={index === 0 || isSavingMetricPriority}
+                        onPress={() => moveMetricPriority(index, -1)}
+                        style={styles.priorityButton}
+                      >
+                        <ArrowUp size={18} color={index === 0 ? themeColors.textSecondary : themeColors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel={t('training.movePriorityDown')}
+                        disabled={index === settings.metricPriority.length - 1 || isSavingMetricPriority}
+                        onPress={() => moveMetricPriority(index, 1)}
+                        style={styles.priorityButton}
+                      >
+                        <ArrowDown
+                          size={18}
+                          color={
+                            index === settings.metricPriority.length - 1
+                              ? themeColors.textSecondary
+                              : themeColors.primary
+                          }
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </View>
             </View>
           </View>
 
@@ -701,6 +762,35 @@ const styles = StyleSheet.create({
   toggleDesc: {
     ...typography.caption,
     marginTop: 2,
+  },
+  priorityContainer: {
+    padding: spacing.m,
+  },
+  priorityList: {
+    marginTop: spacing.s,
+    gap: spacing.xs,
+  },
+  priorityRow: {
+    minHeight: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: borderRadius.s,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: spacing.s,
+  },
+  priorityIndex: {
+    width: 24,
+    fontWeight: '700',
+  },
+  priorityLabel: {
+    ...typography.body,
+    flex: 1,
+  },
+  priorityButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionRow: {
     flexDirection: 'row',

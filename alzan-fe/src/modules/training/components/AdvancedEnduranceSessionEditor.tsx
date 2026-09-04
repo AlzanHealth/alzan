@@ -27,6 +27,7 @@ import {
   type AdvancedSport,
 } from '../helpers/advancedEnduranceSession.helper';
 import { parsePaceInput } from '../helpers/paceInput.helper';
+import type { EnduranceMetricPriority } from '../helpers/enduranceMetricPriority.helper';
 
 type Props = {
   sport: AdvancedSport;
@@ -35,6 +36,7 @@ type Props = {
   distanceUnit: string;
   toDisplayDistance: (meters: number) => number;
   toDbDistance: (distance: number) => number;
+  metricPriority: EnduranceMetricPriority;
 };
 
 type AddMode = { kind: 'step' | 'group'; parentClientId: string | null } | null;
@@ -143,6 +145,7 @@ function SectionEditor({
   distanceUnit,
   toDisplayDistance,
   toDbDistance,
+  metricPriority,
   onChange,
   onDelete,
   expanded,
@@ -154,6 +157,7 @@ function SectionEditor({
   distanceUnit: string;
   toDisplayDistance: (meters: number) => number;
   toDbDistance: (distance: number) => number;
+  metricPriority: EnduranceMetricPriority;
   onChange: (section: AdvancedSectionDraft) => void;
   onDelete?: () => void;
   expanded: boolean;
@@ -194,7 +198,7 @@ function SectionEditor({
         : field === 'distance'
           ? { distanceM: value }
           : { [intensityKey]: value };
-    onChange(deriveAdvancedSectionMetrics({ ...section, ...fieldValues }, sport, field));
+    onChange(deriveAdvancedSectionMetrics({ ...section, ...fieldValues }, sport, field, metricPriority));
   };
   return (
     <View
@@ -433,6 +437,7 @@ export const AdvancedEnduranceSessionEditor = ({
   distanceUnit,
   toDisplayDistance,
   toDbDistance,
+  metricPriority,
 }: Props) => {
   const { t } = useTranslation();
   const { colors: themeColors, styles: dynamicStyles } = useTrainingStyles();
@@ -445,8 +450,8 @@ export const AdvancedEnduranceSessionEditor = ({
   const [newRepetitions, setNewRepetitions] = useState('4');
 
   const renderedSections = useMemo(
-    () => sections.map(section => deriveAdvancedSectionMetrics(section, sport)),
-    [sections, sport],
+    () => sections.map(section => deriveAdvancedSectionMetrics(section, sport, undefined, metricPriority)),
+    [metricPriority, sections, sport],
   );
   const topLevelSections = useMemo(
     () => renderedSections.filter(section => section.parentClientId == null),
@@ -545,6 +550,7 @@ export const AdvancedEnduranceSessionEditor = ({
               distanceUnit={distanceUnit}
               toDisplayDistance={toDisplayDistance}
               toDbDistance={toDbDistance}
+              metricPriority={metricPriority}
               onChange={updateSection}
               onDelete={sections.length > 1 ? () => deleteSection(section.clientId) : undefined}
               expanded={!collapsedSections.has(section.clientId)}
@@ -639,6 +645,7 @@ export const AdvancedEnduranceSessionEditor = ({
                       distanceUnit={distanceUnit}
                       toDisplayDistance={toDisplayDistance}
                       toDbDistance={toDbDistance}
+                      metricPriority={metricPriority}
                       onChange={updateSection}
                       onDelete={() => deleteSection(child.clientId)}
                       expanded={!collapsedSections.has(child.clientId)}
@@ -666,6 +673,7 @@ export const AdvancedEnduranceSessionEditor = ({
                             distanceUnit={distanceUnit}
                             toDisplayDistance={toDisplayDistance}
                             toDbDistance={toDbDistance}
+                            metricPriority={metricPriority}
                             onChange={updateSection}
                             onDelete={() => deleteSection(child.clientId)}
                             expanded={!collapsedSections.has(child.clientId)}

@@ -2734,6 +2734,14 @@ export default {
     generalInfoModalTitle: 'General',
     generalInfoModalBody:
       'Aquí configuras cómo se comporta la sesión mientras entrenas: temporizador automático, reproducción automática, sonido y vibración.\n\nEstos ajustes afectan al flujo en la pantalla de entrenamiento activo y a los avisos durante descansos y cambios de serie.',
+    metricPriorityTitle: 'Prioridad de métricas',
+    metricPriorityDescription:
+      'La última métrica se recalcula automáticamente cuando cambia una de las otras dos. El orden se aplica al registro simple y avanzado de cualquier deporte con distancia.',
+    metricPriorityIntensity: 'Ritmo / velocidad',
+    metricPriorityDuration: 'Tiempo',
+    metricPriorityDistance: 'Distancia',
+    movePriorityUp: 'Subir métrica',
+    movePriorityDown: 'Bajar métrica',
     dataInfoModalTitle: 'Datos',
     dataInfoModalBody:
       'Desde este bloque puedes exportar tu historial de entrenamientos en PDF para revisarlo o compartirlo.\n\nEl archivo incluye las sesiones del rango de fechas que elijas.',

@@ -1,3 +1,5 @@
+import { DEFAULT_ENDURANCE_METRIC_PRIORITY, type EnduranceMetricPriority } from './enduranceMetricPriority.helper';
+
 export type AdvancedSport = 'running' | 'cycling' | 'swimming';
 
 export type AdvancedPhaseType = 'warmup' | 'interval' | 'recovery' | 'cooldown' | 'relax';
@@ -321,16 +323,15 @@ function getIntensityKey(sport: AdvancedSport): 'paceSPerKm' | 'paceSPer100m' | 
 }
 
 /**
- * Fills the missing value among duration, distance and pace/speed.
- * Distance is the authoritative value whenever it exists. Editing duration
- * recalculates intensity, and editing intensity recalculates duration. The
- * only situation in which distance is derived is when it was left empty and
- * the other two metrics are available.
+ * Keeps the configured highest-priority metrics and recalculates the
+ * lowest-priority metric whenever one of the other metrics changes. The
+ * default priority is pace/speed, time, distance.
  */
 export function deriveAdvancedSectionMetrics(
   section: AdvancedSectionDraft,
   sport: AdvancedSport,
   changedField?: AdvancedMetricField,
+  priority: EnduranceMetricPriority = DEFAULT_ENDURANCE_METRIC_PRIORITY,
 ): AdvancedSectionDraft {
   if (section.isGroup) return section;
 
@@ -360,6 +361,27 @@ export function deriveAdvancedSectionMetrics(
       : sport === 'running'
         ? duration / (distance / 1000)
         : distance / duration;
+
+  const deriveField = (field: AdvancedMetricField): boolean => {
+    if (field === 'distance' && durationS != null && intensity != null) {
+      next.distanceM = calculateDistance(durationS, intensity);
+      return true;
+    }
+    if (field === 'duration' && distanceM != null && intensity != null) {
+      next.durationS = calculateRoundedDuration(distanceM, intensity);
+      return true;
+    }
+    if (field === 'intensity' && distanceM != null && durationS != null) {
+      next[intensityKey] = calculateIntensity(durationS, distanceM);
+      return true;
+    }
+    return false;
+  };
+
+  if (changedField != null) {
+    const targetField = changedField === priority[2] ? priority[1] : priority[2];
+    if (deriveField(targetField)) return next;
+  }
 
   if (changedField === 'duration' && durationS != null) {
     if (distanceM != null) next[intensityKey] = calculateIntensity(durationS, distanceM);

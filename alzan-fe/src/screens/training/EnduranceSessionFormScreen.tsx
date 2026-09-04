@@ -74,6 +74,7 @@ import {
 } from './helpers/sessionModality.helper';
 import { parsePaceInput } from '../../modules/training/helpers/paceInput.helper';
 import { deriveEnduranceMetricValues } from '../../modules/training/helpers/enduranceMetricPriority.helper';
+import { useTrainingSettings } from '../../hooks/useTrainingSettings';
 import {
   getAdvancedActivityErrorTranslationKey,
   logAdvancedActivityError,
@@ -290,6 +291,15 @@ function areEquivalentLaps(left: RouteImportLap[], right: RouteImportLap[]): boo
 const WEB_DATE_PARTIAL_REGEX = /^\d{0,4}(-\d{0,2})?(-\d{0,2})?$/;
 const WEB_TIME_PARTIAL_REGEX = /^\d{0,2}(:\d{0,2})?$/;
 
+function formatIntensityForInput(value: number, unit: 'min/km' | 'min/100m' | 'km/h'): string {
+  if (unit === 'km/h') return value.toFixed(1);
+
+  const roundedSeconds = Math.max(1, Math.round(value));
+  const minutes = Math.floor(roundedSeconds / 60);
+  const seconds = roundedSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export const EnduranceSessionFormScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
@@ -310,6 +320,7 @@ export const EnduranceSessionFormScreen = () => {
   const { preferences, toDisplayDistance, toDbDistanceFromDisplay } = useUserPreferences();
   const { data: userProfile } = useUserProfile();
   const { convertWeightToUi, convertSpeedToUi } = useUnitConversion();
+  const { settings: trainingSettings } = useTrainingSettings();
   const applyStrengthActivityImport = useApplyStrengthActivityImport();
   const applyPickedRouteImport = useApplyPickedRouteImport();
 
@@ -468,9 +479,11 @@ export const EnduranceSessionFormScreen = () => {
   const advancedSectionsWithDerivedMetrics = React.useMemo(
     () =>
       advancedSport
-        ? advancedSections.map(section => deriveAdvancedSectionMetrics(section, advancedSport))
+        ? advancedSections.map(section =>
+            deriveAdvancedSectionMetrics(section, advancedSport, undefined, trainingSettings.metricPriority),
+          )
         : advancedSections,
-    [advancedSections, advancedSport],
+    [advancedSections, advancedSport, trainingSettings.metricPriority],
   );
   const advancedTotals = React.useMemo(
     () => calculateAdvancedTotals(advancedSectionsWithDerivedMetrics),
@@ -992,7 +1005,7 @@ export const EnduranceSessionFormScreen = () => {
         : safeParseFloat(distance) * 1.60934
       : 0;
 
-    if (dist > 0 && totalDurationMin > 0 && !isEditingPace && !paceError && simpleSpeedUnit) {
+    if (dist > 0 && totalDurationMin > 0 && !isEditingPace && !paceError && !pace && simpleSpeedUnit) {
       if (simpleSpeedUnit === 'km/h') {
         const kmh = (dist / totalDurationMin) * 60;
         setPace(`${kmh.toFixed(1)}`);
@@ -1081,6 +1094,7 @@ export const EnduranceSessionFormScreen = () => {
     isCaloriesLockedFromRouteImport,
     hasAppliedStrengthImport,
     simpleSpeedUnit,
+    pace,
   ]);
 
   // Keep a user-entered pace available while distance is empty so that the
@@ -1108,6 +1122,7 @@ export const EnduranceSessionFormScreen = () => {
       { distanceM: null, durationS: totalDurationSeconds, intensity },
       simpleSpeedUnit,
       'intensity',
+      trainingSettings.metricPriority,
     );
     if (derived.distanceM != null && derived.distanceM > 0) {
       setDistance(formatNumberForInput(toDisplayDistance(derived.distanceM), 2));
@@ -1122,6 +1137,7 @@ export const EnduranceSessionFormScreen = () => {
     pace,
     paceError,
     simpleSpeedUnit,
+    trainingSettings.metricPriority,
     toDisplayDistance,
   ]);
 
@@ -1165,11 +1181,11 @@ export const EnduranceSessionFormScreen = () => {
       { distanceM, durationS: totalDurationSeconds > 0 ? totalDurationSeconds : null, intensity },
       simpleSpeedUnit,
       'intensity',
+      trainingSettings.metricPriority,
     );
 
-    if (distanceM == null && derived.distanceM != null && derived.distanceM > 0) {
+    if (derived.distanceM != null && derived.distanceM > 0 && derived.distanceM !== distanceM) {
       setDistance(formatNumberForInput(toDisplayDistance(derived.distanceM), 2));
-      return;
     }
 
     if (derived.durationS != null && derived.durationS > 0) {
@@ -1195,16 +1211,79 @@ export const EnduranceSessionFormScreen = () => {
     }
 
     const derived = deriveEnduranceMetricValues(
-      { distanceM: toDbDistanceFromDisplay(safeParseFloat(distance)), durationS: null, intensity },
+      {
+        distanceM: toDbDistanceFromDisplay(safeParseFloat(distance)),
+        durationS:
+          (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
+            (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
+            (Number.parseInt(durationSeconds || '0', 10) || 0) || null,
+        intensity,
+      },
       simpleSpeedUnit,
       'distance',
+      trainingSettings.metricPriority,
     );
-    if (derived.durationS == null || derived.durationS <= 0) return;
+    const currentDurationSeconds =
+      (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
+      (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
+      (Number.parseInt(durationSeconds || '0', 10) || 0);
 
-    const totalSecs = Math.round(derived.durationS);
-    setDurationHours(Math.floor(totalSecs / 3600).toString());
-    setDurationMinutes(Math.floor((totalSecs % 3600) / 60).toString());
-    setDurationSeconds((totalSecs % 60).toString());
+    if (
+      derived.durationS != null &&
+      derived.durationS > 0 &&
+      Math.round(derived.durationS) !== currentDurationSeconds
+    ) {
+      const totalSecs = Math.round(derived.durationS);
+      setDurationHours(Math.floor(totalSecs / 3600).toString());
+      setDurationMinutes(Math.floor((totalSecs % 3600) / 60).toString());
+      setDurationSeconds((totalSecs % 60).toString());
+    }
+
+    if (derived.intensity != null && derived.intensity > 0) {
+      setPace(formatIntensityForInput(derived.intensity, simpleSpeedUnit));
+    }
+  };
+
+  const handleDurationChange = (field: 'hours' | 'minutes' | 'seconds', value: string) => {
+    const nextHours = field === 'hours' ? value : durationHours;
+    const nextMinutes = field === 'minutes' ? value : durationMinutes;
+    const nextSeconds = field === 'seconds' ? value : durationSeconds;
+    setDurationHours(nextHours);
+    setDurationMinutes(nextMinutes);
+    setDurationSeconds(nextSeconds);
+
+    if (!simpleSpeedUnit || !pace || paceError) return;
+
+    let intensity: number | null = null;
+    if (simpleSpeedUnit === 'min/km' || simpleSpeedUnit === 'min/100m') {
+      const parsedPace = parsePaceInput(pace);
+      if (parsedPace.ok) intensity = parsedPace.totalSeconds;
+    } else {
+      const parsedSpeed = safeParseFloat(pace);
+      if (parsedSpeed > 0 && Number.isFinite(parsedSpeed)) intensity = parsedSpeed;
+    }
+    if (intensity == null) return;
+
+    const totalDurationSeconds =
+      (Number.parseInt(nextHours || '0', 10) || 0) * 3600 +
+      (Number.parseInt(nextMinutes || '0', 10) || 0) * 60 +
+      (Number.parseInt(nextSeconds || '0', 10) || 0);
+    if (totalDurationSeconds <= 0) return;
+
+    const currentDistanceM = safeParseFloat(distance) > 0 ? toDbDistanceFromDisplay(safeParseFloat(distance)) : null;
+    const derived = deriveEnduranceMetricValues(
+      { distanceM: currentDistanceM, durationS: totalDurationSeconds, intensity },
+      simpleSpeedUnit,
+      'duration',
+      trainingSettings.metricPriority,
+    );
+
+    if (derived.distanceM != null && derived.distanceM > 0 && derived.distanceM !== currentDistanceM) {
+      setDistance(formatNumberForInput(toDisplayDistance(derived.distanceM), 2));
+    }
+    if (derived.intensity != null && derived.intensity > 0 && derived.intensity !== intensity) {
+      setPace(formatIntensityForInput(derived.intensity, simpleSpeedUnit));
+    }
   };
 
   const persistParsedRouteDetails = React.useCallback(
@@ -1258,6 +1337,7 @@ export const EnduranceSessionFormScreen = () => {
         },
         simpleSpeedUnit,
         'intensity',
+        trainingSettings.metricPriority,
       );
       effectiveDistanceM = derived.distanceM;
       effectiveDurationSeconds = derived.durationS ?? rawDurationSeconds;
@@ -3299,6 +3379,7 @@ export const EnduranceSessionFormScreen = () => {
                   distanceUnit={preferences.distance_unit}
                   toDisplayDistance={toDisplayDistance}
                   toDbDistance={toDbDistanceFromDisplay}
+                  metricPriority={trainingSettings.metricPriority}
                 />
               ) : (
                 <>
@@ -3853,7 +3934,7 @@ export const EnduranceSessionFormScreen = () => {
                       <SimpleWheelPicker
                         items={Array.from({ length: 24 }, (_, i) => i.toString())}
                         selectedValue={durationHours || '0'}
-                        onValueChange={val => setDurationHours(val)}
+                        onValueChange={val => handleDurationChange('hours', val)}
                         width={80}
                         height={150}
                       />
@@ -3875,7 +3956,7 @@ export const EnduranceSessionFormScreen = () => {
                       <SimpleWheelPicker
                         items={Array.from({ length: 60 }, (_, i) => i.toString())}
                         selectedValue={durationMinutes || '0'}
-                        onValueChange={val => setDurationMinutes(val)}
+                        onValueChange={val => handleDurationChange('minutes', val)}
                         width={80}
                         height={150}
                       />
@@ -3897,7 +3978,7 @@ export const EnduranceSessionFormScreen = () => {
                       <SimpleWheelPicker
                         items={Array.from({ length: 60 }, (_, i) => i.toString())}
                         selectedValue={durationSeconds || '0'}
-                        onValueChange={val => setDurationSeconds(val)}
+                        onValueChange={val => handleDurationChange('seconds', val)}
                         width={80}
                         height={150}
                       />
