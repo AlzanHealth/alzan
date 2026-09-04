@@ -53,6 +53,7 @@ import { fetchTemplateWithProgressedSteps } from '../../modules/training/service
 import { Alert } from '../../components/common/Alert';
 import { RouteMap } from '../../components/common/RouteMap';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS, TIME_INPUT_PROPS } from '../../utils/numericInput';
+import { formatDurationTime, formatPaceTime } from '../../utils/unitConversionUtils';
 import { useTranslation } from 'react-i18next';
 import { AdvancedEnduranceSessionEditor } from '../../modules/training/components/AdvancedEnduranceSessionEditor';
 import { useCreateManualEnduranceActivity } from '../../modules/training/hooks/useCreateManualEnduranceActivity';
@@ -292,7 +293,7 @@ const WEB_DATE_PARTIAL_REGEX = /^\d{0,4}(-\d{0,2})?(-\d{0,2})?$/;
 const WEB_TIME_PARTIAL_REGEX = /^\d{0,2}(:\d{0,2})?$/;
 
 function formatIntensityForInput(value: number, unit: 'min/km' | 'min/100m' | 'km/h'): string {
-  if (unit === 'km/h') return value.toFixed(1);
+  if (unit === 'km/h') return Math.round(value).toString();
 
   const roundedSeconds = Math.max(1, Math.round(value));
   const minutes = Math.floor(roundedSeconds / 60);
@@ -779,9 +780,10 @@ export const EnduranceSessionFormScreen = () => {
 
   const formatSplitDuration = React.useCallback((durationSeconds: number | null) => {
     if (durationSeconds == null || durationSeconds <= 0) return '--';
-    const minutes = Math.floor(durationSeconds / 60);
-    const seconds = durationSeconds - minutes * 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toFixed(1).padStart(4, '0')}`;
+    const formatted = formatDurationTime(durationSeconds);
+    if (formatted.split(':').length > 2) return formatted;
+    const [minutes, seconds] = formatted.split(':');
+    return `${minutes.padStart(2, '0')}:${seconds}`;
   }, []);
 
   const formatSplitPace = React.useCallback(
@@ -1008,18 +1010,14 @@ export const EnduranceSessionFormScreen = () => {
     if (dist > 0 && totalDurationMin > 0 && !isEditingPace && !paceError && !pace && simpleSpeedUnit) {
       if (simpleSpeedUnit === 'km/h') {
         const kmh = (dist / totalDurationMin) * 60;
-        setPace(`${kmh.toFixed(1)}`);
+        setPace(`${Math.round(kmh)}`);
       } else if (simpleSpeedUnit === 'min/100m') {
         const distMeters = dist * 1000;
         const minPer100m = (totalDurationMin / distMeters) * 100;
-        const mins = Math.floor(minPer100m);
-        const secs = Math.round((minPer100m - mins) * 60);
-        setPace(`${mins}:${secs.toString().padStart(2, '0')}`);
+        setPace(formatPaceTime(minPer100m * 60));
       } else if (simpleSpeedUnit === 'min/km') {
         const minPerKm = totalDurationMin / dist;
-        const mins = Math.floor(minPerKm);
-        const secs = Math.round((minPerKm - mins) * 60);
-        setPace(`${mins}:${secs.toString().padStart(2, '0')}`);
+        setPace(formatPaceTime(minPerKm * 60));
       }
     } else if (!isEditingPace && !simpleSpeedUnit) {
       setPace('');
@@ -1114,7 +1112,7 @@ export const EnduranceSessionFormScreen = () => {
       if (parsedPace.ok) intensity = parsedPace.totalSeconds;
     } else {
       const parsedSpeed = safeParseFloat(pace);
-      if (parsedSpeed > 0) intensity = parsedSpeed;
+      if (parsedSpeed > 0) intensity = Math.round(parsedSpeed);
     }
     if (intensity == null) return;
 
@@ -1163,12 +1161,14 @@ export const EnduranceSessionFormScreen = () => {
       setPace(parsedPace.normalized);
       intensity = parsedPace.totalSeconds;
     } else {
-      const speedKmh = safeParseFloat(pace);
-      if (speedKmh <= 0 || !Number.isFinite(speedKmh)) {
+      const parsedSpeedKmh = safeParseFloat(pace);
+      if (parsedSpeedKmh <= 0 || !Number.isFinite(parsedSpeedKmh)) {
         setPaceError(t('training.invalidPaceFormat'));
         return;
       }
+      const speedKmh = Math.round(parsedSpeedKmh);
       setPaceError(null);
+      setPace(speedKmh.toString());
       intensity = speedKmh;
     }
 
@@ -1207,7 +1207,7 @@ export const EnduranceSessionFormScreen = () => {
     } else {
       const parsedSpeed = safeParseFloat(pace);
       if (parsedSpeed <= 0 || !Number.isFinite(parsedSpeed)) return;
-      intensity = parsedSpeed;
+      intensity = Math.round(parsedSpeed);
     }
 
     const derived = deriveEnduranceMetricValues(
@@ -1260,7 +1260,7 @@ export const EnduranceSessionFormScreen = () => {
       if (parsedPace.ok) intensity = parsedPace.totalSeconds;
     } else {
       const parsedSpeed = safeParseFloat(pace);
-      if (parsedSpeed > 0 && Number.isFinite(parsedSpeed)) intensity = parsedSpeed;
+      if (parsedSpeed > 0 && Number.isFinite(parsedSpeed)) intensity = Math.round(parsedSpeed);
     }
     if (intensity == null) return;
 
@@ -1326,7 +1326,7 @@ export const EnduranceSessionFormScreen = () => {
           setPaceError(t('training.invalidPaceFormat'));
           return;
         }
-        intensity = parsedSpeed;
+        intensity = Math.round(parsedSpeed);
       }
 
       const derived = deriveEnduranceMetricValues(

@@ -34,6 +34,7 @@ import {
 import { useSessionLaps, type ActivityLap as SessionLap } from '../../hooks/useSessionLaps';
 import { useSessionHeartRateZones } from '../../hooks/useSessionHeartRateZones';
 import { useUnitConversion } from '../../hooks/useUnitConversion';
+import { formatDurationTime } from '../../utils/unitConversionUtils';
 import {
   Clock,
   MapPin,
@@ -626,9 +627,10 @@ export const EnduranceSessionDetailScreen = () => {
 
   const formatSplitDuration = useCallback((durationSeconds: number | null) => {
     if (durationSeconds == null || durationSeconds <= 0) return '--';
-    const minutes = Math.floor(durationSeconds / 60);
-    const seconds = durationSeconds - minutes * 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toFixed(1).padStart(4, '0')}`;
+    const formatted = formatDurationTime(durationSeconds);
+    if (formatted.split(':').length > 2) return formatted;
+    const [minutes, seconds] = formatted.split(':');
+    return `${minutes.padStart(2, '0')}:${seconds}`;
   }, []);
 
   const formatSplitPace = useCallback(

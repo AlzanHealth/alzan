@@ -3,6 +3,7 @@ import { SportIcon } from '../components/icons/SportIcon';
 import { SportIconProps } from '../components/icons/SportIcon';
 import { SportType } from '../types/requests.types';
 import { TranslationKey } from '../i18n/locales/en';
+import { formatDurationTime } from '../utils/unitConversionUtils';
 
 // Create wrapper components for each sport that use SportIcon
 const RunningIcon = (props: SportIconProps) => <SportIcon {...props} sport="running" />;
@@ -254,13 +255,7 @@ export const getSportDefaultTitleKey = (
   return SPORTS_CONFIG[sportType ?? '']?.defaultTitle ?? 'constants.otherTitle';
 };
 
-export const formatDuration = (seconds: number) => {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hrs > 0) return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
+export const formatDuration = formatDurationTime;
 
 export const calculatePace = (distanceM: number, durationS: number, sport: string): string => {
   if (distanceM <= 0 || durationS <= 0) return '-';
@@ -269,22 +264,24 @@ export const calculatePace = (distanceM: number, durationS: number, sport: strin
     // km/h for cycling, skiing, and snowboard
     const distanceKm = distanceM / 1000;
     const hours = durationS / 3600;
-    return `${(distanceKm / hours).toFixed(1)} km/h`;
+    return `${Math.round(distanceKm / hours)} km/h`;
   } else if (sport === 'swimming') {
     // min/100m for swimming
     const hundreds = distanceM / 100;
     const totalMins = durationS / 60;
     const pace = totalMins / hundreds;
-    const mins = Math.floor(pace);
-    const secs = Math.round((pace - mins) * 60);
+    const totalSeconds = Math.round(pace * 60);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')} /100m`;
   } else {
     // min/km for all other distance-based sports (running, hiking, football, etc)
     const distanceKm = distanceM / 1000;
     const totalMins = durationS / 60;
     const pace = totalMins / distanceKm;
-    const mins = Math.floor(pace);
-    const secs = Math.round((pace - mins) * 60);
+    const totalSeconds = Math.round(pace * 60);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')} /km`;
   }
 };

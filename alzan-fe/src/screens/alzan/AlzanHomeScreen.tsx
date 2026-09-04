@@ -193,7 +193,7 @@ const MOCK_FEED_POSTS = [
     stats: {
       distance: '45.2',
       distanceUnit: 'km',
-      pace: '28.5',
+      pace: '29',
       paceUnit: 'km/h',
       time: '1h',
       timeUnit: '35m',

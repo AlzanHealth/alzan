@@ -65,6 +65,19 @@ assert.equal(
 );
 
 assert.equal(
+  formatEnduranceStepDuration(
+    {
+      duration_type: 'time',
+      duration_s: 299.6,
+      target_type: 'none',
+      repetitions: null,
+    },
+    labels,
+  ),
+  'Duration: 5:00',
+);
+
+assert.equal(
   formatEnduranceStepTarget(
     {
       duration_type: 'distance',
@@ -125,7 +138,7 @@ assert.equal(
     'cycling',
     labels,
   ),
-  'Speed: 32.0 km/h',
+  'Speed: 32 km/h',
 );
 
 assert.equal(

@@ -15,6 +15,15 @@ export const formatPaceTime = (secondsPerUnit: number): string => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
+export const formatDurationTime = (seconds: number): string => {
+  const normalizedSeconds = Math.max(0, Math.round(Number.isFinite(seconds) ? seconds : 0));
+  const hrs = Math.floor(normalizedSeconds / 3600);
+  const mins = Math.floor((normalizedSeconds % 3600) / 60);
+  const secs = normalizedSeconds % 60;
+  if (hrs > 0) return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 const formatPaceLabel = (secondsPerUnit: number, unit: string): string => {
   const separator = unit.startsWith('/') ? '' : ' ';
   return `${formatPaceTime(secondsPerUnit)}${separator}${unit}`;
@@ -88,7 +97,8 @@ export const convertSpeedToUi = (
       unit = 'mph';
     }
 
-    return { value: Number(speed.toFixed(1)), unit, label: `${speed.toFixed(1)} ${unit}` };
+    const roundedSpeed = Math.round(speed);
+    return { value: roundedSpeed, unit, label: `${roundedSpeed} ${unit}` };
   } else if (sport === 'swimming') {
     const secondsPer100m = 100 / speedMetersPerSecond;
 

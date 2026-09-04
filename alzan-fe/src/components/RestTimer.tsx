@@ -9,6 +9,7 @@ import beepSound from '../../assets/sounds/beep.mp3';
 
 import { createAudioPlayer, setAudioModeAsync, AudioPlayer } from 'expo-audio';
 import { useTranslation } from 'react-i18next';
+import { formatDurationTime } from '../utils/unitConversionUtils';
 
 interface RestTimerProps {
   initialSeconds: number;
@@ -184,9 +185,7 @@ export const RestTimer: React.FC<RestTimerProps> = ({
         </View>
 
         <View style={styles.timerContainer}>
-          <Text style={[styles.timerText, dynamicStyles.timerText]}>
-            {Math.floor(secondsLeft / 60)}:{(secondsLeft % 60).toString().padStart(2, '0')}
-          </Text>
+          <Text style={[styles.timerText, dynamicStyles.timerText]}>{formatDurationTime(secondsLeft)}</Text>
         </View>
 
         <View style={styles.controls}>

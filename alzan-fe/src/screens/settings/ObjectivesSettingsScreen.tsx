@@ -386,9 +386,10 @@ const SportSection = ({
 };
 
 const formatTime = (seconds: number): string => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
+  const normalizedSeconds = Math.max(0, Math.round(seconds));
+  const h = Math.floor(normalizedSeconds / 3600);
+  const m = Math.floor((normalizedSeconds % 3600) / 60);
+  const s = normalizedSeconds % 60;
   if (h > 0) {
     return `${h}h ${m}m`;
   }

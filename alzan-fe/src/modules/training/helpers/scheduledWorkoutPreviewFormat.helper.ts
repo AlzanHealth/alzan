@@ -1,4 +1,9 @@
-import { convertDistanceToUi, convertSpeedToUi, convertWeightToUi } from '../../../utils/unitConversionUtils';
+import {
+  convertDistanceToUi,
+  convertSpeedToUi,
+  convertWeightToUi,
+  formatDurationTime,
+} from '../../../utils/unitConversionUtils';
 import { DistanceUnit, DurationType, SportType, TargetType, WeightUnit } from '../../../types/requests.types';
 
 export type PreviewLabels = {
@@ -58,13 +63,7 @@ const formatRange = (
   return formatter(min ?? max ?? 0);
 };
 
-const formatPreviewDuration = (seconds: number): string => {
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hrs > 0) return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
+const formatPreviewDuration = formatDurationTime;
 
 export const formatGymExercisePrescription = (exercise: GymExercisePreviewInput, labels: PreviewLabels): string => {
   const parts: string[] = [];

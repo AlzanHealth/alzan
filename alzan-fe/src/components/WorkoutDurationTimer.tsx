@@ -8,14 +8,15 @@ interface WorkoutDurationTimerProps {
 
 export const WorkoutDurationTimer: React.FC<WorkoutDurationTimerProps> = ({ seconds, style }) => {
   const formatTime = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const secs = totalSeconds % 60;
+    const normalizedSeconds = Math.max(0, Math.round(totalSeconds));
+    const hours = Math.floor(normalizedSeconds / 3600);
+    const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+    const seconds = normalizedSeconds % 60;
 
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   return <Text style={style}>{formatTime(seconds)}</Text>;

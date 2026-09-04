@@ -61,7 +61,7 @@ import { AlzanSwitch } from '../../components/common/AlzanSwitch';
 import { useTranslation } from 'react-i18next';
 import { getPhaseLabel } from './helpers/phase.helper';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
-import { formatPaceTime } from '../../utils/unitConversionUtils';
+import { formatDurationTime, formatPaceTime } from '../../utils/unitConversionUtils';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS, parseLocalizedDecimal } from '../../utils/numericInput';
 import {
   calculateProgressionWeeks,
@@ -306,16 +306,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
 
   const formatTime = (seconds: number) => {
-    if (seconds >= 3600) {
-      const hours = Math.floor(seconds / 3600);
-      const rem = seconds % 3600;
-      const mins = Math.floor(rem / 60);
-      const secs = rem % 60;
-      return `${hours}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    return formatDurationTime(seconds);
   };
 
   const formatTarget = (step: Step) => {

@@ -28,6 +28,7 @@ import {
 } from '../helpers/advancedEnduranceSession.helper';
 import { parsePaceInput } from '../helpers/paceInput.helper';
 import type { EnduranceMetricPriority } from '../helpers/enduranceMetricPriority.helper';
+import { formatDurationTime } from '../../../utils/unitConversionUtils';
 
 type Props = {
   sport: AdvancedSport;
@@ -108,9 +109,7 @@ function parseDuration(value: string): number | null {
 
 function formatDuration(seconds: number | null): string {
   if (seconds == null || seconds <= 0) return '';
-  const minutes = Math.floor(seconds / 60);
-  const remaining = Math.round(seconds % 60);
-  return `${minutes}:${remaining.toString().padStart(2, '0')}`;
+  return formatDurationTime(seconds);
 }
 
 function formatDistance(
@@ -179,7 +178,7 @@ function SectionEditor({
     section.durationS ? formatDuration(section.durationS) : '',
     intensityValue != null
       ? sport === 'cycling'
-        ? `${intensityValue}`
+        ? `${Math.round(intensityValue)}`
         : `${formatDuration(intensityValue)}/${sport === 'swimming' ? '100 m' : 'km'}`
       : '',
   ]
@@ -386,7 +385,7 @@ function SectionEditor({
                 intensityValue == null
                   ? ''
                   : sport === 'cycling'
-                    ? String(intensityValue)
+                    ? String(Math.round(intensityValue))
                     : formatDuration(intensityValue)
               }
               placeholder={sport === 'cycling' ? '0' : '0:00'}
