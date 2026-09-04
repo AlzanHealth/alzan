@@ -98,7 +98,9 @@ export function useCorosConnection() {
   const connectionQuery = useQuery({
     queryKey: [...QUERY_KEY, user?.id],
     queryFn: () => (user ? getConnection(user.id) : null),
-    enabled: !!user && capabilityQuery.data?.enabled === true,
+    // Read existing connections even when rollout blocks new connections so
+    // users can still see and revoke an already-authorized COROS account.
+    enabled: !!user,
     staleTime: 2 * 60_000,
   });
 
@@ -118,12 +120,24 @@ export function useCorosConnection() {
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
       Alert.alert(
         result.status === 'partial' ? t('settings.syncPartialTitle') : t('settings.syncCompleteTitle'),
-        t('settings.corosSyncSummary', {
-          imported: result.activities_imported,
-          skipped: result.activities_skipped ?? 0,
-          failed: result.activities_failed ?? 0,
-          healthDays: result.health_days_imported ?? 0,
-        }),
+        [
+          t('settings.corosSyncSummary', {
+            imported: result.activities_imported,
+            skipped: result.activities_skipped ?? 0,
+            failed: result.activities_failed ?? 0,
+            healthDays: result.health_days_imported ?? 0,
+          }),
+          result.backfill_complete === false
+            ? t('settings.corosBackfillInProgress', { date: result.backfill_next_date ?? '—' })
+            : result.backfill_complete === true
+              ? t('settings.corosBackfillComplete')
+              : null,
+          typeof result.fit_pending === 'number' && result.fit_pending > 0
+            ? t('settings.corosFitPending', { count: result.fit_pending })
+            : null,
+        ]
+          .filter((message): message is string => !!message)
+          .join('\n'),
       );
     },
     onError: (error: Error) => Alert.alert(t('common.error'), error.message),

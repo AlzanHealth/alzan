@@ -12,9 +12,9 @@ Este dashboard resume los cambios implementados para la integracion de wearables
 | Apple HealthKit   | Hecho v1 | Existe modulo nativo iOS `AlzanAppleHealth` con HealthKit read-only, permisos, workouts, sleep, biomarcadores, peso/body fat y rutas. Requiere iPhone fisico para datos reales. |
 | Pantalla Pasos    | Hecho v1 | La pantalla lee `daily_steps`; Apple Health y Health Connect la alimentan. Garmin/Suunto no deben mostrarse como pasos diarios cloud todavia.                                  |
 | Polar             | Hecho v1 | OAuth callback publico, registro AccessLink y sync manual de `/v3/exercises` hacia el writer canonico.                                                                          |
-| COROS             | Piloto listo | OAuth con `openId`, backfill 90 días, daily health, FIT seguro, webhook duradero, cifrado AES-256-GCM, rollout por UUID y borrado completo. Falta credencial/payload real COROS. |
+| COROS             | Piloto listo | MCP OAuth con backfill histórico reanudable, daily health, FIT seguro, webhook legacy, cifrado AES-256-GCM, rollout por UUID y borrado completo. Falta credencial/payload real COROS y despliegue/configuración de producción. |
 | Cloud providers   | Parcial  | Polar, Suunto y COROS tienen rutas productivas; los demás siguen preparados por OAuth/provenance sin jobs completos.                                                            |
-| Frontend contrato | Mejorado | Settings permite conectar/sincronizar Apple Health, Health Connect, Polar, Suunto y COROS; COROS se oculta fuera del rollout permitido.                                        |
+| Frontend contrato | Mejorado | Settings permite conectar/sincronizar Apple Health, Health Connect, Polar, Suunto y COROS; COROS permanece visible fuera del rollout con estado informativo y botón de ayuda. |
 | Seguridad         | Mejorada | Tokens privados; COROS además cifra access/refresh tokens, valida FIT contra SSRF y reintenta deautorización remota con outbox cifrado.                                         |
 | Verificacion      | Hecho local | Formato, lint, typecheck, build backend, prebuild Expo, export web, OpenAPI, 22 checks de importación y prueba SQL COROS pasan. Falta el E2E contra sandbox/cuenta real de COROS. |
 

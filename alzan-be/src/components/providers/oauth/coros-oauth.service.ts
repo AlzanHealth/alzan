@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { WearableProvider } from '../providers.types';
@@ -11,6 +11,7 @@ import {
   ProviderEndpoints,
 } from './base-oauth.provider';
 import { encryptCorosToken, isCorosUserAllowed } from './coros-security';
+import { CorosMcpOAuthService } from './coros-mcp-oauth.service';
 
 const DEFAULT_COROS_API_BASE_URL = 'https://opentest.coros.com';
 
@@ -21,6 +22,7 @@ export class CorosOAuthService extends BaseOAuthProvider {
   constructor(
     supabaseAdmin: SupabaseAdminService,
     private readonly configService: ConfigService,
+    @Optional() private readonly corosMcpOAuthService?: CorosMcpOAuthService,
   ) {
     const apiBaseUrl = (configService.get<string>('COROS_API_BASE_URL') || DEFAULT_COROS_API_BASE_URL).replace(
       /\/$/,
@@ -49,6 +51,9 @@ export class CorosOAuthService extends BaseOAuthProvider {
     userId: string,
     redirectUri?: string,
   ): Promise<{ authUrl: string; state: string }> {
+    if (this.corosMcpOAuthService?.isConfigured()) {
+      return this.corosMcpOAuthService.getAuthorizationUrl(userId, redirectUri);
+    }
     this.assertConfigured();
     if (!this.isUserAllowed(userId)) {
       throw new ForbiddenException('COROS integration is not enabled for this user');

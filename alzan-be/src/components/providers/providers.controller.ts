@@ -13,6 +13,7 @@ import {
 import { PublicAuth, SupabaseUserAuth } from '../../core/guards/auth.decorator';
 import { UserContext, UserCtx } from '../../common/decorators/user-context.decorator';
 import { isAllowedOAuthRedirectUri } from './oauth/oauth-redirect.utils';
+import { CorosMcpOAuthService } from './oauth/coros-mcp-oauth.service';
 
 @ApiTags('Providers')
 @SupabaseUserAuth()
@@ -21,6 +22,7 @@ export class ProvidersController {
   constructor(
     private readonly providersRegistry: ProvidersRegistry,
     private readonly configService: ConfigService,
+    private readonly corosMcpOAuthService: CorosMcpOAuthService,
   ) {}
 
   @Get(':provider/authorize')
@@ -89,6 +91,37 @@ export class ProvidersController {
       303,
       `/oauth/success?provider=${encodeURIComponent(provider)}&user_id=${encodeURIComponent(oauthState.userId)}`,
     );
+  }
+
+  @Get('coros/mcp/callback')
+  @PublicAuth()
+  public async corosMcpCallback(@Res() res: Response, @Query() query: OAuthCallbackQueryDto): Promise<void> {
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+
+    const { code, state, error, error_description: errorDescription } = query;
+    if (error) {
+      const message = `${error}: ${errorDescription ?? 'Unknown error'}`;
+      const redirectUri = state ? await this.corosMcpOAuthService.consumeRedirectUriForError(state) : null;
+      const clientErrorRedirect =
+        redirectUri && this.isAllowedRedirectUri(redirectUri)
+          ? this.buildOAuthErrorRedirectUrl(redirectUri, message)
+          : null;
+      res.redirect(303, clientErrorRedirect ?? `/oauth/error?message=${encodeURIComponent(message)}`);
+      return;
+    }
+
+    if (!code || !state) {
+      res.redirect(303, `/oauth/error?message=${encodeURIComponent('Missing OAuth parameters')}`);
+      return;
+    }
+
+    const oauthState = await this.corosMcpOAuthService.handleCallback(code, state);
+    if (oauthState.redirectUri && this.isAllowedRedirectUri(oauthState.redirectUri)) {
+      res.redirect(303, oauthState.redirectUri);
+      return;
+    }
+
+    res.redirect(303, `/oauth/success?provider=coros&user_id=${encodeURIComponent(oauthState.userId)}`);
   }
 
   @Get('success')

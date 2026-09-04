@@ -1427,10 +1427,33 @@ export default {
     permissionSheetOAuthDescription:
       'Vas a abrir el inicio de sesión de {{service}}. Puedes cancelar aquí y seguir en Alzan, o continuar para autorizar la conexión.',
     permissionSheetCorosDescription:
-      'COROS compartirá con Alzan tus entrenamientos, archivos FIT, pasos, calorías, sueño, frecuencia cardiaca en reposo y HRV. Iniciarás sesión directamente en COROS; Alzan nunca recibirá tu contraseña. Puedes desconectar y borrar estos datos cuando quieras.',
+      'COROS enviará a Alzan tus entrenamientos, archivos FIT, pasos, calorías, sueño, frecuencia cardiaca en reposo y HRV. Iniciarás sesión directamente en COROS; Alzan nunca recibirá tu contraseña. Puedes desconectar y borrar estos datos cuando quieras.',
+    corosNotAvailable: 'No disponible en este entorno',
+    corosInfoButton: 'Saber cómo conectar COROS',
+    corosInfoButtonHint: 'Abrir información sobre la conexión y sincronización de COROS',
+    corosInfoTitle: 'Cómo conectar COROS',
+    corosInfoWhereTitle: 'Dónde conectarlo',
+    corosInfoLocation:
+      'Entra en {{location}} y pulsa Conectar. COROS abrirá su propia pantalla de inicio de sesión y consentimiento.',
+    corosInfoSyncTitle: 'Qué ocurre después de autorizar',
+    corosInfoSync:
+      'Después de autorizar, COROS envía sus entrenamientos a Alzan y Alzan importa todo el histórico que COROS pone a disposición. Las siguientes sincronizaciones traen los entrenamientos nuevos y reintentan los archivos FIT que hayan quedado pendientes. Alzan no envía entrenamientos de vuelta a COROS.',
+    corosInfoDataTitle: 'Qué envía COROS a Alzan',
+    corosInfoData:
+      '{{dataFlow}}: entrenamientos, resúmenes, detalles, vueltas y datos FIT cuando COROS los ofrece. Los datos de salud solo se importan después de que des el consentimiento correspondiente.',
+    corosInfoPrivacyTitle: 'Tu privacidad',
+    corosInfoPrivacy:
+      'Iniciarás sesión directamente en COROS. Alzan no recibe ni guarda tu contraseña de COROS, y puedes desconectar y borrar los datos importados desde Alzan.',
+    corosInfoTechnicalTitle: 'Configuración técnica',
+    corosInfoTechnical:
+      'La configuración técnica se realiza en el servidor. Callback local: {{localCallback}}. Callback de producción: {{productionCallback}}. Como usuario no tienes que introducir ninguna de estas direcciones.',
+    corosInfoClose: 'Entendido',
     permissionSheetContinue: 'Continuar',
     corosSyncSummary:
       'Entrenamientos importados: {{imported}} · Omitidos: {{skipped}} · Fallidos: {{failed}} · Días de salud: {{healthDays}}',
+    corosBackfillInProgress: 'Histórico en curso · siguiente fecha: {{date}}',
+    corosBackfillComplete: 'Histórico de COROS completado',
+    corosFitPending: 'FIT pendientes: {{count}}',
     corosDisconnectPendingTitle: 'COROS desconectado localmente',
     corosDisconnectPendingMessage:
       'Los datos COROS se han eliminado de Alzan. COROS no respondió a la revocación y Alzan volverá a intentarlo durante las próximas 24 horas.',

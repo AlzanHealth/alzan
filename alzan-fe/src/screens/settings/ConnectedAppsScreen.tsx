@@ -9,7 +9,7 @@ import {
   Modal,
   SafeAreaView,
 } from 'react-native';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Info } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
 import { useSettingsStyles } from '../../hooks/useSettingsStyles';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +20,9 @@ import { useHealthConnectConnection } from '../../hooks/useHealthConnectConnecti
 import { usePolarConnection } from '../../hooks/usePolarConnection';
 import { useSuuntoConnection } from '../../hooks/useSuuntoConnection';
 import { useCorosConnection } from '../../hooks/useCorosConnection';
+import { useTabBarLayout } from '../../navigation/tabBarLayout';
+import { getCorosConnectionInfo } from './corosConnectionInfo.helper';
+import { getConnectedAppsContentBottomPadding } from './connectedAppsLayout.helper';
 
 type PermissionFlow = {
   serviceName: string;
@@ -30,6 +33,7 @@ type PermissionFlow = {
 export const ConnectedAppsScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors } = useSettingsStyles();
+  const { topFromScreenBottom } = useTabBarLayout();
   const strava = useStravaConnection();
   const appleHealth = useAppleHealthConnection();
   const healthConnect = useHealthConnectConnection();
@@ -37,6 +41,8 @@ export const ConnectedAppsScreen = () => {
   const suunto = useSuuntoConnection();
   const coros = useCorosConnection();
   const [permissionFlow, setPermissionFlow] = useState<PermissionFlow | null>(null);
+  const [corosInfoVisible, setCorosInfoVisible] = useState(false);
+  const corosConnectionInfo = getCorosConnectionInfo();
   const formatLastSync = (lastSyncedAt?: string | null) =>
     lastSyncedAt ? t('settings.lastSync', { date: new Date(lastSyncedAt).toLocaleDateString() }) : null;
 
@@ -87,6 +93,8 @@ export const ConnectedAppsScreen = () => {
     isLoading = false,
     isActioning = false,
     isSyncing = false,
+    onInfo,
+    statusLabel,
   }: {
     name: string;
     connected: boolean;
@@ -98,6 +106,8 @@ export const ConnectedAppsScreen = () => {
     isLoading?: boolean;
     isActioning?: boolean;
     isSyncing?: boolean;
+    onInfo?: () => void;
+    statusLabel?: string;
   }) => (
     <View style={[styles.card, dynamicStyles.card]}>
       <View style={styles.cardHeader}>
@@ -109,7 +119,9 @@ export const ConnectedAppsScreen = () => {
           {isLoading ? (
             <ActivityIndicator size="small" color={themeColors.textSecondary} style={styles.statusLoader} />
           ) : comingSoon ? (
-            <Text style={[styles.statusTextPending, { color: themeColors.primary }]}>{t('alzan.comingSoon')}</Text>
+            <Text style={[styles.statusTextPending, { color: themeColors.primary }]}>
+              {statusLabel ?? t('alzan.comingSoon')}
+            </Text>
           ) : (
             <Text
               style={
@@ -123,6 +135,17 @@ export const ConnectedAppsScreen = () => {
           )}
           {!!detail && <Text style={[styles.detailText, { color: themeColors.textSecondary }]}>{detail}</Text>}
         </View>
+        {onInfo && (
+          <TouchableOpacity
+            style={[styles.infoButton, { borderColor: themeColors.border }]}
+            onPress={onInfo}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.corosInfoButton')}
+            accessibilityHint={t('settings.corosInfoButtonHint')}
+          >
+            <Info size={20} color={themeColors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
       {!comingSoon && !isLoading && (
         <View style={styles.actions}>
@@ -171,7 +194,13 @@ export const ConnectedAppsScreen = () => {
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.container}>
-      <ScrollView style={[styles.container, dynamicStyles.container]} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={[styles.container, dynamicStyles.container]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: getConnectedAppsContentBottomPadding(topFromScreenBottom, spacing.l) },
+        ]}
+      >
         <Text style={[styles.description, { color: themeColors.textSecondary }]}>
           {t('settings.syncAppsDescription')}
         </Text>
@@ -197,25 +226,26 @@ export const ConnectedAppsScreen = () => {
           detail={formatLastSync(suunto.lastSyncedAt)}
         />
 
-        {coros.isAvailable && (
-          <AppCard
-            name="COROS"
-            connected={coros.isConnected}
-            isLoading={coros.isLoading}
-            isActioning={coros.isConnecting || coros.isDisconnecting}
-            isSyncing={coros.isSyncing}
-            onConnect={() =>
-              openPermissionFlow({
-                serviceName: 'COROS',
-                description: t('settings.permissionSheetCorosDescription'),
-                onContinue: coros.connect,
-              })
-            }
-            onDisconnect={coros.disconnect}
-            onSync={coros.sync}
-            detail={formatLastSync(coros.lastSyncedAt)}
-          />
-        )}
+        <AppCard
+          name="COROS"
+          connected={coros.isConnected}
+          isLoading={coros.isLoading}
+          isActioning={coros.isConnecting || coros.isDisconnecting}
+          isSyncing={coros.isSyncing}
+          comingSoon={!coros.isAvailable && !coros.isConnected}
+          statusLabel={t('settings.corosNotAvailable')}
+          onConnect={() =>
+            openPermissionFlow({
+              serviceName: 'COROS',
+              description: t('settings.permissionSheetCorosDescription'),
+              onContinue: coros.connect,
+            })
+          }
+          onDisconnect={coros.disconnect}
+          onSync={coros.sync}
+          detail={formatLastSync(coros.lastSyncedAt)}
+          onInfo={() => setCorosInfoVisible(true)}
+        />
 
         <AppCard name="Garmin" connected={false} onConnect={() => {}} onDisconnect={() => {}} comingSoon />
 
@@ -296,6 +326,79 @@ export const ConnectedAppsScreen = () => {
           </View>
         )}
       </ScrollView>
+      <Modal
+        visible={corosInfoVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCorosInfoVisible(false)}
+      >
+        <SafeAreaView style={styles.infoModalOverlay}>
+          <View style={[styles.infoCard, { backgroundColor: themeColors.cardBackground }]}>
+            <View style={styles.infoHeader}>
+              <View style={styles.infoTitleRow}>
+                <View style={[styles.infoIcon, { backgroundColor: dynamicStyles.iconContainer.backgroundColor }]}>
+                  <Info size={22} color={themeColors.primary} />
+                </View>
+                <Text style={[styles.infoTitle, { color: themeColors.textPrimary }]}>
+                  {t('settings.corosInfoTitle')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.infoCloseButton}
+                onPress={() => setCorosInfoVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.corosInfoClose')}
+              >
+                <Text style={[styles.infoCloseText, { color: themeColors.textSecondary }]}>×</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.infoScrollView} contentContainerStyle={styles.infoContent}>
+              <Text style={[styles.infoSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('settings.corosInfoWhereTitle')}
+              </Text>
+              <Text style={[styles.infoBody, { color: themeColors.textSecondary }]}>
+                {t('settings.corosInfoLocation', { location: corosConnectionInfo.location })}
+              </Text>
+
+              <Text style={[styles.infoSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('settings.corosInfoSyncTitle')}
+              </Text>
+              <Text style={[styles.infoBody, { color: themeColors.textSecondary }]}>{t('settings.corosInfoSync')}</Text>
+
+              <Text style={[styles.infoSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('settings.corosInfoDataTitle')}
+              </Text>
+              <Text style={[styles.infoBody, { color: themeColors.textSecondary }]}>
+                {t('settings.corosInfoData', { dataFlow: corosConnectionInfo.dataFlow })}
+              </Text>
+
+              <Text style={[styles.infoSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('settings.corosInfoPrivacyTitle')}
+              </Text>
+              <Text style={[styles.infoBody, { color: themeColors.textSecondary }]}>
+                {t('settings.corosInfoPrivacy')}
+              </Text>
+
+              <Text style={[styles.infoSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('settings.corosInfoTechnicalTitle')}
+              </Text>
+              <Text style={[styles.infoBody, { color: themeColors.textSecondary }]}>
+                {t('settings.corosInfoTechnical', {
+                  localCallback: corosConnectionInfo.localCallback,
+                  productionCallback: corosConnectionInfo.productionCallback,
+                })}
+              </Text>
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.infoDoneButton, { backgroundColor: themeColors.primary }]}
+              onPress={() => setCorosInfoVisible(false)}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.infoDoneText, { color: themeColors.white }]}>{t('settings.corosInfoClose')}</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
       <Modal
         visible={permissionFlow !== null}
         animationType="slide"
@@ -382,6 +485,15 @@ const styles = StyleSheet.create({
   iconText: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  infoButton: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.s,
   },
   appInfo: {
     flex: 1,
@@ -524,6 +636,82 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   permissionContinueText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  infoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.m,
+  },
+  infoCard: {
+    width: '100%',
+    maxWidth: 520,
+    maxHeight: '88%',
+    borderRadius: borderRadius.l,
+    padding: spacing.l,
+    ...shadows.soft,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.s,
+  },
+  infoTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: spacing.s,
+  },
+  infoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.s,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoTitle: {
+    ...typography.h3,
+    flexShrink: 1,
+  },
+  infoCloseButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoCloseText: {
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: '300',
+  },
+  infoContent: {
+    gap: spacing.s,
+    paddingVertical: spacing.m,
+  },
+  infoScrollView: {
+    flex: 1,
+  },
+  infoSectionTitle: {
+    ...typography.body,
+    fontWeight: '700',
+    marginTop: spacing.s,
+  },
+  infoBody: {
+    ...typography.body,
+    lineHeight: 22,
+  },
+  infoDoneButton: {
+    minHeight: 48,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.l,
+  },
+  infoDoneText: {
     fontSize: 16,
     fontWeight: '700',
   },

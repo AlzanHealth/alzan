@@ -42,4 +42,13 @@ export class CloudProviderSyncOutputDto {
 
   @Expose()
   health_consent_required?: boolean;
+
+  @Expose()
+  backfill_complete?: boolean;
+
+  @Expose()
+  backfill_next_date?: string | null;
+
+  @Expose()
+  fit_pending?: number;
 }

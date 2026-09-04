@@ -98,6 +98,9 @@ export type CloudProviderSyncResult = {
   last_success_at: string | null;
   health_days_imported?: number;
   health_consent_required?: boolean;
+  backfill_complete?: boolean;
+  backfill_next_date?: string | null;
+  fit_pending?: number;
 };
 
 export type CorosCapability = {

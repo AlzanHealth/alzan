@@ -1,9 +1,17 @@
 import { createHash } from 'crypto';
-import { Injectable, InternalServerErrorException, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { CorosOAuthService } from '../../providers/oauth/coros-oauth.service';
 import { decryptCorosToken } from '../../providers/oauth/coros-security';
+import { CorosMcpOAuthService } from '../../providers/oauth/coros-mcp-oauth.service';
 
 type RolloutMode = 'disabled' | 'pilot' | 'public';
 
@@ -17,6 +25,7 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly supabaseAdminService: SupabaseAdminService,
     private readonly corosOAuthService: CorosOAuthService,
+    @Optional() private readonly corosMcpOAuthService?: CorosMcpOAuthService,
   ) {}
 
   public onModuleInit(): void {
@@ -30,10 +39,20 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
   }
 
   public capability(userId: string): { enabled: boolean; mode: RolloutMode } {
-    const configuredMode = this.configService.get<string>('COROS_ROLLOUT_MODE')?.trim().toLowerCase();
+    const mcpConfigured = this.corosMcpOAuthService?.isConfigured() === true;
+    const configuredMode = (
+      mcpConfigured
+        ? (this.configService.get<string>('COROS_MCP_ROLLOUT_MODE') ??
+          this.configService.get<string>('COROS_ROLLOUT_MODE'))
+        : this.configService.get<string>('COROS_ROLLOUT_MODE')
+    )
+      ?.trim()
+      .toLowerCase();
     const mode: RolloutMode = configuredMode === 'public' || configuredMode === 'pilot' ? configuredMode : 'disabled';
     return {
-      enabled: this.corosOAuthService.isConfigured() && this.corosOAuthService.isUserAllowed(userId),
+      enabled: mcpConfigured
+        ? this.corosMcpOAuthService?.isUserAllowed(userId) === true
+        : this.corosOAuthService.isConfigured() && this.corosOAuthService.isUserAllowed(userId),
       mode,
     };
   }
@@ -41,7 +60,7 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
   public async disconnect(userId: string): Promise<{ disconnected: boolean; remoteDeauthorizationPending: boolean }> {
     const { data: connection, error: connectionError } = await this.supabaseAdminService.client
       .from('user_connections')
-      .select('id')
+      .select('id, connection_kind, client_id')
       .eq('user_id', userId)
       .eq('provider', 'coros')
       .maybeSingle();
@@ -57,11 +76,23 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
       if (tokenError) throw new InternalServerErrorException('COROS_TOKEN_READ_FAILED');
       if (token?.access_token) {
         try {
-          await this.corosOAuthService.deregisterUser(this.decryptToken(token.access_token));
+          const decryptedToken = this.decryptToken(token.access_token);
+          if (connection.connection_kind === 'mcp') {
+            if (!this.corosMcpOAuthService) throw new InternalServerErrorException('COROS_MCP_SERVICE_UNAVAILABLE');
+            await this.corosMcpOAuthService.revokeAccessToken(decryptedToken, connection.client_id ?? undefined);
+          } else {
+            await this.corosOAuthService.deregisterUser(decryptedToken);
+          }
         } catch (error) {
           remoteDeauthorizationPending = true;
           try {
-            await this.enqueueDeauthorization(userId, token.access_token, error);
+            await this.enqueueDeauthorization(
+              userId,
+              token.access_token,
+              connection.connection_kind === 'mcp' ? 'mcp' : 'oauth',
+              connection.client_id,
+              error,
+            );
           } catch (enqueueError) {
             this.logger.error('Failed to durably queue COROS remote deauthorization; local deletion aborted', {
               error: this.errorMessage(enqueueError),
@@ -93,7 +124,7 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
 
       const { data: jobs, error } = await this.supabaseAdminService.client
         .from('provider_deauthorization_jobs')
-        .select('id, encrypted_access_token, attempts')
+        .select('id, encrypted_access_token, attempts, connection_kind, client_id')
         .eq('provider', 'coros')
         .gt('expires_at', now)
         .lte('next_attempt_at', now)
@@ -104,7 +135,13 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
 
       for (const job of jobs ?? []) {
         try {
-          await this.corosOAuthService.deregisterUser(this.decryptToken(job.encrypted_access_token));
+          const decryptedToken = this.decryptToken(job.encrypted_access_token);
+          if (job.connection_kind === 'mcp') {
+            if (!this.corosMcpOAuthService) throw new Error('COROS_MCP_SERVICE_UNAVAILABLE');
+            await this.corosMcpOAuthService.revokeAccessToken(decryptedToken, job.client_id ?? undefined);
+          } else {
+            await this.corosOAuthService.deregisterUser(decryptedToken);
+          }
           await this.supabaseAdminService.client.from('provider_deauthorization_jobs').delete().eq('id', job.id);
         } catch (retryError) {
           const attempts = job.attempts + 1;
@@ -127,9 +164,17 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async enqueueDeauthorization(userId: string, encryptedAccessToken: string, error: unknown): Promise<void> {
+  private async enqueueDeauthorization(
+    userId: string,
+    encryptedAccessToken: string,
+    connectionKind: 'oauth' | 'mcp',
+    clientId: string | null,
+    error: unknown,
+  ): Promise<void> {
     const { error: insertError } = await this.supabaseAdminService.client.from('provider_deauthorization_jobs').insert({
       provider: 'coros',
+      connection_kind: connectionKind,
+      client_id: clientId,
       user_reference_hash: createHash('sha256').update(userId).digest('hex'),
       encrypted_access_token: encryptedAccessToken,
       attempts: 1,

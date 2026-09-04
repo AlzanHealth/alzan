@@ -3136,6 +3136,8 @@ export type Database = {
       provider_deauthorization_jobs: {
         Row: {
           attempts: number;
+          client_id: string | null;
+          connection_kind: string;
           created_at: string;
           encrypted_access_token: string;
           expires_at: string;
@@ -3148,6 +3150,8 @@ export type Database = {
         };
         Insert: {
           attempts?: number;
+          client_id?: string | null;
+          connection_kind?: string;
           created_at?: string;
           encrypted_access_token: string;
           expires_at?: string;
@@ -3160,6 +3164,8 @@ export type Database = {
         };
         Update: {
           attempts?: number;
+          client_id?: string | null;
+          connection_kind?: string;
           created_at?: string;
           encrypted_access_token?: string;
           expires_at?: string;
@@ -3174,6 +3180,7 @@ export type Database = {
       };
       provider_oauth_states: {
         Row: {
+          client_id: string | null;
           code_verifier: string | null;
           created_at: string;
           expires_at: string;
@@ -3183,6 +3190,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          client_id?: string | null;
           code_verifier?: string | null;
           created_at?: string;
           expires_at: string;
@@ -3192,6 +3200,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          client_id?: string | null;
           code_verifier?: string | null;
           created_at?: string;
           expires_at?: string;
@@ -4285,6 +4294,7 @@ export type Database = {
       user_connections: {
         Row: {
           access_token: string | null;
+          client_id: string | null;
           connection_kind: string;
           created_at: string;
           id: string;
@@ -4303,6 +4313,7 @@ export type Database = {
         };
         Insert: {
           access_token?: string | null;
+          client_id?: string | null;
           connection_kind?: string;
           created_at?: string;
           id?: string;
@@ -4321,6 +4332,7 @@ export type Database = {
         };
         Update: {
           access_token?: string | null;
+          client_id?: string | null;
           connection_kind?: string;
           created_at?: string;
           id?: string;

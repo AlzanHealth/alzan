@@ -1410,10 +1410,32 @@ const en = {
     permissionSheetOAuthDescription:
       'You are about to open {{service}} sign-in. You can cancel here and stay in Alzan, or continue to authorize the connection.',
     permissionSheetCorosDescription:
-      'COROS will share your workouts, FIT files, steps, calories, sleep, resting heart rate, and HRV with Alzan. You will sign in directly with COROS; Alzan never receives your password. You can disconnect and erase this data at any time.',
+      'COROS will send your workouts, FIT files, steps, calories, sleep, resting heart rate, and HRV to Alzan. You will sign in directly with COROS; Alzan never receives your password. You can disconnect and erase this data at any time.',
+    corosNotAvailable: 'Not available in this environment',
+    corosInfoButton: 'Learn how to connect COROS',
+    corosInfoButtonHint: 'Open information about COROS connection and synchronization',
+    corosInfoTitle: 'How to connect COROS',
+    corosInfoWhereTitle: 'Where to connect it',
+    corosInfoLocation: 'Open {{location}} and press Connect. COROS will open its own sign-in and consent screen.',
+    corosInfoSyncTitle: 'What happens after authorization',
+    corosInfoSync:
+      'After authorization, COROS sends its workouts to Alzan, and Alzan imports all history that COROS makes available. Later synchronizations bring in new workouts and retry FIT files that were temporarily pending. Alzan does not send workouts back to COROS.',
+    corosInfoDataTitle: 'What COROS sends to Alzan',
+    corosInfoData:
+      '{{dataFlow}}: workouts, summaries, details, laps, and FIT data when COROS provides them. Health data is imported only after you grant the corresponding consent.',
+    corosInfoPrivacyTitle: 'Your privacy',
+    corosInfoPrivacy:
+      'You sign in directly with COROS. Alzan does not receive or store your COROS password, and you can disconnect and remove the imported data from Alzan.',
+    corosInfoTechnicalTitle: 'Technical setup',
+    corosInfoTechnical:
+      'The technical configuration is done on the server. Local callback: {{localCallback}}. Production callback: {{productionCallback}}. You do not need to enter either address as an end user.',
+    corosInfoClose: 'Got it',
     permissionSheetContinue: 'Continue',
     corosSyncSummary:
       'Workouts imported: {{imported}} · Skipped: {{skipped}} · Failed: {{failed}} · Health days: {{healthDays}}',
+    corosBackfillInProgress: 'History import in progress · next date: {{date}}',
+    corosBackfillComplete: 'COROS history import complete',
+    corosFitPending: 'FIT files pending: {{count}}',
     corosDisconnectPendingTitle: 'COROS disconnected locally',
     corosDisconnectPendingMessage:
       'Your COROS data has been removed from Alzan. COROS did not respond to revocation, so Alzan will retry for the next 24 hours.',

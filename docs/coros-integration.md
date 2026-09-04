@@ -1,15 +1,19 @@
 # Integración COROS
 
-Estado del código: implementado en modo seguro `disabled`/`pilot`. El go-live sigue bloqueado hasta que COROS entregue credenciales y payloads reales de sandbox.
+Estado del código: COROS MCP está implementado detrás de `COROS_MCP_ROLLOUT_MODE` y conserva el transporte OAuth/Partner legacy para conexiones ya existentes. El go-live sigue bloqueado hasta configurar el cliente OAuth MCP y desplegar el backend.
 
 ## Flujo y límites
 
-- Dirección: COROS → Alzan. No se envían entrenamientos, planes ni rutas a COROS.
+- Dirección MCP: COROS → Alzan. MCP se usa para leer el histórico y mantener actividades actualizadas; no se envía la contraseña de COROS a Alzan.
+- Dirección Partner API: queda preparada para webhooks, varios usuarios por credenciales de plataforma, GPX y sincronización bidireccional cuando COROS entregue acceso.
 - OAuth: `/oauth/coros/authorize` y `/oauth/coros/callback` reutilizan el `state` de un solo uso de Alzan.
-- El identificador externo guardado es `openId`; Alzan nunca recibe la contraseña COROS del usuario.
-- Pull: `/v2/coros/sport/list` y `/coros/daily/query`, en ventanas inclusivas de hasta 30 días.
-- Primer pull: 90 días. Siguientes pulls: tres días de solapamiento.
+- OAuth MCP: `/oauth/coros/authorize` delega a MCP cuando está configurado y COROS devuelve al callback separado `/oauth/coros/mcp/callback`.
+- En el transporte legacy el identificador externo guardado es `openId`; MCP conserva el `client_id` de OAuth y no inventa una identidad distinta. Alzan nunca recibe la contraseña COROS del usuario.
+- Pull legacy: `/v2/coros/sport/list` y `/coros/daily/query`, en ventanas inclusivas de hasta 30 días.
+- Pull MCP: `querySportRecords` en ventanas reanudables desde `COROS_MCP_BACKFILL_START_DATE`; al terminar, cada sincronización usa solapamiento de tres días.
+- MCP guarda la siguiente fecha del backfill en `integration_sync_state`; un corte de red o un límite de páginas no reinicia el histórico ni crea duplicados.
 - Detalle: descarga de `fitUrl` HTTPS o fallback `/v2/coros/sport/detail/fit`.
+- MCP: detalle, laps y FIT se buscan solo si la herramienta está publicada por COROS; si FIT no está disponible o se alcanza el límite diario, la actividad se guarda con el resumen/detalle y queda marcada como pendiente.
 - Push: `POST /webhooks/coros/workouts`, autenticado por los headers `client` y `secret`.
 - Salud: pasos, calorías, sueño, RHR y HRV; requiere el consentimiento `health_integrations_v2_2026_08_22`.
 
@@ -19,6 +23,7 @@ Estado del código: implementado en modo seguro `disabled`/`pilot`. El go-live s
 | --- | --- | --- | --- |
 | `GET` | `/oauth/coros/authorize` | Supabase | Generar `state` y URL OAuth COROS |
 | `GET` | `/oauth/coros/callback` | Pública | Intercambiar `code`, cifrar tokens y guardar `openId` |
+| `GET` | `/oauth/coros/mcp/callback` | Pública | Callback OAuth PKCE del servidor MCP COROS |
 | `GET` | `/wearables/cloud/coros/capability` | Supabase | Aplicar rollout `disabled`, `pilot` o `public` |
 | `POST` | `/wearables/cloud/coros/sync` | Supabase | Sincronizar actividades y salud diaria |
 | `DELETE` | `/wearables/connections/coros` | Supabase | Revocar y borrar datos COROS |
@@ -40,7 +45,19 @@ COROS_TOKEN_ENCRYPTION_KEY_V1=<32-byte-base64-key>
 COROS_FIT_ALLOWED_HOSTS=oss.coros.com
 COROS_WEBHOOK_CLIENT=<issued-or-confirmed-by-coros>
 COROS_WEBHOOK_SECRET=<issued-or-confirmed-by-coros>
+COROS_MCP_URL=https://mcp.coros.com/mcp
+COROS_MCP_ISSUER=<optional-regional-issuer>
+COROS_MCP_CLIENT_ID=<registered-public-oauth-client>
+COROS_MCP_REDIRECT_URI=https://api.alzanhealth.com/oauth/coros/mcp/callback
+COROS_MCP_ROLLOUT_MODE=pilot
+COROS_MCP_BACKFILL_START_DATE=2000-01-01
+COROS_MCP_BACKFILL_WINDOW_DAYS=30
+COROS_MCP_WINDOWS_PER_SYNC=10
 ```
+
+`COROS_MCP_CLIENT_ID` es un cliente público OAuth con PKCE. Si se deja vacío, el backend intenta registro dinámico cuando el issuer MCP lo permite y guarda el `client_id` resultante junto a la conexión. En producción se recomienda registrar el cliente explícitamente para controlar las redirect URIs.
+
+El MCP oficial expone `https://mcp.coros.com/mcp`, usa OAuth 2.0 y permite consultar actividades, detalle, laps y FIT. No ofrece webhooks ni sincronización bidireccional de actividades; esas capacidades requieren Partner API. El límite de FIT se trata como enriquecimiento pendiente y no impide importar la actividad.
 
 Generar la clave interna una sola vez y guardarla en el gestor de secretos del backend:
 
@@ -50,7 +67,7 @@ openssl rand -base64 32
 
 No existe `COROS_DEFAULT_SCOPE` en el código porque la documentación recibida no define scopes OAuth por petición. No existe equivalente implementado a `SUUNTO_SUBSCRIPTION_KEY`.
 
-Para producción, cambiar `COROS_API_BASE_URL` a `https://open.coros.com` únicamente después de la aprobación escrita de COROS.
+Para producción, cambiar `COROS_API_BASE_URL` a `https://open.coros.com` únicamente después de la aprobación escrita de COROS. MCP usa su propio endpoint y no depende de ese cambio.
 
 ## Dominio público y corrección de la solicitud
 
@@ -106,7 +123,7 @@ La rama debe estar integrada y desplegada antes de que COROS pruebe las URLs. El
 
 1. Crear el mapping HTTPS de `api.alzanhealth.com` hacia el servicio `alzan-backend` en `europe-west1`.
 2. Sustituir en Cloudflare los registros actuales del subdominio `api` por los registros que devuelva Google. Mantener el proxy de Cloudflare desactivado (`DNS only`) hasta que Google emita el certificado.
-3. Desplegar esta rama y aplicar sus tres migraciones COROS antes de activar el piloto.
+3. Desplegar esta rama y aplicar la migración MCP COROS (`20260904120000_coros_mcp_connections.sql`) antes de activar el piloto.
 4. Verificar los endpoints públicos con:
 
 ```sh
