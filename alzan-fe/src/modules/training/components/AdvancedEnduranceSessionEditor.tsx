@@ -27,6 +27,7 @@ import {
   type AdvancedSport,
 } from '../helpers/advancedEnduranceSession.helper';
 import { parsePaceInput } from '../helpers/paceInput.helper';
+import { parseDurationInput } from '../helpers/durationInput.helper';
 import type { EnduranceMetricPriority } from '../helpers/enduranceMetricPriority.helper';
 import { formatDurationTime } from '../../../utils/unitConversionUtils';
 
@@ -95,16 +96,6 @@ function BufferedMetricInput({ formattedValue, onCommit, onBlur, onFocus, ...pro
 function parseNumber(value: string): number | null {
   const parsed = parseLocalizedDecimal(value);
   return parsed !== null && parsed >= 0 ? parsed : null;
-}
-
-function parseDuration(value: string): number | null {
-  if (!value.trim()) return null;
-  if (value.includes(':')) {
-    const [minutes, seconds] = value.split(':').map(Number);
-    if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return null;
-    return Math.max(0, minutes * 60 + seconds);
-  }
-  return parseNumber(value);
 }
 
 function formatDuration(seconds: number | null): string {
@@ -296,7 +287,7 @@ function SectionEditor({
                 formattedValue={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onCommit={value => updateMetric('duration', parseDuration(value))}
+                onCommit={value => updateMetric('duration', parseDurationInput(value))}
               />
             </View>
           ) : (
@@ -371,7 +362,7 @@ function SectionEditor({
                 formattedValue={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
-                onCommit={value => updateMetric('duration', parseDuration(value))}
+                onCommit={value => updateMetric('duration', parseDurationInput(value))}
               />
             )}
           </View>
