@@ -114,6 +114,7 @@ export interface CanonicalActivity {
   heartRateZones: CanonicalActivityHeartRateZone[];
   device: CanonicalActivityDevice | null;
   vendorFields: Record<string, unknown>;
+  pendingWatchMetrics?: Record<string, unknown> | null;
   provenance?: CanonicalActivityProvenance;
   hydrationVersion?: number;
 }

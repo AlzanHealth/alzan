@@ -1437,7 +1437,10 @@ export default {
       'Entra en {{location}} y pulsa Conectar. COROS abrirá su propia pantalla de inicio de sesión y consentimiento.',
     corosInfoSyncTitle: 'Qué ocurre después de autorizar',
     corosInfoSync:
-      'Después de autorizar, COROS envía sus entrenamientos a Alzan y Alzan importa todo el histórico que COROS pone a disposición. Las siguientes sincronizaciones traen los entrenamientos nuevos y reintentan los archivos FIT que hayan quedado pendientes. Alzan no envía entrenamientos de vuelta a COROS.',
+      'Después de autorizar, COROS envía sus entrenamientos a Alzan. La API sincroniza automáticamente los últimos tres meses; después, las sincronizaciones traen entrenamientos nuevos y reintentan los archivos FIT pendientes. Alzan no envía entrenamientos a COROS.',
+    corosInfoHistoryTitle: 'Histórico anterior',
+    corosInfoHistory:
+      'Para actividades de hace más de tres meses, exporta archivos FIT desde COROS Training Hub y usa Importar histórico en esta tarjeta. Alzan importa cada archivo una vez, conserva el deporte y las métricas originales e indica qué archivos requieren atención.',
     corosInfoDataTitle: 'Qué envía COROS a Alzan',
     corosInfoData:
       '{{dataFlow}}: entrenamientos, resúmenes, detalles, vueltas y datos FIT cuando COROS los ofrece. Los datos de salud solo se importan después de que des el consentimiento correspondiente.',
@@ -1454,6 +1457,10 @@ export default {
     corosBackfillInProgress: 'Histórico en curso · siguiente fecha: {{date}}',
     corosBackfillComplete: 'Histórico de COROS completado',
     corosFitPending: 'FIT pendientes: {{count}}',
+    corosImportHistory: 'Importar histórico',
+    corosHistoryImportTitle: 'Importación de histórico COROS',
+    corosHistoryImportSummary: 'Importados: {{imported}} · Ya estaban: {{skipped}} · Fallidos: {{failed}}',
+    corosHistoryImportErrors: 'Archivos que requieren atención:\n{{errors}}',
     corosDisconnectPendingTitle: 'COROS desconectado localmente',
     corosDisconnectPendingMessage:
       'Los datos COROS se han eliminado de Alzan. COROS no respondió a la revocación y Alzan volverá a intentarlo durante las próximas 24 horas.',

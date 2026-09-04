@@ -11,6 +11,11 @@ assert.deepEqual(utils.extractCorosWorkoutRecords({ data: [workout] }), [workout
 assert.deepEqual(utils.extractCorosWorkoutRecords({ sportDataList: [workout] }), [workout]);
 assert.deepEqual(utils.extractCorosWorkoutRecords([workout]), [workout]);
 assert.deepEqual(utils.extractCorosWorkoutRecords({ data: 'invalid' }), []);
+assert.deepEqual(utils.extractCorosWorkoutPage({ data: { sportDataList: [workout] }, hasMore: true, nextPage: 2 }), {
+  records: [workout],
+  nextPage: 2,
+});
+assert.deepEqual(utils.extractCorosWorkoutPage({ data: [workout] }), { records: [workout], nextPage: null });
 
 const daily = { happenDay: 20260729, step: 10_000 };
 assert.deepEqual(utils.extractCorosDailyRecords({ data: [daily] }), [daily]);

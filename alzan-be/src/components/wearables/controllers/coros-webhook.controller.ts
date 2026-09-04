@@ -18,16 +18,26 @@ export class CorosWebhookController {
 
   @Post('workouts')
   @HttpCode(HttpStatus.OK)
-  @ApiHeader({ name: 'client', required: true })
+  @ApiHeader({ name: 'client_id', required: true })
   @ApiHeader({ name: 'secret', required: true })
   @ApiOkResponse({ type: CorosWebhookResponseDto })
   public async receiveWorkouts(
-    @Headers('client') client: string | undefined,
-    @Headers('secret') secret: string | undefined,
+    @Headers() headers: Record<string, string | string[] | undefined>,
     @Body() body: CorosWorkoutPushDto,
   ): Promise<CorosWebhookResponseDto> {
+    const client = this.readHeader(headers, ['client_id', 'client-id', 'client']);
+    const secret = this.readHeader(headers, ['secret', 'client_secret', 'client-secret']);
     this.corosWebhookService.authenticate(client, secret);
     await this.corosWebhookService.enqueue(body);
     return { message: 'ok', result: '0000' };
+  }
+
+  private readHeader(headers: Record<string, string | string[] | undefined>, names: string[]): string | undefined {
+    for (const name of names) {
+      const value = headers[name];
+      if (typeof value === 'string') return value;
+      if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+    }
+    return undefined;
   }
 }

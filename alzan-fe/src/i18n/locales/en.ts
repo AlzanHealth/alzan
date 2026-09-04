@@ -1419,7 +1419,10 @@ const en = {
     corosInfoLocation: 'Open {{location}} and press Connect. COROS will open its own sign-in and consent screen.',
     corosInfoSyncTitle: 'What happens after authorization',
     corosInfoSync:
-      'After authorization, COROS sends its workouts to Alzan, and Alzan imports all history that COROS makes available. Later synchronizations bring in new workouts and retry FIT files that were temporarily pending. Alzan does not send workouts back to COROS.',
+      'After authorization, COROS sends its workouts to Alzan. The API synchronizes the latest three months automatically, and later synchronizations bring in new workouts and retry FIT files that were temporarily pending. Alzan does not send workouts back to COROS.',
+    corosInfoHistoryTitle: 'Older history',
+    corosInfoHistory:
+      'For activities older than three months, export FIT files from COROS Training Hub and use Import history on this card. Alzan imports each file once, keeps the original sport and metrics, and reports any file that needs attention.',
     corosInfoDataTitle: 'What COROS sends to Alzan',
     corosInfoData:
       '{{dataFlow}}: workouts, summaries, details, laps, and FIT data when COROS provides them. Health data is imported only after you grant the corresponding consent.',
@@ -1436,6 +1439,10 @@ const en = {
     corosBackfillInProgress: 'History import in progress · next date: {{date}}',
     corosBackfillComplete: 'COROS history import complete',
     corosFitPending: 'FIT files pending: {{count}}',
+    corosImportHistory: 'Import history',
+    corosHistoryImportTitle: 'COROS history import',
+    corosHistoryImportSummary: 'Imported: {{imported}} · Already present: {{skipped}} · Failed: {{failed}}',
+    corosHistoryImportErrors: 'Files needing attention:\n{{errors}}',
     corosDisconnectPendingTitle: 'COROS disconnected locally',
     corosDisconnectPendingMessage:
       'Your COROS data has been removed from Alzan. COROS did not respond to revocation, so Alzan will retry for the next 24 hours.',

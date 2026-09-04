@@ -25,6 +25,40 @@ function extractRecords(payload: unknown, keys: string[]): JsonRecord[] {
   return [];
 }
 
+export interface CorosRecordPage {
+  records: JsonRecord[];
+  nextPage: number | null;
+}
+
+function readPositiveInteger(value: unknown): number | null {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function readPagination(payload: unknown): number | null {
+  if (!isRecord(payload)) return null;
+  const containers = [payload, isRecord(payload.data) ? payload.data : null].filter(isRecord);
+  for (const container of containers) {
+    const explicitNext = readPositiveInteger(
+      container.nextPage ?? container.next_page ?? container.next_page_no ?? container.nextPageNo,
+    );
+    if (explicitNext) return explicitNext;
+    const hasMore = container.hasMore ?? container.has_more ?? container.more;
+    if (hasMore === true) {
+      const currentPage = readPositiveInteger(container.page ?? container.pageNo ?? container.page_no) ?? 1;
+      return currentPage + 1;
+    }
+    const currentPage = readPositiveInteger(container.page ?? container.pageNo ?? container.page_no);
+    const totalPages = readPositiveInteger(container.totalPage ?? container.total_page ?? container.totalPages);
+    if (currentPage && totalPages && currentPage < totalPages) return currentPage + 1;
+  }
+  return null;
+}
+
+function extractRecordPage(payload: unknown, keys: string[]): CorosRecordPage {
+  return { records: extractRecords(payload, keys), nextPage: readPagination(payload) };
+}
+
 function formatCorosDate(date: Date): string {
   return date.toISOString().slice(0, 10).replace(/-/g, '');
 }
@@ -46,11 +80,19 @@ export function buildCorosDateWindows(start: Date, end: Date): Array<{ startDate
 }
 
 export function extractCorosWorkoutRecords(payload: unknown): JsonRecord[] {
-  return extractRecords(payload, ['sportDataList', 'workouts', 'data', 'result']);
+  return extractCorosWorkoutPage(payload).records;
+}
+
+export function extractCorosWorkoutPage(payload: unknown): CorosRecordPage {
+  return extractRecordPage(payload, ['sportDataList', 'workouts', 'data', 'result']);
 }
 
 export function extractCorosDailyRecords(payload: unknown): JsonRecord[] {
-  return extractRecords(payload, ['dailyList', 'dailyDataList', 'daily', 'data', 'result']);
+  return extractCorosDailyPage(payload).records;
+}
+
+export function extractCorosDailyPage(payload: unknown): CorosRecordPage {
+  return extractRecordPage(payload, ['dailyList', 'dailyDataList', 'daily', 'data', 'result']);
 }
 
 export function assertCorosApiSuccess(payload: unknown): void {

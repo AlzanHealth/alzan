@@ -773,7 +773,7 @@
         "operationId": "receiveWorkouts",
         "parameters": [
           { "name": "secret", "in": "header", "required": true, "schema": { "type": "string" } },
-          { "name": "client", "in": "header", "required": true, "schema": { "type": "string" } }
+          { "name": "client_id", "in": "header", "required": true, "schema": { "type": "string" } }
         ],
         "requestBody": {
           "required": true,
@@ -812,6 +812,35 @@
           }
         },
         "tags": ["Wearables"]
+      }
+    },
+    "/activity-imports/coros/history": {
+      "post": {
+        "operationId": "importHistory",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["files"],
+                "properties": {
+                  "files": { "type": "array", "items": { "type": "string", "format": "binary" }, "maxItems": 50 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "COROS Training Hub FIT files imported",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CorosHistoryImportResultDto" } }
+            }
+          }
+        },
+        "tags": ["Activity imports"]
       }
     }
   },
@@ -1088,7 +1117,10 @@
           "phase_durations_ms": { "type": "object" },
           "last_success_at": { "type": "string", "nullable": true },
           "health_days_imported": { "type": "number" },
-          "health_consent_required": { "type": "boolean" }
+          "health_consent_required": { "type": "boolean" },
+          "backfill_complete": { "type": "boolean" },
+          "backfill_next_date": { "type": "string", "nullable": true },
+          "fit_pending": { "type": "number" }
         },
         "required": ["provider", "activities_imported", "last_success_at"]
       },
@@ -1157,6 +1189,24 @@
           "remote_deauthorization_pending": { "type": "boolean" }
         },
         "required": ["disconnected", "remote_deauthorization_pending"]
+      },
+      "CorosHistoryImportFileErrorDto": {
+        "type": "object",
+        "properties": { "fileName": { "type": "string" }, "code": { "type": "string" } },
+        "required": ["fileName", "code"]
+      },
+      "CorosHistoryImportResultDto": {
+        "type": "object",
+        "properties": {
+          "filesImported": { "type": "number" },
+          "filesSkipped": { "type": "number" },
+          "filesFailed": { "type": "number" },
+          "errorsByFile": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CorosHistoryImportFileErrorDto" }
+          }
+        },
+        "required": ["filesImported", "filesSkipped", "filesFailed", "errorsByFile"]
       }
     }
   },

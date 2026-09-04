@@ -1,36 +1,56 @@
 # Integración COROS
 
-Estado del código: COROS MCP está implementado detrás de `COROS_MCP_ROLLOUT_MODE` y conserva el transporte OAuth/Partner legacy para conexiones ya existentes. El go-live sigue bloqueado hasta configurar el cliente OAuth MCP y desplegar el backend.
+## Modelo de conexión
 
-## Flujo y límites
+COROS envía los entrenamientos a Alzan mediante su Partner API directa. Alzan nunca recibe ni almacena la contraseña de COROS: el usuario autoriza en la pantalla oficial de COROS y el backend guarda únicamente los tokens cifrados.
 
-- Dirección MCP: COROS → Alzan. MCP se usa para leer el histórico y mantener actividades actualizadas; no se envía la contraseña de COROS a Alzan.
-- Dirección Partner API: queda preparada para webhooks, varios usuarios por credenciales de plataforma, GPX y sincronización bidireccional cuando COROS entregue acceso.
-- OAuth: `/oauth/coros/authorize` y `/oauth/coros/callback` reutilizan el `state` de un solo uso de Alzan.
-- OAuth MCP: `/oauth/coros/authorize` delega a MCP cuando está configurado y COROS devuelve al callback separado `/oauth/coros/mcp/callback`.
-- En el transporte legacy el identificador externo guardado es `openId`; MCP conserva el `client_id` de OAuth y no inventa una identidad distinta. Alzan nunca recibe la contraseña COROS del usuario.
-- Pull legacy: `/v2/coros/sport/list` y `/coros/daily/query`, en ventanas inclusivas de hasta 30 días.
-- Pull MCP: `querySportRecords` en ventanas reanudables desde `COROS_MCP_BACKFILL_START_DATE`; al terminar, cada sincronización usa solapamiento de tres días.
-- MCP guarda la siguiente fecha del backfill en `integration_sync_state`; un corte de red o un límite de páginas no reinicia el histórico ni crea duplicados.
-- Detalle: descarga de `fitUrl` HTTPS o fallback `/v2/coros/sport/detail/fit`.
-- MCP: detalle, laps y FIT se buscan solo si la herramienta está publicada por COROS; si FIT no está disponible o se alcanza el límite diario, la actividad se guarda con el resumen/detalle y queda marcada como pendiente.
-- Push: `POST /webhooks/coros/workouts`, autenticado por los headers `client` y `secret`.
-- Salud: pasos, calorías, sueño, RHR y HRV; requiere el consentimiento `health_integrations_v2_2026_08_22`.
+La API directa permite consultar actividades en ventanas inclusivas de hasta 30 días y, según la documentación de COROS, solo ofrece automáticamente los últimos tres meses. La primera sincronización usa tres ventanas de 30 días; las siguientes usan solapamiento para evitar huecos y duplicados. El histórico anterior se importa mediante archivos FIT exportados desde COROS Training Hub.
+
+## Flujo de actividades
+
+1. El usuario pulsa `Conectar COROS` en `Ajustes → Integraciones`.
+2. Alzan genera un `state` de un solo uso y redirige al OAuth directo de COROS.
+3. COROS vuelve a `/oauth/coros/callback`.
+4. Alzan cifra y guarda los tokens en `provider_connection_tokens` y conserva la conexión en `user_connections`.
+5. Alzan sincroniza las actividades disponibles, descarga el FIT cuando COROS lo ofrece y escribe todo mediante el escritor canónico.
+6. Las nuevas actividades pueden llegar por webhook o mediante `Sincronizar ahora`.
+
+El resumen se guarda aunque el FIT no esté disponible. La actividad queda marcada como pendiente de enriquecimiento y se reintenta en una sincronización posterior. El límite diario real de FIT no convierte una sincronización parcial en un falso éxito.
+
+## Histórico anterior a tres meses
+
+En COROS Training Hub: `Activity List → Export Data → FIT`. En Alzan, abre la tarjeta COROS conectada y pulsa `Importar histórico`. Se pueden seleccionar varios archivos FIT en una operación.
+
+Cada archivo se valida como FIT, se deduplica por el identificador COROS y por la huella del archivo, y se escribe con `source_channel=file_import` y `source_package=coros_training_hub`. Si un archivo no se puede leer, el resto continúa y la interfaz muestra el nombre y la causa del fallo.
+
+## Deportes y datos
+
+El mapper directo cubre running, trail, ciclismo, natación, triatlón/multisport, senderismo, fuerza/gimnasio, esquí, snowboard, escalada, fútbol, baloncesto, tenis, pádel, surf, remo, artes marciales, golf, volleyball, Hyrox y variantes reconocidas por COROS. Los deportes sin equivalente exacto se conservan como `other` junto con el nombre y los campos originales.
+
+Se conservan, cuando COROS los entrega:
+
+- resumen, fecha, duración, distancia, calorías y dispositivo;
+- frecuencia cardíaca, velocidad, distancia, altitud, cadencia, potencia y temperatura;
+- vueltas, zonas de frecuencia cardíaca y ruta GPS;
+- métricas específicas del deporte y campos COROS;
+- los tramos multisport en el mismo orden en que fueron recibidos.
+
+En fuerza/gimnasio no se inventan ejercicios, series ni repeticiones que no estén presentes en el FIT o en la respuesta de COROS.
 
 ## Endpoints de Alzan
 
 | Método | Ruta | Auth | Finalidad |
 | --- | --- | --- | --- |
-| `GET` | `/oauth/coros/authorize` | Supabase | Generar `state` y URL OAuth COROS |
+| `GET` | `/oauth/coros/authorize` | Supabase | Generar `state` y URL OAuth directa de COROS |
 | `GET` | `/oauth/coros/callback` | Pública | Intercambiar `code`, cifrar tokens y guardar `openId` |
-| `GET` | `/oauth/coros/mcp/callback` | Pública | Callback OAuth PKCE del servidor MCP COROS |
 | `GET` | `/wearables/cloud/coros/capability` | Supabase | Aplicar rollout `disabled`, `pilot` o `public` |
-| `POST` | `/wearables/cloud/coros/sync` | Supabase | Sincronizar actividades y salud diaria |
+| `POST` | `/wearables/cloud/coros/sync` | Supabase | Sincronizar actividades y salud con consentimiento separado |
+| `POST` | `/activity-imports/coros/history` | Supabase | Importar uno o varios FIT históricos |
 | `DELETE` | `/wearables/connections/coros` | Supabase | Revocar y borrar datos COROS |
-| `POST` | `/webhooks/coros/workouts` | Headers COROS | Persistir el push antes de responder |
+| `POST` | `/webhooks/coros/workouts` | `client_id` + `secret` headers COROS | Persistir el push antes de responder |
 | `GET` | `/webhooks/coros/status` | Pública | Comprobación `{"status":"ok"}` |
 
-El webhook admite hasta 100 elementos y 2 MiB, y responde `{"message":"ok","result":"0000"}` solo después de persistirlos. Los eventos se guardan en `external_raw_payloads_v2` y una cola duradera los reprocesa. Los duplicados se absorben por hash de raw payload y por `labelId` en el lifecycle de actividad.
+El webhook admite hasta 100 elementos y 2 MiB. Los eventos se persisten antes de responder y una cola duradera los reprocesa. La identidad `labelId` evita duplicados entre webhook y sincronización manual.
 
 ## Variables de entorno
 
@@ -45,33 +65,17 @@ COROS_TOKEN_ENCRYPTION_KEY_V1=<32-byte-base64-key>
 COROS_FIT_ALLOWED_HOSTS=oss.coros.com
 COROS_WEBHOOK_CLIENT=<issued-or-confirmed-by-coros>
 COROS_WEBHOOK_SECRET=<issued-or-confirmed-by-coros>
-COROS_MCP_URL=https://mcp.coros.com/mcp
-COROS_MCP_ISSUER=<optional-regional-issuer>
-COROS_MCP_CLIENT_ID=<registered-public-oauth-client>
-COROS_MCP_REDIRECT_URI=https://api.alzanhealth.com/oauth/coros/mcp/callback
-COROS_MCP_ROLLOUT_MODE=pilot
-COROS_MCP_BACKFILL_START_DATE=2000-01-01
-COROS_MCP_BACKFILL_WINDOW_DAYS=30
-COROS_MCP_WINDOWS_PER_SYNC=10
 ```
 
-`COROS_MCP_CLIENT_ID` es un cliente público OAuth con PKCE. Si se deja vacío, el backend intenta registro dinámico cuando el issuer MCP lo permite y guarda el `client_id` resultante junto a la conexión. En producción se recomienda registrar el cliente explícitamente para controlar las redirect URIs.
-
-El MCP oficial expone `https://mcp.coros.com/mcp`, usa OAuth 2.0 y permite consultar actividades, detalle, laps y FIT. No ofrece webhooks ni sincronización bidireccional de actividades; esas capacidades requieren Partner API. El límite de FIT se trata como enriquecimiento pendiente y no impide importar la actividad.
-
-Generar la clave interna una sola vez y guardarla en el gestor de secretos del backend:
+La clave se genera una sola vez y se conserva en Secret Manager:
 
 ```sh
 openssl rand -base64 32
 ```
 
-No existe `COROS_DEFAULT_SCOPE` en el código porque la documentación recibida no define scopes OAuth por petición. No existe equivalente implementado a `SUUNTO_SUBSCRIPTION_KEY`.
+No se escriben secretos en Git, Cloud Build ni Expo. Para producción, usar `https://open.coros.com` solo después de la aprobación escrita de COROS.
 
-Para producción, cambiar `COROS_API_BASE_URL` a `https://open.coros.com` únicamente después de la aprobación escrita de COROS. MCP usa su propio endpoint y no depende de ese cambio.
-
-## Dominio público y corrección de la solicitud
-
-El dominio operativo del proyecto es `alzanhealth.com`. No usar `alzan.health`: a fecha de la comprobación no está registrado en DNS (`NXDOMAIN`). Las URLs correctas son:
+## URLs de producción
 
 ```text
 Application URL: https://alzanhealth.com
@@ -81,102 +85,24 @@ Workout receiving endpoint: https://api.alzanhealth.com/webhooks/coros/workouts
 Service status endpoint: https://api.alzanhealth.com/webhooks/coros/status
 ```
 
-Si la solicitud ya se envió con `alzan.health`, enviar inmediatamente esta corrección a `api@coros.com` en el mismo hilo del correo original:
-
-```text
-Subject: Correction to COROS API application – Alzan Health callback domain
-
-Hello COROS Developer Operations,
-
-I am writing to correct the public URLs in the COROS API application submitted for Alzan Health.
-The previously supplied alzan.health domain was incorrect. Please use the following URLs for the application review and credential configuration:
-
-Application URL:
-https://alzanhealth.com
-
-Authorized callback domain:
-https://api.alzanhealth.com
-
-OAuth redirect URI:
-https://api.alzanhealth.com/oauth/coros/callback
-
-Workout receiving endpoint:
-https://api.alzanhealth.com/webhooks/coros/workouts
-
-Service status endpoint:
-https://api.alzanhealth.com/webhooks/coros/status
-
-Please confirm that these corrected URLs have been attached to the application before issuing the Client ID and Client Secret.
-
-Kind regards,
-[NOMBRE LEGAL DEL SOLICITANTE]
-Founder / Developer
-Alzan Health
-support@alzanhealth.com
-```
-
-No aceptar credenciales configuradas para el callback anterior. COROS debe confirmar por escrito que el dominio autorizado es `https://api.alzanhealth.com`.
-
-## Preparación de Cloud Run
-
-La rama debe estar integrada y desplegada antes de que COROS pruebe las URLs. El despliegue de `cloudbuild.yaml` mantiene una instancia con CPU activa porque la cola de webhooks y las revocaciones diferidas se procesan después de responder al HTTP. Esta configuración tiene coste de una instancia mínima de Cloud Run.
-
-1. Crear el mapping HTTPS de `api.alzanhealth.com` hacia el servicio `alzan-backend` en `europe-west1`.
-2. Sustituir en Cloudflare los registros actuales del subdominio `api` por los registros que devuelva Google. Mantener el proxy de Cloudflare desactivado (`DNS only`) hasta que Google emita el certificado.
-3. Desplegar esta rama y aplicar la migración MCP COROS (`20260904120000_coros_mcp_connections.sql`) antes de activar el piloto.
-4. Verificar los endpoints públicos con:
-
-```sh
-pnpm verify:coros-readiness
-```
-
-5. Cuando COROS entregue los secretos, configurarlos en Secret Manager y enlazarlos al servicio Cloud Run. Las variables no secretas también deben quedar en el servicio:
-
-```text
-COROS_API_BASE_URL=https://opentest.coros.com
-COROS_REDIRECT_URI=https://api.alzanhealth.com/oauth/coros/callback
-COROS_ROLLOUT_MODE=pilot
-COROS_PILOT_USER_IDS=<authorized-supabase-user-uuid>
-COROS_FIT_ALLOWED_HOSTS=<hosts-confirmed-by-coros>
-```
-
-Secretos que nunca se escriben en Git, Cloud Build substitutions ni Expo:
-
-```text
-COROS_CLIENT_ID
-COROS_CLIENT_SECRET
-COROS_TOKEN_ENCRYPTION_KEY_V1
-COROS_WEBHOOK_CLIENT
-COROS_WEBHOOK_SECRET
-```
-
-La clave `COROS_TOKEN_ENCRYPTION_KEY_V1` es interna de Alzan y puede prepararse ya. Debe ser una clave base64 de 32 bytes, creada una sola vez, almacenada en Secret Manager y conservada para descifrar los tokens existentes. No rotarla ni reemplazarla sin implementar primero una migración de cifrado.
-
-Después de enlazar la configuración, ejecutar también la validación de secretos desde un fichero temporal o entorno seguro:
-
-```sh
-pnpm verify:coros-readiness -- --env-file=/ruta/segura/coros.env --require-config
-```
+COROS debe confirmar estas URLs, scopes, límites, payloads y credenciales de webhook antes del go-live. El backend debe desplegarse antes de registrar o probar el callback.
 
 ## Seguridad y borrado
 
 - Access y refresh tokens se cifran con AES-256-GCM, IV aleatorio y prefijo de versión `enc:v1`.
-- La clave de cifrado, `Client Secret` y secretos webhook nunca se exponen a Expo.
 - `fitUrl` exige HTTPS, host exacto de allowlist, puerto 443, ausencia de credenciales/fragmento, extensión `.fit`, cero redirects, timeout y máximo 25 MiB.
-- La firma binaria `.FIT` se valida antes de parsear.
-- Los headers webhook se comparan en tiempo constante.
-- La desconexión borra actividades, salud, payloads, tokens y derivados. Las sesiones nativas Alzan asociadas se conservan, pero se limpian sus métricas/provenance COROS.
-- Si la revocación remota falla, se conserva solo el token ya cifrado y un hash de referencia en `provider_deauthorization_jobs`, sin FK al usuario, durante un máximo de 24 horas.
+- El binario `.FIT` se valida antes de parsear.
+- Los headers webhook `client_id` y `secret` se comparan en tiempo constante. Se aceptan también `client`/`client-id` y `client_secret`/`client-secret` para compatibilidad con variantes del proveedor.
+- Desconectar borra actividades, salud, payloads, tokens y derivados COROS; las sesiones nativas de Alzan se conservan y pierden sus métricas/provenance COROS.
+- Si la revocación remota falla, se conserva solo el token cifrado y un hash de referencia durante un máximo de 24 horas.
 
 ## Verificación local
 
 ```sh
-pnpm --prefix alzan-be exec ts-node -r tsconfig-paths/register src/components/providers/oauth/coros-security.spec.ts
-pnpm --prefix alzan-be exec ts-node -r tsconfig-paths/register src/components/providers/oauth/coros-oauth.service.spec.ts
-pnpm --prefix alzan-be exec ts-node -r tsconfig-paths/register src/components/wearables/services/coros-api.utils.spec.ts
-pnpm --prefix alzan-be exec ts-node -r tsconfig-paths/register src/components/wearables/dto/coros-webhook.dto.spec.ts
-pnpm verify:activity-import -- --provider coros
-psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -v ON_ERROR_STOP=1 -f supabase/tests/coros_disconnect.integration.sql
+pnpm --prefix alzan-be run verify:coros
+pnpm --prefix alzan-be run verify:activity-import
+pnpm --prefix alzan-be run verify:oauth-redirect
+pnpm verify:coros-readiness -- --base-url=http://localhost:1111
 ```
 
-La validación final necesita una cuenta COROS real: comparar actividad, tipo, fecha, duración, distancia, ruta, laps, frecuencia cardiaca, pasos, sueño y HRV contra la app COROS.
+La validación local puede comprobar OAuth, ventanas, deduplicación, webhooks, FIT, deportes y errores con mocks. Sin credenciales COROS reales no se puede certificar el intercambio OAuth ni el formato exacto del payload de producción; esa es la única prueba que requiere autorización real de COROS.

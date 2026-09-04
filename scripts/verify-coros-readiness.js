@@ -93,36 +93,11 @@ function validateConfiguration(values, baseUrl, reporter, requireConfig) {
     "COROS_WEBHOOK_SECRET",
   ];
   const legacyMissing = legacyRequired.filter((key) => !values[key]?.trim());
-  const mcpRequired = ["COROS_MCP_URL", "COROS_MCP_REDIRECT_URI", "COROS_MCP_ROLLOUT_MODE"];
-  const mcpMissing = mcpRequired.filter((key) => !values[key]?.trim());
-  const mcpConfigured = mcpMissing.length === 0 && values.COROS_MCP_ROLLOUT_MODE !== "disabled";
-
-  if (legacyMissing.length > 0 && !mcpConfigured) {
-    const missing = [...legacyMissing, ...mcpMissing];
+  if (legacyMissing.length > 0) {
+    const missing = [...legacyMissing];
     const detail = `faltan ${missing.join(", ")}`;
     if (requireConfig) reporter.fail("Configuración COROS", detail);
     else reporter.pending("Configuración COROS", detail);
-  }
-
-  if (mcpConfigured) {
-    const expectedMcpRedirect = `${baseUrl}/oauth/coros/mcp/callback`;
-    if (values.COROS_MCP_REDIRECT_URI !== expectedMcpRedirect) {
-      reporter.fail("Redirect URI MCP COROS", `debe ser ${expectedMcpRedirect}`);
-    } else {
-      reporter.pass("Redirect URI MCP COROS", expectedMcpRedirect);
-    }
-
-    if (!new Set(["disabled", "pilot", "public"]).has(values.COROS_MCP_ROLLOUT_MODE)) {
-      reporter.fail("Rollout MCP COROS", "debe ser disabled, pilot o public");
-    } else {
-      reporter.pass("Rollout MCP COROS", values.COROS_MCP_ROLLOUT_MODE);
-    }
-
-    if (!values.COROS_MCP_CLIENT_ID?.trim()) {
-      reporter.pending("Cliente OAuth MCP COROS", "se usará registro dinámico o falta configurar COROS_MCP_CLIENT_ID");
-    } else {
-      reporter.pass("Cliente OAuth MCP COROS", "client_id configurado");
-    }
   }
 
   if (legacyMissing.length > 0) return;
@@ -181,10 +156,11 @@ async function main() {
   baseUrl.hash = "";
   const normalizedBaseUrl = baseUrl.toString().replace(/\/$/, "");
 
-  if (baseUrl.protocol !== "https:") {
-    reporter.fail("URL pública", "debe usar HTTPS");
+  const isLocalBaseUrl = ["localhost", "127.0.0.1", "::1"].includes(baseUrl.hostname);
+  if (baseUrl.protocol !== "https:" && !(isLocalBaseUrl && baseUrl.protocol === "http:")) {
+    reporter.fail("URL pública", "debe usar HTTPS fuera de localhost");
   } else {
-    reporter.pass("URL pública", normalizedBaseUrl);
+    reporter.pass("URL pública", isLocalBaseUrl ? `${normalizedBaseUrl} (local)` : normalizedBaseUrl);
   }
 
   try {
@@ -223,18 +199,6 @@ async function main() {
     }
   } catch (error) {
     reporter.fail("Callback OAuth COROS", error instanceof Error ? error.message : String(error));
-  }
-
-  try {
-    const response = await request(`${normalizedBaseUrl}/oauth/coros/mcp/callback`);
-    const location = response.headers.get("location") || "";
-    if (response.status === 303 && location.startsWith("/oauth/error?")) {
-      reporter.pass("Callback OAuth MCP COROS", "ruta desplegada y rechaza parámetros ausentes");
-    } else {
-      reporter.fail("Callback OAuth MCP COROS", `HTTP ${response.status}; Location=${location || "ausente"}`);
-    }
-  } catch (error) {
-    reporter.fail("Callback OAuth MCP COROS", error instanceof Error ? error.message : String(error));
   }
 
   try {

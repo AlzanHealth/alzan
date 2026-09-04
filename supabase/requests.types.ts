@@ -459,7 +459,7 @@ type UserConnectionsOverride = {
     access_token: string | null;
     refresh_token: string | null;
     token_expires_at: string | null;
-    connection_kind: "oauth" | "local_sdk" | "file_import" | "mcp";
+    connection_kind: "oauth" | "local_sdk" | "file_import";
     status: "active" | "revoked" | "expired" | "error" | "paused";
     revoked_at: string | null;
     last_synced_at: string | null;
@@ -472,7 +472,7 @@ type UserConnectionsOverride = {
     access_token?: string | null;
     refresh_token?: string | null;
     token_expires_at?: string | null;
-    connection_kind?: "oauth" | "local_sdk" | "file_import" | "mcp";
+    connection_kind?: "oauth" | "local_sdk" | "file_import";
     status?: "active" | "revoked" | "expired" | "error" | "paused";
     revoked_at?: string | null;
     last_synced_at?: string | null;
@@ -485,7 +485,7 @@ type UserConnectionsOverride = {
     access_token?: string | null;
     refresh_token?: string | null;
     token_expires_at?: string | null;
-    connection_kind?: "oauth" | "local_sdk" | "file_import" | "mcp";
+    connection_kind?: "oauth" | "local_sdk" | "file_import";
     status?: "active" | "revoked" | "expired" | "error" | "paused";
     revoked_at?: string | null;
     last_synced_at?: string | null;

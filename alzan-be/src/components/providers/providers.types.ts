@@ -12,7 +12,7 @@ export enum WearableProvider {
   HEALTH_CONNECT = 'health_connect',
 }
 
-export type WearableProviderConnectionKind = 'oauth' | 'local_sdk' | 'file_import' | 'mcp';
+export type WearableProviderConnectionKind = 'oauth' | 'local_sdk' | 'file_import';
 
 export interface WearableProviderCapability {
   provider: WearableProvider;

@@ -112,3 +112,10 @@ export type CorosDisconnectResult = {
   disconnected: boolean;
   remote_deauthorization_pending: boolean;
 };
+
+export type CorosHistoryImportResult = {
+  filesImported: number;
+  filesSkipped: number;
+  filesFailed: number;
+  errorsByFile: Array<{ fileName: string; code: string }>;
+};

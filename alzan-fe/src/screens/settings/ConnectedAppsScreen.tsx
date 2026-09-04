@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   View,
   Text,
@@ -46,6 +47,15 @@ export const ConnectedAppsScreen = () => {
   const formatLastSync = (lastSyncedAt?: string | null) =>
     lastSyncedAt ? t('settings.lastSync', { date: new Date(lastSyncedAt).toLocaleDateString() }) : null;
 
+  const importCorosHistory = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/fit', 'application/octet-stream'],
+      multiple: true,
+      copyToCacheDirectory: true,
+    });
+    if (!result.canceled) coros.importHistory(result.assets);
+  }, [coros]);
+
   const openPermissionFlow = useCallback((flow: PermissionFlow) => {
     setPermissionFlow(flow);
   }, []);
@@ -88,11 +98,13 @@ export const ConnectedAppsScreen = () => {
     onConnect,
     onDisconnect,
     onSync,
+    onImport,
     detail,
     comingSoon = false,
     isLoading = false,
     isActioning = false,
     isSyncing = false,
+    isImporting = false,
     onInfo,
     statusLabel,
   }: {
@@ -101,11 +113,13 @@ export const ConnectedAppsScreen = () => {
     onConnect: () => void;
     onDisconnect: () => void;
     onSync?: () => void;
+    onImport?: () => void;
     detail?: string | null;
     comingSoon?: boolean;
     isLoading?: boolean;
     isActioning?: boolean;
     isSyncing?: boolean;
+    isImporting?: boolean;
     onInfo?: () => void;
     statusLabel?: string;
   }) => (
@@ -149,6 +163,21 @@ export const ConnectedAppsScreen = () => {
       </View>
       {!comingSoon && !isLoading && (
         <View style={styles.actions}>
+          {connected && onImport && (
+            <TouchableOpacity
+              style={[styles.iconButton, { borderColor: themeColors.border }]}
+              onPress={onImport}
+              disabled={isImporting}
+            >
+              {isImporting ? (
+                <ActivityIndicator size="small" color={themeColors.textPrimary} />
+              ) : (
+                <Text style={[styles.buttonText, { color: themeColors.textPrimary }]}>
+                  {t('settings.corosImportHistory')}
+                </Text>
+              )}
+            </TouchableOpacity>
+          )}
           {connected && onSync && (
             <TouchableOpacity
               style={[styles.iconButton, { borderColor: themeColors.border }]}
@@ -243,6 +272,8 @@ export const ConnectedAppsScreen = () => {
           }
           onDisconnect={coros.disconnect}
           onSync={coros.sync}
+          onImport={importCorosHistory}
+          isImporting={coros.isImportingHistory}
           detail={formatLastSync(coros.lastSyncedAt)}
           onInfo={() => setCorosInfoVisible(true)}
         />
@@ -364,6 +395,13 @@ export const ConnectedAppsScreen = () => {
                 {t('settings.corosInfoSyncTitle')}
               </Text>
               <Text style={[styles.infoBody, { color: themeColors.textSecondary }]}>{t('settings.corosInfoSync')}</Text>
+
+              <Text style={[styles.infoSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('settings.corosInfoHistoryTitle')}
+              </Text>
+              <Text style={[styles.infoBody, { color: themeColors.textSecondary }]}>
+                {t('settings.corosInfoHistory')}
+              </Text>
 
               <Text style={[styles.infoSectionTitle, { color: themeColors.textPrimary }]}>
                 {t('settings.corosInfoDataTitle')}

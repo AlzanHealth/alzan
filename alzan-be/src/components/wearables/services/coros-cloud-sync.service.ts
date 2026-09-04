@@ -17,7 +17,7 @@ import {
   mapCorosSleepToCanonical,
 } from '../../activity-import/parsers/coros-health-canonical.mapper';
 import { CorosOAuthService } from '../../providers/oauth/coros-oauth.service';
-import { decryptCorosToken, validateCorosFitUrl } from '../../providers/oauth/coros-security';
+import { decryptCorosToken, encryptCorosToken, validateCorosFitUrl } from '../../providers/oauth/coros-security';
 import { CanonicalProvenance } from '../domain/wearable.types';
 import { CanonicalActivityWriterService } from './canonical-activity-writer.service';
 import { CanonicalHealthWriterService } from './canonical-health-writer.service';
@@ -25,11 +25,11 @@ import {
   assertCorosFitBytes,
   assertCorosApiSuccess,
   buildCorosDateWindows,
-  extractCorosDailyRecords,
+  extractCorosDailyPage,
   extractCorosFitUrls,
-  extractCorosWorkoutRecords,
+  extractCorosWorkoutPage,
 } from './coros-api.utils';
-import { mergeCorosMultisportActivities } from './coros-multisport.utils';
+import { buildCorosCanonicalActivity } from './coros-activity.utils';
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
@@ -53,13 +53,21 @@ export interface CorosSyncResult {
   healthDaysImported: number;
   healthConsentRequired: boolean;
   errorsByCode: Record<string, number>;
+  fitPending: number;
   lastSuccessAt: string | null;
 }
 
 export interface CorosWorkoutPushSyncResult {
   jobId: string;
   status: 'failed' | 'imported' | 'running' | 'skipped';
+  fitPending?: boolean;
 }
+
+type CorosWorkoutImportOutcome = {
+  status: 'failed' | 'imported' | 'skipped';
+  fitPending: boolean;
+  errorCode?: string;
+};
 
 const FIRST_SYNC_LOOKBACK_DAYS = 90;
 const NORMAL_SYNC_OVERLAP_DAYS = 3;
@@ -107,16 +115,19 @@ export class CorosCloudSyncService {
       let activitiesImported = 0;
       let activitiesSkipped = 0;
       let activitiesFailed = 0;
+      let fitPending = 0;
       const errorsByCode: Record<string, number> = {};
 
       for (const summary of this.uniqueWorkouts(workouts)) {
         const outcome = await this.importWorkout(userId, token, summary, job.jobId);
-        if (outcome === 'imported') activitiesImported += 1;
-        else if (outcome === 'skipped') activitiesSkipped += 1;
+        if (outcome.status === 'imported') activitiesImported += 1;
+        else if (outcome.status === 'skipped') activitiesSkipped += 1;
         else {
           activitiesFailed += 1;
-          errorsByCode.COROS_ACTIVITY_IMPORT_FAILED = (errorsByCode.COROS_ACTIVITY_IMPORT_FAILED ?? 0) + 1;
+          const errorCode = outcome.errorCode ?? 'COROS_ACTIVITY_IMPORT_FAILED';
+          errorsByCode[errorCode] = (errorsByCode[errorCode] ?? 0) + 1;
         }
+        if (outcome.fitPending) fitPending += 1;
       }
 
       const hasHealthConsent = await this.hasHealthConsent(userId);
@@ -148,6 +159,7 @@ export class CorosCloudSyncService {
           activitiesSkipped,
           activitiesFailed,
           healthDaysImported,
+          fitPending,
           healthConsentRequired: !hasHealthConsent,
           canonicalVersion: CANONICAL_ACTIVITY_VERSION,
         },
@@ -156,7 +168,7 @@ export class CorosCloudSyncService {
         jobId: job.jobId,
         leaseToken: job.leaseToken,
         status,
-        counters: { activitiesImported, activitiesSkipped, activitiesFailed, healthDaysImported },
+        counters: { activitiesImported, activitiesSkipped, activitiesFailed, healthDaysImported, fitPending },
         lastError: activitiesFailed > 0 ? 'COROS_SYNC_PARTIAL' : null,
       });
       return {
@@ -169,6 +181,7 @@ export class CorosCloudSyncService {
         healthDaysImported,
         healthConsentRequired: !hasHealthConsent,
         errorsByCode,
+        fitPending,
         lastSuccessAt,
       };
     } catch (error: unknown) {
@@ -195,7 +208,8 @@ export class CorosCloudSyncService {
 
     const stopHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
     try {
-      const status = await this.importWorkout(userId, token, summary, job.jobId);
+      const result = await this.importWorkout(userId, token, summary, job.jobId);
+      const status = result.status;
       await this.importLifecycleService.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
@@ -210,7 +224,7 @@ export class CorosCloudSyncService {
       if (status !== 'failed') {
         await this.markConnectionResult(userId, new Date().toISOString(), 'success', {});
       }
-      return { jobId: job.jobId, status };
+      return { jobId: job.jobId, status, fitPending: result.fitPending };
     } catch (error: unknown) {
       await this.finishFailedJob(job.jobId, job.leaseToken, error);
       throw error;
@@ -230,6 +244,7 @@ export class CorosCloudSyncService {
       healthDaysImported: 0,
       healthConsentRequired: false,
       errorsByCode: {},
+      fitPending: 0,
       lastSuccessAt: null,
     };
   }
@@ -239,9 +254,9 @@ export class CorosCloudSyncService {
     token: CorosToken,
     summary: JsonRecord,
     jobId: string,
-  ): Promise<'failed' | 'imported' | 'skipped'> {
+  ): Promise<CorosWorkoutImportOutcome> {
     const labelId = this.readIdentifier(summary.labelId);
-    if (!labelId) return 'failed';
+    if (!labelId) return { status: 'failed', fitPending: false, errorCode: 'COROS_ACTIVITY_ID_MISSING' };
     const claim = await this.importLifecycleService.claimActivity({
       userId,
       provider: 'coros',
@@ -251,7 +266,7 @@ export class CorosCloudSyncService {
       canonicalVersion: CANONICAL_ACTIVITY_VERSION,
       jobId,
     });
-    if (claim.action === 'skip') return 'skipped';
+    if (claim.action === 'skip') return { status: 'skipped', fitPending: false };
 
     try {
       const rawPayload = await this.rawPayloadService.storeRawPayload({
@@ -264,29 +279,16 @@ export class CorosCloudSyncService {
         payload: summary,
         traceId: jobId,
       });
-      const fitFiles = await this.fetchWorkoutFits(token, summary, labelId);
-      const fitActivity = mergeCorosMultisportActivities(
-        fitFiles.map((fitBytes, index) =>
-          parseCorosActivityFileToCanonical(fitBytes, `coros-${labelId}-${index + 1}.fit`),
-        ),
-      );
-      const summaryActivity = parseCorosActivityFileToCanonical(JSON.stringify(summary), `coros-${labelId}.json`);
-      const activity = {
-        ...fitActivity,
-        providerActivityId: labelId,
-        sportType: summaryActivity.sportType,
-        sportSubtype: summaryActivity.sportSubtype,
-        summary: {
-          ...fitActivity.summary,
-          startedAt: summaryActivity.summary.startedAt ?? fitActivity.summary.startedAt,
-          endedAt: summaryActivity.summary.endedAt ?? fitActivity.summary.endedAt,
-          durationSeconds: summaryActivity.summary.durationSeconds ?? fitActivity.summary.durationSeconds,
-          distanceM: summaryActivity.summary.distanceM ?? fitActivity.summary.distanceM,
-          caloriesKcal: summaryActivity.summary.caloriesKcal ?? fitActivity.summary.caloriesKcal,
-        },
-        device: summaryActivity.device ?? fitActivity.device,
-        vendorFields: { ...fitActivity.vendorFields, ...summaryActivity.vendorFields },
-      };
+      parseCorosActivityFileToCanonical(JSON.stringify(summary), `coros-${labelId}.json`);
+      let fitFiles: Uint8Array[] = [];
+      let fitPendingReason: string | null = null;
+      try {
+        fitFiles = await this.fetchWorkoutFits(token, summary, labelId);
+      } catch (error: unknown) {
+        fitPendingReason = this.errorMessage(error);
+        this.logger.warn({ provider: 'coros', labelId, errorCode: fitPendingReason }, 'COROS FIT enrichment pending');
+      }
+      const { activity } = buildCorosCanonicalActivity(summary, labelId, fitFiles, fitPendingReason);
       const provenance: CanonicalProvenance = {
         provider: 'coros',
         sourceChannel: 'cloud',
@@ -304,11 +306,12 @@ export class CorosCloudSyncService {
         lifecycleJobId: jobId,
         canonicalVersion: CANONICAL_ACTIVITY_VERSION,
       });
-      return 'imported';
+      return { status: 'imported', fitPending: fitPendingReason != null };
     } catch (error: unknown) {
-      await this.importLifecycleService.failActivity(claim.importId, this.errorMessage(error), this.isRetryable(error));
-      this.logger.warn({ provider: 'coros', labelId, errorCode: this.errorMessage(error) });
-      return 'failed';
+      const errorCode = this.errorMessage(error);
+      await this.importLifecycleService.failActivity(claim.importId, errorCode, this.isRetryable(error));
+      this.logger.warn({ provider: 'coros', labelId, errorCode });
+      return { status: 'failed', fitPending: false, errorCode };
     }
   }
 
@@ -381,31 +384,78 @@ export class CorosCloudSyncService {
     token: CorosToken,
     windows: Array<{ startDate: string; endDate: string }>,
   ): Promise<JsonRecord[]> {
-    const pages = await Promise.all(
-      windows.map(window => this.getCoros('/v2/coros/sport/list', token, window).then(extractCorosWorkoutRecords)),
-    );
+    const pages = await Promise.all(windows.map(window => this.fetchWorkoutWindow(token, window)));
     return pages.flat();
+  }
+
+  private async fetchWorkoutWindow(
+    token: CorosToken,
+    window: { startDate: string; endDate: string },
+  ): Promise<JsonRecord[]> {
+    const records: JsonRecord[] = [];
+    let response = await this.getCoros('/v2/coros/sport/list', token, window);
+    let requestedPage: number | null = null;
+    const seenPages = new Set<number>();
+    for (let iteration = 0; iteration < 100; iteration += 1) {
+      const page = extractCorosWorkoutPage(response);
+      records.push(...page.records);
+      if (page.nextPage == null) return records;
+      if (seenPages.has(page.nextPage) || (requestedPage != null && page.nextPage <= requestedPage)) {
+        throw new BadGatewayException('COROS_PAGINATION_INVALID');
+      }
+      seenPages.add(page.nextPage);
+      requestedPage = page.nextPage;
+      response = await this.getCoros('/v2/coros/sport/list', token, window, {
+        pageNo: requestedPage,
+        pageSize: 100,
+      });
+    }
+    throw new BadGatewayException('COROS_PAGINATION_TOO_DEEP');
   }
 
   private async fetchDailyHealth(
     token: CorosToken,
     windows: Array<{ startDate: string; endDate: string }>,
   ): Promise<JsonRecord[]> {
-    const pages = await Promise.all(
-      windows.map(window => this.getCoros('/coros/daily/query', token, window).then(extractCorosDailyRecords)),
-    );
+    const pages = await Promise.all(windows.map(window => this.fetchDailyWindow(token, window)));
     return pages.flat();
+  }
+
+  private async fetchDailyWindow(
+    token: CorosToken,
+    window: { startDate: string; endDate: string },
+  ): Promise<JsonRecord[]> {
+    const records: JsonRecord[] = [];
+    let response = await this.getCoros('/coros/daily/query', token, window);
+    let requestedPage: number | null = null;
+    const seenPages = new Set<number>();
+    for (let iteration = 0; iteration < 100; iteration += 1) {
+      const page = extractCorosDailyPage(response);
+      records.push(...page.records);
+      if (page.nextPage == null) return records;
+      if (seenPages.has(page.nextPage) || (requestedPage != null && page.nextPage <= requestedPage)) {
+        throw new BadGatewayException('COROS_PAGINATION_INVALID');
+      }
+      seenPages.add(page.nextPage);
+      requestedPage = page.nextPage;
+      response = await this.getCoros('/coros/daily/query', token, window, {
+        pageNo: requestedPage,
+        pageSize: 100,
+      });
+    }
+    throw new BadGatewayException('COROS_PAGINATION_TOO_DEEP');
   }
 
   private async getCoros(
     path: string,
     token: CorosToken,
     window: { startDate: string; endDate: string },
+    extraParams: Record<string, string | number> = {},
   ): Promise<unknown> {
     try {
       const response = await this.executeRequest(() =>
         axios.get(`${this.apiBaseUrl}${path}`, {
-          params: { token: token.accessToken, openId: token.openId, ...window },
+          params: { token: token.accessToken, openId: token.openId, ...window, ...extraParams },
           headers: { Accept: 'application/json', token: token.accessToken },
           timeout: 15_000,
         }),
@@ -504,7 +554,7 @@ export class CorosCloudSyncService {
     const clientSecret = this.configService.get<string>('COROS_CLIENT_SECRET');
     if (!clientId || !clientSecret) throw new InternalServerErrorException('COROS_CLIENT_CREDENTIALS_MISSING');
     const response = await this.executeRequest(() =>
-      axios.post<{ result?: string; message?: string }>(
+      axios.post<unknown>(
         `${this.apiBaseUrl}/oauth2/refresh-token`,
         new URLSearchParams({
           client_id: clientId,
@@ -515,19 +565,39 @@ export class CorosCloudSyncService {
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10_000 },
       ),
     );
-    if (response.data.result !== '0000') throw new UnauthorizedException('COROS_TOKEN_REFRESH_FAILED');
-    const expiresAt = new Date(Date.now() + COROS_TOKEN_LIFETIME_SECONDS * 1000).toISOString();
+    const responsePayload =
+      this.isRecord(response.data) && this.isRecord(response.data.data) ? response.data.data : response.data;
+    const resultCode = this.isRecord(response.data) ? this.readString(response.data.result) : null;
+    if (resultCode != null && resultCode !== '0000') throw new UnauthorizedException('COROS_TOKEN_REFRESH_FAILED');
+    if (!this.isRecord(responsePayload)) throw new UnauthorizedException('COROS_TOKEN_REFRESH_FAILED');
+    const accessToken = this.readString(
+      responsePayload.access_token ?? responsePayload.accessToken ?? responsePayload.token,
+    );
+    if (!accessToken) throw new UnauthorizedException('COROS_TOKEN_REFRESH_FAILED');
+    const refreshedToken =
+      this.readString(responsePayload.refresh_token ?? responsePayload.refreshToken) ?? token.refreshToken;
+    const expiresIn =
+      this.readNumber(responsePayload.expires_in ?? responsePayload.expiresIn) ?? COROS_TOKEN_LIFETIME_SECONDS;
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+    const encryptionKey = this.encryptionKey;
     const { error } = await this.supabaseAdminService.client
       .from('provider_connection_tokens')
-      .update({ token_expires_at: expiresAt, updated_at: new Date().toISOString() })
+      .update({
+        access_token: encryptCorosToken(accessToken, encryptionKey),
+        refresh_token: refreshedToken ? encryptCorosToken(refreshedToken, encryptionKey) : null,
+        token_expires_at: expiresAt,
+        token_type: this.readString(responsePayload.token_type ?? responsePayload.tokenType),
+        updated_at: new Date().toISOString(),
+      })
       .eq('connection_id', token.connectionId);
     if (error) throw new InternalServerErrorException('COROS_TOKEN_REFRESH_PERSIST_FAILED');
-    await this.supabaseAdminService.client
+    const { error: connectionError } = await this.supabaseAdminService.client
       .from('user_connections')
       .update({ token_expires_at: expiresAt, status: 'active', last_error: null, updated_at: new Date().toISOString() })
       .eq('id', token.connectionId)
       .eq('user_id', userId);
-    return { ...token, expiresAt };
+    if (connectionError) throw new InternalServerErrorException('COROS_CONNECTION_REFRESH_PERSIST_FAILED');
+    return { ...token, accessToken, refreshToken: refreshedToken, expiresAt };
   }
 
   private async resolveDateWindows(userId: string): Promise<Array<{ startDate: string; endDate: string }>> {
@@ -645,7 +715,7 @@ export class CorosCloudSyncService {
     status: 'success' | 'partial',
     errorsByCode: Record<string, number>,
   ): Promise<void> {
-    await this.supabaseAdminService.client
+    const { error } = await this.supabaseAdminService.client
       .from('user_connections')
       .update({
         last_synced_at: syncedAt,
@@ -655,14 +725,16 @@ export class CorosCloudSyncService {
       })
       .eq('user_id', userId)
       .eq('provider', 'coros');
+    if (error) throw new InternalServerErrorException('COROS_CONNECTION_UPDATE_FAILED');
   }
 
   private async markConnectionError(userId: string, message: string): Promise<void> {
-    await this.supabaseAdminService.client
+    const { error } = await this.supabaseAdminService.client
       .from('user_connections')
       .update({ status: 'error', last_error: message, updated_at: new Date().toISOString() })
       .eq('user_id', userId)
       .eq('provider', 'coros');
+    if (error) throw new InternalServerErrorException('COROS_CONNECTION_ERROR_UPDATE_FAILED');
   }
 
   private get apiBaseUrl(): string {

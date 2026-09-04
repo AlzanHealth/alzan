@@ -275,6 +275,8 @@ export class CanonicalActivityWriterService {
       source_record_id: input.provenance.sourceRecordId,
       source_updated_at: input.provenance.sourceUpdatedAt,
       raw_payload_id: input.provenance.rawPayloadId,
+      pending_watch_metrics:
+        input.activity.pendingWatchMetrics == null ? null : this.toJson(input.activity.pendingWatchMetrics),
     };
   }
 
@@ -426,6 +428,8 @@ export class CanonicalActivityWriterService {
       epoc: summary.epoc,
       pte: summary.pte,
       ...this.buildProvenancePayload(input, deviceId),
+      pending_watch_metrics:
+        input.activity.pendingWatchMetrics == null ? null : this.toJson(input.activity.pendingWatchMetrics),
       duplicate_of_session_id: null,
       duplicate_score: null,
       duplicate_resolution: 'merged',
@@ -450,7 +454,8 @@ export class CanonicalActivityWriterService {
       pte: summary.pte,
       tss_hr: summary.tss,
       ...this.buildProvenancePayload(input, deviceId),
-      pending_watch_metrics: null,
+      pending_watch_metrics:
+        input.activity.pendingWatchMetrics == null ? null : this.toJson(input.activity.pendingWatchMetrics),
       duplicate_of_session_id: null,
       duplicate_score: null,
       duplicate_resolution: 'merged',

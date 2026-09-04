@@ -8,7 +8,6 @@ import { PolarOAuthService } from './oauth/polar-oauth.service';
 import { StravaOAuthService } from './oauth/strava-oauth.service';
 import { SuuntoOAuthService } from './oauth/suunto-oauth.service';
 import { CorosOAuthService } from './oauth/coros-oauth.service';
-import { CorosMcpOAuthService } from './oauth/coros-mcp-oauth.service';
 import { UltrahumanOAuthService } from './oauth/ultrahuman-oauth.service';
 import { WhoopOAuthService } from './oauth/whoop-oauth.service';
 import { ProvidersController } from './providers.controller';
@@ -26,7 +25,6 @@ import { SwaggerApi } from '../../core/swagger/swagger-api.enum';
     PolarOAuthService,
     SuuntoOAuthService,
     CorosOAuthService,
-    CorosMcpOAuthService,
     WhoopOAuthService,
     OuraOAuthService,
     FitbitOAuthService,
@@ -39,7 +37,6 @@ import { SwaggerApi } from '../../core/swagger/swagger-api.enum';
     PolarOAuthService,
     SuuntoOAuthService,
     CorosOAuthService,
-    CorosMcpOAuthService,
     WhoopOAuthService,
     OuraOAuthService,
     FitbitOAuthService,
