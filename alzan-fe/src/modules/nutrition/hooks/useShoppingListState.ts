@@ -186,14 +186,14 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     });
   }, [updateState]);
 
-  const setPurchaseQuantity = useCallback(
+  const setAvailableQuantity = useCallback(
     (ingredientKey: string, quantityGrams: number) => {
-      if (!Number.isFinite(quantityGrams) || quantityGrams <= 0) return;
+      if (!Number.isFinite(quantityGrams) || quantityGrams < 0) return;
       updateState(previous => ({
         ...previous,
         [ingredientKey]: createShoppingListItemState({
           ...previous[ingredientKey],
-          purchaseQuantityGrams: Math.round(quantityGrams * 100) / 100,
+          availableQuantityGrams: Math.round(quantityGrams * 100) / 100,
           updatedAt: new Date().toISOString(),
         }),
       }));
@@ -256,11 +256,11 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
       ),
     [state],
   );
-  const purchaseQuantities = useMemo(
+  const availableQuantities = useMemo(
     () =>
       new Map(
         Object.entries(state).flatMap(([key, item]) =>
-          item.purchaseQuantityGrams ? [[key, item.purchaseQuantityGrams]] : [],
+          item.availableQuantityGrams !== undefined ? [[key, item.availableQuantityGrams]] : [],
         ),
       ),
     [state],
@@ -268,7 +268,7 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
 
   return {
     completedKeys,
-    purchaseQuantities,
+    availableQuantities,
     filter,
     setFilter,
     isHydrated,
@@ -277,7 +277,7 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     toggleIngredient,
     setCategoryCompleted,
     clearCompleted,
-    setPurchaseQuantity,
+    setAvailableQuantity,
     resetRange,
     retrySync,
   };

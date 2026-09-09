@@ -24,13 +24,11 @@ export type ShoppingListIngredient = {
   name: string;
   quantity_g: number;
   category: IngredientsCategory | null;
-  purchase_quantity_g?: number;
+  available_quantity_g?: number;
   sources?: ShoppingListIngredientSource[];
 };
 
 export type ShoppingListIngredientFilter = 'all' | 'pending' | 'purchased';
-
-export type ShoppingPurchaseAdjustment = 'exact' | 'round_500g' | 'round_1kg' | 'custom';
 
 export type ShoppingListCategoryGroup = {
   category: IngredientsCategory;
@@ -303,48 +301,36 @@ export const aggregateShoppingIngredients = (
     .map(item => ({
       ...item,
       quantity_g: Math.round(item.quantity_g * 100) / 100,
-      purchase_quantity_g: Math.round(item.quantity_g * 100) / 100,
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
 };
 
-export const getShoppingPurchaseQuantity = (ingredient: ShoppingListIngredient): number =>
-  typeof ingredient.purchase_quantity_g === 'number' && Number.isFinite(ingredient.purchase_quantity_g)
-    ? Math.max(0, ingredient.purchase_quantity_g)
-    : ingredient.quantity_g;
+export const getShoppingAvailableQuantity = (ingredient: ShoppingListIngredient): number =>
+  typeof ingredient.available_quantity_g === 'number' && Number.isFinite(ingredient.available_quantity_g)
+    ? Math.max(0, ingredient.available_quantity_g)
+    : 0;
 
-export const roundShoppingPurchaseQuantity = (quantityGrams: number, increment: 500 | 1000): number =>
-  Math.max(increment, Math.ceil(Math.max(0, quantityGrams) / increment) * increment);
+export const getShoppingQuantityToBuy = (ingredient: ShoppingListIngredient): number =>
+  Math.max(0, Math.round((ingredient.quantity_g - getShoppingAvailableQuantity(ingredient)) * 100) / 100);
 
-export const setShoppingPurchaseQuantity = (
+export const setShoppingAvailableQuantity = (
   ingredients: ShoppingListIngredient[],
   key: string,
   quantityGrams: number,
 ): ShoppingListIngredient[] => {
-  if (!Number.isFinite(quantityGrams) || quantityGrams <= 0) return ingredients;
+  if (!Number.isFinite(quantityGrams) || quantityGrams < 0) return ingredients;
   return ingredients.map(ingredient =>
-    ingredient.key === key ? { ...ingredient, purchase_quantity_g: Math.round(quantityGrams * 100) / 100 } : ingredient,
+    ingredient.key === key
+      ? { ...ingredient, available_quantity_g: Math.round(quantityGrams * 100) / 100 }
+      : ingredient,
   );
-};
-
-export const adjustShoppingPurchaseQuantity = (
-  ingredient: ShoppingListIngredient,
-  adjustment: ShoppingPurchaseAdjustment,
-  customQuantityGrams?: number,
-): number => {
-  if (adjustment === 'round_500g') return roundShoppingPurchaseQuantity(ingredient.quantity_g, 500);
-  if (adjustment === 'round_1kg') return roundShoppingPurchaseQuantity(ingredient.quantity_g, 1000);
-  if (adjustment === 'custom' && typeof customQuantityGrams === 'number' && customQuantityGrams > 0) {
-    return Math.round(customQuantityGrams * 100) / 100;
-  }
-  return ingredient.quantity_g;
 };
 
 export const parseShoppingQuantityInput = (value: string): number | null => {
   const normalized = value.trim().replace(',', '.');
   if (!/^\d+(?:\.\d+)?$/.test(normalized)) return null;
   const quantity = Number(normalized);
-  return Number.isFinite(quantity) && quantity > 0 ? quantity : null;
+  return Number.isFinite(quantity) && quantity >= 0 ? quantity : null;
 };
 
 export const filterShoppingIngredients = (
@@ -400,7 +386,7 @@ export const formatShoppingListForExport = (
     .map(group => {
       const categoryLabel = options.categoryLabels?.get(group.category) || group.category;
       const lines = group.ingredients.map(
-        ingredient => `${ingredient.name} - ${formatShoppingQuantity(getShoppingPurchaseQuantity(ingredient))}`,
+        ingredient => `${ingredient.name} - ${formatShoppingQuantity(getShoppingQuantityToBuy(ingredient))}`,
       );
       return [categoryLabel, ...lines].join('\n');
     })

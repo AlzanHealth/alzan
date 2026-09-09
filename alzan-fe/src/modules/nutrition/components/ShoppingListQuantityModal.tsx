@@ -4,9 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import {
-  adjustShoppingPurchaseQuantity,
-  formatShoppingQuantity,
-  getShoppingPurchaseQuantity,
+  getShoppingAvailableQuantity,
   parseShoppingQuantityInput,
   type ShoppingListIngredient,
 } from '../services/shoppingListPlanner';
@@ -39,16 +37,11 @@ export const ShoppingListQuantityModal = ({
 
   useEffect(() => {
     if (!visible || !ingredient) return;
-    setValue(String(getShoppingPurchaseQuantity(ingredient)));
+    setValue(String(getShoppingAvailableQuantity(ingredient)));
     setError(false);
   }, [ingredient, visible]);
 
   if (!ingredient) return null;
-
-  const chooseQuantity = (quantity: number) => {
-    setError(false);
-    onConfirm(quantity);
-  };
 
   const handleConfirm = () => {
     const quantity = parseShoppingQuantityInput(value);
@@ -71,7 +64,7 @@ export const ShoppingListQuantityModal = ({
               <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <Text style={[styles.title, { color: colors.textPrimary }]}>
-              {t('nutrition.shoppingListCustomQuantityTitle')}
+              {t('nutrition.shoppingListAvailableQuantityTitle')}
             </Text>
             <TouchableOpacity style={styles.headerButton} onPress={handleConfirm} accessibilityRole="button">
               <Text style={[styles.doneText, { color: colors.primary }]}>{t('common.done')}</Text>
@@ -79,36 +72,8 @@ export const ShoppingListQuantityModal = ({
           </View>
           <Text style={[styles.ingredient, { color: colors.textPrimary }]}>{ingredient.name}</Text>
           <Text style={[styles.message, { color: colors.textSecondary }]}>
-            {t('nutrition.shoppingListCustomQuantityMessage')}
+            {t('nutrition.shoppingListAvailableQuantityMessage')}
           </Text>
-          <View style={styles.quickOptions}>
-            <TouchableOpacity
-              style={[styles.quickOption, { borderColor: colors.primary }]}
-              onPress={() => chooseQuantity(adjustShoppingPurchaseQuantity(ingredient, 'exact'))}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.quickOptionText, { color: colors.primary }]}>
-                {t('nutrition.shoppingListExactQuantity')}
-              </Text>
-              <Text style={[styles.quickOptionValue, { color: colors.textSecondary }]}>
-                {formatShoppingQuantity(ingredient.quantity_g)}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickOption, { borderColor: colors.primary }]}
-              onPress={() => chooseQuantity(adjustShoppingPurchaseQuantity(ingredient, 'round_500g'))}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.quickOptionText, { color: colors.primary }]}>500 g</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.quickOption, { borderColor: colors.primary }]}
-              onPress={() => chooseQuantity(adjustShoppingPurchaseQuantity(ingredient, 'round_1kg'))}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.quickOptionText, { color: colors.primary }]}>1 kg</Text>
-            </TouchableOpacity>
-          </View>
           <TextInput
             value={value}
             onChangeText={nextValue => {
@@ -120,12 +85,12 @@ export const ShoppingListQuantityModal = ({
             selectTextOnFocus
             returnKeyType="done"
             onSubmitEditing={handleConfirm}
-            placeholder={String(getShoppingPurchaseQuantity(ingredient))}
+            placeholder={String(getShoppingAvailableQuantity(ingredient))}
             placeholderTextColor={colors.textSecondary}
             style={[styles.input, { color: colors.textPrimary, borderColor: error ? '#ef4444' : colors.primary }]}
-            accessibilityLabel={t('nutrition.shoppingListCustomQuantityMessage')}
+            accessibilityLabel={t('nutrition.shoppingListAvailableQuantityMessage')}
           />
-          {error && <Text style={styles.error}>{t('nutrition.shoppingListCustomQuantityInvalid')}</Text>}
+          {error && <Text style={styles.error}>{t('nutrition.shoppingListAvailableQuantityInvalid')}</Text>}
           <TouchableOpacity
             style={[styles.confirmButton, { backgroundColor: colors.primary }]}
             onPress={handleConfirm}
@@ -149,18 +114,6 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   ingredient: { fontSize: 20, fontWeight: '800', textAlign: 'center' },
   message: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  quickOptions: { flexDirection: 'row', gap: 8 },
-  quickOption: {
-    flex: 1,
-    minHeight: 54,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  quickOptionText: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  quickOptionValue: { fontSize: 11, marginTop: 2 },
   input: {
     minHeight: 52,
     borderWidth: 1.5,

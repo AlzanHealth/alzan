@@ -28,7 +28,7 @@ import {
   filterShoppingIngredients,
   formatShoppingQuantity,
   formatShoppingListForExport,
-  getShoppingPurchaseQuantity,
+  getShoppingQuantityToBuy,
   groupShoppingIngredientsByCategory,
   type ShoppingListCategoryGroup,
   type ShoppingListIngredient,
@@ -103,7 +103,7 @@ export const ShoppingListScreen = () => {
   } = useShoppingList(selectedDate, { mode, customStartDate, customEndDate, showPast });
   const {
     completedKeys,
-    purchaseQuantities,
+    availableQuantities,
     filter,
     setFilter,
     isHydrated,
@@ -112,7 +112,7 @@ export const ShoppingListScreen = () => {
     toggleIngredient,
     setCategoryCompleted,
     clearCompleted,
-    setPurchaseQuantity,
+    setAvailableQuantity,
     resetRange,
     retrySync,
   } = useShoppingListState(user?.id, range);
@@ -132,9 +132,9 @@ export const ShoppingListScreen = () => {
     () =>
       ingredients.map(ingredient => ({
         ...ingredient,
-        purchase_quantity_g: purchaseQuantities.get(ingredient.key) ?? ingredient.purchase_quantity_g,
+        available_quantity_g: availableQuantities.get(ingredient.key) ?? ingredient.available_quantity_g,
       })),
-    [ingredients, purchaseQuantities],
+    [availableQuantities, ingredients],
   );
   const filteredIngredients = useMemo(
     () => filterShoppingIngredients(visibleIngredients, completedKeys, filter),
@@ -237,7 +237,7 @@ export const ShoppingListScreen = () => {
             void createAppleReminders(
               exportIngredients.map(ingredient => ({
                 title: ingredient.name,
-                notes: `${categoryLabels.get(ingredient.category || 'otro') || ingredient.category || 'otro'} · ${formatShoppingQuantity(getShoppingPurchaseQuantity(ingredient))}`,
+                notes: `${categoryLabels.get(ingredient.category || 'otro') || ingredient.category || 'otro'} · ${formatShoppingQuantity(getShoppingQuantityToBuy(ingredient))}`,
               })),
               listName?.trim() || t('nutrition.shoppingListAppleRemindersDefaultList'),
             ).catch(() => Alert.alert(t('common.error'), t('nutrition.shoppingListAppleRemindersError')));
@@ -553,7 +553,7 @@ export const ShoppingListScreen = () => {
           onCancel={() => setQuantityIngredient(null)}
           onConfirm={quantity => {
             if (!quantityIngredient) return;
-            setPurchaseQuantity(quantityIngredient.key, quantity);
+            setAvailableQuantity(quantityIngredient.key, quantity);
             setQuantityIngredient(null);
           }}
         />

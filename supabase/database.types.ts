@@ -3643,6 +3643,7 @@ export type Database = {
       }
       shopping_list_states: {
         Row: {
+          available_quantity_g: number | null
           completed: boolean
           hidden: boolean
           id: string
@@ -3654,6 +3655,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          available_quantity_g?: number | null
           completed?: boolean
           hidden?: boolean
           id?: string
@@ -3665,6 +3667,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          available_quantity_g?: number | null
           completed?: boolean
           hidden?: boolean
           id?: string

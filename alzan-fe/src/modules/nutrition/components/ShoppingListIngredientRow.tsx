@@ -6,7 +6,8 @@ import { format, parseISO } from 'date-fns';
 
 import {
   formatShoppingQuantity,
-  getShoppingPurchaseQuantity,
+  getShoppingAvailableQuantity,
+  getShoppingQuantityToBuy,
   type ShoppingListIngredient,
 } from '../services/shoppingListPlanner';
 
@@ -38,6 +39,8 @@ export const ShoppingListIngredientRow = ({
 }: ShoppingListIngredientRowProps) => {
   const { t } = useTranslation();
   const handlePress = useCallback(() => onToggle(item.key), [item.key, onToggle]);
+  const availableQuantity = getShoppingAvailableQuantity(item);
+  const quantityToBuy = getShoppingQuantityToBuy(item);
   const sourceLabels = (item.sources || []).map(source => {
     const mealLabel = source.mealName || (source.mealType ? String(t(`settings.${source.mealType}` as never)) : null);
     return `${mealLabel || t('nutrition.shoppingListUnknownMeal')} · ${format(parseISO(source.date), 'd MMM')}`;
@@ -56,7 +59,7 @@ export const ShoppingListIngredientRow = ({
         disabled={disabled}
         activeOpacity={0.75}
         accessibilityRole="checkbox"
-        accessibilityLabel={`${item.name}, ${formatShoppingQuantity(getShoppingPurchaseQuantity(item))}`}
+        accessibilityLabel={`${item.name}, ${t('nutrition.shoppingListRequiredAmount', { quantity: formatShoppingQuantity(item.quantity_g) })}, ${t('nutrition.shoppingListAvailableAmount', { quantity: formatShoppingQuantity(availableQuantity) })}, ${t('nutrition.shoppingListToBuy', { quantity: formatShoppingQuantity(quantityToBuy) })}`}
         accessibilityState={{ checked: isCompleted, disabled }}
       >
         <View
@@ -69,10 +72,11 @@ export const ShoppingListIngredientRow = ({
             {item.name}
           </Text>
           <Text style={[styles.needed, { color: colors.textSecondary }]}>
-            {formatShoppingQuantity(item.quantity_g)}{' '}
-            {item.purchase_quantity_g && item.purchase_quantity_g !== item.quantity_g
-              ? `· ${formatShoppingQuantity(item.purchase_quantity_g)} ${t('nutrition.shoppingListPurchaseQuantity')}`
-              : ''}
+            {t('nutrition.shoppingListRequiredAmount', { quantity: formatShoppingQuantity(item.quantity_g) })}
+          </Text>
+          <Text style={[styles.available, { color: colors.textSecondary }]}>
+            {t('nutrition.shoppingListAvailableAmount', { quantity: formatShoppingQuantity(availableQuantity) })} ·{' '}
+            {t('nutrition.shoppingListToBuy', { quantity: formatShoppingQuantity(quantityToBuy) })}
           </Text>
           {sourceLabels.length > 0 && (
             <Text style={[styles.sources, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -87,10 +91,12 @@ export const ShoppingListIngredientRow = ({
           onPress={() => onAdjust(item)}
           disabled={disabled}
           accessibilityRole="button"
-          accessibilityLabel={`${t('nutrition.shoppingListAdjustQuantity')} ${item.name}`}
+          accessibilityLabel={`${t('nutrition.shoppingListSetAvailableQuantity')} ${item.name}`}
         >
           <Pencil size={15} color={colors.primary} />
-          <Text style={[styles.actionText, { color: colors.primary }]}>{t('nutrition.shoppingListAdjustShort')}</Text>
+          <Text style={[styles.actionText, { color: colors.primary }]}>
+            {t('nutrition.shoppingListAvailableShort')}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -120,6 +126,7 @@ const styles = StyleSheet.create({
   copy: { flex: 1 },
   name: { fontSize: 16, fontWeight: '600' },
   needed: { fontSize: 12, marginTop: 3 },
+  available: { fontSize: 12, marginTop: 3 },
   sources: { fontSize: 11, marginTop: 3 },
   completedText: { opacity: 0.52, textDecorationLine: 'line-through' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 4 },

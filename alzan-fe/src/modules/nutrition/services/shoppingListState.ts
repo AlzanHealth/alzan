@@ -3,13 +3,13 @@ import type { ShoppingListDateRange } from './shoppingListPlanner';
 export type ShoppingListItemState = {
   completed: boolean;
   hidden: boolean;
-  purchaseQuantityGrams?: number;
+  availableQuantityGrams?: number;
   updatedAt: string;
 };
 
 export type ShoppingListState = Record<string, ShoppingListItemState>;
 
-const SHOPPING_LIST_STATE_STORAGE_PREFIX = 'alzan.shopping-list.state';
+const SHOPPING_LIST_STATE_STORAGE_PREFIX = 'alzan.shopping-list.state.v2';
 const SHOPPING_LIST_RESET_STORAGE_PREFIX = 'alzan.shopping-list.reset';
 
 export const SHOPPING_LIST_RESET_PENDING_VALUE = '1';
@@ -42,18 +42,18 @@ export const parseShoppingListState = (value: string | null): ShoppingListState 
           typeof candidate.updatedAt === 'string' && Number.isFinite(Date.parse(candidate.updatedAt))
             ? candidate.updatedAt
             : new Date(0).toISOString();
-        const purchaseQuantityGrams = candidate.purchaseQuantityGrams;
+        const availableQuantityGrams = candidate.availableQuantityGrams;
         return [
           [
             key,
             createShoppingListItemState({
               completed: candidate.completed === true,
               hidden: candidate.hidden === true,
-              purchaseQuantityGrams:
-                typeof purchaseQuantityGrams === 'number' &&
-                Number.isFinite(purchaseQuantityGrams) &&
-                purchaseQuantityGrams > 0
-                  ? purchaseQuantityGrams
+              availableQuantityGrams:
+                typeof availableQuantityGrams === 'number' &&
+                Number.isFinite(availableQuantityGrams) &&
+                availableQuantityGrams >= 0
+                  ? availableQuantityGrams
                   : undefined,
               updatedAt,
             }),
@@ -103,7 +103,7 @@ export const areShoppingListStatesEqual = (left: ShoppingListState, right: Shopp
       !!rightItem &&
       leftItem.completed === rightItem.completed &&
       leftItem.hidden === rightItem.hidden &&
-      leftItem.purchaseQuantityGrams === rightItem.purchaseQuantityGrams &&
+      leftItem.availableQuantityGrams === rightItem.availableQuantityGrams &&
       leftItem.updatedAt === rightItem.updatedAt
     );
   });

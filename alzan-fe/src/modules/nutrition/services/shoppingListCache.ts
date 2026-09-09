@@ -14,7 +14,7 @@ type ShoppingListCacheDescriptor = {
   showPast?: boolean;
 };
 
-const SHOPPING_LIST_CACHE_PREFIX = 'alzan.shopping-list.result';
+const SHOPPING_LIST_CACHE_PREFIX = 'alzan.shopping-list.result.v2';
 
 export const getShoppingListCacheKey = (descriptor: ShoppingListCacheDescriptor): string =>
   `${SHOPPING_LIST_CACHE_PREFIX}.${encodeURIComponent(JSON.stringify(descriptor))}`;
@@ -65,11 +65,7 @@ export const parseShoppingListResult = (value: string | null): ShoppingListResul
           (typeof ingredient.category !== 'string' ||
             !SHOPPING_LIST_CATEGORY_ORDER.includes(
               ingredient.category as (typeof SHOPPING_LIST_CATEGORY_ORDER)[number],
-            ))) ||
-        (ingredient.purchase_quantity_g !== undefined &&
-          (typeof ingredient.purchase_quantity_g !== 'number' ||
-            !Number.isFinite(ingredient.purchase_quantity_g) ||
-            ingredient.purchase_quantity_g <= 0))
+            )))
       )
         return null;
 
