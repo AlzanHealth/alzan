@@ -23,6 +23,7 @@ Logical skill ids and visible layout must match 1:1 between `.agents/skills/` an
 - `shared-technical-documentation`
 - `shared-alzan-local-docs-sync-from-code`
 - `shared-skill-crafter-perfect`
+- `shared-cleanup-temporary-artifacts`
 - `shared-no-commit-without-approval`
 - `shared-commit-generator`
 
