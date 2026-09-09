@@ -98,6 +98,7 @@ export interface NutritionSettingsJson {
   next_meal_cutoff_hours?: number;
   nutrition_day_rollover_time?: string;
   shopping_list_start_day?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  shopping_list_excluded_ingredient_keys?: string[];
   default_hydration_ml?: number;
   show_diet_calories_only?: boolean;
   show_training_calories_only?: boolean;
