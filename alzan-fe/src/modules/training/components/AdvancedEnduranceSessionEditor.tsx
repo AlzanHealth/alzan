@@ -65,9 +65,17 @@ const DURATION_HINT_KEYS: Record<VisibleDurationType, TranslationKey> = {
 type BufferedMetricInputProps = Omit<TextInputProps, 'value' | 'onChangeText'> & {
   formattedValue: string;
   onCommit: (value: string) => void;
+  onDraftChange?: (value: string) => void;
 };
 
-function BufferedMetricInput({ formattedValue, onCommit, onBlur, onFocus, ...props }: BufferedMetricInputProps) {
+function BufferedMetricInput({
+  formattedValue,
+  onCommit,
+  onDraftChange,
+  onBlur,
+  onFocus,
+  ...props
+}: BufferedMetricInputProps) {
   const [draft, setDraft] = useState(formattedValue);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -79,7 +87,10 @@ function BufferedMetricInput({ formattedValue, onCommit, onBlur, onFocus, ...pro
     <TextInput
       {...props}
       value={draft}
-      onChangeText={setDraft}
+      onChangeText={value => {
+        setDraft(value);
+        onDraftChange?.(value);
+      }}
       onFocus={event => {
         setIsFocused(true);
         onFocus?.(event);
@@ -190,6 +201,27 @@ function SectionEditor({
           : { [intensityKey]: value };
     onChange(deriveAdvancedSectionMetrics({ ...section, ...fieldValues }, sport, field, metricPriority));
   };
+  const parseMetricInput = (field: AdvancedMetricField, value: string): number | null | undefined => {
+    if (!value.trim()) return null;
+    if (field === 'duration') {
+      const parsed = parseDurationInput(value);
+      return parsed == null ? undefined : parsed;
+    }
+    if (field === 'distance') {
+      const parsed = parseNumber(value);
+      return parsed == null ? undefined : sport === 'swimming' ? parsed : toDbDistance(parsed);
+    }
+    if (sport === 'cycling') {
+      const parsed = parseNumber(value);
+      return parsed == null ? undefined : parsed;
+    }
+    const parsed = parsePaceInput(value);
+    return parsed.ok ? parsed.totalSeconds : undefined;
+  };
+  const updateMetricFromInput = (field: AdvancedMetricField, value: string) => {
+    const parsed = parseMetricInput(field, value);
+    if (parsed !== undefined) updateMetric(field, parsed);
+  };
   return (
     <View
       style={[styles.sectionCard, dynamicStyles.glassCard, compact && styles.compactCard, { borderLeftColor: accent }]}
@@ -287,6 +319,7 @@ function SectionEditor({
                 formattedValue={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
+                onDraftChange={value => updateMetricFromInput('duration', value)}
                 onCommit={value => updateMetric('duration', parseDurationInput(value))}
               />
             </View>
@@ -306,6 +339,7 @@ function SectionEditor({
                   }
                   placeholder="0"
                   placeholderTextColor={themeColors.textSecondary}
+                  onDraftChange={value => updateMetricFromInput('distance', value)}
                   onCommit={value =>
                     updateMetric(
                       'distance',
@@ -342,6 +376,7 @@ function SectionEditor({
                   }
                   placeholder="0"
                   placeholderTextColor={themeColors.textSecondary}
+                  onDraftChange={value => updateMetricFromInput('distance', value)}
                   onCommit={value =>
                     updateMetric(
                       'distance',
@@ -362,6 +397,7 @@ function SectionEditor({
                 formattedValue={formatDuration(section.durationS)}
                 placeholder="0:00"
                 placeholderTextColor={themeColors.textSecondary}
+                onDraftChange={value => updateMetricFromInput('duration', value)}
                 onCommit={value => updateMetric('duration', parseDurationInput(value))}
               />
             )}
@@ -381,6 +417,7 @@ function SectionEditor({
               }
               placeholder={sport === 'cycling' ? '0' : '0:00'}
               placeholderTextColor={themeColors.textSecondary}
+              onDraftChange={value => updateMetricFromInput('intensity', value)}
               onFocus={() => setIntensityError(false)}
               onCommit={value => {
                 if (sport === 'cycling') {

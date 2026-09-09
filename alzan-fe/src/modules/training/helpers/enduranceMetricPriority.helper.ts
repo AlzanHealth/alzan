@@ -43,6 +43,15 @@ function calculateIntensity(durationS: number, distanceM: number, unit: Enduranc
   return (distanceM / durationS) * 3.6;
 }
 
+export function synchronizeEnduranceMetricValues(
+  values: EnduranceMetricValues,
+  unit: EnduranceMetricUnit,
+  changedField: EnduranceMetricField | undefined,
+  priority: EnduranceMetricPriority = DEFAULT_ENDURANCE_METRIC_PRIORITY,
+): EnduranceMetricValues {
+  return deriveEnduranceMetricValues(values, unit, changedField, normalizeEnduranceMetricPriority(priority));
+}
+
 /**
  * Recalculates the lowest-priority metric when one of the other metrics
  * changes. With the default priority, pace/speed and time are preserved and

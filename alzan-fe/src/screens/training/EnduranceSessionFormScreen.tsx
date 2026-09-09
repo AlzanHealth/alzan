@@ -74,7 +74,11 @@ import {
   shouldRenderModalitySelector,
 } from './helpers/sessionModality.helper';
 import { parsePaceInput } from '../../modules/training/helpers/paceInput.helper';
-import { deriveEnduranceMetricValues } from '../../modules/training/helpers/enduranceMetricPriority.helper';
+import {
+  deriveEnduranceMetricValues,
+  synchronizeEnduranceMetricValues,
+  type EnduranceMetricField,
+} from '../../modules/training/helpers/enduranceMetricPriority.helper';
 import { useTrainingSettings } from '../../hooks/useTrainingSettings';
 import {
   getAdvancedActivityErrorTranslationKey,
@@ -404,6 +408,7 @@ export const EnduranceSessionFormScreen = () => {
   const [pace, setPace] = useState(''); // Calculated pace/rhythm (value only)
   const [paceError, setPaceError] = useState<string | null>(null);
   const [isEditingPace, setIsEditingPace] = useState(false);
+  const lastEditedMetricRef = React.useRef<EnduranceMetricField | null>(null);
   const [rpe, setRpe] = useState('');
   const [vo2Max, setVo2Max] = useState('');
   const [totalSteps, setTotalSteps] = useState('');
@@ -1141,6 +1146,7 @@ export const EnduranceSessionFormScreen = () => {
 
   // Handle manual pace editing
   const handlePaceBlur = () => {
+    lastEditedMetricRef.current = 'intensity';
     setIsEditingPace(false);
     if (!pace) {
       setPaceError(null);
@@ -1177,7 +1183,7 @@ export const EnduranceSessionFormScreen = () => {
       (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
       (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
       (Number.parseInt(durationSeconds || '0', 10) || 0);
-    const derived = deriveEnduranceMetricValues(
+    const derived = synchronizeEnduranceMetricValues(
       { distanceM, durationS: totalDurationSeconds > 0 ? totalDurationSeconds : null, intensity },
       simpleSpeedUnit,
       'intensity',
@@ -1197,6 +1203,7 @@ export const EnduranceSessionFormScreen = () => {
   };
 
   const handleDistanceBlur = () => {
+    lastEditedMetricRef.current = 'distance';
     if (!simpleSpeedUnit || safeParseFloat(distance) <= 0 || !pace) return;
 
     let intensity: number | null = null;
@@ -1210,7 +1217,7 @@ export const EnduranceSessionFormScreen = () => {
       intensity = Math.round(parsedSpeed);
     }
 
-    const derived = deriveEnduranceMetricValues(
+    const derived = synchronizeEnduranceMetricValues(
       {
         distanceM: toDbDistanceFromDisplay(safeParseFloat(distance)),
         durationS:
@@ -1245,6 +1252,7 @@ export const EnduranceSessionFormScreen = () => {
   };
 
   const handleDurationChange = (field: 'hours' | 'minutes' | 'seconds', value: string) => {
+    lastEditedMetricRef.current = 'duration';
     const nextHours = field === 'hours' ? value : durationHours;
     const nextMinutes = field === 'minutes' ? value : durationMinutes;
     const nextSeconds = field === 'seconds' ? value : durationSeconds;
@@ -1271,7 +1279,7 @@ export const EnduranceSessionFormScreen = () => {
     if (totalDurationSeconds <= 0) return;
 
     const currentDistanceM = safeParseFloat(distance) > 0 ? toDbDistanceFromDisplay(safeParseFloat(distance)) : null;
-    const derived = deriveEnduranceMetricValues(
+    const derived = synchronizeEnduranceMetricValues(
       { distanceM: currentDistanceM, durationS: totalDurationSeconds, intensity },
       simpleSpeedUnit,
       'duration',
@@ -1311,9 +1319,11 @@ export const EnduranceSessionFormScreen = () => {
     let effectiveDistanceM = rawDistanceM;
     let effectiveDurationSeconds = rawDurationSeconds;
 
-    if (!isAdvancedRegistration && sportType !== 'gym' && simpleSpeedUnit && pace) {
+    if (!isAdvancedRegistration && sportType !== 'gym' && simpleSpeedUnit) {
       let intensity: number | null = null;
-      if (simpleSpeedUnit === 'min/km' || simpleSpeedUnit === 'min/100m') {
+      if (!pace) {
+        intensity = null;
+      } else if (simpleSpeedUnit === 'min/km' || simpleSpeedUnit === 'min/100m') {
         const parsedPace = parsePaceInput(pace);
         if (!parsedPace.ok) {
           setPaceError(t('training.invalidPaceFormat'));
@@ -1329,14 +1339,14 @@ export const EnduranceSessionFormScreen = () => {
         intensity = Math.round(parsedSpeed);
       }
 
-      const derived = deriveEnduranceMetricValues(
+      const derived = synchronizeEnduranceMetricValues(
         {
           distanceM: rawDistanceM,
           durationS: rawDurationSeconds > 0 ? rawDurationSeconds : null,
           intensity,
         },
         simpleSpeedUnit,
-        'intensity',
+        lastEditedMetricRef.current ?? undefined,
         trainingSettings.metricPriority,
       );
       effectiveDistanceM = derived.distanceM;
@@ -1349,6 +1359,9 @@ export const EnduranceSessionFormScreen = () => {
         setDurationHours(Math.floor(effectiveDurationSeconds / 3600).toString());
         setDurationMinutes(Math.floor((effectiveDurationSeconds % 3600) / 60).toString());
         setDurationSeconds((effectiveDurationSeconds % 60).toString());
+      }
+      if (derived.intensity != null && derived.intensity > 0) {
+        setPace(formatIntensityForInput(derived.intensity, simpleSpeedUnit));
       }
     }
 
@@ -3396,7 +3409,10 @@ export const EnduranceSessionFormScreen = () => {
                           placeholder="0.0"
                           placeholderTextColor={themeColors.textSecondary}
                           value={distance}
-                          onChangeText={setDistance}
+                          onChangeText={value => {
+                            lastEditedMetricRef.current = 'distance';
+                            setDistance(value);
+                          }}
                           onBlur={handleDistanceBlur}
                         />
                       </View>
@@ -3454,6 +3470,7 @@ export const EnduranceSessionFormScreen = () => {
                             }}
                             value={pace}
                             onChangeText={value => {
+                              lastEditedMetricRef.current = 'intensity';
                               setPace(value);
                               setPaceError(null);
                             }}

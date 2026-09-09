@@ -3,6 +3,7 @@ import {
   DEFAULT_ENDURANCE_METRIC_PRIORITY,
   deriveEnduranceMetricValues,
   normalizeEnduranceMetricPriority,
+  synchronizeEnduranceMetricValues,
 } from './enduranceMetricPriority.helper';
 
 const fromDistanceAndDuration = deriveEnduranceMetricValues(
@@ -61,6 +62,36 @@ assert.equal(cycling.intensity, 36);
 
 assert.deepEqual(normalizeEnduranceMetricPriority(['distance', 'distance']), ['distance', 'intensity', 'duration']);
 assert.deepEqual(normalizeEnduranceMetricPriority(null), DEFAULT_ENDURANCE_METRIC_PRIORITY);
+
+const synchronizedPriorityOneEdit = synchronizeEnduranceMetricValues(
+  { distanceM: 2000, durationS: 600, intensity: 600 },
+  'min/km',
+  'intensity',
+  ['intensity', 'duration', 'distance'],
+);
+assert.equal(synchronizedPriorityOneEdit.distanceM, 1000);
+assert.equal(synchronizedPriorityOneEdit.durationS, 600);
+assert.equal(synchronizedPriorityOneEdit.intensity, 600);
+
+const synchronizedPriorityTwoEdit = synchronizeEnduranceMetricValues(
+  { distanceM: 2000, durationS: 900, intensity: 300 },
+  'min/km',
+  'duration',
+  ['intensity', 'duration', 'distance'],
+);
+assert.equal(synchronizedPriorityTwoEdit.distanceM, 3000);
+assert.equal(synchronizedPriorityTwoEdit.durationS, 900);
+assert.equal(synchronizedPriorityTwoEdit.intensity, 300);
+
+const synchronizedPriorityThreeEdit = synchronizeEnduranceMetricValues(
+  { distanceM: 3000, durationS: 600, intensity: 300 },
+  'min/km',
+  'distance',
+  ['intensity', 'duration', 'distance'],
+);
+assert.equal(synchronizedPriorityThreeEdit.distanceM, 3000);
+assert.equal(synchronizedPriorityThreeEdit.durationS, 900);
+assert.equal(synchronizedPriorityThreeEdit.intensity, 300);
 
 const priorityFixtures = [
   { unit: 'min/km' as const, distanceM: 2000, durationS: 600, intensity: 300 },

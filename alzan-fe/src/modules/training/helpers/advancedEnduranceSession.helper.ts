@@ -1,4 +1,8 @@
-import { DEFAULT_ENDURANCE_METRIC_PRIORITY, type EnduranceMetricPriority } from './enduranceMetricPriority.helper';
+import {
+  DEFAULT_ENDURANCE_METRIC_PRIORITY,
+  normalizeEnduranceMetricPriority,
+  type EnduranceMetricPriority,
+} from './enduranceMetricPriority.helper';
 
 export type AdvancedSport = 'running' | 'cycling' | 'swimming';
 
@@ -335,6 +339,8 @@ export function deriveAdvancedSectionMetrics(
 ): AdvancedSectionDraft {
   if (section.isGroup) return section;
 
+  const normalizedPriority = normalizeEnduranceMetricPriority(priority);
+
   const intensityKey = getIntensityKey(sport);
   const durationS = positiveValue(section.durationS);
   const distanceM = positiveValue(section.distanceM);
@@ -379,7 +385,7 @@ export function deriveAdvancedSectionMetrics(
   };
 
   if (changedField != null) {
-    const targetField = changedField === priority[2] ? priority[1] : priority[2];
+    const targetField = changedField === normalizedPriority[2] ? normalizedPriority[1] : normalizedPriority[2];
     if (deriveField(targetField)) return next;
   }
 
