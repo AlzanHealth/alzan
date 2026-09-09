@@ -1,5 +1,5 @@
 import type { ShoppingListResult } from './shoppingListService';
-import { SHOPPING_LIST_CATEGORY_ORDER } from './shoppingListPlanner';
+import { normalizeShoppingListExcludedIngredientKeys, SHOPPING_LIST_CATEGORY_ORDER } from './shoppingListPlanner';
 
 type ShoppingListCacheDescriptor = {
   userId: string;
@@ -12,12 +12,18 @@ type ShoppingListCacheDescriptor = {
   timezone: string;
   mealTimes: Record<string, string>;
   showPast?: boolean;
+  excludedIngredientKeys?: readonly string[];
 };
 
 const SHOPPING_LIST_CACHE_PREFIX = 'alzan.shopping-list.result.v2';
 
 export const getShoppingListCacheKey = (descriptor: ShoppingListCacheDescriptor): string =>
-  `${SHOPPING_LIST_CACHE_PREFIX}.${encodeURIComponent(JSON.stringify(descriptor))}`;
+  `${SHOPPING_LIST_CACHE_PREFIX}.${encodeURIComponent(
+    JSON.stringify({
+      ...descriptor,
+      excludedIngredientKeys: normalizeShoppingListExcludedIngredientKeys(descriptor.excludedIngredientKeys),
+    }),
+  )}`;
 
 export const serializeShoppingListResult = (result: ShoppingListResult): string => JSON.stringify(result);
 

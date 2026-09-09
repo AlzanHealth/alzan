@@ -237,7 +237,7 @@ export const planShoppingMealLogs = (
 export const getActiveShoppingMealLogIds = (logs: ShoppingMealLogInput[]): string[] =>
   logs.filter(log => log.adherence_status !== 'skipped').map(log => log.id);
 
-const getIngredientKey = (item: ShoppingIngredientInput): string | null => {
+export const getShoppingIngredientKey = (item: Pick<ShoppingIngredientInput, 'name' | 'source_ref'>): string | null => {
   const sourceRef = item.source_ref?.trim();
   if (sourceRef) return `id:${sourceRef}`;
 
@@ -253,6 +253,15 @@ const getIngredientKey = (item: ShoppingIngredientInput): string | null => {
   return normalizedName ? `name:${normalizedName}` : null;
 };
 
+export const normalizeShoppingListExcludedIngredientKeys = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value.filter((key): key is string => typeof key === 'string' && key.trim().length > 0).map(key => key.trim()),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+};
+
 export const aggregateShoppingIngredients = (
   items: ShoppingIngredientInput[],
   localizedNamesById: ReadonlyMap<string, string> = new Map(),
@@ -262,7 +271,7 @@ export const aggregateShoppingIngredients = (
   const aggregated = new Map<string, ShoppingListIngredient>();
 
   for (const item of items) {
-    const key = getIngredientKey(item);
+    const key = getShoppingIngredientKey(item);
     if (!key) continue;
 
     const sourceRef = item.source_ref?.trim();
@@ -324,6 +333,15 @@ export const setShoppingAvailableQuantity = (
       ? { ...ingredient, available_quantity_g: Math.round(quantityGrams * 100) / 100 }
       : ingredient,
   );
+};
+
+export const filterShoppingIngredientsByExcludedKeys = (
+  ingredients: ShoppingListIngredient[],
+  excludedKeys: readonly string[],
+): ShoppingListIngredient[] => {
+  if (excludedKeys.length === 0) return ingredients;
+  const excludedKeySet = new Set(excludedKeys);
+  return ingredients.filter(ingredient => !excludedKeySet.has(ingredient.key));
 };
 
 export const parseShoppingQuantityInput = (value: string): number | null => {

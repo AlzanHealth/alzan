@@ -15,6 +15,9 @@ import {
   filterShoppingIngredients,
   getShoppingAvailableQuantity,
   getShoppingQuantityToBuy,
+  filterShoppingIngredientsByExcludedKeys,
+  getShoppingIngredientKey,
+  normalizeShoppingListExcludedIngredientKeys,
   parseShoppingQuantityInput,
   setShoppingAvailableQuantity,
   type ShoppingMealLogInput,
@@ -58,6 +61,8 @@ async function run() {
   testPlansUpcomingMealsByLocalSchedule();
   testSupportsAllShoppingRangesAndLimits();
   testCalculatesAvailableQuantitiesAndFilters();
+  testExcludesFixedShoppingIngredients();
+  testNormalizesFixedShoppingIngredientKeys();
   testParsesAvailableQuantities();
   testMigratesLegacyStateIncrementally();
   testPersistsAvailableQuantitiesPerRange();
@@ -93,6 +98,7 @@ async function run() {
       showPast: false,
     }).includes('alzan.shopping-list.result.'),
   );
+  testShoppingListCacheScopesExcludedIngredients();
   testPersistsIndependentShoppingListState();
   console.log('shoppingListService: all assertions passed');
 }
@@ -120,6 +126,64 @@ function testCalculatesAvailableQuantitiesAndFilters() {
     filterShoppingIngredients(ingredients, new Set(['a']), 'purchased').map(item => item.key),
     ['a'],
   );
+}
+
+function testExcludesFixedShoppingIngredients() {
+  const items: ShoppingIngredientInput[] = [
+    { name: 'Proteína', quantity_g: 30, source: 'database', source_ref: 'protein-id' },
+    { name: 'Proteína', quantity_g: 20, source: 'database', source_ref: 'protein-id' },
+    { name: 'Creatina', quantity_g: 5, source: 'database', source_ref: 'creatine-id' },
+    { name: 'Ingrediente manual', quantity_g: 10, source: 'manual', source_ref: null },
+  ];
+  const aggregated = aggregateShoppingIngredients(items);
+
+  assert.equal(getShoppingIngredientKey(items[0]), 'id:protein-id');
+  assert.equal(getShoppingIngredientKey(items[3]), 'name:ingrediente manual');
+  assert.deepEqual(
+    filterShoppingIngredientsByExcludedKeys(aggregated, ['id:protein-id']).map(item => [item.key, item.quantity_g]),
+    [
+      ['id:creatine-id', 5],
+      ['name:ingrediente manual', 10],
+    ],
+  );
+  assert.deepEqual(
+    filterShoppingIngredientsByExcludedKeys(aggregated, []).map(item => item.key),
+    ['id:creatine-id', 'name:ingrediente manual', 'id:protein-id'],
+  );
+}
+
+function testNormalizesFixedShoppingIngredientKeys() {
+  assert.deepEqual(normalizeShoppingListExcludedIngredientKeys([' id:b ', 'id:a', 'id:b', '', 12, null]), [
+    'id:a',
+    'id:b',
+  ]);
+  assert.deepEqual(normalizeShoppingListExcludedIngredientKeys(undefined), []);
+  assert.deepEqual(normalizeShoppingListExcludedIngredientKeys('id:a'), []);
+}
+
+function testShoppingListCacheScopesExcludedIngredients() {
+  const descriptor = {
+    userId: 'user-1',
+    mode: 'upcoming',
+    rangeStart: '2026-08-24',
+    rangeEnd: '2026-08-30',
+    startDay: 1,
+    timezone: 'Europe/Madrid',
+    mealTimes: {},
+    showPast: false,
+  };
+  const withoutExclusions = getShoppingListCacheKey(descriptor);
+  const withExclusions = getShoppingListCacheKey({
+    ...descriptor,
+    excludedIngredientKeys: ['id:zinc', 'id:protein'],
+  });
+  const withSortedExclusions = getShoppingListCacheKey({
+    ...descriptor,
+    excludedIngredientKeys: ['id:protein', 'id:zinc'],
+  });
+
+  assert.notEqual(withoutExclusions, withExclusions);
+  assert.equal(withExclusions, withSortedExclusions);
 }
 
 function testParsesAvailableQuantities() {

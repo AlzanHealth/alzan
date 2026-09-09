@@ -77,8 +77,10 @@ import type { TranslationKey } from '../../i18n/locales/en';
 import type { HomeScreenNavigationProp } from '../../types/navigation.types';
 import {
   normalizeShoppingListStartDay,
+  normalizeShoppingListExcludedIngredientKeys,
   type ShoppingListStartDay,
 } from '../../modules/nutrition/services/shoppingListPlanner';
+import { ShoppingListExcludedIngredientsSettings } from '../../modules/nutrition/components/ShoppingListExcludedIngredientsSettings';
 import {
   clearFutureVacationDraftSelection,
   getVacationDraftSelectionDiff,
@@ -160,6 +162,7 @@ type NutritionSectionInfoKey =
   | 'autoPlanning'
   | 'data'
   | 'shoppingList'
+  | 'shoppingListExcluded'
   | 'nextMeal';
 
 const SHOPPING_LIST_DAYS: Array<{
@@ -299,6 +302,11 @@ export const NutritionSettingsScreen = () => {
   const recipesArePublicByDefault = defaultRecipeVisibility === 'public';
   const recipeSearchScope: RecipeSearchScope = preferences?.nutrition_prefs?.recipe_search_scope || 'source';
   const shoppingListStartDay = normalizeShoppingListStartDay(preferences?.nutrition_prefs?.shopping_list_start_day);
+  const excludedShoppingIngredientKeys = useMemo(
+    () =>
+      normalizeShoppingListExcludedIngredientKeys(preferences?.nutrition_prefs?.shopping_list_excluded_ingredient_keys),
+    [preferences?.nutrition_prefs?.shopping_list_excluded_ingredient_keys],
+  );
   const storedNextMealCutoffHours = preferences?.nutrition_prefs?.next_meal_cutoff_hours;
   const maxNextMealCutoffHours = getMaxNextMealCutoffHours(notifSettings?.meals, enabledMeals);
   const nextMealCutoffHours = normalizeNextMealCutoffHours(storedNextMealCutoffHours, maxNextMealCutoffHours);
@@ -1106,6 +1114,10 @@ export const NutritionSettingsScreen = () => {
       titleKey: 'nutrition.shoppingListInfoModalTitle',
       bodyKey: 'nutrition.shoppingListInfoModalBody',
     },
+    shoppingListExcluded: {
+      titleKey: 'nutrition.shoppingListExcludedIngredientsTitle',
+      bodyKey: 'nutrition.shoppingListExcludedIngredientsInfo',
+    },
     hydration: {
       titleKey: 'nutrition.defaultHydrationInfoModalTitle',
       bodyKey: 'nutrition.defaultHydrationInfoModalBody',
@@ -1339,7 +1351,18 @@ export const NutritionSettingsScreen = () => {
             </View>
           </View>
 
-          {/* 4. Hidratación */}
+          {/* 4. Ingredientes fuera de la compra */}
+          <View style={styles.section}>
+            {renderSectionTitle(t('nutrition.shoppingListExcludedIngredientsTitle'), 'shoppingListExcluded')}
+            <View style={[styles.card, dynamicStyles.glassCard]}>
+              <ShoppingListExcludedIngredientsSettings
+                selectedKeys={excludedShoppingIngredientKeys}
+                onChange={nextKeys => updateNutritionPrefs({ shopping_list_excluded_ingredient_keys: nextKeys })}
+              />
+            </View>
+          </View>
+
+          {/* 5. Hidratación */}
           <View style={styles.section}>
             {renderSectionTitle(t('nutrition.defaultHydrationTitle'), 'hydration')}
             <View style={[styles.card, dynamicStyles.glassCard]}>

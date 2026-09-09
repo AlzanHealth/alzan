@@ -7,6 +7,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { usePreferences } from '../../../hooks/settings/usePreferences';
 import {
   getShoppingRange,
+  normalizeShoppingListExcludedIngredientKeys,
   normalizeShoppingListStartDay,
   type ShoppingListMode,
   type ShoppingMealTimes,
@@ -32,6 +33,11 @@ export function useShoppingList(selectedDate: Date | string, options: UseShoppin
   const startDay = normalizeShoppingListStartDay(preferences?.nutrition_prefs?.shopping_list_start_day);
   const mode = options.mode || 'upcoming';
   const timezone = preferences?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const excludedIngredientKeys = useMemo(
+    () =>
+      normalizeShoppingListExcludedIngredientKeys(preferences?.nutrition_prefs?.shopping_list_excluded_ingredient_keys),
+    [preferences?.nutrition_prefs?.shopping_list_excluded_ingredient_keys],
+  );
   const mealTimes = useMemo<ShoppingMealTimes>(() => {
     const configuredMeals = preferences?.notification_settings?.meals;
     if (!configuredMeals) return {};
@@ -82,9 +88,11 @@ export function useShoppingList(selectedDate: Date | string, options: UseShoppin
             timezone,
             mealTimes,
             showPast: options.showPast,
+            excludedIngredientKeys,
           })
         : null,
     [
+      excludedIngredientKeys,
       mealTimes,
       mode,
       options.customEndDate,
@@ -137,10 +145,12 @@ export function useShoppingList(selectedDate: Date | string, options: UseShoppin
       startDay,
       timezone,
       mealTimes,
+      excludedIngredientKeys,
       now.toISOString().slice(0, 16),
       options.showPast,
     ],
     [
+      excludedIngredientKeys,
       mealTimes,
       mode,
       now,
@@ -167,6 +177,7 @@ export function useShoppingList(selectedDate: Date | string, options: UseShoppin
           timezone,
           mealTimes,
           showPast: options.showPast,
+          excludedIngredientKeys,
         });
         setIsOffline(false);
         if (cacheKey) void AsyncStorage.setItem(cacheKey, serializeShoppingListResult(result)).catch(() => undefined);

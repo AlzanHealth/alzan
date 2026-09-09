@@ -12,9 +12,11 @@ import type {
 } from './shoppingListPlanner';
 import {
   aggregateShoppingIngredients,
+  filterShoppingIngredientsByExcludedKeys,
   getActiveShoppingMealLogIds,
   getShoppingMealState,
   getShoppingRange,
+  normalizeShoppingListExcludedIngredientKeys,
   planShoppingMealLogs,
 } from './shoppingListPlanner';
 
@@ -57,6 +59,7 @@ export async function getShoppingList(
     timezone?: string;
     mealTimes?: ShoppingMealTimes;
     showPast?: boolean;
+    excludedIngredientKeys?: readonly string[];
   } = {},
 ): Promise<ShoppingListResult> {
   if (!userId) throw new Error('No authenticated user');
@@ -160,7 +163,10 @@ export async function getShoppingList(
 
   return {
     range,
-    ingredients: aggregateShoppingIngredients(items || [], localizedNamesById, categoriesById, sourcesByMealLogId),
+    ingredients: filterShoppingIngredientsByExcludedKeys(
+      aggregateShoppingIngredients(items || [], localizedNamesById, categoriesById, sourcesByMealLogId),
+      normalizeShoppingListExcludedIngredientKeys(options.excludedIngredientKeys),
+    ),
     totalMealCount: allLogs.length,
     visibleMealCount: visibleLogs.length,
     hiddenMealCount,

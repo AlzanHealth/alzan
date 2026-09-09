@@ -251,6 +251,36 @@ export const searchIngredients = async (
   return data.map(item => mapIngredientResult(item, languageCode));
 };
 
+export type IngredientSettingsOption = {
+  id: string;
+  name: string;
+};
+
+export const getIngredientsByIds = async (
+  ids: readonly string[],
+  locale?: Locale,
+): Promise<IngredientSettingsOption[]> => {
+  const uniqueIds = Array.from(new Set(ids.filter(id => typeof id === 'string' && id.trim().length > 0)));
+  if (uniqueIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('ingredients')
+    .select('id, name_es, name_en')
+    .in('id', uniqueIds)
+    .returns<Array<{ id: string; name_es: string; name_en: string | null }>>();
+
+  if (error) throw error;
+
+  const languageCode = locale ?? getCurrentAppLocale();
+  const byId = new Map(
+    (data ?? []).map(ingredient => [ingredient.id, getLocalizedIngredientName(ingredient, languageCode)]),
+  );
+  return uniqueIds.flatMap(id => {
+    const name = byId.get(id);
+    return name ? [{ id, name }] : [];
+  });
+};
+
 // 3. Create (Manual)
 export const createIngredient = async (ingredient: Insert<'ingredients'>) => {
   // Ensure normalization

@@ -556,6 +556,18 @@ export default {
     shoppingListInfoModalTitle: 'Lista de la compra',
     shoppingListInfoModalBody:
       'La lista combina los ingredientes de tus comidas para el ciclo de 7 días que contiene la fecha seleccionada.',
+    shoppingListExcludedIngredientsTitle: 'INGREDIENTES QUE NO COMPRO',
+    shoppingListExcludedIngredientsInfo:
+      'Elige ingredientes que ya compras en otro sitio o que no necesitas en tu lista del supermercado. Seguirán en tu plan nutricional, pero quedarán ocultos en la lista de la compra y sus exportaciones.',
+    shoppingListExcludedIngredientsHint:
+      'Estos ingredientes seguirán en tus comidas y totales nutricionales, pero no aparecerán en tu lista de la compra.',
+    shoppingListExcludedIngredientsPlaceholder: 'Buscar ingredientes',
+    shoppingListExcludedIngredientsSearchLabel: 'Buscar ingredientes para excluir de la lista de la compra',
+    shoppingListExcludedIngredientsNoResults: 'No se han encontrado ingredientes coincidentes.',
+    shoppingListExcludedIngredientsSelected: 'Ingredientes excluidos ({{count}})',
+    shoppingListExcludedIngredientsEmpty: 'No has excluido ningún ingrediente.',
+    shoppingListExcludedIngredientsAdd: 'Excluir {{ingredient}} de la lista de la compra',
+    shoppingListExcludedIngredientsRemove: 'Volver a incluir {{ingredient}} en la lista de la compra',
     shoppingListDayMonday: 'Lunes',
     shoppingListDayMondayShort: 'L',
     shoppingListDayTuesday: 'Martes',

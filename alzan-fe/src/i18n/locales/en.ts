@@ -550,6 +550,18 @@ const en = {
     shoppingListInfoModalTitle: 'Shopping list',
     shoppingListInfoModalBody:
       'The list combines ingredients from your meals for the 7-day cycle containing the selected date.',
+    shoppingListExcludedIngredientsTitle: "INGREDIENTS I DON'T BUY",
+    shoppingListExcludedIngredientsInfo:
+      "Choose ingredients you already buy elsewhere or don't need in your market list. They remain in your nutrition plan but are hidden from shopping lists and exports.",
+    shoppingListExcludedIngredientsHint:
+      "These ingredients stay in your meals and nutrition totals, but won't appear in your shopping list.",
+    shoppingListExcludedIngredientsPlaceholder: 'Search ingredients',
+    shoppingListExcludedIngredientsSearchLabel: 'Search ingredients to exclude from shopping lists',
+    shoppingListExcludedIngredientsNoResults: 'No matching ingredients found.',
+    shoppingListExcludedIngredientsSelected: 'Excluded ingredients ({{count}})',
+    shoppingListExcludedIngredientsEmpty: "You haven't excluded any ingredients.",
+    shoppingListExcludedIngredientsAdd: 'Exclude {{ingredient}} from shopping lists',
+    shoppingListExcludedIngredientsRemove: 'Include {{ingredient}} in shopping lists again',
     shoppingListDayMonday: 'Monday',
     shoppingListDayMondayShort: 'M',
     shoppingListDayTuesday: 'Tuesday',
