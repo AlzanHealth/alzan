@@ -14,7 +14,18 @@ import {
   removeAdvancedSection,
   serializeAdvancedSections,
   sortByOrderIndex,
+  type AdvancedSectionDraft,
 } from './advancedEnduranceSession.helper';
+import type { EnduranceMetricField, EnduranceMetricPriority } from './enduranceMetricPriority.helper';
+
+const allMetricPriorities: EnduranceMetricPriority[] = [
+  ['intensity', 'duration', 'distance'],
+  ['intensity', 'distance', 'duration'],
+  ['duration', 'intensity', 'distance'],
+  ['duration', 'distance', 'intensity'],
+  ['distance', 'intensity', 'duration'],
+  ['distance', 'duration', 'intensity'],
+];
 
 const templateSections = materializeTemplateSections([
   {
@@ -552,3 +563,52 @@ const swimmingDerived = deriveAdvancedSectionMetrics(
   'swimming',
 );
 assert.equal(swimmingDerived.paceSPer100m, 120);
+
+const getAdvancedMetricValue = (section: AdvancedSectionDraft, field: EnduranceMetricField): number | null =>
+  field === 'distance' ? section.distanceM : field === 'duration' ? section.durationS : section.paceSPerKm;
+
+const calculateExpectedRunningMetric = (section: AdvancedSectionDraft, field: EnduranceMetricField): number => {
+  if (field === 'distance') return ((section.durationS ?? 0) / (section.paceSPerKm ?? 1)) * 1000;
+  if (field === 'duration') return Math.round(((section.distanceM ?? 0) / 1000) * (section.paceSPerKm ?? 0));
+  return (section.durationS ?? 0) / ((section.distanceM ?? 1) / 1000);
+};
+
+for (const priority of allMetricPriorities) {
+  for (const changedField of ['intensity', 'duration', 'distance'] as const) {
+    const fieldKey =
+      changedField === 'distance' ? 'distanceM' : changedField === 'duration' ? 'durationS' : 'paceSPerKm';
+    const input: AdvancedSectionDraft = {
+      ...createEmptyAdvancedSection(`priority-${priority.join('-')}-${changedField}`),
+      distanceM: changedField === 'distance' ? 3000 : 2000,
+      durationS: changedField === 'duration' ? 900 : 600,
+      paceSPerKm: changedField === 'intensity' ? 600 : 300,
+    };
+    const result = deriveAdvancedSectionMetrics(
+      { ...input, [fieldKey]: input[fieldKey] },
+      'running',
+      changedField,
+      priority,
+    );
+    const targetField = changedField === priority[2] ? priority[1] : priority[2];
+
+    assert.equal(getAdvancedMetricValue(result, targetField), calculateExpectedRunningMetric(input, targetField));
+    for (const field of ['intensity', 'duration', 'distance'] as const) {
+      if (field !== targetField)
+        assert.equal(getAdvancedMetricValue(result, field), getAdvancedMetricValue(input, field));
+    }
+  }
+}
+
+for (const missingField of ['intensity', 'duration', 'distance'] as const) {
+  const input: AdvancedSectionDraft = {
+    ...createEmptyAdvancedSection(`missing-${missingField}`),
+    distanceM: missingField === 'distance' ? null : 2000,
+    durationS: missingField === 'duration' ? null : 600,
+    paceSPerKm: missingField === 'intensity' ? null : 300,
+  };
+  const result = deriveAdvancedSectionMetrics(input, 'running');
+  assert.equal(
+    getAdvancedMetricValue(result, missingField),
+    calculateExpectedRunningMetric({ ...input, distanceM: 2000, durationS: 600, paceSPerKm: 300 }, missingField),
+  );
+}
