@@ -2,13 +2,16 @@ import assert from 'node:assert/strict';
 import {
   addAdvancedGroup,
   addAdvancedSection,
+  buildKilometerSections,
   calculateAdvancedTotals,
   buildAdvancedSessionTimestamps,
   deriveAdvancedSectionMetrics,
+  deriveKilometerSectionMetrics,
   collapseGroupRepetitions,
   createEmptyAdvancedSection,
   expandGroupRepetitions,
   hasValidAdvancedSection,
+  hasValidKilometerSections,
   insertAdvancedSectionsAfterSubtree,
   materializeTemplateSections,
   removeAdvancedSection,
@@ -338,6 +341,44 @@ assert.equal(hasValidAdvancedSection([validStep]), true);
 
 const withGroup = addAdvancedGroup([], 'group-1', 'child-1');
 assert.equal(withGroup.length, 2);
+
+const kilometerSections = buildKilometerSections(12300);
+assert.deepEqual(
+  kilometerSections.map(section => section.distanceM),
+  [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 300],
+);
+assert.equal(
+  kilometerSections.every(section => section.sourceTemplateStepId === null),
+  true,
+);
+assert.equal(
+  kilometerSections.every(section => section.durationS === null),
+  true,
+);
+
+const timedKilometers = kilometerSections.map((section, index) => ({
+  ...section,
+  durationS: index < 8 ? 300 + index : null,
+}));
+const resizedKilometers = buildKilometerSections(8300, timedKilometers);
+assert.deepEqual(
+  resizedKilometers.map(section => section.durationS),
+  [300, 301, 302, 303, 304, 305, 306, 307, null],
+);
+
+const fixedDistanceRun = deriveKilometerSectionMetrics({ ...resizedKilometers[0], durationS: 330 }, 'running');
+assert.equal(fixedDistanceRun.distanceM, 1000);
+assert.equal(fixedDistanceRun.durationS, 330);
+assert.equal(fixedDistanceRun.paceSPerKm, 330);
+
+const fixedDistanceSwim = deriveKilometerSectionMetrics(
+  { ...resizedKilometers[0], distanceM: 300, durationS: 180 },
+  'swimming',
+);
+assert.equal(fixedDistanceSwim.distanceM, 300);
+assert.equal(fixedDistanceSwim.paceSPer100m, 60);
+assert.equal(hasValidKilometerSections(resizedKilometers), false);
+assert.equal(hasValidKilometerSections(resizedKilometers.map(section => ({ ...section, durationS: 300 }))), true);
 assert.equal(withGroup.find(section => section.clientId === 'child-1')?.parentClientId, 'group-1');
 assert.equal(removeAdvancedSection(withGroup, 'group-1').length, 0);
 

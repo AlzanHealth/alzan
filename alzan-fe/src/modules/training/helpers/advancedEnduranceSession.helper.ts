@@ -64,6 +64,10 @@ export type AdvancedSerializedSection = AdvancedSectionDraft & {
 
 export type AdvancedMetricField = 'duration' | 'distance' | 'intensity';
 
+export type KilometerSectionDraft = AdvancedSectionDraft & {
+  kilometerIndex: number;
+};
+
 type OrderedItem = {
   order_index: number | null | undefined;
 };
@@ -170,6 +174,69 @@ export function createEmptyAdvancedSection(
     repetitionIndex: null,
     ...EMPTY_METRICS,
   };
+}
+
+export function buildKilometerSections(
+  distanceM: number | null,
+  previousSections: KilometerSectionDraft[] = [],
+): KilometerSectionDraft[] {
+  const normalizedDistanceM =
+    distanceM != null && Number.isFinite(distanceM) && distanceM > 0 ? Math.round(distanceM) : 0;
+  if (normalizedDistanceM === 0) return [];
+
+  const sectionDistances = Array.from({ length: Math.ceil(normalizedDistanceM / 1000) }, (_, index) => {
+    const remainingM = normalizedDistanceM - index * 1000;
+    return Math.min(1000, remainingM);
+  });
+
+  return sectionDistances.map((sectionDistanceM, index) => {
+    const previous = previousSections[index];
+    const draft = createEmptyAdvancedSection(`kilometer-${index + 1}`);
+    return {
+      ...draft,
+      kilometerIndex: index + 1,
+      label: `Km ${index + 1}`,
+      distanceM: sectionDistanceM,
+      durationS: previous?.distanceM === sectionDistanceM ? previous.durationS : null,
+      paceSPerKm: previous?.distanceM === sectionDistanceM ? previous.paceSPerKm : null,
+      paceSPer100m: previous?.distanceM === sectionDistanceM ? previous.paceSPer100m : null,
+      speedMPerS: previous?.distanceM === sectionDistanceM ? previous.speedMPerS : null,
+    };
+  });
+}
+
+export function deriveKilometerSectionMetrics(
+  section: KilometerSectionDraft,
+  sport: AdvancedSport,
+): KilometerSectionDraft {
+  const durationS = positiveValue(section.durationS);
+  if (!durationS || !section.distanceM || section.distanceM <= 0) {
+    return {
+      ...section,
+      paceSPerKm: null,
+      paceSPer100m: null,
+      speedMPerS: null,
+    };
+  }
+
+  const distanceM = section.distanceM;
+  if (sport === 'running') {
+    return { ...section, paceSPerKm: (durationS / distanceM) * 1000 };
+  }
+  if (sport === 'swimming') {
+    return { ...section, paceSPer100m: (durationS / distanceM) * 100 };
+  }
+  return { ...section, speedMPerS: distanceM / durationS };
+}
+
+export function hasValidKilometerSections(sections: KilometerSectionDraft[]): boolean {
+  return (
+    sections.length > 0 &&
+    sections.every(
+      section =>
+        section.distanceM != null && section.distanceM > 0 && section.durationS != null && section.durationS > 0,
+    )
+  );
 }
 
 function toDraft(step: AdvancedTemplateStep, parentClientId: string | null): AdvancedSectionDraft {
