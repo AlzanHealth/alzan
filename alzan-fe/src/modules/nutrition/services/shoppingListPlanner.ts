@@ -351,13 +351,19 @@ export const parseShoppingQuantityInput = (value: string): number | null => {
   return Number.isFinite(quantity) && quantity >= 0 ? quantity : null;
 };
 
+export const isShoppingIngredientDone = (
+  ingredient: ShoppingListIngredient,
+  completedKeys: ReadonlySet<string>,
+): boolean => completedKeys.has(ingredient.key) || getShoppingQuantityToBuy(ingredient) === 0;
+
 export const filterShoppingIngredients = (
   ingredients: ShoppingListIngredient[],
   completedKeys: ReadonlySet<string>,
   filter: ShoppingListIngredientFilter,
 ): ShoppingListIngredient[] => {
-  if (filter === 'pending') return ingredients.filter(ingredient => !completedKeys.has(ingredient.key));
-  if (filter === 'purchased') return ingredients.filter(ingredient => completedKeys.has(ingredient.key));
+  const isDone = (ingredient: ShoppingListIngredient) => isShoppingIngredientDone(ingredient, completedKeys);
+  if (filter === 'pending') return ingredients.filter(ingredient => !isDone(ingredient));
+  if (filter === 'purchased') return ingredients.filter(isDone);
   return ingredients;
 };
 

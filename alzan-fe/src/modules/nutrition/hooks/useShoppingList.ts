@@ -48,14 +48,8 @@ export function useShoppingList(selectedDate: Date | string, options: UseShoppin
         .map(([mealType, meal]) => [mealType, meal.time]),
     ) as ShoppingMealTimes;
   }, [preferences?.notification_settings?.meals]);
-  const [now, setNow] = useState(() => new Date());
   const [cacheLoaded, setCacheLoaded] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(interval);
-  }, []);
 
   const selectedRange = useMemo(() => {
     if (mode === 'custom' && (!options.customStartDate || !options.customEndDate)) return null;
@@ -146,14 +140,12 @@ export function useShoppingList(selectedDate: Date | string, options: UseShoppin
       timezone,
       mealTimes,
       excludedIngredientKeys,
-      now.toISOString().slice(0, 16),
       options.showPast,
     ],
     [
       excludedIngredientKeys,
       mealTimes,
       mode,
-      now,
       options.customEndDate,
       options.customStartDate,
       options.showPast,
@@ -173,7 +165,7 @@ export function useShoppingList(selectedDate: Date | string, options: UseShoppin
           mode,
           customStartDate: options.customStartDate,
           customEndDate: options.customEndDate,
-          now,
+          now: new Date(),
           timezone,
           mealTimes,
           showPast: options.showPast,
@@ -191,6 +183,10 @@ export function useShoppingList(selectedDate: Date | string, options: UseShoppin
       }
     },
     enabled: !!user && !!selectedRange && cacheLoaded,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   return {

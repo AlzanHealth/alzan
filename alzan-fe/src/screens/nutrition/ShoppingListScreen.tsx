@@ -22,10 +22,12 @@ import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { useAuth } from '../../context/AuthContext';
 import { useShoppingList } from '../../modules/nutrition/hooks/useShoppingList';
 import { useShoppingListState } from '../../modules/nutrition/hooks/useShoppingListState';
+import { useShoppingListSelection } from '../../modules/nutrition/hooks/useShoppingListSelection';
 import { ShoppingListIngredientRow } from '../../modules/nutrition/components/ShoppingListIngredientRow';
 import { ShoppingListQuantityModal } from '../../modules/nutrition/components/ShoppingListQuantityModal';
 import {
   filterShoppingIngredients,
+  isShoppingIngredientDone,
   formatShoppingQuantity,
   formatShoppingListForExport,
   getShoppingQuantityToBuy,
@@ -82,13 +84,28 @@ export const ShoppingListScreen = () => {
   const { styles: dynamicStyles, colors } = useNutritionStyles();
   const { topFromScreenBottom } = useTabBarLayout();
   const initialDate = route.params?.date || format(new Date(), 'yyyy-MM-dd');
-  const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [mode, setMode] = useState<ShoppingListMode>('upcoming');
-  const [customStartDate, setCustomStartDate] = useState(initialDate);
-  const [customEndDate, setCustomEndDate] = useState(format(addDays(parseISO(initialDate), 6), 'yyyy-MM-dd'));
+  const {
+    selection,
+    updateSelection,
+    isReady: selectionReady,
+  } = useShoppingListSelection(
+    user?.id,
+    {
+      selectedDate: initialDate,
+      mode: 'upcoming',
+      customStartDate: initialDate,
+      customEndDate: format(addDays(parseISO(initialDate), 6), 'yyyy-MM-dd'),
+      showPast: false,
+    },
+    route.params?.date,
+  );
+  const { selectedDate, mode, customStartDate, customEndDate, showPast } = selection;
+  const setSelectedDate = (value: string) => updateSelection({ selectedDate: value });
+  const setCustomStartDate = (value: string) => updateSelection({ customStartDate: value });
+  const setCustomEndDate = (value: string) => updateSelection({ customEndDate: value });
+  const setShowPast = (value: boolean) => updateSelection({ showPast: value });
   const [calendarTarget, setCalendarTarget] = useState<'start' | 'end' | null>(null);
   const [quantityIngredient, setQuantityIngredient] = useState<ShoppingListIngredient | null>(null);
-  const [showPast, setShowPast] = useState(false);
   const {
     error,
     isLoading,
@@ -140,7 +157,9 @@ export const ShoppingListScreen = () => {
     () => filterShoppingIngredients(visibleIngredients, completedKeys, filter),
     [completedKeys, filter, visibleIngredients],
   );
-  const completedCount = visibleIngredients.filter(ingredient => completedKeys.has(ingredient.key)).length;
+  const completedCount = visibleIngredients.filter(ingredient =>
+    isShoppingIngredientDone(ingredient, completedKeys),
+  ).length;
   const exportIngredients = filteredIngredients;
   const exportText = useMemo(
     () => formatShoppingListForExport(exportIngredients, { categoryLabels }),
@@ -261,7 +280,7 @@ export const ShoppingListScreen = () => {
     }) => (
       <ShoppingListIngredientRow
         item={item}
-        isCompleted={completedKeys.has(item.key)}
+        isCompleted={isShoppingIngredientDone(item, completedKeys)}
         disabled={!isHydrated}
         isLast={index === section.data.length - 1}
         colors={colors}
@@ -273,7 +292,7 @@ export const ShoppingListScreen = () => {
   );
   const renderSectionHeader = useCallback(
     ({ section }: { section: ShoppingListCategoryGroup & { title: string; data: ShoppingListIngredient[] } }) => {
-      const allChecked = section.data.every(item => completedKeys.has(item.key));
+      const allChecked = section.data.every(item => isShoppingIngredientDone(item, completedKeys));
       return (
         <View style={[styles.categoryHeader, { backgroundColor: colors.surfaceSolid }]}>
           <View style={styles.categoryCopy}>
@@ -285,6 +304,7 @@ export const ShoppingListScreen = () => {
           <TouchableOpacity
             style={styles.categoryAction}
             onPress={() => setCategoryCompleted(section.data, !allChecked)}
+            disabled={!isHydrated}
             accessibilityRole="button"
           >
             <Text style={[styles.categoryActionText, { color: colors.primary }]}>
@@ -308,8 +328,7 @@ export const ShoppingListScreen = () => {
             key={option.value}
             style={[styles.modeButton, mode === option.value && { backgroundColor: colors.primary }]}
             onPress={() => {
-              setMode(option.value);
-              setShowPast(false);
+              updateSelection({ mode: option.value, showPast: false });
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: mode === option.value }}
@@ -503,12 +522,12 @@ export const ShoppingListScreen = () => {
           </View>
           <View style={styles.headerButton} />
         </View>
-        {isLoading ? (
+        {isLoading || !selectionReady ? (
           <View style={styles.centerState}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={[styles.stateText, { color: colors.textSecondary }]}>{t('common.loading')}</Text>
           </View>
-        ) : error ? (
+        ) : error && ingredients.length === 0 ? (
           <View style={styles.centerState}>
             <Text style={[styles.stateText, { color: colors.textSecondary }]}>
               {t('nutrition.shoppingListLoadError')}

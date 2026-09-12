@@ -13,6 +13,7 @@ import {
   clearShoppingListStateWithAdapter,
   createShoppingListStateSyncQueue,
   syncShoppingListStateWithAdapter,
+  persistShoppingListLocallyFirst,
   type ShoppingListStateSyncAdapter,
 } from './shoppingListStateSyncCore';
 import {
@@ -109,30 +110,23 @@ export const clearShoppingListStateOnServer = async (userId: string, range: Shop
   );
 
 export const resetShoppingListStatePersisted = async (userId: string, range: ShoppingListDateRange): Promise<boolean> =>
-  syncQueue.enqueue(getRangeKey(userId, range), async () => {
-    const localSaved = await AsyncStorage.setItem(
-      getShoppingListStateStorageKey(userId, range),
-      serializeShoppingListState(resetShoppingListState()),
-    )
-      .then(() => true)
-      .catch(() => false);
-    const remoteCleared = await clearShoppingListStateWithAdapter(supabaseShoppingListStateAdapter, userId, range);
-    return localSaved && remoteCleared;
-  });
+  persistShoppingListLocallyFirst(
+    () =>
+      AsyncStorage.setItem(
+        getShoppingListStateStorageKey(userId, range),
+        serializeShoppingListState(resetShoppingListState()),
+      ),
+    () => clearShoppingListStateOnServer(userId, range),
+  );
 
 export const persistShoppingListState = async (
   userId: string,
   range: ShoppingListDateRange,
   state: ShoppingListState,
 ): Promise<boolean> =>
-  syncQueue.enqueue(getRangeKey(userId, range), async () => {
-    try {
-      await AsyncStorage.setItem(getShoppingListStateStorageKey(userId, range), serializeShoppingListState(state));
-      await supabaseShoppingListStateAdapter.upsert(userId, range, state);
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  persistShoppingListLocallyFirst(
+    () => AsyncStorage.setItem(getShoppingListStateStorageKey(userId, range), serializeShoppingListState(state)),
+    () => syncShoppingListStateToServer(userId, range, state),
+  );
 
 export { mergeShoppingListStates };

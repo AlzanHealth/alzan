@@ -86,7 +86,7 @@ export const mergeShoppingListStates = (local: ShoppingListState, remote: Shoppi
   const merged: ShoppingListState = { ...local };
   Object.entries(remote).forEach(([key, remoteState]) => {
     const localState = merged[key];
-    if (!localState || remoteState.updatedAt > localState.updatedAt) merged[key] = remoteState;
+    if (!localState || Date.parse(remoteState.updatedAt) > Date.parse(localState.updatedAt)) merged[key] = remoteState;
   });
   return merged;
 };

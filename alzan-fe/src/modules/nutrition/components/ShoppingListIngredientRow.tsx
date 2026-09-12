@@ -2,7 +2,8 @@ import React, { useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Check, Pencil } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { formatLocalizedDate } from '../../../i18n/dateLocale';
 
 import {
   formatShoppingQuantity,
@@ -38,12 +39,15 @@ export const ShoppingListIngredientRow = ({
   onAdjust,
 }: ShoppingListIngredientRowProps) => {
   const { t } = useTranslation();
-  const handlePress = useCallback(() => onToggle(item.key), [item.key, onToggle]);
   const availableQuantity = getShoppingAvailableQuantity(item);
   const quantityToBuy = getShoppingQuantityToBuy(item);
+  const handlePress = useCallback(() => {
+    if (quantityToBuy > 0) onToggle(item.key);
+    else onAdjust(item);
+  }, [item, onAdjust, onToggle, quantityToBuy]);
   const sourceLabels = (item.sources || []).map(source => {
     const mealLabel = source.mealName || (source.mealType ? String(t(`settings.${source.mealType}` as never)) : null);
-    return `${mealLabel || t('nutrition.shoppingListUnknownMeal')} · ${format(parseISO(source.date), 'd MMM')}`;
+    return `${mealLabel || t('nutrition.shoppingListUnknownMeal')} · ${formatLocalizedDate(parseISO(source.date), { en: 'd MMM', es: 'd MMM' })}`;
   });
   return (
     <View
@@ -75,9 +79,13 @@ export const ShoppingListIngredientRow = ({
             {t('nutrition.shoppingListRequiredAmount', { quantity: formatShoppingQuantity(item.quantity_g) })}
           </Text>
           <Text style={[styles.available, { color: colors.textSecondary }]}>
-            {t('nutrition.shoppingListAvailableAmount', { quantity: formatShoppingQuantity(availableQuantity) })} ·{' '}
-            {t('nutrition.shoppingListToBuy', { quantity: formatShoppingQuantity(quantityToBuy) })}
+            {t('nutrition.shoppingListAvailableAmount', { quantity: formatShoppingQuantity(availableQuantity) })}
           </Text>
+          <View style={[styles.amountBadge, { backgroundColor: colors.primary + (isCompleted ? '08' : '12') }]}>
+            <Text style={[styles.amountText, { color: isCompleted ? colors.textSecondary : colors.primary }]}>
+              {t('nutrition.shoppingListToBuy', { quantity: formatShoppingQuantity(quantityToBuy) })}
+            </Text>
+          </View>
           {sourceLabels.length > 0 && (
             <Text style={[styles.sources, { color: colors.textSecondary }]} numberOfLines={2}>
               {t('nutrition.shoppingListUsedIn', { meals: sourceLabels.join(' · ') })}
@@ -107,7 +115,7 @@ const styles = StyleSheet.create({
   row: {
     minHeight: 76,
     paddingHorizontal: 16,
-    paddingVertical: 9,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -128,6 +136,8 @@ const styles = StyleSheet.create({
   needed: { fontSize: 12, marginTop: 3 },
   available: { fontSize: 12, marginTop: 3 },
   sources: { fontSize: 11, marginTop: 3 },
+  amountBadge: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginTop: 7 },
+  amountText: { fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
   completedText: { opacity: 0.52, textDecorationLine: 'line-through' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButton: {

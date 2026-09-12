@@ -126,6 +126,15 @@ function testCalculatesAvailableQuantitiesAndFilters() {
     filterShoppingIngredients(ingredients, new Set(['a']), 'purchased').map(item => item.key),
     ['a'],
   );
+  const stocked = [{ ...ingredients[0], available_quantity_g: 620 }, ingredients[1]];
+  assert.deepEqual(
+    filterShoppingIngredients(stocked, new Set(), 'pending').map(item => item.key),
+    ['b'],
+  );
+  assert.deepEqual(
+    filterShoppingIngredients(stocked, new Set(), 'purchased').map(item => item.key),
+    ['a'],
+  );
 }
 
 function testExcludesFixedShoppingIngredients() {

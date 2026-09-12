@@ -49,3 +49,15 @@ export const createShoppingListStateSyncQueue = () => {
     },
   };
 };
+
+// Local durability must never wait behind a network request.
+export const persistShoppingListLocallyFirst = async (
+  saveLocal: () => Promise<void>,
+  saveRemote: () => Promise<boolean>,
+): Promise<boolean> => {
+  const localSaved = await saveLocal()
+    .then(() => true)
+    .catch(() => false);
+  const remoteSaved = await saveRemote().catch(() => false);
+  return localSaved && remoteSaved;
+};
