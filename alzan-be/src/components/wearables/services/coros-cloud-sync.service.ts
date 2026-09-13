@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { parseCorosJson } from '../../activity-import/parsers/coros-json';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { parseCorosActivityFileToCanonical } from '../../activity-import/parsers/coros-activity-canonical.mapper';
 import {
@@ -25,6 +26,7 @@ import {
   assertCorosFitBytes,
   assertCorosApiSuccess,
   buildCorosDateWindows,
+  corosHistoryStart,
   extractCorosDailyPage,
   extractCorosFitUrls,
   extractCorosWorkoutPage,
@@ -69,14 +71,11 @@ type CorosWorkoutImportOutcome = {
   errorCode?: string;
 };
 
-const FIRST_SYNC_LOOKBACK_DAYS = 90;
-const NORMAL_SYNC_OVERLAP_DAYS = 3;
 const COROS_TOKEN_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 const CANONICAL_ACTIVITY_VERSION = 9;
 const COROS_REQUEST_RETRIES = 3;
 const COROS_RETRY_BASE_DELAY_MS = 250;
 const MAX_FIT_BYTES = 25 * 1024 * 1024;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const COROS_HEALTH_CONSENT_VERSION = 'health_integrations_v2_2026_08_22';
 
 @Injectable()
@@ -110,7 +109,10 @@ export class CorosCloudSyncService {
 
     const stopHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
     try {
-      const windows = await this.resolveDateWindows(userId);
+      const now = new Date();
+      // Revisit the available summaries so old failed or pending FIT imports are
+      // retried. The durable activity claim skips already completed imports.
+      const windows = buildCorosDateWindows(corosHistoryStart(now), now);
       const workouts = await this.fetchWorkouts(token, windows);
       let activitiesImported = 0;
       let activitiesSkipped = 0;
@@ -140,7 +142,7 @@ export class CorosCloudSyncService {
         }
       }
 
-      const status = activitiesFailed > 0 ? 'partial' : 'success';
+      const status = activitiesFailed > 0 || fitPending > 0 ? 'partial' : 'success';
       const lastSuccessAt = new Date().toISOString();
       await this.markConnectionResult(userId, lastSuccessAt, status, errorsByCode);
       await this.syncStateService.saveState({
@@ -288,7 +290,8 @@ export class CorosCloudSyncService {
         fitPendingReason = this.errorMessage(error);
         this.logger.warn({ provider: 'coros', labelId, errorCode: fitPendingReason }, 'COROS FIT enrichment pending');
       }
-      const { activity } = buildCorosCanonicalActivity(summary, labelId, fitFiles, fitPendingReason);
+      const canonical = buildCorosCanonicalActivity(summary, labelId, fitFiles, fitPendingReason);
+      const { activity } = canonical;
       const provenance: CanonicalProvenance = {
         provider: 'coros',
         sourceChannel: 'cloud',
@@ -306,7 +309,7 @@ export class CorosCloudSyncService {
         lifecycleJobId: jobId,
         canonicalVersion: CANONICAL_ACTIVITY_VERSION,
       });
-      return { status: 'imported', fitPending: fitPendingReason != null };
+      return { status: 'imported', fitPending: canonical.fitPendingReason != null };
     } catch (error: unknown) {
       const errorCode = this.errorMessage(error);
       await this.importLifecycleService.failActivity(claim.importId, errorCode, this.isRetryable(error));
@@ -457,6 +460,7 @@ export class CorosCloudSyncService {
         axios.get(`${this.apiBaseUrl}${path}`, {
           params: { token: token.accessToken, openId: token.openId, ...window, ...extraParams },
           headers: { Accept: 'application/json', token: token.accessToken },
+          transformResponse: [(data: string) => parseCorosJson(data)],
           timeout: 15_000,
         }),
       );
@@ -481,6 +485,7 @@ export class CorosCloudSyncService {
               token: token.accessToken,
             },
             headers: { Accept: 'application/json', token: token.accessToken },
+            transformResponse: [(data: string) => parseCorosJson(data)],
             timeout: 15_000,
           }),
         );
@@ -598,22 +603,6 @@ export class CorosCloudSyncService {
       .eq('user_id', userId);
     if (connectionError) throw new InternalServerErrorException('COROS_CONNECTION_REFRESH_PERSIST_FAILED');
     return { ...token, accessToken, refreshToken: refreshedToken, expiresAt };
-  }
-
-  private async resolveDateWindows(userId: string): Promise<Array<{ startDate: string; endDate: string }>> {
-    const { data } = await this.supabaseAdminService.client
-      .from('user_connections')
-      .select('last_synced_at')
-      .eq('user_id', userId)
-      .eq('provider', 'coros')
-      .maybeSingle();
-    const now = new Date();
-    const earliest = now.getTime() - (FIRST_SYNC_LOOKBACK_DAYS - 1) * MS_PER_DAY;
-    const lastSynced = data?.last_synced_at ? Date.parse(data.last_synced_at) : Number.NaN;
-    const startMs = Number.isFinite(lastSynced)
-      ? Math.max(earliest, lastSynced - (NORMAL_SYNC_OVERLAP_DAYS - 1) * MS_PER_DAY)
-      : earliest;
-    return buildCorosDateWindows(new Date(startMs), now);
   }
 
   private async hasHealthConsent(userId: string): Promise<boolean> {

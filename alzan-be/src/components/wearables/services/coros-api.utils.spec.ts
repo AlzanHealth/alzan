@@ -1,5 +1,8 @@
 import { strict as assert } from 'assert';
 import * as utils from './coros-api.utils';
+assert.equal(utils.corosHistoryStart(new Date('2026-05-31T12:00:00Z')).toISOString(), '2026-02-28T00:00:00.000Z');
+assert.equal(utils.corosHistoryStart(new Date('2024-05-31T12:00:00Z')).toISOString(), '2024-02-29T00:00:00.000Z');
+assert.equal(utils.corosHistoryStart(new Date('2026-09-12T12:00:00Z')).toISOString(), '2026-06-12T00:00:00.000Z');
 assert.deepEqual(utils.buildCorosDateWindows(new Date('2026-05-01T12:00:00Z'), new Date('2026-07-29T12:00:00Z')), [
   { startDate: '20260501', endDate: '20260530' },
   { startDate: '20260531', endDate: '20260629' },
@@ -29,6 +32,11 @@ assert.throws(
 );
 
 const detailFitUrl = 'https://oss.coros.com/fit/workout.fit';
+assert.deepEqual(
+  utils.extractCorosFitUrls({ triathlonItemList: [{ fitUrl: detailFitUrl }, { mode: 9 }] }),
+  [],
+  'a missing multisport leg must not be reported as a complete FIT import',
+);
 assert.deepEqual(utils.extractCorosFitUrls({ result: '0000', data: { fitUrl: detailFitUrl } }), [detailFitUrl]);
 assert.deepEqual(
   utils.extractCorosFitUrls({

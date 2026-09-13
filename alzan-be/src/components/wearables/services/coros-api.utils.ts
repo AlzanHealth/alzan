@@ -63,6 +63,13 @@ function formatCorosDate(date: Date): string {
   return date.toISOString().slice(0, 10).replace(/-/g, '');
 }
 
+export function corosHistoryStart(now: Date): Date {
+  const month = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 3, 1));
+  const lastDay = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 0)).getUTCDate();
+  month.setUTCDate(Math.min(now.getUTCDate(), lastDay));
+  return month;
+}
+
 export function buildCorosDateWindows(start: Date, end: Date): Array<{ startDate: string; endDate: string }> {
   const normalizedStart = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
   const normalizedEnd = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
@@ -110,7 +117,7 @@ export function extractCorosFitUrls(payload: unknown): string[] {
   if (rootUrl) urls.push(rootUrl);
   if (Array.isArray(value.triathlonItemList)) {
     for (const item of value.triathlonItemList) {
-      if (!isRecord(item) || typeof item.fitUrl !== 'string') continue;
+      if (!isRecord(item) || typeof item.fitUrl !== 'string' || !item.fitUrl.trim()) return [];
       const itemUrl = item.fitUrl.trim();
       if (itemUrl) urls.push(itemUrl);
     }

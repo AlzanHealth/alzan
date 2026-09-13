@@ -95,9 +95,97 @@ async function assertApplicationErrorsAreRejected(): Promise<void> {
   }
 }
 
+async function assertMissingFitIsPending(): Promise<void> {
+  const service = createService();
+  const originalGet = axios.get;
+  axios.get = (async () => ({ data: { result: '0000', data: {} } })) as typeof axios.get;
+  try {
+    await assert.rejects(service.fetchWorkoutFits(token, { mode: 8, subMode: 1 }, 'label-1'), /COROS_FIT_URL_MISSING/);
+  } finally {
+    axios.get = originalGet;
+  }
+}
+
+async function assertSyncRetriesPendingWithoutDuplicates(): Promise<void> {
+  let claimed = false;
+  let complete = false;
+  let active = false;
+  let writes = 0;
+  const service = new CorosCloudSyncService(
+    {} as ConfigService,
+    {} as SupabaseAdminService,
+    { storeRawPayload: async () => ({ id: 'raw-id' }) } as unknown as RawPayloadService,
+    { saveState: async () => undefined } as unknown as IntegrationSyncStateService,
+    {
+      upsertActivity: async () => {
+        writes += 1;
+      },
+    } as unknown as CanonicalActivityWriterService,
+    {} as CanonicalHealthWriterService,
+    {
+      claimSyncJob: async () => ({ action: active ? 'active' : 'claimed', jobId: 'job', leaseToken: 'lease' }),
+      claimActivity: async (input: { userId: string; sourceRecordId: string }) => {
+        assert.equal(input.userId, 'user-1');
+        assert.equal(input.sourceRecordId, '418173315956375553');
+        claimed = true;
+        return { action: complete ? 'skip' : 'claimed', importId: 'import-id' };
+      },
+      finishSyncJob: async () => undefined,
+    } as unknown as WearableImportLifecycleService,
+    { isUserAllowed: (userId: string) => userId === 'user-1' } as unknown as CorosOAuthService,
+  );
+  const internals = service as unknown as {
+    getUsableToken: () => Promise<CorosToken>;
+    fetchWorkouts: (
+      _token: CorosToken,
+      windows: Array<{ startDate: string; endDate: string }>,
+    ) => Promise<Record<string, unknown>[]>;
+    fetchWorkoutFits: () => Promise<Uint8Array[]>;
+    hasHealthConsent: () => Promise<boolean>;
+    markConnectionResult: () => Promise<void>;
+    startLeaseHeartbeat: () => () => void;
+  };
+  internals.getUsableToken = async () => token;
+  internals.hasHealthConsent = async () => false;
+  internals.markConnectionResult = async () => undefined;
+  internals.startLeaseHeartbeat = () => () => undefined;
+  internals.fetchWorkoutFits = async () => {
+    throw new Error('COROS_FIT_URL_MISSING');
+  };
+  internals.fetchWorkouts = async (_token, windows) => {
+    assert.ok(windows.length >= 3, 'revisit old pending imports, not just a three-day overlap');
+    const summary = {
+      labelId: '418173315956375553',
+      mode: 8,
+      subMode: 1,
+      startTime: 1788501600,
+      duration: 1800,
+      distance: 5000,
+    };
+    return [summary, summary];
+  };
+  await assert.rejects(service.sync('other-user'), /not enabled/);
+  assert.equal(claimed, false);
+  const first = await service.sync('user-1');
+  assert.equal(first.status, 'partial');
+  assert.equal(first.fitPending, 1);
+  assert.equal(writes, 1, 'duplicate summaries should be imported once');
+  await service.sync('user-1');
+  assert.equal(writes, 2, 'pending FIT must be retried');
+  complete = true;
+  const skipped = await service.sync('user-1');
+  assert.equal(skipped.activitiesSkipped, 1);
+  assert.equal(writes, 2, 'complete activity must not be overwritten by a summary-only retry');
+  active = true;
+  assert.equal((await service.sync('user-1')).status, 'running');
+  assert.equal(writes, 2);
+}
+
 async function run(): Promise<void> {
   await assertFitDetailUrlIsDownloaded();
   await assertApplicationErrorsAreRejected();
+  await assertMissingFitIsPending();
+  await assertSyncRetriesPendingWithoutDuplicates();
 }
 
 void run();

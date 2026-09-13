@@ -1425,6 +1425,9 @@ const en = {
     permissionSheetCorosDescription:
       'COROS will send your workouts, FIT files, steps, calories, sleep, resting heart rate, and HRV to Alzan. You will sign in directly with COROS; Alzan never receives your password. You can disconnect and erase this data at any time.',
     corosNotAvailable: 'Not available in this environment',
+    corosConfigurationMissing: 'COROS connection is awaiting server configuration',
+    corosAccessRestricted: 'COROS access is not enabled for this account',
+    corosAvailabilityError: 'Could not check COROS availability. Please retry.',
     corosInfoButton: 'Learn how to connect COROS',
     corosInfoButtonHint: 'Open information about COROS connection and synchronization',
     corosInfoTitle: 'How to connect COROS',

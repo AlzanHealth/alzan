@@ -1442,6 +1442,9 @@ export default {
     permissionSheetCorosDescription:
       'COROS enviará a Alzan tus entrenamientos, archivos FIT, pasos, calorías, sueño, frecuencia cardiaca en reposo y HRV. Iniciarás sesión directamente en COROS; Alzan nunca recibirá tu contraseña. Puedes desconectar y borrar estos datos cuando quieras.',
     corosNotAvailable: 'No disponible en este entorno',
+    corosConfigurationMissing: 'La conexión COROS está pendiente de configuración del servidor',
+    corosAccessRestricted: 'El acceso a COROS no está habilitado para esta cuenta',
+    corosAvailabilityError: 'No se ha podido comprobar la disponibilidad de COROS. Reintenta.',
     corosInfoButton: 'Saber cómo conectar COROS',
     corosInfoButtonHint: 'Abrir información sobre la conexión y sincronización de COROS',
     corosInfoTitle: 'Cómo conectar COROS',

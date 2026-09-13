@@ -63,24 +63,30 @@ export function buildCorosCanonicalActivity(
   fitFiles: Uint8Array[],
   fitPendingReason: string | null,
 ): CorosCanonicalActivityResult {
+  fitPendingReason = fitFiles.length === 0 ? (fitPendingReason ?? 'COROS_FIT_URL_MISSING') : fitPendingReason;
   const summaryActivity = parseCorosActivityFileToCanonical(JSON.stringify(summary), `coros-${labelId}.json`);
   let activity = summaryActivity;
 
   if (fitFiles.length > 0) {
-    const fitActivity = mergeCorosMultisportActivities(
-      fitFiles.map((fitBytes, index) =>
-        parseCorosActivityFileToCanonical(fitBytes, `coros-${labelId}-${index + 1}.fit`),
-      ),
-    );
-    activity = {
-      ...fitActivity,
-      providerActivityId: labelId,
-      sportType: summaryActivity.sportType,
-      sportSubtype: summaryActivity.sportSubtype,
-      summary: mergeSummary(fitActivity.summary, summaryActivity.summary),
-      device: summaryActivity.device ?? fitActivity.device,
-      vendorFields: { ...fitActivity.vendorFields, ...summaryActivity.vendorFields },
-    };
+    try {
+      const fitActivity = mergeCorosMultisportActivities(
+        fitFiles.map((fitBytes, index) =>
+          parseCorosActivityFileToCanonical(fitBytes, `coros-${labelId}-${index + 1}.fit`),
+        ),
+      );
+      activity = {
+        ...fitActivity,
+        providerActivityId: labelId,
+        sportType: summaryActivity.sportType,
+        sportSubtype: summaryActivity.sportSubtype,
+        summary: mergeSummary(fitActivity.summary, summaryActivity.summary),
+        device: summaryActivity.device ?? fitActivity.device,
+        vendorFields: { ...fitActivity.vendorFields, ...summaryActivity.vendorFields },
+      };
+    } catch {
+      fitPendingReason = 'COROS_FIT_PARSE_FAILED';
+      activity = { ...summaryActivity, providerActivityId: labelId };
+    }
   } else {
     activity = { ...summaryActivity, providerActivityId: labelId };
   }

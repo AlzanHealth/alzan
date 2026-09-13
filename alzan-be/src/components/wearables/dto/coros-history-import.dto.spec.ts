@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert';
-import { plainToInstance } from 'class-transformer';
+import { instanceToPlain, plainToInstance } from 'class-transformer';
 import { CorosHistoryImportResultDto } from './coros-history-import.dto';
 
 const serialized = plainToInstance(
@@ -14,7 +14,7 @@ const serialized = plainToInstance(
   { excludeExtraneousValues: true },
 );
 
-assert.deepEqual(serialized, {
+assert.deepEqual(instanceToPlain(serialized), {
   filesImported: 1,
   filesSkipped: 2,
   filesFailed: 1,

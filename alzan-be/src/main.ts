@@ -9,6 +9,7 @@ import { AppModule } from './app.module';
 import { ConfigNamespace, NodeEnvironment } from './common/enum/config.enum';
 import { setupSwagger } from './core/swagger/setup-swagger';
 import serverConfig from './config/server.config';
+import { corosJsonMiddleware } from './components/wearables/coros-json.middleware';
 
 const logger = new Logger('main');
 async function bootstrap(): Promise<void> {
@@ -19,6 +20,7 @@ async function bootstrap(): Promise<void> {
   app.useLogger(app.get(PinoLogger));
 
   app.use(helmet());
+  app.use('/webhooks/coros/workouts', bodyParser.text({ type: 'application/json', limit: '2mb' }), corosJsonMiddleware);
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: false }));
 

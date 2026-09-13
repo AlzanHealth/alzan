@@ -29,6 +29,8 @@ const configService = {
 };
 const supabaseAdminService = { client };
 const corosOAuthService = {
+  isConfigured: () => false,
+  isUserAllowed: (_userId: string) => false,
   deregisterUser: async () => {
     throw new Error('COROS unavailable');
   },
@@ -41,6 +43,11 @@ const service = new CorosConnectionService(
 );
 
 async function run(): Promise<void> {
+  assert.deepEqual(service.capability('user-id'), { enabled: false, mode: 'disabled', reason: 'not_configured' });
+  corosOAuthService.isConfigured = () => true;
+  assert.equal(service.capability('user-id').reason, 'restricted');
+  corosOAuthService.isUserAllowed = () => true;
+  assert.equal(service.capability('user-id').reason, 'ready');
   await assert.rejects(service.disconnect('user-id'), /COROS_DEAUTHORIZATION_RETRY_ENQUEUE_FAILED/);
   assert.equal(localDeletionCalled, false);
 }

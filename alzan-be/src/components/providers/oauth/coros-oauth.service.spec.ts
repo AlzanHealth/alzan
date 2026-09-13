@@ -41,6 +41,10 @@ const configService = { get: (key: string) => config.get(key) };
 const service = new TestableCorosOAuthService(supabaseAdmin as never, configService as never);
 
 assert.equal(service.authMethod, AuthenticationMethod.BODY);
+assert.equal(service.isConfigured(), true);
+config.set('COROS_REDIRECT_URI', 'not-a-url');
+assert.equal(service.isConfigured(), false);
+config.set('COROS_REDIRECT_URI', 'https://api.alzanhealth.com/oauth/coros/callback');
 assert.deepEqual(service.endpoints, {
   authorizeUrl: 'https://opentest.coros.com/oauth2/authorize',
   tokenUrl: 'https://opentest.coros.com/oauth2/accesstoken',

@@ -107,6 +107,7 @@ export const ConnectedAppsScreen = () => {
     isImporting = false,
     onInfo,
     statusLabel,
+    onRetry,
   }: {
     name: string;
     connected: boolean;
@@ -122,6 +123,7 @@ export const ConnectedAppsScreen = () => {
     isImporting?: boolean;
     onInfo?: () => void;
     statusLabel?: string;
+    onRetry?: () => void;
   }) => (
     <View style={[styles.card, dynamicStyles.card]}>
       <View style={styles.cardHeader}>
@@ -161,6 +163,15 @@ export const ConnectedAppsScreen = () => {
           </TouchableOpacity>
         )}
       </View>
+      {onRetry && !isLoading && (
+        <TouchableOpacity
+          style={[styles.iconButton, { borderColor: themeColors.border }]}
+          onPress={onRetry}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.buttonText, { color: themeColors.textPrimary }]}>{t('nutrition.retry')}</Text>
+        </TouchableOpacity>
+      )}
       {!comingSoon && !isLoading && (
         <View style={styles.actions}>
           {connected && onImport && (
@@ -261,8 +272,17 @@ export const ConnectedAppsScreen = () => {
           isLoading={coros.isLoading}
           isActioning={coros.isConnecting || coros.isDisconnecting}
           isSyncing={coros.isSyncing}
-          comingSoon={!coros.isAvailable && !coros.isConnected}
-          statusLabel={t('settings.corosNotAvailable')}
+          comingSoon={(!coros.isAvailable || coros.capabilityError) && !coros.isConnected}
+          onRetry={coros.capabilityError ? coros.retryCapability : undefined}
+          statusLabel={
+            coros.capabilityError
+              ? t('settings.corosAvailabilityError')
+              : coros.capabilityReason === 'not_configured'
+                ? t('settings.corosConfigurationMissing')
+                : coros.capabilityReason === 'restricted'
+                  ? t('settings.corosAccessRestricted')
+                  : t('settings.corosNotAvailable')
+          }
           onConnect={() =>
             openPermissionFlow({
               serviceName: 'COROS',

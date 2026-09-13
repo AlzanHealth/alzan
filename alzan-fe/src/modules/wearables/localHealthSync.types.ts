@@ -106,6 +106,7 @@ export type CloudProviderSyncResult = {
 export type CorosCapability = {
   enabled: boolean;
   mode: 'disabled' | 'pilot' | 'public';
+  reason?: 'ready' | 'not_configured' | 'restricted';
 };
 
 export type CorosDisconnectResult = {

@@ -29,12 +29,19 @@ export class CorosConnectionService implements OnModuleInit, OnModuleDestroy {
     if (this.retryTimer) clearInterval(this.retryTimer);
   }
 
-  public capability(userId: string): { enabled: boolean; mode: RolloutMode } {
+  public capability(userId: string): {
+    enabled: boolean;
+    mode: RolloutMode;
+    reason: 'ready' | 'not_configured' | 'restricted';
+  } {
     const configuredMode = this.configService.get<string>('COROS_ROLLOUT_MODE')?.trim().toLowerCase();
     const mode: RolloutMode = configuredMode === 'public' || configuredMode === 'pilot' ? configuredMode : 'disabled';
+    const configured = this.corosOAuthService.isConfigured();
+    const allowed = this.corosOAuthService.isUserAllowed(userId);
     return {
-      enabled: this.corosOAuthService.isConfigured() && this.corosOAuthService.isUserAllowed(userId),
+      enabled: configured && allowed,
       mode,
+      reason: !configured ? 'not_configured' : !allowed ? 'restricted' : 'ready',
     };
   }
 

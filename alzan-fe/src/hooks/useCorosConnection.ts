@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { corosAvailability } from '../modules/wearables/corosAvailability';
 import { Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
@@ -232,8 +233,18 @@ export function useCorosConnection() {
     ]);
   }, [disconnectMutation, t]);
 
+  const availability = corosAvailability({
+    loading: capabilityQuery.isLoading,
+    error: capabilityQuery.isError,
+    capability: capabilityQuery.data,
+  });
   return {
-    isAvailable: capabilityQuery.data?.enabled === true,
+    isAvailable: availability === 'ready',
+    capabilityError: availability === 'error',
+    capabilityReason: availability,
+    retryCapability: () => {
+      void capabilityQuery.refetch();
+    },
     isConnected: !!connectionQuery.data,
     isLoading: capabilityQuery.isLoading || connectionQuery.isLoading,
     isConnecting: connectMutation.isPending,

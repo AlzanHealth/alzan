@@ -33,7 +33,8 @@ function parseEnvFile(filePath) {
   const values = {};
   const raw = fs.readFileSync(filePath, "utf8");
   for (const line of raw.split(/\r?\n/)) {
-    const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    const match =
+      /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
     if (!match || match[2].startsWith("#")) continue;
     let value = match[2];
     if (
@@ -65,8 +66,11 @@ function createReporter() {
       console.log(`PENDING  ${label}${detail ? ` — ${detail}` : ""}`);
     },
     finish(requireConfig) {
-      console.log(`\nResultado: ${failures.length} fallo(s), ${pending.length} pendiente(s).`);
-      if (failures.length > 0 || (requireConfig && pending.length > 0)) process.exitCode = 1;
+      console.log(
+        `\nResultado: ${failures.length} fallo(s), ${pending.length} pendiente(s).`,
+      );
+      if (failures.length > 0 || (requireConfig && pending.length > 0))
+        process.exitCode = 1;
     },
   };
 }
@@ -86,11 +90,8 @@ function validateConfiguration(values, baseUrl, reporter, requireConfig) {
     "COROS_CLIENT_SECRET",
     "COROS_REDIRECT_URI",
     "COROS_ROLLOUT_MODE",
-    "COROS_PILOT_USER_IDS",
     "COROS_TOKEN_ENCRYPTION_KEY_V1",
     "COROS_FIT_ALLOWED_HOSTS",
-    "COROS_WEBHOOK_CLIENT",
-    "COROS_WEBHOOK_SECRET",
   ];
   const legacyMissing = legacyRequired.filter((key) => !values[key]?.trim());
   if (legacyMissing.length > 0) {
@@ -109,23 +110,46 @@ function validateConfiguration(values, baseUrl, reporter, requireConfig) {
     reporter.pass("Redirect URI COROS", expectedRedirect);
   }
 
-  if (!new Set(["disabled", "pilot", "public"]).has(values.COROS_ROLLOUT_MODE)) {
+  if (
+    !new Set(["disabled", "pilot", "public"]).has(values.COROS_ROLLOUT_MODE)
+  ) {
     reporter.fail("Rollout COROS", "debe ser disabled, pilot o public");
-  } else if (values.COROS_ROLLOUT_MODE !== "pilot") {
-    reporter.fail("Rollout COROS", "para sandbox debe ser pilot");
+  } else if (values.COROS_ROLLOUT_MODE === "disabled") {
+    reporter.fail("Rollout COROS", "la conexión está deshabilitada");
   } else {
-    reporter.pass("Rollout COROS", "pilot");
+    reporter.pass("Rollout COROS", values.COROS_ROLLOUT_MODE);
   }
 
-  const pilotIds = values.COROS_PILOT_USER_IDS.split(",").map((value) => value.trim());
+  const pilotIds = (values.COROS_PILOT_USER_IDS || "")
+    .split(",")
+    .map((value) => value.trim());
   const invalidPilotIds = pilotIds.filter(
-    (value) => !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value),
+    (value) =>
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
   );
-  if (invalidPilotIds.length > 0) {
-    reporter.fail("Usuarios piloto COROS", "COROS_PILOT_USER_IDS debe contener UUID de Supabase");
+  if (values.COROS_ROLLOUT_MODE === "pilot" && invalidPilotIds.length > 0) {
+    reporter.fail(
+      "Usuarios piloto COROS",
+      "COROS_PILOT_USER_IDS debe contener UUID de Supabase",
+    );
   } else {
-    reporter.pass("Usuarios piloto COROS", `${pilotIds.length} UUID configurado(s)`);
+    reporter.pass(
+      "Usuarios piloto COROS",
+      `${pilotIds.length} UUID configurado(s)`,
+    );
   }
+
+  const webhookConfigured = Boolean(
+    values.COROS_WEBHOOK_CLIENT?.trim() && values.COROS_WEBHOOK_SECRET?.trim(),
+  );
+  reporter.pass(
+    "Webhook COROS",
+    webhookConfigured
+      ? "configurado"
+      : "opcional, no configurado; sincronización manual disponible",
+  );
 
   let encryptionKey;
   try {
@@ -134,12 +158,18 @@ function validateConfiguration(values, baseUrl, reporter, requireConfig) {
     encryptionKey = Buffer.alloc(0);
   }
   if (encryptionKey.length !== 32) {
-    reporter.fail("Clave de cifrado COROS", "debe decodificar exactamente 32 bytes base64");
+    reporter.fail(
+      "Clave de cifrado COROS",
+      "debe decodificar exactamente 32 bytes base64",
+    );
   } else {
     reporter.pass("Clave de cifrado COROS", "32 bytes");
   }
 
-  const allowedApiBases = new Set(["https://opentest.coros.com", "https://open.coros.com"]);
+  const allowedApiBases = new Set([
+    "https://opentest.coros.com",
+    "https://open.coros.com",
+  ]);
   if (!allowedApiBases.has(values.COROS_API_BASE_URL.replace(/\/$/, ""))) {
     reporter.fail("Host API COROS", "solo opentest.coros.com u open.coros.com");
   } else {
@@ -156,23 +186,39 @@ async function main() {
   baseUrl.hash = "";
   const normalizedBaseUrl = baseUrl.toString().replace(/\/$/, "");
 
-  const isLocalBaseUrl = ["localhost", "127.0.0.1", "::1"].includes(baseUrl.hostname);
-  if (baseUrl.protocol !== "https:" && !(isLocalBaseUrl && baseUrl.protocol === "http:")) {
+  const isLocalBaseUrl = ["localhost", "127.0.0.1", "::1"].includes(
+    baseUrl.hostname,
+  );
+  if (
+    baseUrl.protocol !== "https:" &&
+    !(isLocalBaseUrl && baseUrl.protocol === "http:")
+  ) {
     reporter.fail("URL pública", "debe usar HTTPS fuera de localhost");
   } else {
-    reporter.pass("URL pública", isLocalBaseUrl ? `${normalizedBaseUrl} (local)` : normalizedBaseUrl);
+    reporter.pass(
+      "URL pública",
+      isLocalBaseUrl ? `${normalizedBaseUrl} (local)` : normalizedBaseUrl,
+    );
   }
 
   try {
     const addresses = await dns.lookup(baseUrl.hostname, { all: true });
     if (addresses.length === 0) throw new Error("sin direcciones");
-    reporter.pass("DNS", `${baseUrl.hostname} tiene ${addresses.length} dirección(es)`);
+    reporter.pass(
+      "DNS",
+      `${baseUrl.hostname} tiene ${addresses.length} dirección(es)`,
+    );
   } catch (error) {
-    reporter.fail("DNS", error instanceof Error ? error.message : String(error));
+    reporter.fail(
+      "DNS",
+      error instanceof Error ? error.message : String(error),
+    );
   }
 
   try {
-    const response = await request(`${normalizedBaseUrl}/webhooks/coros/status`);
+    const response = await request(
+      `${normalizedBaseUrl}/webhooks/coros/status`,
+    );
     const body = await response.text();
     let parsed;
     try {
@@ -181,39 +227,66 @@ async function main() {
       parsed = null;
     }
     if (response.status === 200 && parsed?.status === "ok") {
-      reporter.pass("Status COROS", "HTTP 200 y {\"status\":\"ok\"}");
+      reporter.pass("Status COROS", 'HTTP 200 y {"status":"ok"}');
     } else {
-      reporter.fail("Status COROS", `HTTP ${response.status}; respuesta inesperada`);
+      reporter.fail(
+        "Status COROS",
+        `HTTP ${response.status}; respuesta inesperada`,
+      );
     }
   } catch (error) {
-    reporter.fail("Status COROS", error instanceof Error ? error.message : String(error));
+    reporter.fail(
+      "Status COROS",
+      error instanceof Error ? error.message : String(error),
+    );
   }
 
   try {
     const response = await request(`${normalizedBaseUrl}/oauth/coros/callback`);
     const location = response.headers.get("location") || "";
     if (response.status === 303 && location.startsWith("/oauth/error?")) {
-      reporter.pass("Callback OAuth COROS", "ruta desplegada y rechaza parámetros ausentes");
+      reporter.pass(
+        "Callback OAuth COROS",
+        "ruta desplegada y rechaza parámetros ausentes",
+      );
     } else {
-      reporter.fail("Callback OAuth COROS", `HTTP ${response.status}; Location=${location || "ausente"}`);
+      reporter.fail(
+        "Callback OAuth COROS",
+        `HTTP ${response.status}; Location=${location || "ausente"}`,
+      );
     }
   } catch (error) {
-    reporter.fail("Callback OAuth COROS", error instanceof Error ? error.message : String(error));
+    reporter.fail(
+      "Callback OAuth COROS",
+      error instanceof Error ? error.message : String(error),
+    );
   }
 
   try {
-    const response = await request(`${normalizedBaseUrl}/webhooks/coros/workouts`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sportDataList: [] }),
-    });
+    const response = await request(
+      `${normalizedBaseUrl}/webhooks/coros/workouts`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sportDataList: [] }),
+      },
+    );
     if (response.status === 401) {
-      reporter.pass("Autenticación webhook COROS", "rechaza una petición sin headers");
+      reporter.pass(
+        "Autenticación webhook COROS",
+        "rechaza una petición sin headers",
+      );
     } else {
-      reporter.fail("Autenticación webhook COROS", `esperaba HTTP 401 y devolvió ${response.status}`);
+      reporter.fail(
+        "Autenticación webhook COROS",
+        `esperaba HTTP 401 y devolvió ${response.status}`,
+      );
     }
   } catch (error) {
-    reporter.fail("Autenticación webhook COROS", error instanceof Error ? error.message : String(error));
+    reporter.fail(
+      "Autenticación webhook COROS",
+      error instanceof Error ? error.message : String(error),
+    );
   }
 
   let values = { ...process.env };
@@ -226,11 +299,21 @@ async function main() {
       reporter.pass("Fichero de configuración", envPath);
     }
   }
-  validateConfiguration(values, normalizedBaseUrl, reporter, options.requireConfig);
+  validateConfiguration(
+    values,
+    normalizedBaseUrl,
+    reporter,
+    options.requireConfig,
+  );
   reporter.finish(options.requireConfig);
 }
 
-main().catch((error) => {
-  console.error(`FAIL     Verificación COROS — ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+if (require.main === module)
+  main().catch((error) => {
+    console.error(
+      `FAIL     Verificación COROS — ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exitCode = 1;
+  });
+
+module.exports = { validateConfiguration };

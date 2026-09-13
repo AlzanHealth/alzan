@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "main": "index.ts",
   "scripts": {
+    "verify:coros": "tsx src/modules/wearables/corosAvailability.spec.ts",
     "start": "expo start",
     "build": "expo prebuild",
     "android": "expo run:android",

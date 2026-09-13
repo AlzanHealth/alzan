@@ -68,8 +68,13 @@ export class CorosOAuthService extends BaseOAuthProvider {
   public isConfigured(): boolean {
     const { clientId, clientSecret, redirectUri } = this.credentials;
     const encryptionKey = this.configService.get<string>('COROS_TOKEN_ENCRYPTION_KEY_V1');
-    if (!clientId || !clientSecret || !redirectUri || !encryptionKey) return false;
+    if (!clientId.trim() || !clientSecret.trim() || !redirectUri.trim() || !encryptionKey?.trim()) return false;
     try {
+      const callback = new URL(redirectUri);
+      const local = ['localhost', '127.0.0.1', '[::1]'].includes(callback.hostname);
+      if (callback.protocol !== 'https:' && !(local && callback.protocol === 'http:')) return false;
+      if (callback.username || callback.password || callback.hash) return false;
+      if (!['https://opentest.coros.com', 'https://open.coros.com'].includes(this.apiBaseUrl)) return false;
       encryptCorosToken('configuration-check', encryptionKey);
       return true;
     } catch {

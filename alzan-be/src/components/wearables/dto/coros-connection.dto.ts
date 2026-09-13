@@ -9,6 +9,10 @@ export class CorosCapabilityDto {
   @ApiProperty({ enum: ['disabled', 'pilot', 'public'] })
   @Expose()
   mode!: 'disabled' | 'pilot' | 'public';
+
+  @ApiProperty({ enum: ['ready', 'not_configured', 'restricted'] })
+  @Expose()
+  reason!: 'ready' | 'not_configured' | 'restricted';
 }
 
 export class CorosDisconnectDto {

@@ -8,6 +8,7 @@ import {
   CanonicalActivityStreams,
 } from './activity-import-canonical.types';
 import { mapClimbingTextToCanonical } from './climbing-sport.mapper';
+import { parseCorosJson as parseCorosJsonLosslessly } from './coros-json';
 import { mapGolfTextToCanonical } from './golf-sport.mapper';
 import { mapHyroxTextToCanonical } from './hyrox-sport.mapper';
 import { mapMartialArtsTextToCanonical } from './martial-arts-sport.mapper';
@@ -312,6 +313,27 @@ function readSpeedMps(value: unknown, unit?: unknown): number | null {
   return speed;
 }
 
+function readSummarySpeed(record: JsonRecord): number | null {
+  if (record.speedUnit != null || record.avgSpeed == null) {
+    return readSpeedMps(record.avgSpeed ?? record.averageSpeed, record.speedUnit);
+  }
+  const pace = readNumber(record.avgSpeed);
+  return pace != null && pace > 0 ? 1000 / pace : null;
+}
+
+function corosLocalTime(timestamp: string | null, code: unknown): string | null {
+  const offset = readNumber(code);
+  if (!timestamp || offset == null || !Number.isInteger(offset) || Math.abs(offset) > 56) return null;
+  return new Date(Date.parse(timestamp) + offset * 15 * 60_000).toISOString().slice(0, 19);
+}
+
+function corosTimezone(code: unknown): string | null {
+  const offset = readNumber(code);
+  if (offset == null || !Number.isInteger(offset) || Math.abs(offset) > 56) return null;
+  const minutes = Math.abs(offset * 15);
+  return `${offset < 0 ? '-' : '+'}${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
 function readSamples(record: JsonRecord): JsonRecord[] {
   const samples = record.samples ?? record.records ?? record.streams;
   if (Array.isArray(samples)) return samples.filter(isRecord);
@@ -481,7 +503,7 @@ function mapCorosFit(binary: Uint8Array, filename: string, options?: ParseCorosA
 }
 
 function parseCorosJson(content: string, filename: string, options?: ParseCorosActivityOptions): CanonicalActivity {
-  const parsed = JSON.parse(content) as unknown;
+  const parsed = parseCorosJsonLosslessly(content);
   if (!isRecord(parsed)) throw new Error('Invalid COROS JSON file.');
   const record = isRecord(parsed.workout) ? parsed.workout : isRecord(parsed.activity) ? parsed.activity : parsed;
   const startedAt = normaliseTimestamp(record.startTime ?? record.start_time ?? record.startedAt ?? record.start);
@@ -506,6 +528,9 @@ function parseCorosJson(content: string, filename: string, options?: ParseCorosA
     summary: {
       startedAt,
       endedAt,
+      timezone: corosTimezone(record.startTimezone),
+      startedAtLocal: corosLocalTime(startedAt, record.startTimezone),
+      endedAtLocal: corosLocalTime(endedAt, record.endTimezone ?? record.startTimezone),
       durationSeconds,
       elapsedSeconds: readNumber(record.elapsedSeconds) ?? durationSeconds,
       distanceM,
@@ -515,11 +540,10 @@ function parseCorosJson(content: string, filename: string, options?: ParseCorosA
       ),
       maxHeartRate: roundNullable(readNumber(record.maxHeartRate) ?? maxMetric(streams.heartRate)),
       minHeartRate: roundNullable(readNumber(record.minHeartRate)),
-      avgSpeedMps:
-        readSpeedMps(record.avgSpeed ?? record.averageSpeed, record.speedUnit) ?? averageMetric(streams.speed),
+      avgSpeedMps: readSummarySpeed(record) ?? averageMetric(streams.speed),
       maxSpeedMps: readSpeedMps(record.maxSpeed, record.speedUnit) ?? maxMetric(streams.speed),
       avgCadence: roundNullable(
-        readNumber(record.avgCadence ?? record.averageCadence) ?? averageMetric(streams.cadence),
+        readNumber(record.avgCadence ?? record.averageCadence ?? record.avgFrequency) ?? averageMetric(streams.cadence),
       ),
       maxCadence: roundNullable(readNumber(record.maxCadence) ?? maxMetric(streams.cadence)),
       avgPowerW: roundNullable(readNumber(record.avgPower ?? record.averagePower) ?? averageMetric(streams.power)),
@@ -552,6 +576,7 @@ function parseCorosJson(content: string, filename: string, options?: ParseCorosA
       sourceProvider: 'coros',
       corosFilename: filename,
       corosSport: readCorosSport(record),
+      planWorkoutId: readIdentifier(record.planWorkoutId),
       corosMode: readNumber(record.mode) ?? readString(record.mode),
       corosSubMode: readNumber(record.subMode) ?? readString(record.subMode),
       fitUrl: readString(record.fitUrl),
