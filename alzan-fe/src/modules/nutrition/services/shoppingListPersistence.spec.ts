@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import { createShoppingListStateSyncQueue, persistShoppingListLocallyFirst } from './shoppingListStateSyncCore';
+import {
+  createShoppingListStateSyncQueue,
+  persistShoppingListLocallyFirst,
+  syncShoppingListStateWithAdapter,
+} from './shoppingListStateSyncCore';
 import {
   createShoppingListItemState,
   getShoppingListStateStorageKey,
@@ -14,6 +18,42 @@ async function run() {
   const local = new Map<string, string>();
   const remote = new Map<string, ShoppingListState>();
   const range = { startDate: '2026-09-12', endDate: '2026-09-18' };
+  const stale = { rice: createShoppingListItemState({ availableQuantityGrams: 0 }) };
+  const checked = {
+    rice: createShoppingListItemState({
+      completed: true,
+      availableQuantityGrams: 500,
+      updatedAt: '2026-09-12T10:00:00Z',
+    }),
+  };
+  let server: ShoppingListState = checked;
+  const offlineOnly = { bread: createShoppingListItemState({ completed: true }) };
+  assert.equal(
+    await syncShoppingListStateWithAdapter(
+      {
+        load: async () => server,
+        upsert: async (_user, _range, snapshot) => {
+          server = snapshot;
+        },
+        clear: async () => {},
+      },
+      'user-a',
+      range,
+      { ...stale, ...offlineOnly },
+    ),
+    true,
+  );
+  assert.deepEqual(
+    server,
+    { ...checked, ...offlineOnly },
+    'reconnect must preserve newer remote and offline-only items',
+  );
+  const equalTimeUnchecked = { rice: createShoppingListItemState({ updatedAt: checked.rice.updatedAt }) };
+  assert.deepEqual(
+    mergeShoppingListStates(checked, equalTimeUnchecked),
+    mergeShoppingListStates(equalTimeUnchecked, checked),
+    'equal timestamps must converge regardless of tab/order',
+  );
   const key = getShoppingListStateStorageKey('user-a', range);
   let releaseNetwork = () => {};
   const network = new Promise<void>(resolve => {

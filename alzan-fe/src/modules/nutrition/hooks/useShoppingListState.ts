@@ -67,6 +67,27 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     [storageKey],
   );
 
+  const persistState = useCallback(
+    async (next: ShoppingListState): Promise<boolean> => {
+      if (!userId || !storageKey) return false;
+      const resetVersion = resetVersionRef.current;
+      return persistShoppingListState(userId, range, next, async confirmed => {
+        if (
+          activeStorageKeyRef.current !== storageKey ||
+          resetPendingRef.current ||
+          resetVersionRef.current !== resetVersion
+        )
+          return;
+        // Reconcile with edits made while the request was in flight, not its old snapshot.
+        const merged = mergeShoppingListStates(stateRef.current, confirmed);
+        stateRef.current = merged;
+        setState(merged);
+        await AsyncStorage.setItem(storageKey, serializeShoppingListState(merged));
+      });
+    },
+    [userId, range.startDate, range.endDate, storageKey],
+  );
+
   useEffect(() => {
     let cancelled = false;
     setHydratedKey(null);
@@ -132,7 +153,7 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
       stateRef.current = merged;
       setState(merged);
       if (!areShoppingListStatesEqual(merged, remoteState)) {
-        await runSync(() => persistShoppingListState(userId, range, merged));
+        await runSync(() => persistState(merged));
       } else {
         await AsyncStorage.setItem(storageKey, serializeShoppingListState(merged)).catch(() => undefined);
       }
@@ -144,18 +165,27 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     return () => {
       cancelled = true;
       syncOperationRef.current += 1;
+      resetVersionRef.current += 1;
     };
-  }, [hydrationAttempt, range.endDate, range.startDate, resetStorageKey, runSync, storageKey, userId]);
+  }, [hydrationAttempt, range.endDate, range.startDate, resetStorageKey, runSync, storageKey, userId, persistState]);
 
   const updateState = useCallback(
     (updater: (previous: ShoppingListState) => ShoppingListState) => {
       if (!userId || !isHydrated || resetPendingRef.current) return;
-      const next = updater(stateRef.current);
+      const previous = stateRef.current;
+      const next = updater(previous);
+      for (const [key, item] of Object.entries(next)) {
+        const previousTime = Date.parse(previous[key]?.updatedAt ?? '');
+        if (item !== previous[key] && Date.parse(item.updatedAt) <= previousTime) {
+          // An intentional edit must advance the version, even with equal ticks or clock skew.
+          next[key] = { ...item, updatedAt: new Date(previousTime + 1).toISOString() };
+        }
+      }
       stateRef.current = next;
       setState(next);
-      void runSync(() => persistShoppingListState(userId, range, next));
+      void runSync(() => persistState(next));
     },
-    [isHydrated, range, runSync, userId],
+    [isHydrated, persistState, runSync, userId],
   );
 
   const toggleIngredient = useCallback(
@@ -272,8 +302,8 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
       setHydrationAttempt(attempt => attempt + 1);
       return false;
     }
-    return runSync(() => persistShoppingListState(userId, range, stateRef.current));
-  }, [isHydrated, range, resetStorageKey, runSync, storageKey, userId]);
+    return runSync(() => persistState(stateRef.current));
+  }, [isHydrated, range, resetStorageKey, runSync, storageKey, userId, persistState]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;

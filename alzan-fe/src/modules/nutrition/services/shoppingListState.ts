@@ -86,7 +86,15 @@ export const mergeShoppingListStates = (local: ShoppingListState, remote: Shoppi
   const merged: ShoppingListState = { ...local };
   Object.entries(remote).forEach(([key, remoteState]) => {
     const localState = merged[key];
-    if (!localState || Date.parse(remoteState.updatedAt) > Date.parse(localState.updatedAt)) merged[key] = remoteState;
+    // Keep this ordering identical to shopping_list_states_keep_newest in SQL.
+    // Equal timestamps need a stable winner independent of arrival/tab order.
+    const comparison = localState
+      ? Date.parse(remoteState.updatedAt) - Date.parse(localState.updatedAt) ||
+        Number(remoteState.completed) - Number(localState.completed) ||
+        Number(remoteState.hidden) - Number(localState.hidden) ||
+        (remoteState.availableQuantityGrams ?? -1) - (localState.availableQuantityGrams ?? -1)
+      : 1;
+    if (comparison > 0) merged[key] = remoteState;
   });
   return merged;
 };

@@ -68,6 +68,7 @@ import {
   buildAdvancedSessionTimestamps,
   createEmptyAdvancedSection,
   deriveAdvancedSectionMetrics,
+  deriveKilometerSectionMetrics,
   hasValidAdvancedSection,
   hasValidKilometerSections,
   materializeTemplateSections,
@@ -405,6 +406,7 @@ export const EnduranceSessionFormScreen = () => {
   const [advancedEditorMode, setAdvancedEditorMode] = useState<'template' | 'free' | 'kilometers'>('free');
   const [kilometerDistanceInput, setKilometerDistanceInput] = useState('');
   const [kilometerSections, setKilometerSections] = useState<KilometerSectionDraft[]>([]);
+  const hasInitializedKilometersRef = React.useRef(false);
   const [name, setName] = useState(getInitialName());
   const [distance, setDistance] = useState('');
   const [durationHours, setDurationHours] = useState('');
@@ -505,10 +507,6 @@ export const EnduranceSessionFormScreen = () => {
   const activeAdvancedSectionsWithDerivedMetrics = React.useMemo(
     () => (advancedEditorMode === 'kilometers' ? kilometerSections : advancedSectionsWithDerivedMetrics),
     [advancedEditorMode, advancedSectionsWithDerivedMetrics, kilometerSections],
-  );
-  const advancedTotals = React.useMemo(
-    () => calculateAdvancedTotals(activeAdvancedSectionsWithDerivedMetrics),
-    [activeAdvancedSectionsWithDerivedMetrics],
   );
   const modalityOptions = getOptions(sportType, 'modality');
   const hasModalityOptions = shouldRenderModalitySelector(modalityOptions);
@@ -1267,14 +1265,15 @@ export const EnduranceSessionFormScreen = () => {
   };
 
   const selectAdvancedEditorMode = (mode: 'template' | 'free' | 'kilometers') => {
-    if (mode === 'kilometers' && advancedEditorMode !== 'kilometers') {
+    if (mode === 'kilometers' && !hasInitializedKilometersRef.current) {
+      hasInitializedKilometersRef.current = true;
       const currentDistanceKm =
         safeParseFloat(distance) > 0
           ? preferences.distance_unit === 'km'
             ? safeParseFloat(distance)
             : safeParseFloat(distance) * 1.60934
           : 0;
-      const nextInput = currentDistanceKm > 0 ? formatNumberForInput(currentDistanceKm, 2) : kilometerDistanceInput;
+      const nextInput = currentDistanceKm > 0 ? formatNumberForInput(currentDistanceKm, 3) : kilometerDistanceInput;
       setKilometerDistanceInput(nextInput);
       setKilometerSections(
         buildKilometerSections(currentDistanceKm > 0 ? currentDistanceKm * 1000 : null, kilometerSections),
@@ -1285,19 +1284,14 @@ export const EnduranceSessionFormScreen = () => {
 
   const handleKilometerDistanceInputChange = (value: string) => {
     setKilometerDistanceInput(value);
-    if (!/^\s*\d+(?:[.,]\d+)?\s*$/.test(value)) return;
-    const parsedDistanceKm = parseLocalizedDecimal(value);
-    if (parsedDistanceKm != null && parsedDistanceKm > 0) {
-      setKilometerSections(buildKilometerSections(parsedDistanceKm * 1000, kilometerSections));
-    }
   };
 
   const commitKilometerDistance = () => {
     const parsedDistanceKm = parseLocalizedDecimal(kilometerDistanceInput);
-    const normalizedDistanceKm = parsedDistanceKm != null && parsedDistanceKm > 0 ? parsedDistanceKm : null;
-    setKilometerSections(
-      buildKilometerSections(normalizedDistanceKm == null ? null : normalizedDistanceKm * 1000, kilometerSections),
-    );
+    // Keep the last confirmed draft recoverable while the distance is empty or invalid.
+    // Saving validates the current input independently, so this cannot save stale totals.
+    if (parsedDistanceKm == null || parsedDistanceKm <= 0) return;
+    setKilometerSections(previous => buildKilometerSections(parsedDistanceKm * 1000, previous));
   };
 
   const persistParsedRouteDetails = React.useCallback(
@@ -1316,6 +1310,22 @@ export const EnduranceSessionFormScreen = () => {
   const handleSave = async () => {
     // --- VALIDATION ---
     const isAdvancedRegistration = registrationMode === 'advanced' && advancedAvailable;
+    // Save can run before the distance input's blur has committed a React update.
+    // Validate and serialize the same freshly reconciled snapshot, never stale totals.
+    const kilometerDistanceKm = parseLocalizedDecimal(kilometerDistanceInput);
+    const confirmedKilometerSections =
+      isAdvancedRegistration && advancedEditorMode === 'kilometers'
+        ? buildKilometerSections(
+            kilometerDistanceKm != null && kilometerDistanceKm > 0 ? kilometerDistanceKm * 1000 : null,
+            kilometerSections,
+          ).map(section => (advancedSport ? deriveKilometerSectionMetrics(section, advancedSport) : section))
+        : kilometerSections;
+    const sectionsForSave =
+      advancedEditorMode === 'kilometers' ? confirmedKilometerSections : activeAdvancedSectionsWithDerivedMetrics;
+    const totalsForSave = calculateAdvancedTotals(sectionsForSave);
+    if (isAdvancedRegistration && advancedEditorMode === 'kilometers' && confirmedKilometerSections.length > 0) {
+      setKilometerSections(confirmedKilometerSections);
+    }
     const rawDurationSeconds =
       (Number.parseInt(durationHours || '0', 10) || 0) * 3600 +
       (Number.parseInt(durationMinutes || '0', 10) || 0) * 60 +
@@ -1375,8 +1385,8 @@ export const EnduranceSessionFormScreen = () => {
     if (isAdvancedRegistration) {
       const hasValidSections =
         advancedEditorMode === 'kilometers'
-          ? hasValidKilometerSections(kilometerSections)
-          : hasValidAdvancedSection(activeAdvancedSectionsWithDerivedMetrics);
+          ? hasValidKilometerSections(confirmedKilometerSections)
+          : hasValidAdvancedSection(sectionsForSave);
       if (!hasValidSections) {
         Alert.alert(
           t('training.missingDataTitle'),
@@ -1440,8 +1450,8 @@ export const EnduranceSessionFormScreen = () => {
       const startDateTime = new Date(`${normalizedDate}T${normalizedTime}:00`).toISOString();
 
       if (isAdvancedRegistration) {
-        const durationInSeconds = advancedTotals.durationS ?? 0;
-        const advancedLeaves = activeAdvancedSectionsWithDerivedMetrics.filter(section => !section.isGroup);
+        const durationInSeconds = totalsForSave.durationS ?? 0;
+        const advancedLeaves = sectionsForSave.filter(section => !section.isGroup);
         const sumSectionMetric = (selector: (section: (typeof advancedLeaves)[number]) => number | null) => {
           const values = advancedLeaves
             .map(selector)
@@ -1470,8 +1480,8 @@ export const EnduranceSessionFormScreen = () => {
             stroke: sportType === 'swimming' ? stroke : null,
             start_time: advancedTimestamps.startTime,
             end_time: advancedTimestamps.endTime,
-            duration_s: advancedTotals.durationS,
-            distance_m: advancedTotals.distanceM,
+            duration_s: totalsForSave.durationS,
+            distance_m: totalsForSave.distanceM,
             elev_gain_m: elevation ? safeParseFloat(elevation) : sumSectionMetric(section => section.elevationGainM),
             avg_heart_rate: hr ? Number.parseInt(hr, 10) : averageSectionMetric(section => section.heartRateAvg),
             max_heart_rate: maxSectionMetric(section => section.heartRateMax),
@@ -1487,7 +1497,7 @@ export const EnduranceSessionFormScreen = () => {
             started_at_local: advancedTimestamps.startedAtLocal,
             ended_at_local: advancedTimestamps.endedAtLocal,
           },
-          sections: serializeAdvancedSections(activeAdvancedSectionsWithDerivedMetrics),
+          sections: serializeAdvancedSections(sectionsForSave),
         });
 
         persistedSessionId = createdSessionId;

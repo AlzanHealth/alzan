@@ -460,7 +460,10 @@ export class CorosCloudSyncService {
         axios.get(`${this.apiBaseUrl}${path}`, {
           params: { token: token.accessToken, openId: token.openId, ...window, ...extraParams },
           headers: { Accept: 'application/json', token: token.accessToken },
-          transformResponse: [(data: string) => parseCorosJson(data)],
+          // Axios also transforms rejected responses. Preserve HTTP errors for retry/status handling.
+          transformResponse: [
+            (data: string, _headers, status) => (status != null && status >= 400 ? data : parseCorosJson(data)),
+          ],
           timeout: 15_000,
         }),
       );
@@ -485,7 +488,9 @@ export class CorosCloudSyncService {
               token: token.accessToken,
             },
             headers: { Accept: 'application/json', token: token.accessToken },
-            transformResponse: [(data: string) => parseCorosJson(data)],
+            transformResponse: [
+              (data: string, _headers, status) => (status != null && status >= 400 ? data : parseCorosJson(data)),
+            ],
             timeout: 15_000,
           }),
         );

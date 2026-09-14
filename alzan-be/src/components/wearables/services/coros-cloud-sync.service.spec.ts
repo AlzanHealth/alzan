@@ -1,7 +1,7 @@
 import { strict as assert } from 'assert';
-import { BadGatewayException } from '@nestjs/common';
+import { BadGatewayException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { CorosOAuthService } from '../../providers/oauth/coros-oauth.service';
 import { CanonicalActivityWriterService } from './canonical-activity-writer.service';
@@ -182,10 +182,122 @@ async function assertSyncRetriesPendingWithoutDuplicates(): Promise<void> {
 }
 
 async function run(): Promise<void> {
+  await assertHttpErrorsKeepRetrySemantics();
   await assertFitDetailUrlIsDownloaded();
   await assertApplicationErrorsAreRejected();
   await assertMissingFitIsPending();
   await assertSyncRetriesPendingWithoutDuplicates();
+}
+
+async function assertHttpErrorsKeepRetrySemantics(): Promise<void> {
+  const originalAdapter = axios.defaults.adapter;
+  const longId = '418173315956375553';
+  try {
+    for (const endpoint of ['daily', 'fit']) {
+      for (const body of ['<html>Unavailable</html>', '']) {
+        for (const status of [503, 429, 401, 403]) {
+          let attempts = 0;
+          axios.defaults.adapter = async config => {
+            attempts += 1;
+            throw new AxiosError('HTTP failure', 'ERR_BAD_RESPONSE', config, undefined, {
+              data: body,
+              status,
+              statusText: 'HTTP failure',
+              headers: { 'retry-after': '0' },
+              config,
+            });
+          };
+          const service = createService();
+          const request =
+            endpoint === 'daily'
+              ? service.getCoros('/coros/daily/query', token, { startDate: '20260901', endDate: '20260904' })
+              : service.fetchWorkoutFits(token, { mode: 8, subMode: 1 }, longId);
+          await assert.rejects(request, error => {
+            if (status === 429)
+              return error instanceof ServiceUnavailableException && error.message === 'COROS_RATE_LIMITED';
+            if (status === 401 || status === 403) return error instanceof UnauthorizedException;
+            return error instanceof BadGatewayException;
+          });
+          assert.equal(
+            attempts,
+            status === 503 || status === 429 ? 4 : 1,
+            `${endpoint}: ${status} ${JSON.stringify(body)}`,
+          );
+        }
+      }
+    }
+    let attempts = 0;
+    axios.defaults.adapter = async config => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new AxiosError('Unavailable', 'ERR_BAD_RESPONSE', config, undefined, {
+          data: '<html>Unavailable</html>',
+          status: 503,
+          statusText: 'Unavailable',
+          headers: { 'retry-after': '0' },
+          config,
+        });
+      }
+      return {
+        data: `{"result":"0000","data":{"labelId":${longId}}}`,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      };
+    };
+    assert.deepEqual(
+      await createService().getCoros('/coros/daily/query', token, { startDate: '20260901', endDate: '20260904' }),
+      {
+        result: '0000',
+        data: { labelId: longId },
+      },
+    );
+    assert.equal(attempts, 2);
+    attempts = 0;
+    axios.defaults.adapter = async config => {
+      attempts += 1;
+      if (config.url?.endsWith('/v2/coros/sport/detail/fit')) {
+        assert.equal((config.params as { labelId: string }).labelId, longId);
+        if (attempts === 1) {
+          throw new AxiosError('Unavailable', 'ERR_BAD_RESPONSE', config, undefined, {
+            data: '',
+            status: 503,
+            statusText: 'Unavailable',
+            headers: { 'retry-after': '0' },
+            config,
+          });
+        }
+        return {
+          data: `{"result":"0000","data":{"fitUrl":"https://oss.coros.com/${longId}.fit"}}`,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        };
+      }
+      assert.equal(config.url, `https://oss.coros.com/${longId}.fit`);
+      return { data: fitArrayBuffer(), status: 200, statusText: 'OK', headers: {}, config };
+    };
+    assert.equal((await createService().fetchWorkoutFits(token, { mode: 8, subMode: 1 }, longId)).length, 1);
+    assert.equal(attempts, 3);
+
+    // Invalid successful responses and application errors still fail without retrying.
+    for (const body of ['', '<html>Not JSON</html>', '{"result":"5011"}']) {
+      attempts = 0;
+      axios.defaults.adapter = async config => {
+        attempts += 1;
+        return { data: body, status: 200, statusText: 'OK', headers: {}, config };
+      };
+      await assert.rejects(
+        createService().getCoros('/coros/daily/query', token, { startDate: '20260901', endDate: '20260904' }),
+        (error: unknown) => error instanceof BadGatewayException,
+      );
+      assert.equal(attempts, 1);
+    }
+  } finally {
+    axios.defaults.adapter = originalAdapter;
+  }
 }
 
 void run();

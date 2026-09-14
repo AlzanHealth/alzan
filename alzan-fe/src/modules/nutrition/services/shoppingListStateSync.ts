@@ -99,9 +99,10 @@ export const syncShoppingListStateToServer = async (
   userId: string,
   range: ShoppingListDateRange,
   state: ShoppingListState,
+  onSynced?: (state: ShoppingListState) => Promise<void>,
 ): Promise<boolean> =>
   syncQueue.enqueue(getRangeKey(userId, range), () =>
-    syncShoppingListStateWithAdapter(supabaseShoppingListStateAdapter, userId, range, state),
+    syncShoppingListStateWithAdapter(supabaseShoppingListStateAdapter, userId, range, state, onSynced),
   );
 
 export const clearShoppingListStateOnServer = async (userId: string, range: ShoppingListDateRange): Promise<boolean> =>
@@ -123,10 +124,11 @@ export const persistShoppingListState = async (
   userId: string,
   range: ShoppingListDateRange,
   state: ShoppingListState,
+  onSynced?: (state: ShoppingListState) => Promise<void>,
 ): Promise<boolean> =>
   persistShoppingListLocallyFirst(
     () => AsyncStorage.setItem(getShoppingListStateStorageKey(userId, range), serializeShoppingListState(state)),
-    () => syncShoppingListStateToServer(userId, range, state),
+    () => syncShoppingListStateToServer(userId, range, state, onSynced),
   );
 
 export { mergeShoppingListStates };
