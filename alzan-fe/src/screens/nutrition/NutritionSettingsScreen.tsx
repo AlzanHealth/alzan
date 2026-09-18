@@ -29,7 +29,6 @@ import { usePreferences } from '../../hooks/settings/usePreferences';
 import {
   addDays,
   addMonths,
-  differenceInCalendarDays,
   endOfMonth,
   endOfWeek,
   format,
@@ -57,6 +56,7 @@ import {
 import { getCatchUpHorizonISO } from '../../modules/nutrition/services/dietCopyPlanner';
 import { setUserRecipesVisibility } from '../../modules/nutrition/services/recipeService';
 import { generateDietPDF } from '../../modules/nutrition/services/pdfExportService';
+import { validateNutritionExportRange } from './nutritionExportRange';
 import type { WebExportWindow } from '../../modules/nutrition/services/pdfExportService';
 import { BlurView } from 'expo-blur';
 import { LiquidGlassNativeCard } from '../../components/common/LiquidGlassNativeCard';
@@ -112,7 +112,6 @@ const DEFAULT_SNACK_OPTS = {
   show_only_if_content: false,
 };
 
-const MAX_EXPORT_RANGE_DAYS = 92;
 const VACATION_CALENDAR_RANGE_MONTHS = 12;
 const HYDRATION_PRESETS_ML = [1500, 2000, 2500, 3000];
 const MAX_DEFAULT_HYDRATION_ML = 10000;
@@ -130,10 +129,6 @@ const getDefaultExportRange = () => {
     start: subDays(end, 7),
     end,
   };
-};
-
-const getMinExportStartDate = (endDate: Date) => {
-  return subDays(endDate, MAX_EXPORT_RANGE_DAYS);
 };
 
 const buildMonthGrid = (month: Date): Date[] => {
@@ -386,14 +381,6 @@ export const NutritionSettingsScreen = () => {
   const [showCleanFutureModal, setShowCleanFutureModal] = useState(false); // Dedicated Clean Future modal
   const [pendingMode, setPendingMode] = useState<'sequential' | 'alternating' | null>(null);
 
-  const parseWebDateInput = (value: string): Date | null => {
-    const normalized = value.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
-    const parsed = new Date(`${normalized}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return format(parsed, 'yyyy-MM-dd') === normalized ? parsed : null;
-  };
-
   const getErrorMessage = (error: unknown): string => {
     if (error instanceof Error && error.message.trim()) return error.message;
     if (typeof error === 'string' && error.trim()) return error;
@@ -433,12 +420,6 @@ export const NutritionSettingsScreen = () => {
   }, [preferences]);
 
   useEffect(() => {
-    if (!showExportModal) return;
-    setExportStartInput(format(exportStart, 'yyyy-MM-dd'));
-    setExportEndInput(format(exportEnd, 'yyyy-MM-dd'));
-  }, [showExportModal, exportStart, exportEnd]);
-
-  useEffect(() => {
     setNutritionDayRolloverInput(nutritionDayRolloverTime);
   }, [nutritionDayRolloverTime]);
 
@@ -458,15 +439,25 @@ export const NutritionSettingsScreen = () => {
     setVacationDraftSelection(prev => mergeLoadedVacationDates(prev, vacationDates));
   }, [showVacationModal, isLoadingVacationDates, vacationDates, vacationRangeKey]);
 
-  const exportMinStartDate = getMinExportStartDate(exportEnd);
-  const exportRangeDays = differenceInCalendarDays(exportEnd, exportStart);
-  const exportRangeErrorMessage =
-    exportRangeDays < 0
-      ? t('nutrition.invalidDatesMessage')
-      : exportRangeDays > MAX_EXPORT_RANGE_DAYS
-        ? t('nutrition.exportRangeMinStartMessage', { date: format(exportMinStartDate, 'yyyy-MM-dd') })
+  const validateExportDraft = () =>
+    validateNutritionExportRange(
+      Platform.OS === 'web' ? exportStartInput : format(exportStart, 'yyyy-MM-dd'),
+      Platform.OS === 'web' ? exportEndInput : format(exportEnd, 'yyyy-MM-dd'),
+    );
+  const exportValidation = validateExportDraft();
+  const exportFieldError =
+    exportValidation.error === 'invalid'
+      ? t('nutrition.exportInvalidDate')
+      : exportValidation.error === 'future'
+        ? t('nutrition.exportFutureDate')
         : null;
-  const isExportDisabled = isExporting || !!exportRangeErrorMessage;
+  const exportRangeErrorMessage =
+    exportValidation.error === 'inverted'
+      ? t('nutrition.invalidDatesMessage')
+      : exportValidation.error === 'tooLong'
+        ? t('nutrition.exportRangeTooLongMessage')
+        : null;
+  const isExportDisabled = isExporting || exportValidation.error !== null;
 
   // Helper to update preferences
   const updateNutritionPrefs = (updates: Partial<NutritionSettingsJson>) => {
@@ -666,22 +657,11 @@ export const NutritionSettingsScreen = () => {
 
   // Export action
   const handleExport = async () => {
+    const validatedRange = validateExportDraft();
+    if (isExporting || validatedRange.error !== null) return;
     try {
-      if (exportRangeErrorMessage) return;
-      // Validate max 3 months
-      const diffMs = exportEnd.getTime() - exportStart.getTime();
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      if (diffDays > 92) {
-        Alert.alert(t('nutrition.exportRangeTooLongTitle'), t('nutrition.exportRangeTooLongMessage'));
-        return;
-      }
-      if (diffDays < 0) {
-        Alert.alert(t('nutrition.invalidDatesTitle'), t('nutrition.invalidDatesMessage'));
-        return;
-      }
-
-      const exportStartDate = format(exportStart, 'yyyy-MM-dd');
-      const exportEndDate = format(exportEnd, 'yyyy-MM-dd');
+      const exportStartDate = format(validatedRange.startDate, 'yyyy-MM-dd');
+      const exportEndDate = format(validatedRange.endDate, 'yyyy-MM-dd');
       const webPrintWindow: WebExportWindow | null =
         Platform.OS === 'web'
           ? ((
@@ -1828,18 +1808,8 @@ export const NutritionSettingsScreen = () => {
                     <TextInput
                       style={[styles.webDateInput, dynamicStyles.input, { color: themeColors.textPrimary }]}
                       value={exportStartInput}
-                      onChangeText={value => {
-                        setExportStartInput(value);
-                        const parsed = parseWebDateInput(value);
-                        if (!parsed) return;
-                        if (parsed > new Date()) return;
-                        applyExportStartDate(parsed);
-                      }}
-                      onBlur={() => {
-                        if (!parseWebDateInput(exportStartInput)) {
-                          setExportStartInput(format(exportStart, 'yyyy-MM-dd'));
-                        }
-                      }}
+                      onChangeText={setExportStartInput}
+                      accessibilityLabel={t('nutrition.startDate')}
                       placeholder="YYYY-MM-DD"
                       placeholderTextColor={themeColors.textSecondary}
                       autoCapitalize="none"
@@ -1859,6 +1829,11 @@ export const NutritionSettingsScreen = () => {
                       }}
                     />
                   )}
+                  {'field' in exportValidation && exportValidation.field === 'start' && (
+                    <Text accessibilityRole="alert" style={[styles.exportRangeError, { color: themeColors.danger }]}>
+                      {exportFieldError}
+                    </Text>
+                  )}
                 </View>
 
                 <View style={styles.exportDateField}>
@@ -1867,18 +1842,8 @@ export const NutritionSettingsScreen = () => {
                     <TextInput
                       style={[styles.webDateInput, dynamicStyles.input, { color: themeColors.textPrimary }]}
                       value={exportEndInput}
-                      onChangeText={value => {
-                        setExportEndInput(value);
-                        const parsed = parseWebDateInput(value);
-                        if (!parsed) return;
-                        if (parsed > new Date()) return;
-                        applyExportEndDate(parsed);
-                      }}
-                      onBlur={() => {
-                        if (!parseWebDateInput(exportEndInput)) {
-                          setExportEndInput(format(exportEnd, 'yyyy-MM-dd'));
-                        }
-                      }}
+                      onChangeText={setExportEndInput}
+                      accessibilityLabel={t('nutrition.endDate')}
                       placeholder="YYYY-MM-DD"
                       placeholderTextColor={themeColors.textSecondary}
                       autoCapitalize="none"
@@ -1894,6 +1859,11 @@ export const NutritionSettingsScreen = () => {
                       onChange={(e, d) => d && applyExportEndDate(d)}
                     />
                   )}
+                  {'field' in exportValidation && exportValidation.field === 'end' && (
+                    <Text accessibilityRole="alert" style={[styles.exportRangeError, { color: themeColors.danger }]}>
+                      {exportFieldError}
+                    </Text>
+                  )}
                 </View>
               </View>
               {exportRangeErrorMessage ? (
@@ -1908,6 +1878,8 @@ export const NutritionSettingsScreen = () => {
                   onPress={handleExport}
                   style={[styles.modalBtnConfirm, isExportDisabled && { opacity: 0.45 }]}
                   disabled={isExportDisabled}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isExportDisabled, busy: isExporting }}
                 >
                   {isExporting ? (
                     <ActivityIndicator size="small" color={colors.white} />

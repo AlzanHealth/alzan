@@ -436,6 +436,8 @@ const en = {
     pdfAdherence: 'Adherence',
     pdfPer100g: 'Per 100g',
     exportRangeTooLongTitle: 'Range too long',
+    exportInvalidDate: 'Enter a real date in YYYY-MM-DD format.',
+    exportFutureDate: 'The date cannot be later than today.',
     exportRangeTooLongMessage: 'The maximum export range is 3 months.',
     exportRangeMaxEndMessage: 'The maximum end date for this start date is {{date}}.',
     exportRangeMinStartMessage: 'The minimum start date for this end date is {{date}}.',

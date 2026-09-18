@@ -441,6 +441,8 @@ export default {
     pdfAdherence: 'Adherencia',
     pdfPer100g: 'Por 100g',
     exportRangeTooLongTitle: 'Rango demasiado largo',
+    exportInvalidDate: 'Introduce una fecha real con formato AAAA-MM-DD.',
+    exportFutureDate: 'La fecha no puede ser posterior a hoy.',
     exportRangeTooLongMessage: 'El rango máximo de exportación es de 3 meses.',
     exportRangeMaxEndMessage: 'La fecha fin máxima para esta fecha de inicio es {{date}}.',
     exportRangeMinStartMessage: 'La fecha de inicio mínima para esta fecha de fin es {{date}}.',
