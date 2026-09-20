@@ -3409,6 +3409,9 @@ export const EnduranceSessionFormScreen = () => {
                 </View>
               )}
 
+              <Text accessibilityRole="header" style={[styles.formSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('training.activityMetricsSection')}
+              </Text>
               {registrationMode === 'advanced' ? (
                 <>
                   <View style={[styles.modeToggle, dynamicStyles.glassCard]}>
@@ -3493,7 +3496,7 @@ export const EnduranceSessionFormScreen = () => {
                 <>
                   <View style={styles.row}>
                     {currentConfig?.fields.distance && (
-                      <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
+                      <View style={[styles.formGroup, { flex: 1 }]}>
                         <Text style={[styles.label, dynamicStyles.sublabel]}>
                           {t('training.distanceParen')}
                           {preferences.distance_unit})
@@ -3513,12 +3516,7 @@ export const EnduranceSessionFormScreen = () => {
                       </View>
                     )}
                     {currentConfig?.fields.duration && (
-                      <View
-                        style={[
-                          styles.formGroup,
-                          { flex: 1, marginLeft: currentConfig.fields.distance ? spacing.s : 0 },
-                        ]}
-                      >
+                      <View style={[styles.formGroup, { flex: 1 }]}>
                         <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.duration')}</Text>
                         <TouchableOpacity
                           style={[
@@ -3597,7 +3595,7 @@ export const EnduranceSessionFormScreen = () => {
 
                   <View style={styles.row}>
                     {currentConfig?.fields.calories && (
-                      <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
+                      <View style={[styles.formGroup, { flex: 1 }]}>
                         <Text style={styles.label}>{t('training.caloriesKcal')}</Text>
                         <TextInput
                           style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
@@ -3613,7 +3611,7 @@ export const EnduranceSessionFormScreen = () => {
                       </View>
                     )}
                     {currentConfig?.fields.calories && (
-                      <View style={[styles.formGroup, { flex: 1, marginLeft: spacing.s }]}>
+                      <View style={[styles.formGroup, { flex: 1 }]}>
                         <Text style={styles.label}>{t('training.recoveryTime')}</Text>
                         <View
                           style={[
@@ -3650,43 +3648,51 @@ export const EnduranceSessionFormScreen = () => {
               )}
 
               {registrationMode === 'simple' && (
-                <View style={styles.row}>
-                  {currentConfig?.fields.heartRate && (
-                    <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
-                      <Text style={styles.label}>{t('training.avgHeartRate')}</Text>
-                      <TextInput
-                        style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                        {...INTEGER_INPUT_PROPS}
-                        placeholder="0"
-                        placeholderTextColor={themeColors.textSecondary}
-                        value={hr}
-                        onChangeText={setHr}
-                      />
-                    </View>
-                  )}
-                  {currentConfig?.fields.rpe && (
-                    <View
-                      style={[
-                        styles.formGroup,
-                        { flex: 1, marginLeft: currentConfig.fields.heartRate ? spacing.s : 0 },
-                      ]}
+                <>
+                  {(currentConfig?.fields.heartRate || currentConfig?.fields.rpe) && (
+                    <Text
+                      accessibilityRole="header"
+                      style={[styles.formSectionTitle, { color: themeColors.textPrimary }]}
                     >
-                      <Text style={styles.label}>{t('training.effortRpe')}</Text>
-                      <TextInput
-                        style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
-                        {...INTEGER_INPUT_PROPS}
-                        placeholder={t('training.repsPlaceholder')}
-                        placeholderTextColor={themeColors.textSecondary}
-                        value={rpe}
-                        onChangeText={setRpe}
-                      />
-                    </View>
+                      {t('training.activityEffortSection')}
+                    </Text>
                   )}
-                </View>
+                  <View style={styles.row}>
+                    {currentConfig?.fields.heartRate && (
+                      <View style={[styles.formGroup, { flex: 1 }]}>
+                        <Text style={styles.label}>{t('training.avgHeartRate')}</Text>
+                        <TextInput
+                          style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
+                          {...INTEGER_INPUT_PROPS}
+                          placeholder="0"
+                          placeholderTextColor={themeColors.textSecondary}
+                          value={hr}
+                          onChangeText={setHr}
+                        />
+                      </View>
+                    )}
+                    {currentConfig?.fields.rpe && (
+                      <View style={[styles.formGroup, { flex: 1 }]}>
+                        <Text style={styles.label}>{t('training.effortRpe')}</Text>
+                        <TextInput
+                          style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
+                          {...INTEGER_INPUT_PROPS}
+                          placeholder={t('training.repsPlaceholder')}
+                          placeholderTextColor={themeColors.textSecondary}
+                          value={rpe}
+                          onChangeText={setRpe}
+                        />
+                      </View>
+                    )}
+                  </View>
+                </>
               )}
 
-              <View style={[styles.row, registrationMode === 'advanced' && styles.advancedDateTimeRow]}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
+              <Text accessibilityRole="header" style={[styles.formSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('training.activityDateSection')}
+              </Text>
+              <View style={styles.row}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.date')}</Text>
                   {Platform.OS === 'web' ? (
                     <TextInput
@@ -3708,7 +3714,7 @@ export const EnduranceSessionFormScreen = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-                <View style={[styles.formGroup, { flex: 1, marginLeft: spacing.s }]}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={[styles.label, dynamicStyles.sublabel]}>{t('training.hour')}</Text>
                   {Platform.OS === 'web' ? (
                     <TextInput
@@ -3732,8 +3738,11 @@ export const EnduranceSessionFormScreen = () => {
                 </View>
               </View>
 
+              <Text accessibilityRole="header" style={[styles.formSectionTitle, { color: themeColors.textPrimary }]}>
+                {t('training.additionalMetrics')}
+              </Text>
               <View style={styles.row}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={styles.label}>{t('training.vo2Max')}</Text>
                   <TextInput
                     style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
@@ -3744,7 +3753,7 @@ export const EnduranceSessionFormScreen = () => {
                     onChangeText={setVo2Max}
                   />
                 </View>
-                <View style={[styles.formGroup, { flex: 1, marginLeft: spacing.s }]}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
                   <Text style={styles.label}>{t('training.totalSteps')}</Text>
                   <TextInput
                     style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
@@ -3759,7 +3768,7 @@ export const EnduranceSessionFormScreen = () => {
 
               <View style={styles.row}>
                 {currentConfig?.fields.elevation && (
-                  <View style={[styles.formGroup, { flex: 1, marginRight: spacing.s }]}>
+                  <View style={[styles.formGroup, { flex: 1 }]}>
                     <Text style={styles.label}>{t('training.elevationM')}</Text>
                     <TextInput
                       style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
@@ -3772,7 +3781,7 @@ export const EnduranceSessionFormScreen = () => {
                   </View>
                 )}
                 {currentConfig?.fields.elevation && (
-                  <View style={[styles.formGroup, { flex: 1, marginLeft: spacing.s }]}>
+                  <View style={[styles.formGroup, { flex: 1 }]}>
                     <Text style={styles.label}>{t('training.elevationLossM')}</Text>
                     <TextInput
                       style={[styles.input, dynamicStyles.input, { color: themeColors.textPrimary }]}
@@ -4976,6 +4985,12 @@ const styles = StyleSheet.create({
   },
   formGroup: {
     marginBottom: spacing.m,
+    minWidth: 156,
+  },
+  formSectionTitle: {
+    ...typography.h4,
+    marginTop: spacing.l,
+    marginBottom: spacing.m,
   },
   label: {
     ...typography.caption,
@@ -4991,6 +5006,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   input: {
+    minHeight: 48,
     borderRadius: borderRadius.m,
     padding: spacing.m,
     fontSize: 16,
@@ -5021,6 +5037,8 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: spacing.m,
   },
   advancedDateTimeRow: {
     marginTop: spacing.l,
@@ -5269,14 +5287,19 @@ const styles = StyleSheet.create({
     ...typography.button,
   },
   rowLabel: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '500',
   },
   rowRightValue: {
+    flexShrink: 1,
+    justifyContent: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
   },
   rowValueText: {
+    flexShrink: 1,
+    textAlign: 'right',
     fontSize: 15,
   },
   modalOverlay: {
