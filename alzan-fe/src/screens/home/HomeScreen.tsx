@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { HomeScreenNavigationProp, TabParamList } from '../../types/navigation.types';
@@ -44,10 +44,14 @@ import { getLocaleTag } from '../../i18n/dateLocale';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTranslation } from 'react-i18next';
 import { formatLocalizedDate } from '../../i18n/dateLocale';
+import { getHomeSummaryColumns } from './homeLayout';
 
 export const HomeScreen = () => {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const [summaryWidth, setSummaryWidth] = useState(width - spacing.m * 2);
+  const summaryColumns = getHomeSummaryColumns(summaryWidth, fontScale);
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const queryClient = useQueryClient();
 
@@ -357,8 +361,8 @@ export const HomeScreen = () => {
         >
           {/* Centered Header with Settings Icon */}
           <View style={styles.header}>
-            <View style={{ width: 24 }} />
-            <View style={{ alignItems: 'center' }}>
+            <View style={styles.headerButton} />
+            <View style={styles.headerContent}>
               <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{t('auth.appName')}</Text>
               <Text style={[styles.headerDate, { color: colors.textSecondary }]}>
                 {formatLocalizedDate(new Date(), {
@@ -367,29 +371,42 @@ export const HomeScreen = () => {
                 })}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.adjustments')}
+              onPress={() => navigation.navigate('Settings')}
+            >
               <Settings size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
           {homeMode !== 'compact' && (
-            <TouchableOpacity onPress={handlePrimaryAction} activeOpacity={0.78}>
-              <GlassCard style={styles.primaryActionCard}>
-                <View style={styles.cardContentRow}>
-                  <View style={[styles.primaryActionIcon, { backgroundColor: colors.primary }]}>
-                    <PrimaryActionIcon color={colors.white} size={22} />
-                  </View>
-                  <View style={styles.agendaContent}>
-                    <Text style={[styles.primaryActionTitle, { color: colors.textPrimary }]}>
-                      {primaryActionConfig.title}
-                    </Text>
-                    <Text style={[styles.agendaSubtitle, { color: colors.textSecondary }]}>
-                      {primaryActionConfig.subtitle}
-                    </Text>
-                  </View>
-                  <ChevronRight color={colors.textSecondary} size={20} />
+            <TouchableOpacity
+              onPress={handlePrimaryAction}
+              activeOpacity={0.78}
+              accessibilityRole="button"
+              accessibilityLabel={primaryActionConfig.title}
+              accessibilityHint={primaryActionConfig.subtitle}
+              style={[
+                styles.primaryActionCard,
+                { backgroundColor: colors.selectedOptionBackground, borderColor: colors.primary },
+              ]}
+            >
+              <View style={styles.cardContentRow}>
+                <View style={[styles.primaryActionIcon, { backgroundColor: colors.primary }]}>
+                  <PrimaryActionIcon color={colors.white} size={22} />
                 </View>
-              </GlassCard>
+                <View style={styles.agendaContent}>
+                  <Text style={[styles.primaryActionTitle, { color: colors.textPrimary }]}>
+                    {primaryActionConfig.title}
+                  </Text>
+                  <Text style={[styles.primaryActionSubtitle, { color: colors.textPrimary }]}>
+                    {primaryActionConfig.subtitle}
+                  </Text>
+                </View>
+                <ChevronRight color={colors.primary} size={24} />
+              </View>
             </TouchableOpacity>
           )}
 
@@ -397,13 +414,21 @@ export const HomeScreen = () => {
           <Text style={[styles.sectionTitle, { marginTop: spacing.s, color: colors.textPrimary }]}>
             {t('home.todaysSummary')}
           </Text>
-          <View style={styles.statsGrid}>
-            {[0, 2].map(rowStart => (
+          <View style={styles.statsGrid} onLayout={event => setSummaryWidth(event.nativeEvent.layout.width)}>
+            {Array.from(
+              { length: Math.ceil(visibleCards.length / summaryColumns) },
+              (_, row) => row * summaryColumns,
+            ).map(rowStart => (
               <View style={styles.statsRow} key={`stats-row-${rowStart}`}>
-                {visibleCards.slice(rowStart, rowStart + 2).map(card => {
+                {visibleCards.slice(rowStart, rowStart + summaryColumns).map(card => {
                   const Icon = card.icon;
                   return (
-                    <TouchableOpacity key={card.key} style={styles.halfWidth} onPress={card.onPress}>
+                    <TouchableOpacity
+                      key={card.key}
+                      style={styles.halfWidth}
+                      onPress={card.onPress}
+                      accessibilityRole="button"
+                    >
                       <GlassCard style={styles.statsCard}>
                         <View style={styles.cardContentColumn}>
                           <View style={styles.statsHeader}>
@@ -519,7 +544,7 @@ export const HomeScreen = () => {
                 {t('home.weeklyBalanceSubtitle')}
               </Text>
             </View>
-            <View style={styles.weeklyStatsRow}>
+            <View style={[styles.weeklyStatsRow, summaryColumns === 1 && styles.stackedStats]}>
               {weeklyStats.map(item => (
                 <View key={item.label} style={styles.weeklyStat}>
                   <Text style={[styles.weeklyValue, { color: colors.textPrimary }]}>{item.value}</Text>
@@ -560,9 +585,22 @@ const styles = StyleSheet.create({
     ...typography.h2,
     marginBottom: 2,
   },
+  headerButton: {
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerContent: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+  },
   headerDate: {
     ...typography.body,
     textTransform: 'capitalize',
+    textAlign: 'center',
   },
   sectionTitle: {
     ...typography.h3,
@@ -573,12 +611,15 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     marginBottom: spacing.m,
     minHeight: 76,
+    borderWidth: 1,
+    borderLeftWidth: 4,
   },
   primaryActionCardCompact: {
     minHeight: 64,
     paddingVertical: spacing.s,
   },
   primaryActionIcon: {
+    flexShrink: 0,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -586,8 +627,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryActionTitle: {
-    ...typography.h4,
-    marginBottom: 2,
+    ...typography.h3,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  primaryActionSubtitle: {
+    ...typography.body,
   },
   weeklyCard: {
     padding: spacing.m,
@@ -612,6 +657,10 @@ const styles = StyleSheet.create({
   weeklyStatsRow: {
     flexDirection: 'row',
     gap: spacing.s,
+  },
+  stackedStats: {
+    flexDirection: 'column',
+    gap: spacing.m,
   },
   weeklyStat: {
     flex: 1,
@@ -643,14 +692,15 @@ const styles = StyleSheet.create({
   statsCard: {
     padding: spacing.m,
     borderRadius: borderRadius.l,
-    height: 100, // Fixed height for consistency
+    minHeight: 112,
   },
   statsCardCompact: {
-    height: 86,
+    minHeight: 86,
     padding: spacing.s,
   },
   cardContentColumn: {
-    flex: 1,
+    flexGrow: 1,
+    gap: spacing.s,
     justifyContent: 'space-between',
   },
   statsHeader: {
@@ -661,15 +711,19 @@ const styles = StyleSheet.create({
   statsLabel: {
     ...typography.h4,
     fontWeight: '600',
+    flex: 1,
+    minWidth: 0,
   },
   statsValueContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'baseline',
     gap: 4,
   },
   statsValue: {
     ...typography.h1,
     fontSize: 28, // Slightly smaller than massive header
+    flexShrink: 1,
   },
   statsValueCompact: {
     fontSize: 23,
@@ -677,6 +731,7 @@ const styles = StyleSheet.create({
   statsUnit: {
     ...typography.caption,
     marginBottom: 4, // Align baseline
+    flexShrink: 1,
   },
 
   // Agenda
@@ -698,6 +753,7 @@ const styles = StyleSheet.create({
     gap: spacing.m,
   },
   agendaIconContainer: {
+    flexShrink: 0,
     width: 48,
     height: 48,
     borderRadius: 24, // Circle
@@ -717,6 +773,7 @@ const styles = StyleSheet.create({
   },
   agendaContent: {
     flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
   },
   agendaTitle: {
