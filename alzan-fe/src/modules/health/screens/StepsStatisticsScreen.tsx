@@ -9,6 +9,7 @@ import { colors, typography } from '../../../theme';
 import { HealthScreenNavigationProp, HealthStackParamList } from '../../../types/navigation.types';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { StepsChart, StepsChartHandle } from '../components/StepsChart';
+import { useTabBarLayout } from '../../../navigation/tabBarLayout';
 
 export const StepsStatisticsScreen = () => {
   const { t } = useTranslation();
@@ -17,6 +18,7 @@ export const StepsStatisticsScreen = () => {
   const fromHome = route.params?.fromHome;
   const { styles: dynamicStyles, colors: themeColors } = useHealthStyles();
   const stepsChartRef = useRef<StepsChartHandle>(null);
+  const { topFromScreenBottom } = useTabBarLayout();
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.container}>
@@ -44,7 +46,7 @@ export const StepsStatisticsScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: topFromScreenBottom + 24 }]}>
           <Pressable style={styles.clearSelectionLayer} onPress={() => stepsChartRef.current?.clearSelection()}>
             <StepsChart ref={stepsChartRef} />
           </Pressable>
@@ -66,6 +68,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   backButton: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
     padding: 8,
     marginLeft: -8,
   },
@@ -74,8 +79,8 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   addButton: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',

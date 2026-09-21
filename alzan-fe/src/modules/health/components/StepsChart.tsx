@@ -18,10 +18,10 @@ import { getDateFnsLocale, getLocaleTag } from '../../../i18n/dateLocale';
 import { useTranslation } from 'react-i18next';
 import { useStepsRange } from '../hooks/useSteps';
 import { aggregateStepsByDate } from '../services/stepsAggregation';
+import { HealthPeriodSelector } from './HealthPeriodSelector';
 
 type TimeRange = 'S' | 'M' | '6M' | 'A';
 
-const RANGES: TimeRange[] = ['S', 'M', '6M', 'A'];
 const CHART_TOP_PADDING_STEPS = 2000;
 const CHART_AXIS_STEP = 500;
 const WEEK_PAGE_DAYS = 7;
@@ -318,29 +318,7 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
 
       <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
         {/* Range selector */}
-        <View
-          style={[
-            styles.rangeContainer,
-            { backgroundColor: isDark ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' },
-          ]}
-        >
-          {RANGES.map(r => (
-            <Pressable
-              key={r}
-              style={[
-                styles.rangeBtn,
-                range === r && { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.9)' },
-              ]}
-              onPress={() => handleRangePress(r)}
-            >
-              <Text
-                style={[styles.rangeText, { color: themeColors.textPrimary }, range === r && { fontWeight: '600' }]}
-              >
-                {t(`steps.range.${r}`)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <HealthPeriodSelector value={range} onChange={handleRangePress} />
 
         {/* Header value */}
         <View style={styles.infoContainer}>
@@ -475,24 +453,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'visible',
   },
-  rangeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
-    padding: 2,
-    marginBottom: 20,
-  },
-  rangeBtn: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  rangeText: {
-    fontSize: 13,
-    fontWeight: '400',
-  },
   infoContainer: {
     marginBottom: 16,
     paddingHorizontal: 4,
@@ -506,11 +466,13 @@ const styles = StyleSheet.create({
   },
   valueRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
     marginBottom: 4,
   },
   infoValue: {
-    fontSize: 34,
+    fontSize: 42,
+    fontVariant: ['tabular-nums'],
     fontWeight: '700',
     letterSpacing: -1,
     marginRight: 6,

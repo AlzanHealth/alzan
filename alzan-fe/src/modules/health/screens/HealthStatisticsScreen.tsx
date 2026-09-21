@@ -9,23 +9,30 @@ import { HealthInteractiveChart } from '../components/HealthInteractiveChart';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import { useTabBarLayout } from '../../../navigation/tabBarLayout';
 
 export const HealthStatisticsScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<HealthScreenNavigationProp>();
+  const { topFromScreenBottom } = useTabBarLayout();
   const { styles: dynamicStyles, colors: themeColors } = useHealthStyles();
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.container}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+          >
             <ChevronLeft size={24} color={themeColors.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.title, dynamicStyles.title]}>{t('health.advancedStats')}</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: topFromScreenBottom + 24 }]}>
           <HealthInteractiveChart />
         </ScrollView>
       </SafeAreaView>
@@ -44,11 +51,15 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   backButton: {
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
     padding: 8,
     marginRight: 8,
     marginLeft: -8,
   },
   title: {
+    flexShrink: 1,
     ...typography.h3,
     color: colors.textPrimary,
   },

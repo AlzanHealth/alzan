@@ -17,6 +17,7 @@ import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { GlassCard } from '../../../components/GlassCard';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { MetricRangeBar } from './MetricRangeBar';
+import { HealthPeriodSelector } from './HealthPeriodSelector';
 import {
   format,
   subDays,
@@ -39,13 +40,6 @@ type HealthInteractiveChartProps = {
   onExportPress?: () => void;
   isExporting?: boolean;
 };
-
-const RANGES: { label: string; value: TimeRange }[] = [
-  { label: 'S', value: 'S' },
-  { label: 'M', value: 'M' },
-  { label: '6M', value: '6M' },
-  { label: 'A', value: 'A' },
-];
 
 export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: HealthInteractiveChartProps) => {
   const { t } = useTranslation();
@@ -432,12 +426,14 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
               })
             }
             style={styles.historyButton}
+            accessibilityRole="button"
           >
-            <Text style={styles.historyButtonText}>{t('health.history')}</Text>
+            <Text style={[styles.historyButtonText, { color: themeColors.primary }]}>{t('health.history')}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      <Text style={[styles.filterLabel, { color: themeColors.textSecondary }]}>{t('health.chartMetric')}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -447,6 +443,8 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
         {metrics.map(m => (
           <TouchableOpacity
             key={m.value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: metric === m.value }}
             style={[
               styles.metricChip,
               {
@@ -482,45 +480,22 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
       </ScrollView>
 
       <GlassCard style={[styles.chartWrapper, dynamicStyles.glassCard]}>
-        <View
-          style={[
-            styles.rangeContainer,
-            { backgroundColor: isDark ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' },
-          ]}
-        >
-          {RANGES.map(r => (
-            <TouchableOpacity
-              key={r.value}
-              style={[
-                styles.rangeBtn,
-                range === r.value && {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.9)',
-                },
-              ]}
-              onPress={() => {
-                setRange(r.value);
-                setSelectedPoint(undefined);
-                setVisibleRange(undefined);
-              }}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.rangeText,
-                  { color: themeColors.textPrimary },
-                  range === r.value && { color: isDark ? '#FFFFFF' : '#000000', fontWeight: '600' },
-                ]}
-              >
-                {r.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <HealthPeriodSelector
+          value={range}
+          onChange={nextRange => {
+            setRange(nextRange);
+            setSelectedPoint(undefined);
+            setVisibleRange(undefined);
+          }}
+        />
 
         <View style={styles.infoContainer}>
-          {!selectedPoint && (
-            <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{t('health.averageAllCaps')}</Text>
-          )}
+          <Text style={[styles.metricName, { color: themeColors.textPrimary }]}>
+            {metrics.find(m => m.value === metric)?.label}
+          </Text>
+          <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>
+            {t(selectedPoint ? 'health.selectedRecord' : 'health.averageAllCaps')}
+          </Text>
           <View style={styles.valueRow}>
             <Text style={[styles.infoValue, { color: themeColors.textPrimary }]}>
               {displayValue !== null ? formatMetricValue(displayValue) : '-'}
@@ -528,18 +503,23 @@ export const HealthInteractiveChart = ({ onExportPress, isExporting = false }: H
             <Text style={[styles.infoUnit, { color: themeColors.textSecondary }]}>{getUnit()}</Text>
           </View>
           <Text style={[styles.infoDate, { color: themeColors.textSecondary }]}>{displayDate}</Text>
+          {selectedPoint && (
+            <TouchableOpacity onPress={handleClearSelection} accessibilityRole="button" style={styles.clearSelection}>
+              <Text style={{ color: themeColors.primary }}>{t('health.showPeriodAverage')}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator color="#007AFF" size="large" />
+            <ActivityIndicator color={themeColors.primary} size="large" />
           </View>
         ) : (
           <SimpleChart
             data={chartData}
             type="line"
             height={260}
-            color="#007AFF"
+            color={themeColors.primary}
             lineStyle="linear"
             unit={getUnit()}
             onPointSelect={handlePointSelect}
@@ -577,6 +557,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   headerRow: {
+    flexWrap: 'wrap',
+    gap: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -594,14 +576,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   exportButton: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
   historyButton: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -617,6 +601,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   metricChip: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 22,
@@ -632,24 +618,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'visible',
   },
-  rangeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
-    padding: 2,
-    marginBottom: 20,
-  },
-  rangeBtn: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  rangeText: {
-    fontSize: 13,
-    fontWeight: '400',
-  },
+  filterLabel: { fontSize: 13, fontWeight: '600', marginBottom: 8, paddingHorizontal: 4 },
+  metricName: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  clearSelection: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   infoContainer: {
     marginBottom: 24,
     paddingHorizontal: 4,
@@ -663,11 +634,13 @@ const styles = StyleSheet.create({
   },
   valueRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
     marginBottom: 4,
   },
   infoValue: {
-    fontSize: 34,
+    fontSize: 42,
+    fontVariant: ['tabular-nums'],
     fontWeight: '700',
     letterSpacing: -1,
     marginRight: 4,
@@ -691,6 +664,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     fontStyle: 'italic',
-    opacity: 0.7,
   },
 });
