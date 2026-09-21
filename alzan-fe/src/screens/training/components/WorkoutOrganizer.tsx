@@ -46,6 +46,17 @@ export function WorkoutOrganizer({
     [exercises, draft.adhocExercises],
   );
   const completedSets = useMemo(() => new Set(draft.completedSets), [draft.completedSets]);
+  const exerciseName = useCallback(
+    (id: string) => {
+      const details = exerciseById.get(id)?.exercise;
+      return (
+        (i18n.language.startsWith('en')
+          ? details?.base_name_en || details?.base_name_es
+          : details?.base_name_es || details?.base_name_en) || t('training.exercise')
+      );
+    },
+    [exerciseById, i18n.language, t],
+  );
 
   useEffect(() => {
     if (!visible) setMovingId(null);
@@ -54,16 +65,17 @@ export function WorkoutOrganizer({
   const renderBlock = useCallback(
     ({ item: ids, index }: { item: string[]; index: number }) => (
       <View style={[styles.block, theme.border]}>
-        <Text accessibilityRole="header" style={[styles.blockTitle, theme.title]}>
-          {t('training.workoutBlock', { position: index + 1 })}
-        </Text>
+        <View style={styles.blockHeading}>
+          <Text accessibilityRole="header" style={[styles.blockTitle, theme.title]}>
+            {t('training.workoutBlock', { position: index + 1 })}
+          </Text>
+          <Text style={[styles.blockName, theme.subtitle]} numberOfLines={2}>
+            {ids.map(id => exerciseName(id)).join(' · ')}
+          </Text>
+        </View>
         {ids.map(id => {
           const exercise = exerciseById.get(id);
-          const details = exercise?.exercise;
-          const name =
-            (i18n.language.startsWith('en')
-              ? details?.base_name_en || details?.base_name_es
-              : details?.base_name_es || details?.base_name_en) || t('training.exercise');
+          const name = exerciseName(id);
           const total = Math.max(0, (exercise?.target_sets ?? 3) + (draft.extraSets[id] ?? 0));
           const completed = Array.from({ length: total }, (_, number) => `${id}-${number + 1}`).filter(key =>
             completedSets.has(key),
@@ -142,9 +154,14 @@ export function WorkoutOrganizer({
                   onChange(moveWorkoutBlock(draft, index, destination));
                 }}
               >
-                <Text style={[styles.buttonText, theme.title]}>
-                  {t('training.workoutBlock', { position: destination + 1 })}
-                </Text>
+                <View style={styles.destinationLabel}>
+                  <Text style={[styles.buttonText, theme.title]}>
+                    {t('training.workoutBlock', { position: destination + 1 })}
+                  </Text>
+                  <Text style={[styles.destinationName, theme.subtitle]} numberOfLines={1}>
+                    {exerciseName(block[0])}
+                  </Text>
+                </View>
               </Pressable>
             ))}
           </View>
@@ -157,7 +174,7 @@ export function WorkoutOrganizer({
       draft,
       executingId,
       exerciseById,
-      i18n.language,
+      exerciseName,
       movingId,
       onChange,
       onReplace,
@@ -245,7 +262,9 @@ const styles = StyleSheet.create({
   list: { flexGrow: 0, flexShrink: 1 },
   content: { paddingHorizontal: spacing.m, paddingBottom: spacing.m, gap: spacing.m },
   block: { borderWidth: 1, borderRadius: borderRadius.m, padding: spacing.s, gap: spacing.s },
+  blockHeading: { gap: spacing.xs },
   blockTitle: { ...typography.button },
+  blockName: { ...typography.caption },
   member: { gap: spacing.xs, paddingVertical: spacing.xs },
   name: { ...typography.body },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s },
@@ -261,6 +280,8 @@ const styles = StyleSheet.create({
   },
   buttonText: { ...typography.button, textAlign: 'center' },
   destinations: { borderLeftWidth: 1, marginLeft: spacing.s, paddingLeft: spacing.s, gap: spacing.s },
+  destinationLabel: { alignItems: 'center', gap: 2 },
+  destinationName: { ...typography.caption, textAlign: 'center' },
   footer: { flexDirection: 'row', flexWrap: 'wrap', padding: spacing.m, gap: spacing.s, borderTopWidth: 1 },
   footerButton: { flexGrow: 1, flexBasis: 100 },
   disabled: { opacity: 0.5 },
