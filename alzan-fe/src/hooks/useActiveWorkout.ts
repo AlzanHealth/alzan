@@ -89,7 +89,7 @@ export class ActiveGymSessionAlreadyStartedError extends Error {
   }
 }
 
-export const useActiveWorkout = (sessionId?: string) => {
+export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: string[] = []) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const languageCode = getCurrentAppLocale();
@@ -211,8 +211,13 @@ export const useActiveWorkout = (sessionId?: string) => {
   // Fetch active session data
   // In a real app complexity is higher (re-hydrating state from sets logged in DB + template plan)
   // For now, we will fetch the session + the template it was based on to build the "Plan".
-  const { data: activeSessionCoreData, isLoading } = useQuery({
-    queryKey: ['activeSession', sessionId, languageCode],
+  const {
+    data: activeSessionCoreData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ['activeSession', sessionId, languageCode, user?.id],
     queryFn: async () => {
       console.log('[useActiveWorkout.fetchSession] Iniciando - sessionId:', sessionId);
       try {
@@ -242,7 +247,7 @@ export const useActiveWorkout = (sessionId?: string) => {
         // Fetch template exercises (The Plan)
         let exercises: WorkoutTemplateExerciseWithExercise[] = [];
         if (session.workout_template_id) {
-          const { data: templateExercises } = await supabase
+          const { data: templateExercises, error: templateError } = await supabase
             .from('workout_template_exercises')
             .select(
               `
@@ -260,6 +265,7 @@ export const useActiveWorkout = (sessionId?: string) => {
             .eq('workout_template_id', session.workout_template_id)
             .order('order_index')
             .returns<WorkoutTemplateExerciseLookupRow[]>();
+          if (templateError) throw templateError;
 
           // Transform to include exercise_type_code at exercise level
           exercises = (templateExercises || []).map(te => ({
@@ -299,18 +305,20 @@ export const useActiveWorkout = (sessionId?: string) => {
         }
 
         // Fetch already completed sets in this session
-        const { data: completedSets } = await supabase
+        const { data: completedSets, error: completedSetsError } = await supabase
           .from('workout_sets')
           .select('*')
           .eq('session_id', sessionId)
           .order('created_at');
+        if (completedSetsError) throw completedSetsError;
         console.log('[useActiveWorkout.fetchSession] Sets completados:', completedSets?.length);
 
-        const { data: sessionSupersetLinks } = await supabase
+        const { data: sessionSupersetLinks, error: linksError } = await supabase
           .from('activity_session_superset_links')
           .select('*')
           .eq('session_id', sessionId)
           .order('from_order_index', { ascending: true });
+        if (linksError) throw linksError;
 
         // Detect Adhoc Exercises (present in sets but not in template)
         const templateExerciseIds = new Set(exercises.map(e => e.exercise_id));
@@ -323,10 +331,11 @@ export const useActiveWorkout = (sessionId?: string) => {
         });
 
         if (adhocExerciseIds.size > 0) {
-          const { data: adhocExercisesData } = await supabase
+          const { data: adhocExercisesData, error: adhocError } = await supabase
             .from('exercises')
             .select('*, exercise_type:exercise_types(id, code)')
             .in('id', Array.from(adhocExerciseIds));
+          if (adhocError) throw adhocError;
 
           if (adhocExercisesData) {
             // Build session exercise entries for adhoc exercises logged directly in this session.
@@ -372,16 +381,18 @@ export const useActiveWorkout = (sessionId?: string) => {
         throw err;
       }
     },
-    enabled: !!sessionId,
+    enabled: !!sessionId && !!user?.id,
   });
 
   const allExerciseIds = activeSessionCoreData
-    ? Array.from(new Set(activeSessionCoreData.exercises.map(exercise => exercise.exercise_id)))
+    ? Array.from(
+        new Set([...activeSessionCoreData.exercises.map(exercise => exercise.exercise_id), ...supplementalExerciseIds]),
+      ).sort()
     : [];
   const exerciseIdsKey = allExerciseIds.join(',');
 
   const { data: activeSessionSupplementalData } = useQuery({
-    queryKey: ['activeSessionSupplemental', sessionId, exerciseIdsKey],
+    queryKey: ['activeSessionSupplemental', user?.id, sessionId, exerciseIdsKey],
     queryFn: async () => {
       if (!sessionId || allExerciseIds.length === 0) {
         return {
@@ -469,7 +480,7 @@ export const useActiveWorkout = (sessionId?: string) => {
       try {
         const { data, error } = await supabase
           .from('workout_sets')
-          .insert({
+          .upsert({
             ...setData,
             user_id: user?.id ?? '',
             created_at: new Date().toISOString(),
@@ -667,6 +678,8 @@ export const useActiveWorkout = (sessionId?: string) => {
     startSession,
     activeSessionData,
     isLoading,
+    isError,
+    refetch,
     logSet,
     finishSession,
     cancelSession,

@@ -93,6 +93,8 @@ export type TrainingStackParamList = {
     fromScreen?: string;
     routineId?: string;
     selectionMode?: 'single' | 'multi';
+    replacementExerciseName?: string;
+    excludedExerciseIds?: string[];
   };
   StartWorkout: { templateId: string; date?: string; planId?: string };
   ActiveWorkout: { sessionId: string };

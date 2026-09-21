@@ -1771,6 +1771,34 @@ export default {
     stravaConnectedSince: 'Conectado',
   },
   training: {
+    finishedDraftCleanupError:
+      'La sesión se ha guardado, pero no se ha podido limpiar su copia local. No vuelvas a guardarla.',
+    organizeWorkout: 'Organizar',
+    organizationHint:
+      'Los cambios solo afectan a esta sesión. Las superseries se mueven juntas como bloques numerados.',
+    workoutBlock: 'Bloque {{position}}',
+    moveWorkoutTo: 'Mover a…',
+    detachSuperset: 'Separar de la superserie',
+    replaceExercise: 'Sustituir ejercicio',
+    replacementSearchTitle: 'Vas a sustituir',
+    exerciseAlreadyInSession: 'Este ejercicio ya está en la sesión.',
+    replacementCompletedBlocked: 'No se puede sustituir un ejercicio con series completadas.',
+    replacementTimerBlocked: 'Termina o cancela el temporizador de este ejercicio antes de sustituirlo.',
+    replacementUnavailable: 'El ejercicio ha cambiado. Vuelve a abrir el organizador.',
+    organizationProgress: '{{completed}} de {{total}} series completadas',
+    replacementConfirm: '¿Sustituir {{from}} por {{to}}?',
+    replacementKeeps:
+      'Se conservan posición, series, repeticiones, descanso y superserie. Se vacían todos los pesos escritos y se usa el récord del nuevo ejercicio.',
+    replacementResets:
+      'Se conservan posición, número de series, descanso y superserie. Se reinician pesos, tipos de serie y objetivos para el nuevo tipo de ejercicio.',
+    replacementPending: 'Los valores pendientes que hayas escrito cambiarán como se indica arriba.',
+    draftStorageError:
+      'No se han podido guardar tus últimos cambios en este dispositivo. Mantén esta pantalla abierta y reintenta.',
+    draftLoadingError:
+      'No se ha podido recuperar la sesión guardada. La edición está bloqueada para proteger tu progreso.',
+    draftLoading: 'Recuperando tu sesión…',
+    organizationChanged:
+      'La sesión cambió mientras la organizabas. Tu borrador no se ha aplicado. Abre Organizar de nuevo para usar el progreso actualizado.',
     dataProvidedByCoros: 'Datos proporcionados por COROS',
     dataProvidedByCorosDevice: 'Datos proporcionados por COROS · {{device}}',
     workout: 'Entrenamiento de',

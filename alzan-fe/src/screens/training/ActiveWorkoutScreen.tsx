@@ -24,6 +24,18 @@ import { GlassCard } from '../../components/GlassCard';
 import { getSetTableMinWidth, TRAINING_CONTROL_SIZE } from './helpers/trainingFormLayout';
 import { spacing, borderRadius, shadows, darkShadows } from '../../theme';
 import { ExerciseWithType, useActiveWorkout } from '../../hooks/useActiveWorkout';
+import { useAuth } from '../../context/AuthContext';
+import { useActiveWorkoutDraft } from '../../hooks/useActiveWorkoutDraft';
+import { ActiveWorkoutDraft, emptyActiveWorkoutDraft } from './helpers/activeWorkoutDraft';
+import { WorkoutOrganizer } from './components/WorkoutOrganizer';
+import { prepareWorkoutSetIds, saveWorkoutSequentially } from './helpers/workoutFinalization';
+import {
+  effectiveWorkoutExercises,
+  addWorkoutExercise,
+  nextWorkoutAutoSet,
+  substitutionBlockReason,
+  substituteWorkoutExercise,
+} from './helpers/workoutOrganization';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { RestTimer } from '../../components/RestTimer';
 import { ExecutionTimer } from '../../components/ExecutionTimer';
@@ -55,9 +67,6 @@ import {
   getGymSetModeLabel,
   getNextGymSetMode,
   getWorkoutSetTypeForGymSetMode,
-  GymSetMode,
-  parseGymSetModeRecord,
-  parseWarmupSetRecordAsGymSetModes,
 } from './helpers/gymSetMode.helper';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 
@@ -176,375 +185,202 @@ export const ActiveWorkoutScreen = () => {
   const { sessionId } = route.params || {};
   const insets = useSafeAreaInsets();
 
-  const { activeSessionData, isLoading, logSet, finishSession, cancelSession, saveSessionSupersetLinks } =
-    useActiveWorkout(sessionId);
+  const [supplementalExerciseIds, setSupplementalExerciseIds] = useState<string[]>([]);
+  const {
+    activeSessionData,
+    isLoading,
+    isError,
+    refetch,
+    logSet,
+    finishSession,
+    cancelSession,
+    saveSessionSupersetLinks,
+  } = useActiveWorkout(sessionId, supplementalExerciseIds);
 
   const { preferences, toDisplayWeight, toDbWeight } = useUserPreferences();
   const { settings } = useTrainingSettings();
 
-  // Map key: `${exerciseIndex}-${setIndex}` -> { weight: string, reps: string }
-  const [inputs, setInputs] = useState<Record<string, { weight: string; reps: string }>>({});
-  const [setModes, setSetModes] = useState<Record<string, GymSetMode>>({});
-  const setModesLoaded = useRef(false);
+  const { user } = useAuth();
+  const seed = useMemo<ActiveWorkoutDraft | undefined>(() => {
+    if (!activeSessionData || activeSessionData.session.user_id !== user?.id) return undefined;
+    const items = [...activeSessionData.exercises].sort((a, b) => a.order_index - b.order_index);
+    const initial = emptyActiveWorkoutDraft();
+    initial.exerciseOrder = items.map(item => item.exercise_id);
+    initial.setModes = buildGymSetModeDefaults(items);
+    initial.supersetLinks = Array.from(
+      activeSessionData.sessionSupersetLinks.length
+        ? buildSupersetLinksFromSessionLinks(items, activeSessionData.sessionSupersetLinks)
+        : buildSupersetLinksFromOrderedExercises(items),
+    );
+    items.forEach(item => {
+      for (let number = 1; number <= (item.target_sets ?? 3); number++) {
+        initial.inputs[`${item.exercise_id}-${number}`] = { weight: '', reps: String(item.target_reps_min ?? '') };
+      }
+    });
+    activeSessionData.completedSets.forEach(set => {
+      const key = `${set.exercise_id}-${set.set_number}`;
+      initial.completedSets.push(key);
+      initial.inputs[key] = { weight: String(toDisplayWeight(set.weight_kg ?? 0)), reps: String(set.reps ?? '') };
+      initial.setModes[key] = set.is_warmup ? 'warmup' : set.set_type === 'drop_set' ? 'drop_set' : 'normal';
+    });
+    return initial;
+  }, [user?.id, activeSessionData?.session.id, activeSessionData?.exercises, activeSessionData?.completedSets]);
+  const persistence = useActiveWorkoutDraft(user?.id, sessionId, seed);
+  const { draft, update: updateDraft } = persistence;
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const inputs = draft.inputs;
+  const setModes = draft.setModes;
+  const extraSets = draft.extraSets;
+  const hiddenExercises = new Set(draft.hiddenExercises);
+  const localCompletedSets = new Set(draft.completedSets);
+  const supersetLinks = new Set(draft.supersetLinks);
+  const fieldSetter =
+    <K extends keyof ActiveWorkoutDraft>(key: K) =>
+    (value: React.SetStateAction<ActiveWorkoutDraft[K]>) =>
+      updateDraft(prev => ({
+        ...prev,
+        [key]:
+          typeof value === 'function'
+            ? (value as (current: ActiveWorkoutDraft[K]) => ActiveWorkoutDraft[K])(prev[key])
+            : value,
+      }));
+  const setInputs = fieldSetter('inputs');
+  const setSetModes = fieldSetter('setModes');
+  const setExtraSets = fieldSetter('extraSets');
+  const setExerciseOrder = fieldSetter('exerciseOrder');
+  const setCollection = (
+    key: 'hiddenExercises' | 'completedSets' | 'supersetLinks',
+    value: React.SetStateAction<Set<string>>,
+  ) =>
+    updateDraft(prev => {
+      const next = typeof value === 'function' ? value(new Set(prev[key])) : value;
+      return { ...prev, [key]: Array.from(next) };
+    });
+  const setHiddenExercises = (value: React.SetStateAction<Set<string>>) => setCollection('hiddenExercises', value);
+  const setLocalCompletedSets = (value: React.SetStateAction<Set<string>>) => setCollection('completedSets', value);
+  const setSupersetLinks = (value: React.SetStateAction<Set<string>>) => setCollection('supersetLinks', value);
   const [isCompletingAll, setIsCompletingAll] = useState(false);
-  const inputsLoaded = useRef(false);
-
-  // ... (Keep existing useEffects for loading/saving inputs)
-  // Load persisted inputs on mount and apply defaults
-  useEffect(() => {
-    const loadInputs = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(`active_session_inputs_${sessionId}`);
-        let currentInputs: Record<string, { weight: string; reps: string }> = stored
-          ? (JSON.parse(stored) as Record<string, { weight: string; reps: string }>)
-          : {};
-
-        // Apply defaults for Reps (from Template) if not present
-        if (activeSessionData?.exercises) {
-          const newInputs: Record<string, { weight: string; reps: string }> = { ...currentInputs };
-          let hasChanges = false;
-          const exercises = activeSessionData.exercises;
-
-          exercises.forEach(item => {
-            const exerciseId = item.exercise_id;
-            const targetSets = item.target_sets || 3;
-            const defaultReps = item.target_reps_min || 0;
-
-            for (let i = 1; i <= targetSets; i++) {
-              const key = `${exerciseId}-${i}`;
-              const existingInput = newInputs[key];
-
-              if (!existingInput) {
-                newInputs[key] = {
-                  weight: '', // Weights start empty
-                  reps: defaultReps > 0 ? defaultReps.toString() : '',
-                };
-                hasChanges = true;
-              } else if (existingInput.reps === undefined || existingInput.reps === '') {
-                if (defaultReps > 0 && !stored) {
-                  newInputs[key] = { ...existingInput, reps: defaultReps.toString() };
-                  hasChanges = true;
-                }
-              }
-            }
-          });
-
-          if (hasChanges) {
-            currentInputs = newInputs;
-          }
-        }
-
-        setInputs(currentInputs);
-      } catch (e) {
-        console.log('Error loading inputs:', e);
-      } finally {
-        inputsLoaded.current = true;
-      }
-    };
-
-    if (activeSessionData) {
-      loadInputs();
-    }
-  }, [sessionId, activeSessionData?.exercises]);
-
-  useEffect(() => {
-    if (!inputsLoaded.current) return;
-    const saveInputs = async () => {
-      try {
-        await AsyncStorage.setItem(`active_session_inputs_${sessionId}`, JSON.stringify(inputs));
-      } catch (_error) {
-        console.log('Error saving inputs:', _error);
-      }
-    };
-    saveInputs();
-  }, [inputs, sessionId]);
-
-  // Timer State (Rest)
   const [timerVisible, setTimerVisible] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [helpModalVisible, setHelpModalVisible] = useState(false);
-
-  // Execution Timer State (for time-based exercises)
   const [executionTimerVisible, setExecutionTimerVisible] = useState(false);
+  const [executionTimerExerciseId, setExecutionTimerExerciseId] = useState<string | null>(null);
   const [executionTimerSeconds, setExecutionTimerSeconds] = useState(30);
   const [pendingRestSeconds, setPendingRestSeconds] = useState<number | null>(null);
   const [pendingAutoPlayQueue, setPendingAutoPlayQueue] = useState<AutoPlayQueue | null>(null);
-
-  // Local Completed Sets State (Batch Save Model)
-  const [localCompletedSets, setLocalCompletedSets] = useState<Set<string>>(new Set());
-  const completedSetsLoaded = useRef(false);
-
-  // ... (Keep existing useEffects for completed sets persistence)
-  useEffect(() => {
-    const loadCompletedSets = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(`active_session_completed_sets_${sessionId}`);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setLocalCompletedSets(new Set(parsed));
-        } else {
-          const dbSetKeys = activeSessionData?.completedSets?.map(s => `${s.exercise_id}-${s.set_number}`) || [];
-          if (dbSetKeys.length > 0) {
-            setLocalCompletedSets(new Set(dbSetKeys));
-          }
-        }
-      } catch (e) {
-        console.log('Error loading completed sets:', e);
-      } finally {
-        completedSetsLoaded.current = true;
-      }
-    };
-    loadCompletedSets();
-  }, [sessionId, activeSessionData?.completedSets]);
-
-  useEffect(() => {
-    if (!completedSetsLoaded.current) return;
-    const saveCompletedSets = async () => {
-      try {
-        await AsyncStorage.setItem(
-          `active_session_completed_sets_${sessionId}`,
-          JSON.stringify(Array.from(localCompletedSets)),
-        );
-      } catch (e) {
-        console.log('Error saving completed sets:', e);
-      }
-    };
-    saveCompletedSets();
-  }, [localCompletedSets, sessionId]);
-
-  const [extraSets, setExtraSets] = useState<Record<string, number>>({});
-  const [localAdhocExercises, setLocalAdhocExercises] = useState<WorkoutTemplateExerciseWithDetails[]>([]);
-  const [hiddenExercises, setHiddenExercises] = useState<Set<string>>(new Set());
-  const [exerciseOrder, setExerciseOrder] = useState<string[]>([]); // Custom order by exercise_id
-  const [supersetLinks, setSupersetLinks] = useState<Set<string>>(new Set());
-  const supersetLinksLoaded = useRef(false);
-
-  // Exercise Options Menu State
   const [menuVisibleForExercise, setMenuVisibleForExercise] = useState<string | null>(null);
-
-  const dbExercises = activeSessionData?.exercises || [];
-  const exercises = [
-    ...dbExercises,
-    ...localAdhocExercises.filter(local => !dbExercises.find(db => db.exercise_id === local.exercise_id)),
-  ];
-  const templateExercises = useMemo(
-    () => [...dbExercises].sort((a, b) => a.order_index - b.order_index),
-    [dbExercises],
-  );
-
-  // Load localized session state (extra sets, order, etc)
-  useEffect(() => {
-    const loadLocalState = async () => {
-      try {
-        const [
-          storedExtraSets,
-          storedSetModes,
-          storedWarmupSets,
-          storedAdhoc,
-          storedHidden,
-          storedOrder,
-          storedSupersetLinks,
-        ] = await Promise.all([
-          AsyncStorage.getItem(`active_session_extra_sets_${sessionId}`),
-          AsyncStorage.getItem(`active_session_set_modes_${sessionId}`),
-          AsyncStorage.getItem(`active_session_warmup_sets_${sessionId}`),
-          AsyncStorage.getItem(`active_session_adhoc_${sessionId}`),
-          AsyncStorage.getItem(`active_session_hidden_${sessionId}`),
-          AsyncStorage.getItem(`active_session_order_${sessionId}`),
-          AsyncStorage.getItem(`active_session_superset_links_${sessionId}`),
-        ]);
-
-        if (storedExtraSets) setExtraSets(JSON.parse(storedExtraSets));
-        const defaultSetModes = {
-          ...buildGymSetModeDefaults(templateExercises),
-          ...(activeSessionData?.completedSets || []).reduce<Record<string, GymSetMode>>((acc, set) => {
-            const key = `${set.exercise_id}-${set.set_number}`;
-            if (set.is_warmup) {
-              acc[key] = 'warmup';
-            } else if (set.set_type === 'drop_set') {
-              acc[key] = 'drop_set';
-            }
-            return acc;
-          }, {}),
-        };
-        if (storedSetModes) {
-          const parsedSetModes = parseGymSetModeRecord(JSON.parse(storedSetModes));
-          if (parsedSetModes && (Object.keys(parsedSetModes).length > 0 || Object.keys(defaultSetModes).length === 0)) {
-            setSetModes(parsedSetModes);
-          } else {
-            setSetModes(defaultSetModes);
-          }
-        } else if (storedWarmupSets) {
-          const parsedWarmupSets = parseWarmupSetRecordAsGymSetModes(JSON.parse(storedWarmupSets));
-          if (
-            parsedWarmupSets &&
-            (Object.keys(parsedWarmupSets).length > 0 || Object.keys(defaultSetModes).length === 0)
-          ) {
-            setSetModes(parsedWarmupSets);
-          } else {
-            setSetModes(defaultSetModes);
-          }
-        } else {
-          setSetModes(defaultSetModes);
-        }
-        if (storedAdhoc) setLocalAdhocExercises(JSON.parse(storedAdhoc));
-        if (storedHidden) setHiddenExercises(new Set(JSON.parse(storedHidden)));
-        if (storedOrder) setExerciseOrder(JSON.parse(storedOrder));
-        if (storedSupersetLinks) {
-          const parsed = JSON.parse(storedSupersetLinks);
-          if (Array.isArray(parsed)) {
-            const validLinks = new Set<string>();
-            parsed.forEach(val => {
-              if (typeof val === 'number') {
-                const ex1 = templateExercises[val];
-                const ex2 = templateExercises[val + 1];
-                if (ex1 && ex2) validLinks.add(`${ex1.exercise_id}|${ex2.exercise_id}`);
-              } else if (typeof val === 'string') {
-                validLinks.add(val);
-              }
-            });
-            setSupersetLinks(validLinks);
-          }
-        } else if (activeSessionData?.sessionSupersetLinks && activeSessionData.sessionSupersetLinks.length > 0) {
-          setSupersetLinks(
-            buildSupersetLinksFromSessionLinks(templateExercises, activeSessionData.sessionSupersetLinks),
-          );
-        } else {
-          setSupersetLinks(buildSupersetLinksFromOrderedExercises(templateExercises));
-        }
-      } catch (e) {
-        console.log('Error loading local session state:', e);
-      } finally {
-        setModesLoaded.current = true;
-        supersetLinksLoaded.current = true;
-      }
-    };
-
-    if (activeSessionData) {
-      loadLocalState();
-    }
-  }, [
-    sessionId,
-    activeSessionData?.completedSets,
-    activeSessionData?.exercises,
-    activeSessionData?.sessionSupersetLinks,
-    templateExercises,
-  ]);
-
-  // Persist extraSets
-  useEffect(() => {
-    const save = async () => {
-      try {
-        await AsyncStorage.setItem(`active_session_extra_sets_${sessionId}`, JSON.stringify(extraSets));
-      } catch (e) {
-        console.log('Error saving extraSets:', e);
-      }
-    };
-    save();
-  }, [extraSets, sessionId]);
-
-  // Persist set modes
-  useEffect(() => {
-    if (!setModesLoaded.current) return;
-    const save = async () => {
-      try {
-        await AsyncStorage.setItem(`active_session_set_modes_${sessionId}`, JSON.stringify(setModes));
-      } catch (e) {
-        console.log('Error saving setModes:', e);
-      }
-    };
-    save();
-  }, [setModes, sessionId]);
-
-  // Persist localAdhocExercises
-  useEffect(() => {
-    const save = async () => {
-      try {
-        // Create a safe version to stringify if needed, or just stringify directly if circular deps aren't present
-        await AsyncStorage.setItem(`active_session_adhoc_${sessionId}`, JSON.stringify(localAdhocExercises));
-      } catch (e) {
-        console.log('Error saving adhoc:', e);
-      }
-    };
-    save();
-  }, [localAdhocExercises, sessionId]);
-
-  // Persist hiddenExercises
-  useEffect(() => {
-    const save = async () => {
-      try {
-        await AsyncStorage.setItem(`active_session_hidden_${sessionId}`, JSON.stringify(Array.from(hiddenExercises)));
-      } catch (e) {
-        console.log('Error saving hidden:', e);
-      }
-    };
-    save();
-  }, [hiddenExercises, sessionId]);
-
-  // Persist exerciseOrder
-  useEffect(() => {
-    if (exerciseOrder.length > 0) {
-      AsyncStorage.setItem(`active_session_order_${sessionId}`, JSON.stringify(exerciseOrder)).catch(e =>
-        console.log(e),
-      );
-    }
-  }, [exerciseOrder, sessionId]);
-
-  // Persist supersetLinks
-  useEffect(() => {
-    if (!supersetLinksLoaded.current) return;
-
-    const save = async () => {
-      try {
-        await AsyncStorage.setItem(
-          `active_session_superset_links_${sessionId}`,
-          JSON.stringify(Array.from(supersetLinks).sort((a, b) => a.localeCompare(b))),
-        );
-      } catch (e) {
-        console.log('Error saving supersetLinks:', e);
-      }
-    };
-    save();
-  }, [supersetLinks, sessionId]);
-
-  useEffect(() => {
-    if (exercises.length > 0) {
-      setExerciseOrder(prev => {
-        if (prev.length === 0) {
-          return exercises.map(e => e.exercise_id);
-        }
-        // Append new ones if any
-        const existingIds = new Set(prev);
-        const newIds = exercises.filter(e => !existingIds.has(e.exercise_id)).map(e => e.exercise_id);
-        if (newIds.length > 0) {
-          return [...prev, ...newIds];
-        }
-        return prev;
-      });
-    }
-  }, [exercises.length]); // Depend on length to avoid deep loops
-
-  const orderedExerciseIds = exerciseOrder.length > 0 ? exerciseOrder : exercises.map(exercise => exercise.exercise_id);
-
-  // Build ordered visible exercises
+  const dbExercises = activeSessionData?.exercises ?? [];
+  const exercises = effectiveWorkoutExercises(draft, dbExercises);
+  const orderedExerciseIds = draft.exerciseOrder;
   const visibleExercises = orderedExerciseIds
-    .map(id => exercises.find(e => e.exercise_id === id))
-    .filter(e => e && !hiddenExercises.has(e.exercise_id))
-    .filter(e => e !== undefined);
-
+    .map(id => exercises.find(item => item.exercise_id === id))
+    .filter((item): item is WorkoutTemplateExerciseWithDetails => !!item && !hiddenExercises.has(item.exercise_id));
   useEffect(() => {
-    setSupersetLinks(prev => {
-      const activeIds = new Set(orderedExerciseIds);
-      const cleaned = new Set<string>();
-      prev.forEach(linkKey => {
-        const [id1, id2] = linkKey.split('|');
-        if (activeIds.has(id1) && activeIds.has(id2)) {
-          cleaned.add(linkKey);
-        }
-      });
-      return cleaned.size === prev.size ? prev : cleaned;
+    setSupplementalExerciseIds(draft.adhocExercises.map(item => item.exercise_id));
+  }, [draft.adhocExercises]);
+
+  const [organizationDraft, setOrganizationDraft] = useState<ActiveWorkoutDraft | null>(null);
+  const organizationBase = useRef<ActiveWorkoutDraft | null>(null);
+  const [searchingReplacement, setSearchingReplacement] = useState(false);
+  const [replacementPreview, setReplacementPreview] = useState<{
+    id: string;
+    replacement: ExerciseWithDetails;
+    organizing: boolean;
+  } | null>(null);
+  const savedExerciseIds = activeSessionData?.completedSets.map(set => set.exercise_id) ?? [];
+  const currentContext = useRef({
+    savedExerciseIds,
+    executingId: executionTimerVisible ? executionTimerExerciseId : null,
+    dbExercises,
+  });
+  currentContext.current = {
+    savedExerciseIds,
+    executingId: executionTimerVisible ? executionTimerExerciseId : null,
+    dbExercises,
+  };
+  useFocusEffect(
+    React.useCallback(() => {
+      setSearchingReplacement(false);
+    }, []),
+  );
+  const openOrganizer = () => {
+    organizationBase.current = draftRef.current;
+    setOrganizationDraft(draftRef.current);
+    setMenuVisibleForExercise(null);
+  };
+  const applyOrganization = () => {
+    if (!organizationDraft) return;
+    if (draftRef.current !== organizationBase.current) {
+      Alert.alert(t('common.error'), t('training.organizationChanged'));
+      return;
+    }
+    // Persisted completions can arrive during the organizer/search flow.
+    const removedIds = organizationBase.current.exerciseOrder.filter(
+      id => !organizationDraft.exerciseOrder.includes(id),
+    );
+    if (
+      removedIds.some(id =>
+        substitutionBlockReason(
+          draftRef.current,
+          id,
+          currentContext.current.savedExerciseIds,
+          currentContext.current.executingId,
+        ),
+      )
+    ) {
+      Alert.alert(t('common.error'), t('training.replacementCompletedBlocked'));
+      return;
+    }
+    updateDraft(() => organizationDraft);
+    setOrganizationDraft(null);
+  };
+  const startReplacement = (id: string, organizing = false) => {
+    const sourceDraft = organizing ? organizationDraft : draftRef.current;
+    if (!sourceDraft) return;
+    const reason = substitutionBlockReason(
+      sourceDraft,
+      id,
+      currentContext.current.savedExerciseIds,
+      currentContext.current.executingId,
+    );
+    if (reason) {
+      Alert.alert(t('training.replaceExercise'), t(`training.${reason}`));
+      return;
+    }
+    const items = effectiveWorkoutExercises(sourceDraft, currentContext.current.dbExercises);
+    const source = items.find(item => item.exercise_id === id);
+    if (!source?.exercise) return;
+    setMenuVisibleForExercise(null);
+    setSearchingReplacement(true);
+    navigation.navigate('ExerciseSearch', {
+      onSelect: () => {},
+      replacementExerciseName: getLocalizedExerciseName(source.exercise),
+      excludedExerciseIds: items.map(item => item.exercise_id),
+      onExerciseSelected: replacement => setReplacementPreview({ id, replacement, organizing }),
     });
-  }, [orderedExerciseIds]);
+  };
+  const confirmReplacement = () => {
+    if (!replacementPreview) return;
+    const { id, replacement, organizing } = replacementPreview;
+    const sourceDraft = organizing ? organizationDraft : draftRef.current;
+    if (!sourceDraft) return;
+    try {
+      const next = substituteWorkoutExercise(
+        sourceDraft,
+        effectiveWorkoutExercises(sourceDraft, currentContext.current.dbExercises),
+        id,
+        replacement,
+        currentContext.current.savedExerciseIds,
+        currentContext.current.executingId,
+      );
+      if (organizing) setOrganizationDraft(next);
+      else updateDraft(() => next);
+      setReplacementPreview(null);
+    } catch {
+      Alert.alert(t('common.error'), t('training.replacementUnavailable'));
+    }
+  };
 
   const isExerciseInSuperset = (exerciseId: string) => {
     for (const link of supersetLinks) {
@@ -614,11 +450,6 @@ export const ActiveWorkoutScreen = () => {
     return activeSessionData?.completedSets?.find(s => s.exercise_id === exerciseId && s.set_number === setNumber);
   };
 
-  const getExerciseTotalSets = (exerciseId: string) => {
-    const exercise = visibleExercises.find(item => item.exercise_id === exerciseId);
-    return Math.max(0, (exercise?.target_sets || 3) + (extraSets[exerciseId] || 0));
-  };
-
   const getExecutionSecondsForSet = (
     exercise: WorkoutTemplateExerciseWithDetails | undefined,
     setNumber: number,
@@ -648,7 +479,7 @@ export const ActiveWorkoutScreen = () => {
 
       setInputs(prev => ({
         ...prev,
-        [key]: { ...prev[key], [field]: normalized },
+        [key]: { weight: normalized, reps: prev[key]?.reps ?? '' },
       }));
       return;
     }
@@ -656,7 +487,7 @@ export const ActiveWorkoutScreen = () => {
     const normalizedReps = value.replace(/[^0-9]/g, '');
     setInputs(prev => ({
       ...prev,
-      [key]: { ...prev[key], [field]: normalizedReps },
+      [key]: { weight: prev[key]?.weight ?? '', reps: normalizedReps },
     }));
   };
 
@@ -712,15 +543,10 @@ export const ActiveWorkoutScreen = () => {
         setExecutionTimerSeconds(targetRepsMin);
         setPendingRestSeconds(restVal);
         setExecutionTimerVisible(true);
+        setExecutionTimerExerciseId(exerciseId);
 
         if (settings.autoPlayEnabled) {
-          const totalSets = getExerciseTotalSets(exerciseId);
-          const nextSetNumber = setNumber + 1;
-          if (nextSetNumber <= totalSets && !nextCompletedSets.has(`${exerciseId}-${nextSetNumber}`)) {
-            setPendingAutoPlayQueue({ exerciseId, nextSetNumber });
-          } else {
-            setPendingAutoPlayQueue(null);
-          }
+          setPendingAutoPlayQueue({ exerciseId, nextSetNumber: setNumber + 1 });
         } else {
           setPendingAutoPlayQueue(null);
         }
@@ -740,6 +566,7 @@ export const ActiveWorkoutScreen = () => {
   // Handle execution timer completion - show rest timer
   const handleExecutionComplete = () => {
     setExecutionTimerVisible(false);
+    setExecutionTimerExerciseId(null);
     if (pendingRestSeconds && pendingRestSeconds > 0) {
       setTimerSeconds(pendingRestSeconds);
       setTimerVisible(true);
@@ -749,6 +576,7 @@ export const ActiveWorkoutScreen = () => {
 
   const handleExecutionDismiss = () => {
     setExecutionTimerVisible(false);
+    setExecutionTimerExerciseId(null);
     setPendingRestSeconds(null);
     setPendingAutoPlayQueue(null);
   };
@@ -756,10 +584,19 @@ export const ActiveWorkoutScreen = () => {
   const handleRestComplete = () => {
     setTimerVisible(false);
 
-    if (!settings.autoPlayEnabled || !pendingAutoPlayQueue) return;
-
-    const { exerciseId, nextSetNumber } = pendingAutoPlayQueue;
-    const exercise = visibleExercises.find(item => item.exercise_id === exerciseId);
+    if (finishingRef.current || !settings.autoPlayEnabled || !pendingAutoPlayQueue) return;
+    const target = nextWorkoutAutoSet(
+      draftRef.current,
+      effectiveWorkoutExercises(draftRef.current, currentContext.current.dbExercises),
+      pendingAutoPlayQueue.exerciseId,
+      pendingAutoPlayQueue.nextSetNumber,
+    );
+    if (!target) {
+      setPendingAutoPlayQueue(null);
+      return;
+    }
+    const { exercise, setNumber: nextSetNumber } = target;
+    const exerciseId = exercise.exercise_id;
     const executionSeconds = getExecutionSecondsForSet(exercise, nextSetNumber, exercise?.target_reps_min || 30);
     const restSeconds = exercise?.rest_seconds ?? 60;
     const setKey = `${exerciseId}-${nextSetNumber}`;
@@ -770,17 +607,12 @@ export const ActiveWorkoutScreen = () => {
       return next;
     });
 
-    const totalSets = getExerciseTotalSets(exerciseId);
-    const followingSetNumber = nextSetNumber + 1;
-    if (followingSetNumber <= totalSets) {
-      setPendingAutoPlayQueue({ exerciseId, nextSetNumber: followingSetNumber });
-    } else {
-      setPendingAutoPlayQueue(null);
-    }
+    setPendingAutoPlayQueue({ exerciseId, nextSetNumber: nextSetNumber + 1 });
 
     setExecutionTimerSeconds(executionSeconds);
     setPendingRestSeconds(restSeconds);
     setExecutionTimerVisible(true);
+    setExecutionTimerExerciseId(exerciseId);
   };
 
   // Exercise Menu Actions
@@ -931,12 +763,16 @@ export const ActiveWorkoutScreen = () => {
     durationRef.current = nextDuration;
   }, []);
 
-  const inputsRef = useRef(inputs);
-  useEffect(() => {
-    inputsRef.current = inputs;
-  }, [inputs]);
-
   const [isFinishing, setIsFinishing] = useState(false);
+  const finishingRef = useRef(false);
+  const clearFinishedDraft = async () => {
+    try {
+      await persistence.clear();
+      await AsyncStorage.removeItem(`active_session_duration_${sessionId}`);
+    } catch {
+      Alert.alert(t('common.error'), t('training.finishedDraftCleanupError'));
+    }
+  };
 
   const handleFinish = async () => {
     Alert.alert(t('training.finishWorkoutConfirmTitle'), t('training.finishWorkoutConfirmMessage'), [
@@ -944,23 +780,33 @@ export const ActiveWorkoutScreen = () => {
       {
         text: t('training.finishNow'),
         onPress: async () => {
+          if (finishingRef.current || !persistence.ready) return;
+          finishingRef.current = true;
           try {
             setIsFinishing(true);
-            await new Promise(r => setTimeout(r, 50));
-
-            const inputsCurrent = inputsRef.current;
-            const pendingSaves: Promise<unknown>[] = [];
+            const snapshot = prepareWorkoutSetIds(draftRef.current, activeSessionData?.completedSets ?? []);
+            updateDraft(() => snapshot);
+            await persistence.flush();
+            const inputsCurrent = snapshot.inputs;
+            const finishingItems = effectiveWorkoutExercises(snapshot, currentContext.current.dbExercises);
+            const finishingExercises = snapshot.exerciseOrder
+              .map(id => finishingItems.find(item => item.exercise_id === id))
+              .filter(
+                (item): item is WorkoutTemplateExerciseWithDetails =>
+                  !!item && !snapshot.hiddenExercises.includes(item.exercise_id),
+              );
+            const pendingSaves: (() => Promise<unknown>)[] = [];
 
             let savedCount = 0;
             let savedVolume = 0;
 
-            for (const item of visibleExercises) {
+            for (const item of finishingExercises) {
               const exerciseId = item?.exercise_id;
-              const totalSets = Math.max(0, (item?.target_sets || 3) + (extraSets[exerciseId!] || 0));
+              const totalSets = Math.max(0, (item?.target_sets || 3) + (snapshot.extraSets[exerciseId!] || 0));
 
               for (let i = 0; i < totalSets; i++) {
                 const setNum = i + 1;
-                if (!isSetCompleted(exerciseId!, setNum)) continue;
+                if (!snapshot.completedSets.includes(`${exerciseId}-${setNum}`)) continue;
 
                 const key = `${exerciseId}-${setNum}`;
                 const inputData = inputsCurrent[key];
@@ -977,40 +823,38 @@ export const ActiveWorkoutScreen = () => {
                 else if (item?.target_reps_min) reps = item.target_reps_min;
 
                 const weightKg = toDbWeight(weight);
-                const setMode = setModes[key] || 'normal';
+                const setMode = snapshot.setModes[key] || 'normal';
                 const isWarmup = setMode === 'warmup';
 
                 savedCount++;
                 savedVolume += weightKg * reps;
 
-                pendingSaves.push(
-                  logSet
-                    .mutateAsync({
-                      session_id: sessionId,
-                      exercise_id: exerciseId!,
-                      set_number: setNum,
-                      weight_kg: weightKg,
-                      reps: reps,
-                      rest_s: item?.rest_seconds,
-                      is_warmup: isWarmup,
-                      set_type: getWorkoutSetTypeForGymSetMode(setMode),
-                      is_pr: false,
-                    })
-                    .catch(e => console.error(`Error saving set ${key}:`, e)),
+                pendingSaves.push(() =>
+                  logSet.mutateAsync({
+                    id: snapshot.setIds?.[key],
+                    session_id: sessionId,
+                    exercise_id: exerciseId!,
+                    set_number: setNum,
+                    weight_kg: weightKg,
+                    reps: reps,
+                    rest_s: item?.rest_seconds,
+                    is_warmup: isWarmup,
+                    set_type: getWorkoutSetTypeForGymSetMode(setMode),
+                    is_pr: false,
+                  }),
                 );
               }
             }
 
             if (pendingSaves.length > 0) {
-              await Promise.all(pendingSaves);
-              await new Promise(r => setTimeout(r, 500));
+              await saveWorkoutSequentially(pendingSaves, save => save());
             }
 
             const supersetPayload = [];
-            for (let i = 0; i < visibleExercises.length - 1; i++) {
-              const curr = visibleExercises[i];
-              const next = visibleExercises[i + 1];
-              if (curr && next && supersetLinks.has(`${curr.exercise_id}|${next.exercise_id}`)) {
+            for (let i = 0; i < finishingExercises.length - 1; i++) {
+              const curr = finishingExercises[i];
+              const next = finishingExercises[i + 1];
+              if (curr && next && snapshot.supersetLinks.includes(`${curr.exercise_id}|${next.exercise_id}`)) {
                 supersetPayload.push({
                   fromExerciseId: curr.exercise_id,
                   fromOrderIndex: i,
@@ -1034,22 +878,13 @@ export const ActiveWorkoutScreen = () => {
               notes: '',
             });
 
-            await AsyncStorage.removeItem(`active_session_duration_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_inputs_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_completed_sets_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_extra_sets_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_set_modes_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_warmup_sets_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_adhoc_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_hidden_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_order_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_superset_links_${sessionId}`);
+            await clearFinishedDraft();
 
             navigation.replace('EnduranceSessionForm', {
               gymSessionData: {
                 sessionId,
                 name: activeSessionData?.session?.name || t('training.strengthWorkout'),
-                exercisesCount: visibleExercises.length,
+                exercisesCount: finishingExercises.length,
                 setsCount: savedCount,
                 volumeLoad: Math.round(savedVolume),
                 startTime: activeSessionData?.session?.start_time || new Date().toISOString(),
@@ -1061,6 +896,8 @@ export const ActiveWorkoutScreen = () => {
             console.error('[handleFinish] Error fatal:', e);
             setIsFinishing(false);
             Alert.alert(t('common.error'), t('training.finishSessionError'));
+          } finally {
+            finishingRef.current = false;
           }
         },
       },
@@ -1074,22 +911,19 @@ export const ActiveWorkoutScreen = () => {
         text: t('training.yesCancel'),
         style: 'destructive',
         onPress: async () => {
+          if (finishingRef.current) return;
+          finishingRef.current = true;
+          setIsFinishing(true);
           try {
             await cancelSession.mutateAsync(sessionId);
-            await AsyncStorage.removeItem(`active_session_duration_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_inputs_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_completed_sets_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_extra_sets_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_set_modes_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_warmup_sets_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_adhoc_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_hidden_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_order_${sessionId}`);
-            await AsyncStorage.removeItem(`active_session_superset_links_${sessionId}`);
+            await clearFinishedDraft();
 
             navigation.goBack();
           } catch (_error) {
             Alert.alert(t('common.error'), t('training.cancelSessionError'));
+          } finally {
+            finishingRef.current = false;
+            setIsFinishing(false);
           }
         },
       },
@@ -1141,8 +975,14 @@ export const ActiveWorkoutScreen = () => {
   };
 
   const handleAddAdhocExercise = (exercise: ExerciseWithDetails) => {
+    if (
+      effectiveWorkoutExercises(draftRef.current, currentContext.current.dbExercises).some(
+        item => item.exercise_id === exercise.id,
+      )
+    )
+      return;
     const defaultTargets = getDefaultGymExerciseTargets(exercise.exercise_type_code);
-    const newAdhoc = {
+    const newAdhoc: WorkoutTemplateExerciseWithDetails = {
       id: `local-${exercise.id}-${Date.now()}`,
       exercise_id: exercise.id,
       exercise: exercise,
@@ -1153,9 +993,14 @@ export const ActiveWorkoutScreen = () => {
       target_reps_max: defaultTargets.target_reps_max,
       target_weight_kg: 0,
       rest_seconds: 60,
-      start_order: 9999,
+      order_index: draftRef.current.exerciseOrder.length,
+      workout_template_id: activeSessionData?.session.workout_template_id ?? '',
+      user_id: user?.id ?? null,
+      notes: null,
+      target_rpe: null,
+      superset_next_exercise_id: null,
     };
-    setLocalAdhocExercises(prev => [...prev, newAdhoc] as WorkoutTemplateExerciseWithDetails[]);
+    updateDraft(prev => addWorkoutExercise(prev, newAdhoc));
   };
 
   const [completingExerciseIds] = useState<Set<string>>(new Set());
@@ -1267,6 +1112,42 @@ export const ActiveWorkoutScreen = () => {
   );
 
   // --- RENDER ---
+  if (!persistence.ready) {
+    const loadingFailed = !!persistence.error || isError || (!isLoading && !activeSessionData);
+    return (
+      <SafeAreaView
+        style={[
+          styles.container,
+          { backgroundColor: themeColors.background, padding: spacing.l, justifyContent: 'center' },
+        ]}
+      >
+        <Text style={{ color: themeColors.textPrimary }}>
+          {t(loadingFailed ? 'training.draftLoadingError' : 'training.draftLoading')}
+        </Text>
+        {loadingFailed ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={{ minHeight: 44, justifyContent: 'center' }}
+            onPress={() => {
+              persistence.retry();
+              void refetch();
+            }}
+          >
+            <Text style={{ color: themeColors.primary }}>{t('nutrition.retry')}</Text>
+          </TouchableOpacity>
+        ) : (
+          <ActivityIndicator color={themeColors.primary} />
+        )}
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={{ minHeight: 44, justifyContent: 'center' }}
+          onPress={handleMinimize}
+        >
+          <Text style={{ color: themeColors.primary }}>{t('common.back')}</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -1313,6 +1194,27 @@ export const ActiveWorkoutScreen = () => {
               )}
             </TouchableOpacity>
           </View>
+        </View>
+        <View style={{ paddingHorizontal: spacing.m, paddingVertical: spacing.xs }}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={openOrganizer}
+            style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: spacing.m }}
+          >
+            <Text style={{ color: themeColors.primary, fontWeight: '600' }}>{t('training.organizeWorkout')}</Text>
+          </TouchableOpacity>
+          {!!persistence.error && (
+            <View accessibilityRole="alert">
+              <Text style={{ color: themeColors.danger }}>{t('training.draftStorageError')}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                onPress={persistence.retry}
+                style={{ minHeight: 44, justifyContent: 'center' }}
+              >
+                <Text style={{ color: themeColors.primary }}>{t('nutrition.retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1842,6 +1744,76 @@ export const ActiveWorkoutScreen = () => {
             />
           )}
 
+          {organizationDraft && (
+            <WorkoutOrganizer
+              visible={!searchingReplacement && !replacementPreview}
+              draft={organizationDraft}
+              exercises={dbExercises}
+              savedExerciseIds={savedExerciseIds}
+              executingId={executionTimerVisible ? executionTimerExerciseId : null}
+              onChange={setOrganizationDraft}
+              onCancel={() => setOrganizationDraft(null)}
+              onApply={applyOrganization}
+              onReplace={id => startReplacement(id, true)}
+            />
+          )}
+          <Modal
+            visible={!!replacementPreview && !searchingReplacement}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setReplacementPreview(null)}
+          >
+            <View style={styles.modalOverlay}>
+              <ScrollView
+                style={{ maxWidth: 600, maxHeight: '85%', width: '100%', flexGrow: 0 }}
+                contentContainerStyle={[styles.menuModalContent, dynamicStyles.modalContent]}
+              >
+                <Text accessibilityRole="header" style={[styles.menuTitle, dynamicStyles.title]}>
+                  {t('training.replacementConfirm', {
+                    from: getLocalizedExerciseName(
+                      effectiveWorkoutExercises(organizationDraft ?? draft, dbExercises).find(
+                        item => item.exercise_id === replacementPreview?.id,
+                      )?.exercise ?? {},
+                    ),
+                    to: replacementPreview ? getLocalizedExerciseName(replacementPreview.replacement) : '',
+                  })}
+                </Text>
+                <Text style={{ color: themeColors.textPrimary, marginBottom: spacing.m }}>
+                  {t(
+                    isTimeBasedExerciseType(
+                      effectiveWorkoutExercises(organizationDraft ?? draft, dbExercises).find(
+                        item => item.exercise_id === replacementPreview?.id,
+                      )?.exercise?.exercise_type_code,
+                    ) === isTimeBasedExerciseType(replacementPreview?.replacement.exercise_type_code)
+                      ? 'training.replacementKeeps'
+                      : 'training.replacementResets',
+                  )}
+                </Text>
+                <Text style={{ color: themeColors.textSecondary, marginBottom: spacing.m }}>
+                  {t('training.replacementPending')}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.menuOption, { minHeight: 44 }]}
+                  onPress={confirmReplacement}
+                >
+                  <Text style={{ color: themeColors.primary }}>{t('training.replaceExercise')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.menuOption, { minHeight: 44 }]}
+                  onPress={() => setReplacementPreview(null)}
+                >
+                  <Text style={{ color: themeColors.textPrimary }}>{t('common.cancel')}</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </Modal>
+          <Modal visible={isFinishing} transparent onRequestClose={() => {}}>
+            <View style={styles.modalOverlay}>
+              <ActivityIndicator size="large" color={themeColors.primary} />
+            </View>
+          </Modal>
           {/* Exercise Options Menu Modal */}
           <Modal
             visible={!!menuVisibleForExercise}
@@ -1859,6 +1831,24 @@ export const ActiveWorkoutScreen = () => {
                 onStartShouldSetResponder={() => true}
               >
                 <Text style={[styles.menuTitle, dynamicStyles.title]}>{t('training.exerciseOptions')}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.menuOption, { minHeight: 44 }]}
+                  onPress={openOrganizer}
+                >
+                  <Text style={[styles.menuOptionText, { color: themeColors.primary }]}>
+                    {t('training.organizeWorkout')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.menuOption, { minHeight: 44 }]}
+                  onPress={() => menuVisibleForExercise && startReplacement(menuVisibleForExercise)}
+                >
+                  <Text style={[styles.menuOptionText, { color: themeColors.primary }]}>
+                    {t('training.replaceExercise')}
+                  </Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[
                     styles.menuOption,

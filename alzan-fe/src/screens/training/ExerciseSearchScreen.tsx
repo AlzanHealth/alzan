@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -37,6 +37,11 @@ export const ExerciseSearchScreen = () => {
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'ExerciseSearch'>>();
   const isMultiSelect = route.params?.selectionMode === 'multi';
+  const replacementExerciseName = route.params?.replacementExerciseName;
+  const excludedExerciseIds = useMemo(
+    () => new Set(route.params?.excludedExerciseIds),
+    [route.params?.excludedExerciseIds],
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscleId, setSelectedMuscleId] = useState<number | null>(null);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
@@ -68,6 +73,7 @@ export const ExerciseSearchScreen = () => {
   const showInitialLoading = isLoading && exercises.length === 0;
 
   const handleSelectExercise = (exercise: ExerciseWithDetails) => {
+    if (excludedExerciseIds.has(exercise.id)) return;
     const { fromScreen, onExerciseSelected } = route.params || {};
 
     if (fromScreen === 'GymRoutineEditor') {
@@ -86,6 +92,7 @@ export const ExerciseSearchScreen = () => {
   const isExerciseSelected = (exerciseId: string) => selectedExercises.some(item => item.id === exerciseId);
 
   const toggleExerciseSelection = (exercise: ExerciseWithDetails) => {
+    if (excludedExerciseIds.has(exercise.id)) return;
     setSelectedExercises(prev =>
       prev.some(item => item.id === exercise.id) ? prev.filter(item => item.id !== exercise.id) : [...prev, exercise],
     );
@@ -94,12 +101,14 @@ export const ExerciseSearchScreen = () => {
   // Multi-select: emit every staged exercise (the editor listener appends each
   // one in order) and return once.
   const handleConfirmMultiSelect = () => {
-    if (selectedExercises.length === 0) return;
-    selectedExercises.forEach(exercise => DeviceEventEmitter.emit('exerciseSelected', exercise));
+    const availableSelections = selectedExercises.filter(exercise => !excludedExerciseIds.has(exercise.id));
+    if (availableSelections.length === 0) return;
+    availableSelections.forEach(exercise => DeviceEventEmitter.emit('exerciseSelected', exercise));
     navigation.goBack();
   };
 
   const handlePressExercise = (exercise: ExerciseWithDetails) => {
+    if (excludedExerciseIds.has(exercise.id)) return;
     if (isMultiSelect) {
       toggleExerciseSelection(exercise);
       return;
@@ -113,6 +122,7 @@ export const ExerciseSearchScreen = () => {
 
   const renderItem = ({ item }: { item: ExerciseWithDetails }) => {
     const selected = isMultiSelect && isExerciseSelected(item.id);
+    const excluded = excludedExerciseIds.has(item.id);
 
     return (
       <View
@@ -126,7 +136,14 @@ export const ExerciseSearchScreen = () => {
           },
         ]}
       >
-        <TouchableOpacity onPress={() => handlePressExercise(item)} style={styles.cardContent}>
+        <TouchableOpacity
+          onPress={() => handlePressExercise(item)}
+          style={styles.cardContent}
+          disabled={excluded}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: excluded, selected }}
+          accessibilityHint={excluded ? t('training.exerciseAlreadyInSession') : undefined}
+        >
           <View
             style={[
               styles.iconContainer,
@@ -142,6 +159,11 @@ export const ExerciseSearchScreen = () => {
               {item.muscle_name && item.equipment_name && <Text style={styles.separatorText}>•</Text>}
               {item.equipment_name && <Text style={styles.equipmentText}>{item.equipment_name}</Text>}
             </View>
+            {excluded && (
+              <Text style={[styles.exclusionText, { color: themeColors.textSecondary }]}>
+                {t('training.exerciseAlreadyInSession')}
+              </Text>
+            )}
           </View>
           {isMultiSelect && (
             <View
@@ -235,7 +257,14 @@ export const ExerciseSearchScreen = () => {
             </TouchableOpacity>
           )}
         </View>
-        {/* ... rest of render ... */}
+        {replacementExerciseName && (
+          <View style={styles.replacementContext}>
+            <Text style={[styles.replacementTitle, { color: themeColors.textSecondary }]}>
+              {t('training.replacementSearchTitle')}
+            </Text>
+            <Text style={[styles.exerciseName, dynamicStyles.title]}>{replacementExerciseName}</Text>
+          </View>
+        )}
         <View style={styles.searchContainer}>
           <View style={[styles.searchBar, dynamicStyles.input, { height: 50, paddingVertical: 0 }]}>
             <Search size={20} color={themeColors.textSecondary} />
@@ -326,6 +355,18 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: spacing.m,
     marginBottom: spacing.s,
+  },
+  replacementContext: {
+    paddingHorizontal: spacing.m,
+    paddingBottom: spacing.m,
+    gap: spacing.xs,
+  },
+  replacementTitle: {
+    ...typography.caption,
+  },
+  exclusionText: {
+    ...typography.caption,
+    marginTop: spacing.xs,
   },
   searchBar: {
     flexDirection: 'row',
