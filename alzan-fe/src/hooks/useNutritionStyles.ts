@@ -6,7 +6,11 @@ import { useTheme } from '../context/ThemeContext';
  * Works with useTheme to provide dark mode support
  */
 export const useNutritionStyles = () => {
-  const { colors, isDark } = useTheme();
+  const { colors: themeColors, isDark } = useTheme();
+  const colors = useMemo(
+    () => ({ ...themeColors, textSecondary: isDark ? '#AEAEB6' : '#5C5C63' }),
+    [themeColors, isDark],
+  );
 
   const styles = useMemo(
     () => ({

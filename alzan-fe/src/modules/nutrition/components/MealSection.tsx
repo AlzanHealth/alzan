@@ -66,8 +66,7 @@ export const MealSection: React.FC<MealSectionProps> = ({
           {title}
         </Text>
         <Text style={[styles.total, isSecondary && styles.totalSecondary, { color: themeColors.textSecondary }]}>
-          {Math.round(totalKcal)}
-          {t('nutrition.kcal')}
+          {Math.round(totalKcal)} {t('nutrition.kcal')}
         </Text>
       </View>
 
@@ -128,11 +127,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#000',
+    flexShrink: 1,
   },
   titleSecondary: {
     fontSize: 14,
@@ -143,6 +145,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     fontWeight: '500',
+    fontVariant: ['tabular-nums'],
   },
   totalSecondary: {
     fontSize: 12,
@@ -152,6 +155,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   addButton: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,

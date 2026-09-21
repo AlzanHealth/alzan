@@ -398,11 +398,17 @@ export const ShoppingListScreen = () => {
             <TouchableOpacity
               key={value}
               onPress={() => setFilter(value)}
-              style={[styles.filterButton, filter === value && { backgroundColor: colors.primary }]}
+              style={[
+                styles.filterButton,
+                {
+                  backgroundColor: filter === value ? colors.primary : colors.surfaceSolid,
+                  borderColor: filter === value ? colors.primary : colors.border,
+                },
+              ]}
               accessibilityRole="button"
               accessibilityState={{ selected: filter === value }}
             >
-              <Text style={[styles.filterText, { color: filter === value ? colors.white : colors.primary }]}>
+              <Text style={[styles.filterText, { color: filter === value ? colors.white : colors.textPrimary }]}>
                 {t(filterLabelKeys[value] as never)}
               </Text>
             </TouchableOpacity>
@@ -591,13 +597,14 @@ const styles = StyleSheet.create({
   modeCard: { marginHorizontal: 16, marginBottom: 8, padding: 3, borderRadius: 14, flexDirection: 'row' },
   modeButton: {
     flex: 1,
-    minHeight: 38,
+    minHeight: 44,
+    paddingVertical: 8,
     paddingHorizontal: 5,
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modeText: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  modeText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
   periodCard: {
     marginHorizontal: 16,
     marginBottom: 10,
@@ -626,8 +633,8 @@ const styles = StyleSheet.create({
   noticeAction: { fontSize: 12, fontWeight: '800' },
   filterPanel: {
     marginHorizontal: 16,
-    marginBottom: 6,
-    paddingVertical: 3,
+    marginBottom: 12,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
@@ -635,22 +642,30 @@ const styles = StyleSheet.create({
   },
   progressText: { flex: 1, minWidth: 112, fontSize: 13, fontWeight: '600' },
   filterRow: { flex: 2, minWidth: 210, flexDirection: 'row', gap: 4 },
-  filterButton: { flex: 1, minHeight: 34, paddingHorizontal: 7, borderRadius: 10, justifyContent: 'center' },
-  filterText: { fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  filterButton: {
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: 7,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  filterText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
   actionsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 4 },
   secondaryAction: {
     flex: 1,
-    minHeight: 40,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
   },
-  secondaryActionText: { fontSize: 12, fontWeight: '700' },
+  secondaryActionText: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
   exportActions: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginBottom: 4, flexWrap: 'wrap' },
   exportAction: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 44,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 14,
     paddingHorizontal: 10,
@@ -677,8 +692,8 @@ const styles = StyleSheet.create({
   categoryCopy: { flex: 1 },
   categoryTitle: { fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   categoryCount: { fontSize: 12, marginTop: 3 },
-  categoryAction: { minHeight: 40, paddingHorizontal: 5, justifyContent: 'center' },
-  categoryActionText: { fontSize: 11, fontWeight: '800' },
+  categoryAction: { minHeight: 44, maxWidth: '45%', paddingHorizontal: 8, justifyContent: 'center' },
+  categoryActionText: { fontSize: 12, fontWeight: '700', textAlign: 'right' },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
   stateText: { textAlign: 'center', fontSize: 15, lineHeight: 21 },
   retryButton: { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 12 },

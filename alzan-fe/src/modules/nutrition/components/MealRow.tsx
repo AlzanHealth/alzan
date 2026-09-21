@@ -65,8 +65,7 @@ export const MealRow: React.FC<MealRowProps> = ({
         </TouchableOpacity>
         <View style={styles.macros}>
           <Text style={[styles.kcalText, { color: themeColors.textPrimary }]}>
-            {Math.round(macros.kcal)}
-            {t('nutrition.kcal')}
+            {Math.round(macros.kcal)} {t('nutrition.kcal')}
           </Text>
           {showMacros && (
             <Text style={[styles.macroDetails, { color: themeColors.textSecondary }]}>
@@ -128,6 +127,8 @@ export const MealRow: React.FC<MealRowProps> = ({
             {hasLog && onDelete && (
               <TouchableOpacity
                 onPress={onDelete}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('common.delete')} ${item.displayName}`}
                 style={[styles.iconButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F5F5F5' }]}
               >
                 <Trash2 size={16} color={themeColors.danger} />
@@ -150,6 +151,7 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
+    minWidth: 0,
   },
   nameButton: {
     alignSelf: 'flex-start',
@@ -165,12 +167,15 @@ const styles = StyleSheet.create({
   macros: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    rowGap: 4,
   },
   kcalText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#000',
     marginRight: 8,
+    fontVariant: ['tabular-nums'],
   },
   macroDetails: {
     fontSize: 13,
@@ -187,12 +192,17 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    marginLeft: 12,
     marginTop: 4,
   },
   iconButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 8,
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
