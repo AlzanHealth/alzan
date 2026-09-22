@@ -1,4 +1,5 @@
 import React from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import iconA from '../../../assets/iconA.png';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -275,6 +276,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   contentContainer: {
+    ...formLayout.settings,
     padding: spacing.m,
     paddingBottom: 120,
   },

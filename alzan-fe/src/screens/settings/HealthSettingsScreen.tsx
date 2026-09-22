@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { ActivityIndicator, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -167,6 +168,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   contentContainer: {
+    ...formLayout.settings,
     padding: spacing.m,
     paddingBottom: 80,
   },

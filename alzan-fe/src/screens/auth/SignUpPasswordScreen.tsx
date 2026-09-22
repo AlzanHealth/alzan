@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { View, Text, TextInput, KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { AuthScreenNavigationProp, AuthStackParamList } from '../../types/navigation.types';
@@ -9,7 +10,7 @@ import { AuthColors, useAuthStyles } from '../../hooks/useAuthStyles';
 import { Ionicons } from '@expo/vector-icons';
 import { LegalModal } from '../../components/LegalModal';
 import { TERMS_AND_CONDITIONS, PRIVACY_POLICY } from '../../utils/gdpr/legalTexts';
-import { Alert } from '../../components/common/Alert';
+import { FormError } from '../../components/common/FormError';
 import { useTranslation } from 'react-i18next';
 
 export const SignUpPasswordScreen = () => {
@@ -21,6 +22,7 @@ export const SignUpPasswordScreen = () => {
   // State
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const email = route.params?.email;
 
   // Validation State
@@ -51,8 +53,10 @@ export const SignUpPasswordScreen = () => {
   };
 
   const handleSignUp = async () => {
+    if (loading) return;
+    setFormError(null);
     if (!validatePassword(password)) {
-      Alert.alert(t('auth.weakPasswordTitle'), t('auth.fixPasswordErrors'));
+      setFormError(t('auth.fixPasswordErrors'));
       return;
     }
 
@@ -73,7 +77,7 @@ export const SignUpPasswordScreen = () => {
       navigation.navigate('VerifyEmail', { email });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : t('auth.verifyCodeError');
-      Alert.alert(t('common.error'), message);
+      setFormError(message);
     } finally {
       setLoading(false);
     }
@@ -122,6 +126,7 @@ export const SignUpPasswordScreen = () => {
           )}
         </View>
 
+        <FormError message={formError} />
         <PrimaryButton
           title={t('auth.register')}
           onPress={handleSignUp}
@@ -180,6 +185,7 @@ const localStyles = StyleSheet.create({
     marginBottom: spacing.m,
   },
   content: {
+    ...formLayout.auth,
     flex: 1,
     paddingHorizontal: spacing.l,
   },

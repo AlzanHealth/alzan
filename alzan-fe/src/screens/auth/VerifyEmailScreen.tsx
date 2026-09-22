@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { formLayout } from '../../components/common/formLayout';
+import { FormError } from '../../components/common/FormError';
 import {
   View,
   Text,
@@ -31,6 +33,7 @@ export const VerifyEmailScreen = () => {
 
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputRef = useRef<TextInput>(null);
 
@@ -49,8 +52,10 @@ export const VerifyEmailScreen = () => {
   };
 
   const handleVerify = async () => {
+    if (loading) return;
+    setFormError(null);
     if (code.length !== CODE_LENGTH) {
-      Alert.alert(t('auth.incompleteCodeTitle'), t('auth.enterCodeDigits', { count: CODE_LENGTH }));
+      setFormError(t('auth.enterCodeDigits', { count: CODE_LENGTH }));
       return;
     }
 
@@ -70,14 +75,15 @@ export const VerifyEmailScreen = () => {
     } catch (error: unknown) {
       console.error('[VerifyEmail] Error:', error);
       const message = error instanceof Error ? error.message : t('auth.verifyCodeError');
-      Alert.alert(t('common.error'), message);
+      setFormError(message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
-    if (resendCooldown > 0) return;
+    if (resendCooldown > 0 || loading) return;
+    setFormError(null);
 
     setLoading(true);
     try {
@@ -92,7 +98,7 @@ export const VerifyEmailScreen = () => {
       setResendCooldown(60); // 60 second cooldown
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : t('auth.couldNotResendCode');
-      Alert.alert(t('auth.error'), message);
+      setFormError(message);
     } finally {
       setLoading(false);
     }
@@ -157,6 +163,7 @@ export const VerifyEmailScreen = () => {
             />
           </Pressable>
 
+          <FormError message={formError} />
           <PrimaryButton
             title={t('auth.verify')}
             onPress={handleVerify}
@@ -184,6 +191,7 @@ export const VerifyEmailScreen = () => {
 
 const localStyles = StyleSheet.create({
   content: {
+    ...formLayout.auth,
     flex: 1,
     paddingHorizontal: spacing.l,
     justifyContent: 'center',

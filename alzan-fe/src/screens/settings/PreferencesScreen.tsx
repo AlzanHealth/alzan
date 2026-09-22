@@ -1,4 +1,5 @@
 import React from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { colors, spacing, typography, borderRadius } from '../../theme';
 import { usePreferences } from '../../hooks/settings/usePreferences';
@@ -27,6 +28,8 @@ const PreferenceOption = ({
       selected && [styles.optionSelected, dynamicStyles.optionSelected, { borderColor: themeColors.primary }],
     ]}
     onPress={onSelect}
+    accessibilityRole="radio"
+    accessibilityState={{ checked: selected }}
   >
     <Text
       style={[
@@ -193,6 +196,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
   },
   section: {
@@ -207,6 +211,7 @@ const styles = StyleSheet.create({
     gap: spacing.s,
   },
   option: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

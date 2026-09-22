@@ -23,6 +23,8 @@ import { useAuthStyles } from '../../hooks/useAuthStyles';
 import { signInWithProvider } from '../../services/oauth';
 import APP_LOGO from '../../../assets/iconA.png';
 import { Alert } from '../../components/common/Alert';
+import { FormError } from '../../components/common/FormError';
+import { formLayout } from '../../components/common/formLayout';
 
 const ENABLE_OAUTH = false; // <-- cuando actives Google/Apple lo pones en true
 
@@ -33,6 +35,7 @@ export const AuthScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -53,6 +56,8 @@ export const AuthScreen = () => {
   }, []);
 
   const handleLogin = async () => {
+    if (loading) return;
+    setFormError(null);
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -72,8 +77,8 @@ export const AuthScreen = () => {
         throw error;
       }
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Error desconocido';
-      Alert.alert('Error', message);
+      const message = error instanceof Error ? error.message : t('auth.unknownError');
+      setFormError(message);
     } finally {
       setLoading(false);
     }
@@ -93,6 +98,7 @@ export const AuthScreen = () => {
             </View>
 
             <View style={styles.inputContainer}>
+              <Text style={styles.label}>{t('auth.userOrEmail')}</Text>
               <TextInput
                 style={styles.input}
                 value={email}
@@ -105,19 +111,27 @@ export const AuthScreen = () => {
             </View>
 
             <View style={styles.inputContainer}>
+              <Text style={styles.label}>{t('auth.password')}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { paddingRight: 56 }]}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 placeholder={t('auth.password')}
                 placeholderTextColor={colors.textSecondary}
               />
-              <TouchableOpacity style={localStyles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
+              <TouchableOpacity
+                style={localStyles.eyeIcon}
+                onPress={() => setShowPassword(!showPassword)}
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.password')}
+                accessibilityState={{ selected: showPassword }}
+              >
                 <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
+            <FormError message={formError} />
             <PrimaryButton title={t('auth.signIn')} onPress={handleLogin} loading={loading} style={styles.button} />
 
             <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotPasswordButton}>
@@ -170,6 +184,7 @@ export const AuthScreen = () => {
           <View style={localStyles.bottomContainer}>
             <TouchableOpacity
               onPress={handleCreateAccount}
+              accessibilityRole="button"
               style={[localStyles.createAccountButton, { borderColor: colors.primary }]}
             >
               <Text style={[localStyles.createAccountText, { color: colors.primary }]}>{t('auth.createAccount')}</Text>
@@ -188,7 +203,6 @@ export const AuthScreen = () => {
 const localStyles = StyleSheet.create({
   topContent: {
     flex: 1,
-    paddingHorizontal: spacing.l,
     justifyContent: 'center',
     paddingTop: 60,
   },
@@ -199,6 +213,7 @@ const localStyles = StyleSheet.create({
   },
 
   bottomContainer: {
+    ...formLayout.auth,
     padding: spacing.l,
     paddingBottom: Platform.OS === 'ios' ? 0 : spacing.l,
     alignItems: 'center',
@@ -222,7 +237,11 @@ const localStyles = StyleSheet.create({
   },
   eyeIcon: {
     position: 'absolute',
-    right: spacing.m,
-    top: 14,
+    right: 4,
+    bottom: 3,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

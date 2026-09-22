@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -156,6 +157,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
   },
   section: {

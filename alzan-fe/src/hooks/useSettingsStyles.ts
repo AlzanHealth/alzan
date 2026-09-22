@@ -7,7 +7,11 @@ export type Styles = ReturnType<typeof useSettingsStyles>['styles'];
  * Use this to ensure consistent dark mode styling across all settings screens
  */
 export const useSettingsStyles = () => {
-  const { colors, isDark } = useTheme();
+  const { colors: themeColors, isDark } = useTheme();
+  const colors = useMemo(
+    () => ({ ...themeColors, textSecondary: isDark ? '#AEAEB6' : '#5C5C63' }),
+    [themeColors, isDark],
+  );
 
   const styles = useMemo(
     () => ({

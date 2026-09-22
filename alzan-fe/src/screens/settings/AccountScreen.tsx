@@ -1,4 +1,5 @@
 import React from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { spacing, typography, borderRadius } from '../../theme';
 import { supabase } from '../../lib/supabaseClient';
@@ -78,6 +79,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
   },
   section: {

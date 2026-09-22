@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   View,
@@ -696,6 +697,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
     paddingBottom: 120,
   },

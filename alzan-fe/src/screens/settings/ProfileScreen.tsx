@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -196,6 +197,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
   },
   section: {

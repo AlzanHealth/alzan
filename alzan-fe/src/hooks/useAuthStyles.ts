@@ -2,11 +2,16 @@ import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { typography, spacing, borderRadius } from '../theme';
+import { formLayout } from '../components/common/formLayout';
 
 export type AuthColors = ReturnType<typeof useAuthStyles>['colors'];
 
 export const useAuthStyles = () => {
-  const { colors, isDark } = useTheme();
+  const { colors: themeColors, isDark } = useTheme();
+  const colors = useMemo(
+    () => ({ ...themeColors, textSecondary: isDark ? '#AEAEB6' : '#5C5C63' }),
+    [themeColors, isDark],
+  );
 
   const styles = useMemo(
     () =>
@@ -16,6 +21,7 @@ export const useAuthStyles = () => {
           backgroundColor: colors.background,
         },
         scrollContent: {
+          ...formLayout.auth,
           flexGrow: 1,
           justifyContent: 'center',
           padding: spacing.l,
@@ -53,13 +59,14 @@ export const useAuthStyles = () => {
           color: colors.textSecondary,
         },
         input: {
+          minHeight: 50,
           backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.5)',
           borderRadius: borderRadius.m,
           padding: spacing.m,
           fontSize: 16,
           color: colors.textPrimary,
-          borderWidth: isDark ? 1 : 0,
-          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+          borderWidth: 1,
+          borderColor: colors.textSecondary,
         },
         inputPlaceholder: {
           color: colors.textSecondary,
@@ -72,6 +79,8 @@ export const useAuthStyles = () => {
           backgroundColor: 'transparent',
         },
         forgotPasswordButton: {
+          minHeight: 44,
+          justifyContent: 'center',
           alignItems: 'center',
           paddingVertical: spacing.s,
         },
@@ -103,6 +112,9 @@ export const useAuthStyles = () => {
           borderColor: colors.border,
         },
         backButton: {
+          minWidth: 44,
+          minHeight: 44,
+          justifyContent: 'center',
           marginRight: spacing.m,
         },
         description: {

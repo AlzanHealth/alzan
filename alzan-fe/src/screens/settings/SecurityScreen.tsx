@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { formLayout } from '../../components/common/formLayout';
+import { View, Text, StyleSheet, TextInput, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing, typography, borderRadius } from '../../theme';
@@ -7,41 +8,47 @@ import { supabase } from '../../lib/supabaseClient';
 import { useSettingsStyles } from '../../hooks/useSettingsStyles';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
+import { FormError } from '../../components/common/FormError';
+import { PrimaryButton } from '../../components/PrimaryButton';
 
 export const SecurityScreen = () => {
   const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const { styles: dynamicStyles, colors: themeColors } = useSettingsStyles();
 
   const handleUpdatePassword = async () => {
+    if (loading) return;
+    setFormError(null);
     if (password.length < 8) {
-      Alert.alert(t('common.error'), t('auth.passwordMinLengthError'));
+      setFormError(t('auth.passwordMinLengthError'));
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert(t('common.error'), t('settings.passwordsDoNotMatch'));
+      setFormError(t('settings.passwordsDoNotMatch'));
       return;
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-
-    if (error) {
-      Alert.alert(t('common.error'), error.message);
-    } else {
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
       Alert.alert(t('common.done'), t('auth.passwordUpdatedSuccess'));
       setPassword('');
       setConfirmPassword('');
+    } catch (error: unknown) {
+      setFormError(error instanceof Error ? error.message : t('auth.unknownError'));
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
       <SafeAreaView style={[styles.container, dynamicStyles.container]} edges={['bottom']}>
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('settings.changePassword')}</Text>
 
           <View style={styles.form}>
@@ -69,19 +76,10 @@ export const SecurityScreen = () => {
               {t('settings.passwordRequirements')}
             </Text>
 
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled, { backgroundColor: themeColors.primary }]}
-              onPress={handleUpdatePassword}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={themeColors.white} />
-              ) : (
-                <Text style={[styles.buttonText, { color: themeColors.white }]}>{t('settings.update')}</Text>
-              )}
-            </TouchableOpacity>
+            <FormError message={formError} />
+            <PrimaryButton title={t('settings.update')} onPress={handleUpdatePassword} loading={loading} />
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -92,6 +90,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
   },
   title: {

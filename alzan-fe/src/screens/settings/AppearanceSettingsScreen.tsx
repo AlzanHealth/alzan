@@ -1,7 +1,8 @@
 import React from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { spacing, typography, borderRadius, shadows, colors as staticColors } from '../../theme';
+import { spacing, typography, borderRadius, shadows } from '../../theme';
 import { useTheme } from '../../context/ThemeContext';
 import { Check, Moon, Sun, Smartphone } from 'lucide-react-native';
 import { TouchableOpacity } from 'react-native';
@@ -40,6 +41,8 @@ export const AppearanceSettingsScreen = () => {
                   themePreference === 'light' && [styles.themeOptionSelected, dynamicStyles.themeOptionSelected],
                 ]}
                 onPress={() => setTheme('light')}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: themePreference === 'light' }}
               >
                 <Sun size={24} color={themePreference === 'light' ? colors.primary : colors.textSecondary} />
                 <Text
@@ -63,6 +66,8 @@ export const AppearanceSettingsScreen = () => {
                   themePreference === 'dark' && [styles.themeOptionSelected, dynamicStyles.themeOptionSelected],
                 ]}
                 onPress={() => setTheme('dark')}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: themePreference === 'dark' }}
               >
                 <Moon size={24} color={themePreference === 'dark' ? colors.primary : colors.textSecondary} />
                 <Text
@@ -86,6 +91,8 @@ export const AppearanceSettingsScreen = () => {
                   themePreference === 'system' && [styles.themeOptionSelected, dynamicStyles.themeOptionSelected],
                 ]}
                 onPress={() => setTheme('system')}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: themePreference === 'system' }}
               >
                 <Smartphone size={24} color={themePreference === 'system' ? colors.primary : colors.textSecondary} />
                 <Text
@@ -132,6 +139,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
     paddingBottom: 120,
   },
@@ -149,6 +157,7 @@ const styles = StyleSheet.create({
     ...shadows.soft,
   },
   themeOption: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.m,
@@ -163,7 +172,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   themeLabelSelected: {
-    color: staticColors.primary,
     fontWeight: '600',
   },
   checkCircle: {

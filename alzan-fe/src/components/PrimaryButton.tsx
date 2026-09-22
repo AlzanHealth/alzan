@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import { colors, borderRadius, spacing, typography } from '../theme';
+import { borderRadius, spacing, typography } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface PrimaryButtonProps {
   title: string;
@@ -21,6 +22,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   textStyle,
   variant = 'primary',
 }) => {
+  const { colors } = useTheme();
   const getBackgroundColor = () => {
     if (disabled) return colors.textSecondary;
     if (variant === 'primary') return colors.primary;
@@ -36,7 +38,15 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: getBackgroundColor() }, variant === 'outline' && styles.outline, style]}
+      style={[
+        styles.button,
+        { backgroundColor: getBackgroundColor() },
+        variant === 'outline' && [styles.outline, { borderColor: colors.primary }],
+        style,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
@@ -52,7 +62,8 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    height: 50,
+    minHeight: 50,
+    paddingVertical: spacing.s,
     borderRadius: borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
@@ -60,9 +71,9 @@ const styles = StyleSheet.create({
   },
   outline: {
     borderWidth: 1,
-    borderColor: colors.primary,
   },
   text: {
+    textAlign: 'center',
     fontWeight: '600',
   },
 });

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ArrowDown, ArrowUp, Check } from 'lucide-react-native';
@@ -189,6 +190,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
   },
   description: {

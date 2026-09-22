@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import { View, Text, TextInput, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AuthScreenNavigationProp } from '../../types/navigation.types';
@@ -54,6 +55,7 @@ const localStyles = StyleSheet.create({
     marginBottom: spacing.m,
   },
   content: {
+    ...formLayout.auth,
     flex: 1,
     paddingHorizontal: spacing.l,
   },

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { formLayout } from '../../components/common/formLayout';
 import {
   View,
   Text,
@@ -967,6 +968,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
+    ...formLayout.settings,
     padding: spacing.m,
     paddingBottom: 120,
   },

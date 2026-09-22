@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, Text } from 'react-native';
+import { ScrollView, TextInput, Text } from 'react-native';
 import { supabase } from '../../lib/supabaseClient';
 import { PrimaryButton } from '../../components/PrimaryButton';
 
@@ -10,6 +10,8 @@ import { RootStackParamList } from '../../types/navigation.types';
 import { useAuth } from '../../context/AuthContext';
 import { Alert } from '../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
+import { useAuthStyles } from '../../hooks/useAuthStyles';
+import { FormError } from '../../components/common/FormError';
 
 export const ResetPasswordScreen = () => {
   const { t } = useTranslation();
@@ -17,12 +19,16 @@ export const ResetPasswordScreen = () => {
   const { setIsPasswordRecovery } = useAuth();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const { styles, colors } = useAuthStyles();
 
   const handleUpdatePassword = async () => {
+    if (loading) return;
+    setFormError(null);
     setLoading(true);
     try {
       if (password.length < 8) {
-        Alert.alert(t('common.error'), t('auth.passwordMinLengthError'));
+        setFormError(t('auth.passwordMinLengthError'));
         return;
       }
 
@@ -41,31 +47,30 @@ export const ResetPasswordScreen = () => {
       ]);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : t('auth.unknownError');
-      Alert.alert(t('common.error'), message);
+      setFormError(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={{ flex: 1, padding: 20, paddingTop: 60, backgroundColor: 'white' }}>
-      <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>{t('auth.newPassword')}</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={styles.title}>{t('auth.newPassword')}</Text>
       <TextInput
         placeholder={t('auth.setNewPassword')}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
         autoCapitalize="none"
-        style={{
-          borderWidth: 1,
-          borderColor: '#ccc',
-          padding: 15,
-          borderRadius: 8,
-          marginBottom: 20,
-          fontSize: 16,
-        }}
+        placeholderTextColor={colors.textSecondary}
+        style={styles.input}
       />
+      <FormError message={formError} />
       <PrimaryButton title={t('auth.savePassword')} onPress={handleUpdatePassword} loading={loading} />
-    </View>
+    </ScrollView>
   );
 };

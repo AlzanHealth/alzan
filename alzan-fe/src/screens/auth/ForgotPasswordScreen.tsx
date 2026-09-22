@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import { AuthScreenNavigationProp } from '../../types/navigation.types';
@@ -11,6 +11,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import { useAuthStyles } from '../../hooks/useAuthStyles';
 import { CONFIG } from '../../constants/environment';
 import { Alert } from '../../components/common/Alert';
+import { FormError } from '../../components/common/FormError';
 
 export const ForgotPasswordScreen = () => {
   const { t } = useTranslation();
@@ -18,10 +19,13 @@ export const ForgotPasswordScreen = () => {
   const { styles, colors } = useAuthStyles();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleResetPassword = async () => {
+    if (loading) return;
+    setFormError(null);
     if (!email) {
-      Alert.alert(t('common.error'), t('auth.enterEmailAddressError'));
+      setFormError(t('auth.enterEmailAddressError'));
       return;
     }
 
@@ -40,14 +44,18 @@ export const ForgotPasswordScreen = () => {
       Alert.alert(t('auth.emailSentTitle'), t('auth.checkInbox'));
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : t('auth.unknownError');
-      Alert.alert(t('common.error'), message);
+      setFormError(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={[styles.container, { paddingTop: 60, paddingHorizontal: 24 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <ArrowLeft size={24} color={colors.textPrimary} />
@@ -71,6 +79,7 @@ export const ForgotPasswordScreen = () => {
           />
         </View>
 
+        <FormError message={formError} />
         <PrimaryButton
           title={t('auth.sendLink')}
           onPress={handleResetPassword}
@@ -78,6 +87,6 @@ export const ForgotPasswordScreen = () => {
           style={styles.button}
         />
       </GlassCard>
-    </View>
+    </ScrollView>
   );
 };
