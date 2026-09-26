@@ -361,6 +361,9 @@ export const NutritionSettingsScreen = () => {
   const [futureDeleteStart, setFutureDeleteStart] = useState(() => getDefaultFutureMealDeleteRange().start);
   const [futureDeleteEnd, setFutureDeleteEnd] = useState(() => getDefaultFutureMealDeleteRange().end);
   const [activeFutureDeleteDatePicker, setActiveFutureDeleteDatePicker] = useState<'start' | 'end' | null>(null);
+  const [confirmFutureDelete, setConfirmFutureDelete] = useState(false);
+  const [futureDeleteRangeError, setFutureDeleteRangeError] = useState(false);
+  const futureDeleteInFlight = useRef(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Track loading state for each meal toggle
@@ -856,6 +859,8 @@ export const NutritionSettingsScreen = () => {
   };
 
   const openCleanFutureModal = () => {
+    setConfirmFutureDelete(false);
+    setFutureDeleteRangeError(false);
     const defaultRange = getDefaultFutureMealDeleteRange();
     setFutureDeleteStart(defaultRange.start);
     setFutureDeleteEnd(defaultRange.end);
@@ -865,58 +870,56 @@ export const NutritionSettingsScreen = () => {
   };
 
   const closeCleanFutureModal = () => {
+    setConfirmFutureDelete(false);
+    setFutureDeleteRangeError(false);
     setShowCleanFutureModal(false);
     setShowCleanFutureRangeMode(false);
     setActiveFutureDeleteDatePicker(null);
   };
 
   const handleCleanFutureRange = () => {
-    let range: { start: string; end: string };
     try {
-      range = buildFutureMealDeleteRange(futureDeleteStart, futureDeleteEnd);
+      buildFutureMealDeleteRange(futureDeleteStart, futureDeleteEnd);
     } catch {
-      Alert.alert(t('common.error'), t('nutrition.futureDeleteRangeInvalidMessage'));
+      setFutureDeleteRangeError(true);
       return;
     }
+    setFutureDeleteRangeError(false);
+    setConfirmFutureDelete(true);
+  };
 
-    Alert.alert(
-      t('nutrition.confirmDeletionTitle'),
-      t('nutrition.confirmDeleteFutureRangeMessage', {
-        start: format(futureDeleteStart, 'dd/MM/yyyy'),
-        end: format(futureDeleteEnd, 'dd/MM/yyyy'),
-      }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            if (!user || isLoadingCopy) return;
-
-            setIsLoadingCopy(true);
-            closeCleanFutureModal();
-            try {
-              const result = await deleteMealLogsInRange(user.id, range);
-              if (!result.success) {
-                Alert.alert(t('common.error'), result.error || t('nutrition.deleteRecordsErrorMessage'));
-                return;
-              }
-
-              Alert.alert(
-                t('nutrition.deletedTitle'),
-                result.deletedCount > 0
-                  ? t('nutrition.futureRangeDeletedSuccessfully')
-                  : t('nutrition.noRecordsToDeleteMessage'),
-              );
-            } catch (error) {
-              Alert.alert(t('common.error'), getErrorMessage(error));
-            } finally {
-              setIsLoadingCopy(false);
-            }
-          },
-        },
-      ],
-    );
+  const executeCleanFutureRange = async () => {
+    if (!confirmFutureDelete || !user || isLoadingCopy || futureDeleteInFlight.current) return;
+    let range: { start: string; end: string };
+    try {
+      // Revalidate at confirmation in case the dialog stayed open across midnight.
+      range = buildFutureMealDeleteRange(futureDeleteStart, futureDeleteEnd);
+    } catch {
+      setConfirmFutureDelete(false);
+      setFutureDeleteRangeError(true);
+      return;
+    }
+    futureDeleteInFlight.current = true;
+    setIsLoadingCopy(true);
+    closeCleanFutureModal();
+    try {
+      const result = await deleteMealLogsInRange(user.id, range);
+      if (!result.success) {
+        Alert.alert(t('common.error'), result.error || t('nutrition.deleteRecordsErrorMessage'));
+        return;
+      }
+      Alert.alert(
+        t('nutrition.deletedTitle'),
+        result.deletedCount > 0
+          ? t('nutrition.futureRangeDeletedSuccessfully')
+          : t('nutrition.noRecordsToDeleteMessage'),
+      );
+    } catch (error) {
+      Alert.alert(t('common.error'), getErrorMessage(error));
+    } finally {
+      futureDeleteInFlight.current = false;
+      setIsLoadingCopy(false);
+    }
   };
 
   const handleApplyCopyMode = async (mode: typeof dietCopyMode, overwrite: boolean) => {
@@ -2468,13 +2471,42 @@ export const NutritionSettingsScreen = () => {
         </Modal>
 
         {/* Clean Future Modal */}
-        <Modal visible={showCleanFutureModal} animationType="fade" transparent>
+        <Modal visible={showCleanFutureModal} animationType="fade" transparent onRequestClose={closeCleanFutureModal}>
           <View style={styles.modalOverlayBlur}>
             <BlurView intensity={isDark ? 40 : 30} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
             <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeCleanFutureModal} />
             <LiquidGlassNativeCard style={styles.glassModalCard}>
               <View style={styles.glassModalContent}>
-                {!showCleanFutureRangeMode ? (
+                {confirmFutureDelete ? (
+                  <>
+                    <Text style={[styles.modalTitle, { color: themeColors.textPrimary }]}>
+                      {t('nutrition.confirmDeletionTitle')}
+                    </Text>
+                    <Text style={[styles.modalSubtitle, { color: themeColors.textSecondary }]}>
+                      {t('nutrition.confirmDeleteFutureRangeMessage', {
+                        start: format(futureDeleteStart, 'dd/MM/yyyy'),
+                        end: format(futureDeleteEnd, 'dd/MM/yyyy'),
+                      })}
+                    </Text>
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        onPress={() => setConfirmFutureDelete(false)}
+                        style={styles.modalBtnCancel}
+                      >
+                        <Text style={styles.modalBtnTextCancel}>{t('common.cancel')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        onPress={executeCleanFutureRange}
+                        disabled={isLoadingCopy}
+                        style={[styles.modalBtnConfirm, { backgroundColor: themeColors.danger }]}
+                      >
+                        <Text style={styles.modalBtnTextConfirm}>{t('common.delete')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : !showCleanFutureRangeMode ? (
                   <>
                     <Trash2
                       size={48}
@@ -2601,6 +2633,7 @@ export const NutritionSettingsScreen = () => {
                         <Text style={styles.modalBtnTextCancel}>{t('nutrition.backButton')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
+                        accessibilityRole="button"
                         onPress={handleCleanFutureRange}
                         disabled={isLoadingCopy}
                         style={[
@@ -2616,6 +2649,11 @@ export const NutritionSettingsScreen = () => {
                         )}
                       </TouchableOpacity>
                     </View>
+                    {futureDeleteRangeError && (
+                      <Text accessibilityRole="alert" style={[styles.infoModalText, { color: themeColors.danger }]}>
+                        {t('nutrition.futureDeleteRangeInvalidMessage')}
+                      </Text>
+                    )}
                   </>
                 )}
               </View>
