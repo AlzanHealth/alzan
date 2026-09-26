@@ -1812,6 +1812,10 @@ export default {
     replacementTimerBlocked: 'Termina o cancela el temporizador de este ejercicio antes de sustituirlo.',
     replacementUnavailable: 'El ejercicio ha cambiado. Vuelve a abrir el organizador.',
     organizationProgress: '{{completed}} de {{total}} series completadas',
+    setProgressCompact: '{{completed}}/{{total}} series',
+    organizationSuperset: 'Superserie',
+    collapseSets: 'Plegar series',
+    expandSets: 'Mostrar series',
     replacementConfirm: '¿Sustituir {{from}} por {{to}}?',
     replacementKeeps:
       'Se conservan posición, series, repeticiones, descanso y superserie. Se vacían todos los pesos escritos y se usa el récord del nuevo ejercicio.',

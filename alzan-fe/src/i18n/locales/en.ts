@@ -1791,6 +1791,10 @@ const en = {
     replacementTimerBlocked: 'Finish or cancel this exercise’s timer before replacing it.',
     replacementUnavailable: 'The exercise has changed. Reopen the organizer.',
     organizationProgress: '{{completed}} of {{total}} sets completed',
+    setProgressCompact: '{{completed}}/{{total}} sets',
+    organizationSuperset: 'Superset',
+    collapseSets: 'Collapse sets',
+    expandSets: 'Show sets',
     replacementConfirm: 'Replace {{from}} with {{to}}?',
     replacementKeeps:
       'Keeps position, sets, reps, rest and superset. Clears all entered weights and uses the new exercise’s record.',

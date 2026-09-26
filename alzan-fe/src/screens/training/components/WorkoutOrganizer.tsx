@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +6,7 @@ import { useTrainingStyles } from '../../../hooks/useTrainingStyles';
 import { borderRadius, spacing, typography } from '../../../theme';
 import type { WorkoutTemplateExerciseWithDetails } from '../ActiveWorkoutScreen';
 import type { ActiveWorkoutDraft } from '../helpers/activeWorkoutDraft';
+import { workoutSetProgress } from '../helpers/workoutSetProgress';
 import {
   detachWorkoutExercise,
   moveWorkoutBlock,
@@ -40,6 +41,8 @@ export function WorkoutOrganizer({
   const { styles: theme } = useTrainingStyles();
   const insets = useSafeAreaInsets();
   const [movingId, setMovingId] = useState<string | null>(null);
+  const listRef = useRef<FlatList<string[]>>(null);
+  const organizerOffset = useRef(0);
   const blocks = useMemo(() => workoutBlocks(draft), [draft]);
   const exerciseById = useMemo(
     () => new Map([...exercises, ...draft.adhocExercises].map(exercise => [exercise.exercise_id, exercise])),
@@ -62,30 +65,80 @@ export function WorkoutOrganizer({
     if (!visible) setMovingId(null);
   }, [visible]);
 
+  const closeSelector = useCallback(() => {
+    setMovingId(null);
+  }, []);
+
+  const movingIndex = blocks.findIndex(ids => ids[0] === movingId);
+
+  const renderDestination = useCallback(
+    ({ item: ids, index }: { item: string[]; index: number }) => (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: index === movingIndex, selected: index === movingIndex }}
+        accessibilityLabel={`${index + 1} · ${ids.map(exerciseName).join(' · ')}`}
+        disabled={index === movingIndex}
+        style={({ pressed }) => [
+          styles.destination,
+          theme.border,
+          index === movingIndex && styles.disabled,
+          pressed && styles.pressed,
+        ]}
+        onPress={() => {
+          if (movingIndex < 0) return;
+          onChange(moveWorkoutBlock(draft, movingIndex, index));
+          closeSelector();
+        }}
+      >
+        <Text style={[styles.position, theme.subtitle]}>{index + 1}</Text>
+        <View style={styles.destinationLabel}>
+          {ids.length > 1 && <Text style={[styles.caption, theme.subtitle]}>{t('training.organizationSuperset')}</Text>}
+          {ids.map(id => (
+            <Text key={id} style={[styles.name, theme.title]}>
+              {exerciseName(id)}
+            </Text>
+          ))}
+        </View>
+      </Pressable>
+    ),
+    [movingIndex, exerciseName, theme, draft, onChange, closeSelector, t],
+  );
+
   const renderBlock = useCallback(
     ({ item: ids, index }: { item: string[]; index: number }) => (
       <View style={[styles.block, theme.border]}>
         <View style={styles.blockHeading}>
           <Text accessibilityRole="header" style={[styles.blockTitle, theme.title]}>
-            {t('training.workoutBlock', { position: index + 1 })}
+            {ids.length > 1
+              ? `${index + 1} · ${t('training.organizationSuperset')}`
+              : `${index + 1} · ${exerciseName(ids[0])}`}
           </Text>
-          <Text style={[styles.blockName, theme.subtitle]} numberOfLines={2}>
-            {ids.map(id => exerciseName(id)).join(' · ')}
-          </Text>
+          {blocks.length > 1 && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t('training.moveWorkoutTo')}: ${ids.map(exerciseName).join(' · ')}`}
+              style={({ pressed }) => [styles.button, theme.secondaryButton, pressed && styles.pressed]}
+              onPress={() => setMovingId(ids[0])}
+            >
+              <Text style={[styles.buttonText, theme.title]}>{t('training.moveWorkoutTo')}</Text>
+            </Pressable>
+          )}
         </View>
         {ids.map(id => {
           const exercise = exerciseById.get(id);
           const name = exerciseName(id);
-          const total = Math.max(0, (exercise?.target_sets ?? 3) + (draft.extraSets[id] ?? 0));
-          const completed = Array.from({ length: total }, (_, number) => `${id}-${number + 1}`).filter(key =>
-            completedSets.has(key),
-          ).length;
+          const { completed, total } = workoutSetProgress(
+            id,
+            exercise?.target_sets,
+            draft.extraSets[id] ?? 0,
+            completedSets,
+          );
           const reason = substitutionBlockReason(draft, id, savedExerciseIds, executingId);
           return (
             <View key={id} style={styles.member}>
-              <Text style={[styles.name, theme.title]}>{name}</Text>
+              {ids.length > 1 && <Text style={[styles.name, theme.title]}>{name}</Text>}
               <Text style={[styles.caption, theme.subtitle]}>
-                {t('training.organizationProgress', { completed, total })}
+                {t('training.setProgressCompact', { completed, total })}
               </Text>
               <View style={styles.actions}>
                 {ids.length > 1 && (
@@ -124,48 +177,6 @@ export function WorkoutOrganizer({
             </View>
           );
         })}
-        {blocks.length > 1 && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: movingId === ids[0] }}
-            accessibilityLabel={`${t('training.moveWorkoutTo')}: ${t('training.workoutBlock', { position: index + 1 })}`}
-            style={({ pressed }) => [styles.button, theme.secondaryButton, pressed && styles.pressed]}
-            onPress={() => setMovingId(current => (current === ids[0] ? null : ids[0]))}
-          >
-            <Text style={[styles.buttonText, theme.title]}>{t('training.moveWorkoutTo')}</Text>
-          </Pressable>
-        )}
-        {movingId === ids[0] && (
-          <View style={[styles.destinations, theme.border]}>
-            {blocks.map((block, destination) => (
-              <Pressable
-                key={block[0]}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: destination === index, selected: destination === index }}
-                disabled={destination === index}
-                style={({ pressed }) => [
-                  styles.button,
-                  theme.secondaryButton,
-                  destination === index && styles.disabled,
-                  pressed && styles.pressed,
-                ]}
-                onPress={() => {
-                  setMovingId(null);
-                  onChange(moveWorkoutBlock(draft, index, destination));
-                }}
-              >
-                <View style={styles.destinationLabel}>
-                  <Text style={[styles.buttonText, theme.title]}>
-                    {t('training.workoutBlock', { position: destination + 1 })}
-                  </Text>
-                  <Text style={[styles.destinationName, theme.subtitle]} numberOfLines={1}>
-                    {exerciseName(block[0])}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        )}
       </View>
     ),
     [
@@ -175,7 +186,6 @@ export function WorkoutOrganizer({
       executingId,
       exerciseById,
       exerciseName,
-      movingId,
       onChange,
       onReplace,
       savedExerciseIds,
@@ -185,7 +195,7 @@ export function WorkoutOrganizer({
   );
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={movingId ? closeSelector : onCancel}>
       <View
         style={[
           styles.overlay,
@@ -200,19 +210,39 @@ export function WorkoutOrganizer({
       >
         <View accessibilityViewIsModal style={[styles.panel, theme.modalContent]}>
           <View style={styles.header}>
+            {movingId && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={closeSelector}
+                style={[styles.button, styles.backButton, theme.secondaryButton]}
+              >
+                <Text style={[styles.buttonText, theme.title]}>{t('common.back')}</Text>
+              </Pressable>
+            )}
             <Text accessibilityRole="header" style={[styles.title, theme.title]}>
-              {t('training.organizeWorkout')}
+              {t(movingId ? 'training.moveWorkoutTo' : 'training.organizeWorkout')}
             </Text>
-            <Text style={[styles.caption, theme.subtitle]}>{t('training.organizationHint')}</Text>
+            <Text style={[styles.caption, theme.subtitle]} numberOfLines={movingId ? 2 : undefined}>
+              {movingId ? (blocks[movingIndex] ?? []).map(exerciseName).join(' · ') : t('training.organizationHint')}
+            </Text>
           </View>
           <FlatList
+            key={movingId ? 'destinations' : 'organizer'}
+            ref={listRef}
             data={blocks}
-            renderItem={renderBlock}
+            renderItem={movingId ? renderDestination : renderBlock}
             keyExtractor={ids => ids.join('|')}
             style={styles.list}
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
-            extraData={renderBlock}
+            extraData={movingId ? renderDestination : renderBlock}
+            onScroll={event => {
+              if (!movingId) organizerOffset.current = event.nativeEvent.contentOffset.y;
+            }}
+            onContentSizeChange={() => {
+              if (!movingId) listRef.current?.scrollToOffset({ offset: organizerOffset.current, animated: false });
+            }}
+            scrollEventThrottle={16}
           />
           <View style={[styles.footer, theme.border]}>
             <Pressable
@@ -256,15 +286,14 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.l,
     overflow: 'hidden',
   },
-  header: { padding: spacing.m, gap: spacing.s },
+  header: { padding: spacing.m, gap: spacing.s, flexShrink: 0 },
   title: { ...typography.h3 },
   caption: { ...typography.caption },
   list: { flexGrow: 0, flexShrink: 1 },
   content: { paddingHorizontal: spacing.m, paddingBottom: spacing.m, gap: spacing.m },
   block: { borderWidth: 1, borderRadius: borderRadius.m, padding: spacing.s, gap: spacing.s },
-  blockHeading: { gap: spacing.xs },
-  blockTitle: { ...typography.button },
-  blockName: { ...typography.caption },
+  blockHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
+  blockTitle: { ...typography.button, flex: 1 },
   member: { gap: spacing.xs, paddingVertical: spacing.xs },
   name: { ...typography.body },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s },
@@ -278,11 +307,27 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.s,
     flexShrink: 1,
   },
-  buttonText: { ...typography.button, textAlign: 'center' },
-  destinations: { borderLeftWidth: 1, marginLeft: spacing.s, paddingLeft: spacing.s, gap: spacing.s },
-  destinationLabel: { alignItems: 'center', gap: 2 },
-  destinationName: { ...typography.caption, textAlign: 'center' },
-  footer: { flexDirection: 'row', flexWrap: 'wrap', padding: spacing.m, gap: spacing.s, borderTopWidth: 1 },
+  buttonText: { ...typography.button, fontSize: 13, textAlign: 'center' },
+  destination: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.s,
+    padding: spacing.s,
+    borderWidth: 1,
+    borderRadius: borderRadius.s,
+  },
+  position: { ...typography.button, minWidth: 24, textAlign: 'center' },
+  destinationLabel: { flex: 1, gap: spacing.xs },
+  backButton: { alignSelf: 'flex-start' },
+  footer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: spacing.m,
+    gap: spacing.s,
+    borderTopWidth: 1,
+    flexShrink: 0,
+  },
   footerButton: { flexGrow: 1, flexBasis: 100 },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.7 },

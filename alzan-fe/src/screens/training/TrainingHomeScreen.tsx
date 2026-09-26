@@ -1004,7 +1004,14 @@ export const TrainingHomeScreen = () => {
                             : template?.sport_type
                               ? t(SPORTS_CONFIG[template.sport_type].label)
                               : t('settings.workout')}
-                          {isCompleted ? ` · ${t('training.completedStatus')}` : ''}
+                          {isCompleted && (
+                            <>
+                              {' · '}
+                              <Text style={[styles.completedStatusText, { color: colors.successText }]}>
+                                {`✓ ${t('training.completedStatus')}`}
+                              </Text>
+                            </>
+                          )}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -1375,6 +1382,9 @@ const styles = StyleSheet.create({
   planSubtitle: {
     fontSize: 13,
     marginTop: 2,
+  },
+  completedStatusText: {
+    fontWeight: '600',
   },
   startPlanBtn: {
     minWidth: 88,

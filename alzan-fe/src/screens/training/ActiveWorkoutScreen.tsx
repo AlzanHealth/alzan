@@ -28,6 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useActiveWorkoutDraft } from '../../hooks/useActiveWorkoutDraft';
 import { ActiveWorkoutDraft, emptyActiveWorkoutDraft } from './helpers/activeWorkoutDraft';
 import { WorkoutOrganizer } from './components/WorkoutOrganizer';
+import { workoutSetProgress } from './helpers/workoutSetProgress';
 import { prepareWorkoutSetIds, saveWorkoutSequentially } from './helpers/workoutFinalization';
 import {
   effectiveWorkoutExercises,
@@ -270,6 +271,8 @@ export const ActiveWorkoutScreen = () => {
   const [pendingRestSeconds, setPendingRestSeconds] = useState<number | null>(null);
   const [pendingAutoPlayQueue, setPendingAutoPlayQueue] = useState<AutoPlayQueue | null>(null);
   const [menuVisibleForExercise, setMenuVisibleForExercise] = useState<string | null>(null);
+  const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => setCollapsedExerciseIds(new Set()), [sessionId]);
   const dbExercises = activeSessionData?.exercises ?? [];
   const exercises = effectiveWorkoutExercises(draft, dbExercises);
   const orderedExerciseIds = draft.exerciseOrder;
@@ -279,6 +282,25 @@ export const ActiveWorkoutScreen = () => {
   useEffect(() => {
     setSupplementalExerciseIds(draft.adhocExercises.map(item => item.exercise_id));
   }, [draft.adhocExercises]);
+
+  // Folding is presentation-only. Never fold automatically when a set is completed,
+  // and reveal the table again if new pending sets or an execution timer appear.
+  useEffect(() => {
+    setCollapsedExerciseIds(previous => {
+      const completed = new Set(draft.completedSets);
+      const currentExercises = effectiveWorkoutExercises(draft, activeSessionData?.exercises ?? []);
+      const next = [...previous].filter(id => {
+        const exercise = currentExercises.find(item => item.exercise_id === id);
+        return (
+          exercise &&
+          !draft.hiddenExercises.includes(id) &&
+          !(executionTimerVisible && executionTimerExerciseId === id) &&
+          workoutSetProgress(id, exercise.target_sets, draft.extraSets[id] ?? 0, completed).canCollapse
+        );
+      });
+      return next.length === previous.size ? previous : new Set(next);
+    });
+  }, [draft, activeSessionData?.exercises, executionTimerVisible, executionTimerExerciseId]);
 
   const [organizationDraft, setOrganizationDraft] = useState<ActiveWorkoutDraft | null>(null);
   const organizationBase = useRef<ActiveWorkoutDraft | null>(null);
@@ -1225,6 +1247,7 @@ export const ActiveWorkoutScreen = () => {
             contentContainerStyle={styles.content}
             data={visibleExercises}
             extraData={{
+              collapsedExerciseIds,
               completedSets: activeSessionData?.completedSets,
               deletingExerciseIds,
               extraSets,
@@ -1302,7 +1325,13 @@ export const ActiveWorkoutScreen = () => {
             }
             renderItem={({ item, index: i }) => {
               const exerciseId = item.exercise_id;
-              const totalSets = Math.max(0, (item.target_sets || 3) + (extraSets[exerciseId] || 0));
+              const {
+                total: totalSets,
+                completed,
+                canCollapse,
+              } = workoutSetProgress(exerciseId, item.target_sets, extraSets[exerciseId] ?? 0, localCompletedSets);
+              const canFold = canCollapse && !(executionTimerVisible && executionTimerExerciseId === exerciseId);
+              const isCollapsed = canFold && collapsedExerciseIds.has(exerciseId);
               const isTimeBased = isTimeBasedExerciseType(item.exercise?.exercise_type_code);
               const nextItem = visibleExercises[i + 1];
               const linkKey = nextItem ? `${item.exercise_id}|${nextItem.exercise_id}` : null;
@@ -1378,241 +1407,290 @@ export const ActiveWorkoutScreen = () => {
                               {item.exercise ? getLocalizedExerciseName(item.exercise) : ''}
                             </Text>
                           </View>
-                          <TouchableOpacity onPress={() => setMenuVisibleForExercise(exerciseId)}>
+                          <TouchableOpacity
+                            style={styles.exerciseMenuButton}
+                            onPress={() => setMenuVisibleForExercise(exerciseId)}
+                          >
                             <MoreVertical size={20} color={themeColors.textSecondary} />
                           </TouchableOpacity>
                         </View>
-
-                        <ScrollView
-                          horizontal
-                          contentContainerStyle={styles.setTableScroll}
-                          keyboardShouldPersistTaps="handled"
-                        >
-                          <View style={{ flex: 1, minWidth: getSetTableMinWidth(fontScale) }}>
-                            <View
-                              style={[
-                                styles.setsHeader,
-                                {
-                                  borderBottomColor: isInSuperset
-                                    ? themeColors.primary + '7A'
-                                    : isDark
-                                      ? 'rgba(255,255,255,0.1)'
-                                      : 'rgba(0,0,0,0.05)',
-                                },
-                              ]}
+                        <View style={styles.exerciseProgressRow}>
+                          <Text
+                            style={[
+                              styles.exerciseProgress,
+                              { color: canCollapse ? themeColors.successText : themeColors.textSecondary },
+                            ]}
+                          >
+                            {t('training.setProgressCompact', { completed, total: totalSets })}
+                          </Text>
+                          {canFold && (
+                            <TouchableOpacity
+                              accessibilityRole="button"
+                              accessibilityState={{ expanded: !isCollapsed }}
+                              accessibilityLabel={`${t(isCollapsed ? 'training.expandSets' : 'training.collapseSets')}: ${item.exercise ? getLocalizedExerciseName(item.exercise) : t('training.exercise')}`}
+                              style={styles.collapseSetsButton}
+                              onPress={() =>
+                                setCollapsedExerciseIds(previous => {
+                                  const next = new Set(previous);
+                                  if (next.has(exerciseId)) next.delete(exerciseId);
+                                  else next.add(exerciseId);
+                                  return next;
+                                })
+                              }
                             >
-                              <Text
-                                style={[styles.colHeader, dynamicStyles.sublabel, { width: TRAINING_CONTROL_SIZE }]}
-                              >
-                                {t('training.setColon')}
+                              <Text style={{ color: themeColors.primary }}>
+                                {t(isCollapsed ? 'training.expandSets' : 'training.collapseSets')}
                               </Text>
-                              {!isTimeBased && (
-                                <>
-                                  <Text style={[styles.colHeader, dynamicStyles.sublabel, { width: 60 }]}>
-                                    {t('training.prColonAllCaps')}
-                                  </Text>
-                                  <Text style={[styles.colHeader, dynamicStyles.sublabel, { flex: 1 }]}>
-                                    {preferences.weight_unit}
-                                  </Text>
-                                </>
+                              {isCollapsed ? (
+                                <ChevronDown size={18} color={themeColors.primary} />
+                              ) : (
+                                <ChevronUp size={18} color={themeColors.primary} />
                               )}
-                              <Text style={[styles.colHeader, dynamicStyles.sublabel, { flex: isTimeBased ? 2 : 1 }]}>
-                                {isTimeBased ? t('training.time') : t('training.repsColon')}
-                              </Text>
-                              <TouchableOpacity
-                                onPress={() => setHelpModalVisible(true)}
-                                style={styles.checkBtn}
-                                accessibilityRole="button"
-                                accessibilityLabel={t('training.seriesHelp')}
-                              >
-                                <HelpCircle size={16} color={themeColors.textSecondary} />
-                              </TouchableOpacity>
-                            </View>
-
-                            {Array.from({ length: totalSets }).map((_, setIdx) => {
-                              const setNum = setIdx + 1;
-                              const isDone = isSetCompleted(exerciseId, setNum);
-                              const doneSet = getCompletedSet(exerciseId, setNum);
-                              const key = `${exerciseId}-${setNum}`;
-                              const setMode = setModes[key] || 'normal';
-
-                              const prData = activeSessionData?.prs?.[exerciseId];
-                              const prevText = prData
-                                ? `${toDisplayWeight(prData.weight_kg)} ${preferences.weight_unit}`
-                                : '-';
-
-                              return (
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        {!isCollapsed && (
+                          <>
+                            <ScrollView
+                              horizontal
+                              contentContainerStyle={styles.setTableScroll}
+                              keyboardShouldPersistTaps="handled"
+                            >
+                              <View style={{ flex: 1, minWidth: getSetTableMinWidth(fontScale) }}>
                                 <View
-                                  key={setNum}
                                   style={[
-                                    styles.setRow,
-                                    isDone && {
-                                      backgroundColor: isDark ? 'rgba(52, 199, 89, 0.15)' : 'rgba(52, 199, 89, 0.1)',
-                                    },
-                                    setMode === 'warmup' && {
-                                      backgroundColor: isDark ? 'rgba(255, 149, 0, 0.15)' : 'rgba(255, 149, 0, 0.1)',
-                                    },
-                                    setMode === 'drop_set' && {
-                                      backgroundColor: isDark ? 'rgba(88, 86, 214, 0.16)' : 'rgba(88, 86, 214, 0.1)',
+                                    styles.setsHeader,
+                                    {
+                                      borderBottomColor: isInSuperset
+                                        ? themeColors.primary + '7A'
+                                        : isDark
+                                          ? 'rgba(255,255,255,0.1)'
+                                          : 'rgba(0,0,0,0.05)',
                                     },
                                   ]}
                                 >
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.warmupBtn,
-                                      setMode === 'warmup' && styles.warmupBtnActive,
-                                      setMode === 'drop_set' && styles.dropSetBtnActive,
-                                    ]}
-                                    onPress={() =>
-                                      setSetModes(prev => {
-                                        const nextMode = getNextGymSetMode(prev[key] || 'normal');
-                                        const next = { ...prev };
-                                        if (nextMode === 'normal') {
-                                          delete next[key];
-                                        } else {
-                                          next[key] = nextMode;
-                                        }
-                                        return next;
-                                      })
-                                    }
-                                    disabled={isDone}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t('training.setTypeControl', {
-                                      number: setNum,
-                                      type: getGymSetModeLabel(setMode, setNum),
-                                    })}
-                                    accessibilityState={{ disabled: isDone }}
+                                  <Text
+                                    style={[styles.colHeader, dynamicStyles.sublabel, { width: TRAINING_CONTROL_SIZE }]}
                                   >
-                                    <Text
-                                      style={[
-                                        styles.warmupText,
-                                        { color: themeColors.textSecondary },
-                                        setMode !== 'normal' && styles.warmupTextActive,
-                                      ]}
-                                    >
-                                      {getGymSetModeLabel(setMode, setNum)}
-                                    </Text>
-                                  </TouchableOpacity>
-
+                                    {t('training.setColon')}
+                                  </Text>
                                   {!isTimeBased && (
                                     <>
+                                      <Text style={[styles.colHeader, dynamicStyles.sublabel, { width: 60 }]}>
+                                        {t('training.prColonAllCaps')}
+                                      </Text>
+                                      <Text style={[styles.colHeader, dynamicStyles.sublabel, { flex: 1 }]}>
+                                        {preferences.weight_unit}
+                                      </Text>
+                                    </>
+                                  )}
+                                  <Text
+                                    style={[styles.colHeader, dynamicStyles.sublabel, { flex: isTimeBased ? 2 : 1 }]}
+                                  >
+                                    {isTimeBased ? t('training.time') : t('training.repsColon')}
+                                  </Text>
+                                  <TouchableOpacity
+                                    onPress={() => setHelpModalVisible(true)}
+                                    style={styles.checkBtn}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('training.seriesHelp')}
+                                  >
+                                    <HelpCircle size={16} color={themeColors.textSecondary} />
+                                  </TouchableOpacity>
+                                </View>
+
+                                {Array.from({ length: totalSets }).map((_, setIdx) => {
+                                  const setNum = setIdx + 1;
+                                  const isDone = isSetCompleted(exerciseId, setNum);
+                                  const doneSet = getCompletedSet(exerciseId, setNum);
+                                  const key = `${exerciseId}-${setNum}`;
+                                  const setMode = setModes[key] || 'normal';
+
+                                  const prData = activeSessionData?.prs?.[exerciseId];
+                                  const prevText = prData
+                                    ? `${toDisplayWeight(prData.weight_kg)} ${preferences.weight_unit}`
+                                    : '-';
+
+                                  return (
+                                    <View
+                                      key={setNum}
+                                      style={[
+                                        styles.setRow,
+                                        isDone && {
+                                          backgroundColor: isDark
+                                            ? 'rgba(52, 199, 89, 0.15)'
+                                            : 'rgba(52, 199, 89, 0.1)',
+                                        },
+                                        setMode === 'warmup' && {
+                                          backgroundColor: isDark
+                                            ? 'rgba(255, 149, 0, 0.15)'
+                                            : 'rgba(255, 149, 0, 0.1)',
+                                        },
+                                        setMode === 'drop_set' && {
+                                          backgroundColor: isDark
+                                            ? 'rgba(88, 86, 214, 0.16)'
+                                            : 'rgba(88, 86, 214, 0.1)',
+                                        },
+                                      ]}
+                                    >
                                       <TouchableOpacity
-                                        style={styles.prevSetButton}
-                                        onPress={() => handleApplyPrToSetWeight(key, prData?.weight_kg)}
-                                        disabled={!prData}
+                                        style={[
+                                          styles.warmupBtn,
+                                          setMode === 'warmup' && styles.warmupBtnActive,
+                                          setMode === 'drop_set' && styles.dropSetBtnActive,
+                                        ]}
+                                        onPress={() =>
+                                          setSetModes(prev => {
+                                            const nextMode = getNextGymSetMode(prev[key] || 'normal');
+                                            const next = { ...prev };
+                                            if (nextMode === 'normal') {
+                                              delete next[key];
+                                            } else {
+                                              next[key] = nextMode;
+                                            }
+                                            return next;
+                                          })
+                                        }
+                                        disabled={isDone}
                                         accessibilityRole="button"
-                                        accessibilityLabel={t('training.applyRecordToSet', { number: setNum })}
-                                        activeOpacity={0.75}
+                                        accessibilityLabel={t('training.setTypeControl', {
+                                          number: setNum,
+                                          type: getGymSetModeLabel(setMode, setNum),
+                                        })}
+                                        accessibilityState={{ disabled: isDone }}
                                       >
                                         <Text
                                           style={[
-                                            styles.prevSet,
-                                            {
-                                              fontSize: 11,
-                                              color: prData ? themeColors.primary : themeColors.textSecondary,
-                                            },
+                                            styles.warmupText,
+                                            { color: themeColors.textSecondary },
+                                            setMode !== 'normal' && styles.warmupTextActive,
                                           ]}
-                                          numberOfLines={2}
                                         >
-                                          {prevText}
+                                          {getGymSetModeLabel(setMode, setNum)}
                                         </Text>
                                       </TouchableOpacity>
 
+                                      {!isTimeBased && (
+                                        <>
+                                          <TouchableOpacity
+                                            style={styles.prevSetButton}
+                                            onPress={() => handleApplyPrToSetWeight(key, prData?.weight_kg)}
+                                            disabled={!prData}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={t('training.applyRecordToSet', { number: setNum })}
+                                            activeOpacity={0.75}
+                                          >
+                                            <Text
+                                              style={[
+                                                styles.prevSet,
+                                                {
+                                                  fontSize: 11,
+                                                  color: prData ? themeColors.primary : themeColors.textSecondary,
+                                                },
+                                              ]}
+                                              numberOfLines={2}
+                                            >
+                                              {prevText}
+                                            </Text>
+                                          </TouchableOpacity>
+
+                                          <TextInput
+                                            style={[styles.input, dynamicStyles.input]}
+                                            {...DECIMAL_INPUT_PROPS}
+                                            accessibilityLabel={t('training.setWeightInput', {
+                                              number: setNum,
+                                              unit: preferences.weight_unit,
+                                            })}
+                                            placeholder={item.target_weight_kg?.toString() || '0'}
+                                            placeholderTextColor={themeColors.textSecondary + '50'}
+                                            onChangeText={v => handleInput(key, 'weight', v)}
+                                            value={
+                                              inputs[key]?.weight !== undefined
+                                                ? inputs[key].weight
+                                                : isDone && doneSet?.weight_kg
+                                                  ? toDisplayWeight(doneSet?.weight_kg).toString()
+                                                  : ''
+                                            }
+                                          />
+                                        </>
+                                      )}
                                       <TextInput
-                                        style={[styles.input, dynamicStyles.input]}
-                                        {...DECIMAL_INPUT_PROPS}
-                                        accessibilityLabel={t('training.setWeightInput', {
+                                        style={[styles.input, dynamicStyles.input, isTimeBased && { flex: 2 }]}
+                                        {...INTEGER_INPUT_PROPS}
+                                        accessibilityLabel={t('training.setRepsInput', {
                                           number: setNum,
-                                          unit: preferences.weight_unit,
+                                          unit: isTimeBased ? t('training.time') : t('training.repsColon'),
                                         })}
-                                        placeholder={item.target_weight_kg?.toString() || '0'}
+                                        placeholder={
+                                          isTimeBased
+                                            ? (item.target_reps_min || 0).toString()
+                                            : item.target_reps_min?.toString() || '0'
+                                        }
                                         placeholderTextColor={themeColors.textSecondary + '50'}
-                                        onChangeText={v => handleInput(key, 'weight', v)}
+                                        onChangeText={v => handleInput(key, 'reps', v)}
                                         value={
-                                          inputs[key]?.weight !== undefined
-                                            ? inputs[key].weight
-                                            : isDone && doneSet?.weight_kg
-                                              ? toDisplayWeight(doneSet?.weight_kg).toString()
-                                              : ''
+                                          inputs[key]?.reps !== undefined
+                                            ? inputs[key].reps
+                                            : isDone && doneSet?.reps
+                                              ? doneSet.reps.toString()
+                                              : isTimeBased
+                                                ? (item.target_reps_min || 0).toString()
+                                                : ''
                                         }
                                       />
-                                    </>
-                                  )}
-                                  <TextInput
-                                    style={[styles.input, dynamicStyles.input, isTimeBased && { flex: 2 }]}
-                                    {...INTEGER_INPUT_PROPS}
-                                    accessibilityLabel={t('training.setRepsInput', {
-                                      number: setNum,
-                                      unit: isTimeBased ? t('training.time') : t('training.repsColon'),
-                                    })}
-                                    placeholder={
-                                      isTimeBased
-                                        ? (item.target_reps_min || 0).toString()
-                                        : item.target_reps_min?.toString() || '0'
-                                    }
-                                    placeholderTextColor={themeColors.textSecondary + '50'}
-                                    onChangeText={v => handleInput(key, 'reps', v)}
-                                    value={
-                                      inputs[key]?.reps !== undefined
-                                        ? inputs[key].reps
-                                        : isDone && doneSet?.reps
-                                          ? doneSet.reps.toString()
-                                          : isTimeBased
-                                            ? (item.target_reps_min || 0).toString()
-                                            : ''
-                                    }
-                                  />
 
-                                  <TouchableOpacity
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t('training.completeSetControl', { number: setNum })}
-                                    accessibilityState={{ selected: isDone }}
-                                    style={[
-                                      styles.checkBtn,
-                                      isDone && styles.checkBtnDone,
-                                      !isDone && {
-                                        backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                                      },
-                                    ]}
-                                    onPress={() => {
-                                      const typedTimeSeconds = parseInt(inputs[key]?.reps || '', 10);
-                                      const executionSeconds = Number.isFinite(typedTimeSeconds)
-                                        ? typedTimeSeconds
-                                        : item.target_reps_min;
+                                      <TouchableOpacity
+                                        accessibilityRole="button"
+                                        accessibilityLabel={t('training.completeSetControl', { number: setNum })}
+                                        accessibilityState={{ selected: isDone }}
+                                        style={[
+                                          styles.checkBtn,
+                                          isDone && styles.checkBtnDone,
+                                          !isDone && {
+                                            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                                          },
+                                        ]}
+                                        onPress={() => {
+                                          const typedTimeSeconds = parseInt(inputs[key]?.reps || '', 10);
+                                          const executionSeconds = Number.isFinite(typedTimeSeconds)
+                                            ? typedTimeSeconds
+                                            : item.target_reps_min;
 
-                                      handleCompleteSet(
-                                        item,
-                                        setNum,
-                                        isTimeBased ? executionSeconds : item.target_reps_min,
-                                        item.rest_seconds,
-                                        isTimeBased,
-                                      );
-                                    }}
-                                  >
-                                    <Check size={16} color={isDone ? '#FFF' : themeColors.textSecondary} />
-                                  </TouchableOpacity>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        </ScrollView>
-                        <TouchableOpacity style={styles.addSetBtn} onPress={() => handleAddSet(exerciseId)}>
-                          <Plus size={16} color={themeColors.primary} />
-                          <Text style={[styles.addSetText, { color: themeColors.primary }]}>
-                            {t('training.addSet')}
-                          </Text>
-                        </TouchableOpacity>
+                                          handleCompleteSet(
+                                            item,
+                                            setNum,
+                                            isTimeBased ? executionSeconds : item.target_reps_min,
+                                            item.rest_seconds,
+                                            isTimeBased,
+                                          );
+                                        }}
+                                      >
+                                        <Check size={16} color={isDone ? '#FFF' : themeColors.textSecondary} />
+                                      </TouchableOpacity>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            </ScrollView>
+                            <TouchableOpacity style={styles.addSetBtn} onPress={() => handleAddSet(exerciseId)}>
+                              <Plus size={16} color={themeColors.primary} />
+                              <Text style={[styles.addSetText, { color: themeColors.primary }]}>
+                                {t('training.addSet')}
+                              </Text>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                          style={styles.completeAllBtn}
-                          onPress={() => handleCompleteAll(exerciseId, item)}
-                          disabled={completingExerciseIds.has(exerciseId)}
-                        >
-                          <Check size={16} color={themeColors.success} />
-                          <Text style={[styles.completeAllText, { color: themeColors.success }]}>
-                            {t('training.completeAllSets')}
-                          </Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.completeAllBtn}
+                              onPress={() => handleCompleteAll(exerciseId, item)}
+                              disabled={completingExerciseIds.has(exerciseId)}
+                            >
+                              <Check size={16} color={themeColors.success} />
+                              <Text style={[styles.completeAllText, { color: themeColors.success }]}>
+                                {t('training.completeAllSets')}
+                              </Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
                       </GlassCard>
                     </Animated.View>
                   </Animated.View>
@@ -2143,6 +2221,25 @@ const styles = StyleSheet.create({
   exerciseCard: {
     marginBottom: 16,
     padding: 16,
+  },
+  exerciseMenuButton: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  exerciseProgressRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  exerciseProgress: { fontSize: 13, fontWeight: '600' },
+  collapseSetsButton: {
+    minHeight: 44,
+    minWidth: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
   },
   exerciseHeader: {
     flexDirection: 'row',
