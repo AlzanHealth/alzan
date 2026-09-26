@@ -1795,6 +1795,8 @@ export default {
     stravaConnectedSince: 'Conectado',
   },
   training: {
+    completedStatus: 'Completado',
+    viewSummary: 'Ver resumen',
     finishedDraftCleanupError:
       'La sesión se ha guardado, pero no se ha podido limpiar su copia local. No vuelvas a guardarla.',
     organizeWorkout: 'Organizar',

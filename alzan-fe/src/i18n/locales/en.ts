@@ -1776,6 +1776,8 @@ const en = {
     stravaConnectedSince: 'Connected',
   },
   training: {
+    completedStatus: 'Completed',
+    viewSummary: 'View summary',
     finishedDraftCleanupError: 'The session was saved, but its local copy could not be cleared. Do not save it again.',
     organizeWorkout: 'Organize',
     organizationHint: 'Changes apply only to this session. Supersets move together as numbered blocks.',

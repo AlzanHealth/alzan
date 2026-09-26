@@ -36,7 +36,7 @@ import { ActiveSessionBanner } from './components/ActiveSessionBanner';
 import { ImportReviewSurface } from './components/ImportReviewSurface';
 import { ScheduledWorkoutPreviewModal, ScheduledWorkoutPreviewPlan } from './components/ScheduledWorkoutPreviewModal';
 
-import { format, addDays, addWeeks, isSameDay, startOfWeek, subDays, startOfDay, subWeeks } from 'date-fns';
+import { format, addDays, addWeeks, startOfWeek, subDays, startOfDay, subWeeks } from 'date-fns';
 import { useMutation, useQuery, keepPreviousData, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +54,7 @@ import { Alert } from '../../components/common/Alert';
 import { moveWorkoutPlan } from '../../modules/training/services/trainingRescheduleService';
 import { ActivityImportReview } from '../../openapi/generated/alzan-be/sdk.gen';
 import { matchPlansToCompletedSessions } from './helpers/dailyPlanSessionMerge.helper';
+import { getDailyPlanAction } from './helpers/dailyPlanAction.helper';
 import { invalidateTrainingCalendar } from '../../lib/trainingQueryKeys';
 import { buildTemplateAssociationPayload } from '../../modules/training/helpers/templateAssociation.helper';
 
@@ -888,31 +889,9 @@ export const TrainingHomeScreen = () => {
             {dailyPlans.map((plan: DailyEntry) => {
               const isGym = !!plan.gym_template_id || plan.isGym;
               const template = isGym ? plan.workout_templates : plan.endurance_workout_templates;
-              // Check if this specific template is currently active (ONLY FOR GYM)
-              // Robust Active Session Check:
-              // 1. Explicit Link: Plan knows about Session (stored in workout_plans.activity_session_id)
-              // 2. Fallback: Same Template + Same Date (ignoring time) to prevent future/past false positives
-
-              // Direct Id Match (Most reliable)
-              const hasExplicitLink = plan.activity_session_id && plan.activity_session_id === activeSession?.id;
-
-              // Fallback for sessions started without explicit plan link (e.g. from "Quick Start")
-              // Only matches if:
-              // a) Plan has no linked session yet
-              // b) Template IDs match
-              // c) Dates match (ignoring time)
-              const isLegacyMatch =
-                !plan.activity_session_id &&
-                activeSession?.workout_template_id === (plan.gym_template_id || template?.id) &&
-                activeSession?.start_time &&
-                isSameDay(new Date(activeSession.start_time), new Date(plan.planned_date || ''));
-
-              const isThisSessionActive = isGym && !activeSession?.end_time && (hasExplicitLink || isLegacyMatch);
+              const action = getDailyPlanAction(plan, activeSession);
+              const { isThisSessionActive, isCompleted } = action;
               const isAnyGymSessionActive = isGym && !!activeGymSessionId;
-
-              // Check if workout is already completed for this date
-              // Completion is resolved in dailyPlans using explicit activity_session_id/template links first.
-              const isCompleted = Boolean(plan.isExtraSession || plan.completedSession || plan.status === 'completed');
 
               const isRecurring = !!(isGym
                 ? plan.workout_templates && plan.workout_templates.suggested_day_of_week != null
@@ -976,6 +955,8 @@ export const TrainingHomeScreen = () => {
                           if (plan.completedSession?.id) {
                             navigation.navigate('EnduranceSessionDetail', { sessionId: plan.completedSession.id });
                           }
+                        } else if (isThisSessionActive) {
+                          startPlan();
                         } else {
                           openPreview();
                         }
@@ -1004,7 +985,7 @@ export const TrainingHomeScreen = () => {
                       </View>
 
                       <View style={styles.planTextBlock}>
-                        <Text style={[styles.planTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                        <Text style={[styles.planTitle, { color: colors.textPrimary }]}>
                           {plan.completedSession
                             ? plan.completedSession.name ||
                               (isGym
@@ -1017,12 +998,13 @@ export const TrainingHomeScreen = () => {
                                   ))
                             : template?.base_name || t('settings.workout')}
                         </Text>
-                        <Text style={[styles.planSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                        <Text style={[styles.planSubtitle, { color: colors.textSecondary }]}>
                           {isGym
                             ? t('constants.gym')
                             : template?.sport_type
                               ? t(SPORTS_CONFIG[template.sport_type].label)
                               : t('settings.workout')}
+                          {isCompleted ? ` · ${t('training.completedStatus')}` : ''}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -1030,11 +1012,13 @@ export const TrainingHomeScreen = () => {
                     <TouchableOpacity
                       style={[
                         styles.startPlanBtn,
-                        { backgroundColor: colors.primary },
-                        isThisSessionActive && { backgroundColor: colors.success },
-                        isCompleted && { backgroundColor: colors.danger },
+                        { backgroundColor: isCompleted ? 'transparent' : colors.primary },
+                        action.disabled && { opacity: 0.45 },
                       ]}
-                      disabled={isCompleted ? !plan.completedSession?.id : false}
+                      disabled={action.disabled}
+                      accessibilityState={{ disabled: action.disabled }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t(action.label)}
                       onPress={
                         isCompleted
                           ? () => {
@@ -1045,10 +1029,10 @@ export const TrainingHomeScreen = () => {
                           : startPlan
                       }
                     >
-                      {!isCompleted && <Play size={12} color="#FFF" style={{ marginRight: 4 }} />}
-                      <Text style={styles.startPlanText}>
-                        {isCompleted ? 'TERMINADO' : isThisSessionActive ? 'REANUDAR' : isGym ? 'INICIAR' : 'REGISTRAR'}
+                      <Text style={[styles.startPlanText, isCompleted && { color: colors.primary }]}>
+                        {t(action.label)}
                       </Text>
+                      {isCompleted && <ChevronRight size={16} color={colors.primary} />}
                     </TouchableOpacity>
                   </View>
                 </GlassCard>
@@ -1393,18 +1377,22 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   startPlanBtn: {
-    minWidth: 116,
+    minWidth: 88,
+    maxWidth: '45%',
+    minHeight: 44,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 22,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   startPlanText: {
     color: '#FFF',
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   swipeActionContainer: {
     width: 80,
