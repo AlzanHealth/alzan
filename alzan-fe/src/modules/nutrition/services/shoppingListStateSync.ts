@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { shoppingListLocalStorage } from './shoppingListLocalStorage';
 
 import { supabase } from '../../../lib/supabaseClient';
 import {
@@ -113,7 +113,7 @@ export const clearShoppingListStateOnServer = async (userId: string, range: Shop
 export const resetShoppingListStatePersisted = async (userId: string, range: ShoppingListDateRange): Promise<boolean> =>
   persistShoppingListLocallyFirst(
     () =>
-      AsyncStorage.setItem(
+      shoppingListLocalStorage.setItem(
         getShoppingListStateStorageKey(userId, range),
         serializeShoppingListState(resetShoppingListState()),
       ),
@@ -127,7 +127,11 @@ export const persistShoppingListState = async (
   onSynced?: (state: ShoppingListState) => Promise<void>,
 ): Promise<boolean> =>
   persistShoppingListLocallyFirst(
-    () => AsyncStorage.setItem(getShoppingListStateStorageKey(userId, range), serializeShoppingListState(state)),
+    () =>
+      shoppingListLocalStorage.setItem(
+        getShoppingListStateStorageKey(userId, range),
+        serializeShoppingListState(state),
+      ),
     () => syncShoppingListStateToServer(userId, range, state, onSynced),
   );
 

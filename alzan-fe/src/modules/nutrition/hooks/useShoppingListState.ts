@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { shoppingListLocalStorage } from '../services/shoppingListLocalStorage';
+import { useShoppingLocalSaveStatus } from './useShoppingLocalSaveStatus';
 
 import {
   getShoppingListCompletionStorageKey,
@@ -35,6 +37,7 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
     [range.endDate, range.startDate, userId],
   );
   const [state, setState] = useState<ShoppingListState>({});
+  const localSaveStatus = useShoppingLocalSaveStatus(storageKey);
   const activeStorageKeyRef = useRef(storageKey);
   activeStorageKeyRef.current = storageKey;
   const stateRef = useRef<ShoppingListState>({});
@@ -82,7 +85,7 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
         const merged = mergeShoppingListStates(stateRef.current, confirmed);
         stateRef.current = merged;
         setState(merged);
-        await AsyncStorage.setItem(storageKey, serializeShoppingListState(merged));
+        await shoppingListLocalStorage.setItem(storageKey, serializeShoppingListState(merged));
       });
     },
     [userId, range.startDate, range.endDate, storageKey],
@@ -131,7 +134,8 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
         return;
       }
 
-      const migratedStorageSaved = await AsyncStorage.setItem(storageKey, serializeShoppingListState(migratedState))
+      const migratedStorageSaved = await shoppingListLocalStorage
+        .setItem(storageKey, serializeShoppingListState(migratedState))
         .then(() => true)
         .catch(() => false);
       if (!migratedStorageSaved && !cancelled) setSyncError(new Error('Could not save shopping list locally'));
@@ -155,7 +159,7 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
       if (!areShoppingListStatesEqual(merged, remoteState)) {
         await runSync(() => persistState(merged));
       } else {
-        await AsyncStorage.setItem(storageKey, serializeShoppingListState(merged)).catch(() => undefined);
+        await shoppingListLocalStorage.setItem(storageKey, serializeShoppingListState(merged)).catch(() => undefined);
       }
     })().catch(() => {
       if (cancelled) return;
@@ -334,6 +338,7 @@ export function useShoppingListState(userId: string | undefined, range: Shopping
   );
 
   return {
+    localSaveStatus,
     completedKeys,
     availableQuantities,
     filter,
