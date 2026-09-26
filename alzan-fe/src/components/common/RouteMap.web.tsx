@@ -42,7 +42,8 @@ function buildLeafletHtml(
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     html,body,#map{width:100%;height:100%;background:${mapBackground};touch-action:manipulation}
-    .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
+    .leaflet-control-zoom{display:none!important}
+    ${isDark ? '.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9)}' : ''}
     ${safeLeafletCss}
   </style>
 </head>
@@ -122,7 +123,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({
           border: 'none',
           pointerEvents: isInteractive ? 'auto' : 'none',
         },
-        sandbox: 'allow-scripts allow-same-origin',
+        sandbox: 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox',
       })}
     </View>
   );

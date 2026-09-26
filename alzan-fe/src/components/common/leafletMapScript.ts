@@ -51,7 +51,7 @@ export function initLeafletMap() {
     center: [centerLat, centerLon],
     zoom: 13,
     zoomControl: false, // Keep UI clean
-    attributionControl: false,
+    attributionControl: true,
     scrollWheelZoom: isInteractive,
     dragging: isInteractive,
     doubleClickZoom: isInteractive,
@@ -65,33 +65,14 @@ export function initLeafletMap() {
     window.ReactNativeWebView.postMessage(status + (message ? `:${message}` : ''));
   };
 
-  // Base map with automatic fallback providers (important for some Android networks/WebViews).
-  let fallbackApplied = false;
-  const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
+  // CARTO can return an API-key notice as a successful image, bypassing tileerror.
+  // Use the existing keyless provider directly; request only visible tiles.
+  const primaryLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+    referrerPolicy: 'strict-origin-when-cross-origin',
   });
-
-  const lightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 19,
-  });
-
-  const darkFallbackLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 19,
-  });
-
-  const lightFallbackLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 19,
-  });
-
-  const fallbackLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-  });
-  const primaryLayer = isDark ? darkLayer : lightLayer;
-  const secondaryLayer = isDark ? darkFallbackLayer : lightFallbackLayer;
 
   let hasReportedReady = false;
   const reportReady = () => {
@@ -108,26 +89,7 @@ export function initLeafletMap() {
   };
 
   primaryLayer.on('tileload', reportReady);
-  secondaryLayer.on('tileload', reportReady);
-  fallbackLayer.on('tileload', reportReady);
-
   primaryLayer.on('tileerror', () => {
-    if (fallbackApplied) return;
-    fallbackApplied = true;
-    if (map.hasLayer(primaryLayer)) {
-      map.removeLayer(primaryLayer);
-    }
-    secondaryLayer.addTo(map);
-  });
-
-  secondaryLayer.on('tileerror', () => {
-    if (map.hasLayer(secondaryLayer)) {
-      map.removeLayer(secondaryLayer);
-    }
-    fallbackLayer.addTo(map);
-  });
-
-  fallbackLayer.on('tileerror', () => {
     reportFatalTileError('tile-provider-unavailable');
   });
 

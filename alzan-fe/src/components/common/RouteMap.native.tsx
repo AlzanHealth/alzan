@@ -50,7 +50,7 @@ type ParsedRoute = {
 const MAX_POINTS = 2000;
 const CAMERA_PADDING = 28;
 const OPEN_FREE_MAP_LIGHT_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
-const DARK_MATTER_STYLE_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const OPEN_FREE_MAP_DARK_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
 
 function sampleCoords(coords: LatLon[], maxPoints: number): LatLon[] {
   if (coords.length <= maxPoints) return coords;
@@ -285,7 +285,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({
   }
 
   const sourcePrefix = instanceIdRef.current;
-  const mapStyleUrl = isDark ? DARK_MATTER_STYLE_URL : OPEN_FREE_MAP_LIGHT_STYLE_URL;
+  const mapStyleUrl = isDark ? OPEN_FREE_MAP_DARK_STYLE_URL : OPEN_FREE_MAP_LIGHT_STYLE_URL;
 
   return (
     <View style={[containerStyle, style]}>
@@ -296,7 +296,7 @@ export const RouteMap: React.FC<RouteMapProps> = ({
         rotateEnabled={false}
         zoomEnabled={isInteractive}
         scrollEnabled={isInteractive}
-        attributionEnabled={false}
+        attributionEnabled={true}
         onRegionWillChange={() => {
           if (isInteractive) {
             onInteractionStart?.();
