@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Dumbbell, Apple, Heart, PlayCircle, MessageCircle, User } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { LiquidGlassFooter } from '../components/common/LiquidGlassFooter';
+import { Alert } from '../components/common/Alert';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   getTabBarTopFromScreenBottom,
@@ -161,7 +162,10 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
 
   const handleTabPress = (tabConfig: TabConfig, _routeKey?: string) => {
     if (tabConfig.isAlzanSwitch) {
-      if (!SOCIAL_MODE_ENABLED && !isAlzanMode) return;
+      if (!SOCIAL_MODE_ENABLED && !isAlzanMode) {
+        Alert.alert(t('alzan.comingSoon'), t('alzan.unavailableDescription'));
+        return;
+      }
 
       // Toggle Mode
       const newMode = !isAlzanMode;
@@ -256,11 +260,12 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
               <TouchableOpacity
                 key={tabConfig.name}
                 accessibilityRole="button"
-                accessibilityState={isAlzanSwitchDisabled ? { disabled: true } : isFocused ? { selected: true } : {}}
+                accessibilityLabel={t(tabConfig.labelKey)}
+                accessibilityHint={isAlzanSwitchDisabled ? t('alzan.unavailableDescription') : undefined}
+                accessibilityState={{ selected: isFocused }}
                 onPress={() => handleTabPress(tabConfig)}
                 style={styles.tabButton}
-                disabled={isAlzanSwitchDisabled}
-                activeOpacity={isAlzanSwitchDisabled ? 1 : 0.7}
+                activeOpacity={0.7}
               >
                 <View style={wrapperStyle}>
                   <Icon color={iconColor} size={iconSize} />
@@ -269,7 +274,6 @@ const CustomTabBar = ({ state, navigation, isAlzanMode, setIsAlzanMode }: Custom
                       styles.label,
                       {
                         color: iconColor,
-                        opacity: isFocused || tabConfig.isAlzanSwitch ? 1 : 0.6,
                         fontWeight: isFocused ? '700' : '500',
                       },
                     ]}
@@ -417,6 +421,8 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
+    minWidth: 44,
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 20,
@@ -431,7 +437,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.1 }],
   },
   label: {
-    fontSize: 9,
+    fontSize: 11,
     marginTop: 4,
   },
 });

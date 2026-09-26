@@ -763,6 +763,8 @@ const en = {
     records: 'Records',
     medals: 'Medals',
     comingSoon: 'Coming soon',
+    unavailableDescription:
+      'The Alzan social section is not available yet. You can continue using Home, Training, Nutrition and Health.',
     previousRecordAbbr: 'Prev',
     longestRun: 'Longest Run',
     avgPace: 'Avg Pace',

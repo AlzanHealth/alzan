@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +14,7 @@ interface LiquidHeaderProps {
 }
 
 export const LiquidHeader: React.FC<LiquidHeaderProps> = ({ title, onBack, rightComponent, subtitle }) => {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       {/* Glass effect - same as TabNavigator */}
@@ -41,7 +43,12 @@ export const LiquidHeader: React.FC<LiquidHeaderProps> = ({ title, onBack, right
         {/* Content */}
         <View style={styles.content}>
           {onBack && (
-            <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <TouchableOpacity
+              onPress={onBack}
+              style={styles.backButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.back')}
+            >
               <ArrowLeft size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           )}
@@ -94,8 +101,8 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
     alignItems: 'center',

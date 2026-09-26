@@ -772,6 +772,8 @@ export default {
     records: 'Récords',
     medals: 'Medallas',
     comingSoon: 'Próximamente',
+    unavailableDescription:
+      'La sección social de Alzan todavía no está disponible. Puedes seguir utilizando Inicio, Entreno, Nutrición y Salud.',
     previousRecordAbbr: 'Ex',
     longestRun: 'Carrera Más Larga',
     avgPace: 'Ritmo Medio',
