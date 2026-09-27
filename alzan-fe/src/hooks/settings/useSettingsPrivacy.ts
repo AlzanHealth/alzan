@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { Alert } from '../../components/common/Alert';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQueryClient } from '@tanstack/react-query';
+import { clearTemporaryQueryCache } from '../../utils/gdpr/clearTemporaryQueryCache';
 import { Visibility } from '../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +19,7 @@ const DEFAULT_SETTINGS: PrivacySettings = {
 };
 
 export const useSettingsPrivacy = () => {
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const [settings, setSettings] = useState<PrivacySettings>(DEFAULT_SETTINGS);
@@ -83,7 +85,7 @@ export const useSettingsPrivacy = () => {
 
   const clearLocalCache = async () => {
     try {
-      await AsyncStorage.clear();
+      clearTemporaryQueryCache(queryClient);
       Alert.alert(t('settings.thanksTitle'), t('settings.cacheClearedSuccess'));
       return true;
     } catch (err: unknown) {

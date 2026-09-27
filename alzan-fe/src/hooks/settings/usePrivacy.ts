@@ -15,8 +15,9 @@ export const usePrivacy = () => {
     setLoading(true);
     try {
       if (user) {
-        await exportUserData(user.id, user.email);
+        return await exportUserData(user.id, user.email);
       }
+      return false;
     } finally {
       setLoading(false);
     }

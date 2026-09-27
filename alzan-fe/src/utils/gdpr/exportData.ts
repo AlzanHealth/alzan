@@ -1,7 +1,8 @@
 import { supabase } from '../../lib/supabaseClient';
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { Alert } from 'react-native';
+import { Platform } from 'react-native';
+import { Alert } from '../../components/common/Alert';
 import i18n from '../../i18n';
 
 export const exportUserData = async (userId: string, email?: string) => {
@@ -19,6 +20,9 @@ export const exportUserData = async (userId: string, email?: string) => {
       supabase.from('external_accounts').select('*').eq('user_id', userId),
       supabase.from('nutrition_day_statuses').select('*').eq('user_id', userId).order('date', { ascending: true }),
     ]);
+    for (const result of [profile, goals, preferences, externalAccounts, nutritionDayStatuses]) {
+      if (result.error) throw result.error;
+    }
     console.log('[gdpr.exportUserData] Datos obtenidos');
 
     const exportObject = {
@@ -34,6 +38,21 @@ export const exportUserData = async (userId: string, email?: string) => {
 
     const jsonString = JSON.stringify(exportObject, null, 2);
     const fileName = `alzan_data_export_${userId.slice(0, 8)}.json`;
+
+    if (Platform.OS === 'web') {
+      const url = URL.createObjectURL(new Blob([jsonString], { type: 'application/json' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      try {
+        anchor.click();
+      } finally {
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+      return true;
+    }
 
     // Using new expo-file-system v19 API
     const file = new File(Paths.document, fileName);

@@ -561,7 +561,7 @@ export default {
     shoppingListLocalSaveError: 'No se ha podido guardar en este dispositivo',
     shoppingListRemotePending: 'Sincronización con el servidor pendiente.',
     shoppingListAccessibility: 'Abrir lista de la compra',
-    shoppingListBackAccessibility: 'Volver a nutrición',
+    shoppingListBackAccessibility: 'Volver',
     shoppingListStartDayTitle: 'CICLO DE COMPRA',
     shoppingListStartDayLabel: 'El ciclo empieza el',
     shoppingListStartDayHint: 'La lista cubre 7 días a partir de este día.',
@@ -1102,6 +1102,9 @@ export default {
     averageLabel: 'Media',
     quality: 'Calidad',
     lastNight: 'Última Noche',
+    latestSleepRecord: 'Último registro de sueño',
+    latestWeightRecord: 'Último registro de peso',
+    statistics: 'Estadísticas de salud',
     registerMeasurements: 'Registrar Medidas',
     measurements: 'Medidas',
     vs: 'vs',
@@ -1380,6 +1383,9 @@ export default {
     healthAccountNote: 'Podrás conectar tu cuenta de salud más adelante desde Ajustes',
     healthDescriptionApple: 'Importa actividad, peso y datos de salud automáticamente desde Apple Health.',
     healthDescriptionAndroid: 'Importa actividad, peso y datos de salud automáticamente desde Google Health Connect.',
+    healthPlatformWeb: 'Salud del dispositivo',
+    healthDescriptionWeb:
+      'Los datos de salud se pueden conectar desde la app nativa de Alzan en iPhone o Android. Esta versión web no puede solicitar esos permisos.',
     finishRegistrationError: 'Hubo un problema al finalizar el registro. Por favor intenta de nuevo.',
 
     continue: 'Continuar',
@@ -1513,6 +1519,7 @@ export default {
     healthConnectNoDataMessage:
       'Alzan tiene permiso para leer Health Connect, pero este dispositivo aún no tiene registros de una app compatible. Añade pasos, entrenamientos, sueño o peso en Health Connect y vuelve a sincronizar.',
     fileGeneratedSuccess: 'Archivo generado correctamente',
+    dataExportRetry: 'No se ha podido completar la exportación. Vuelve a intentar descargarla.',
     downloadMyData: 'Descargar mis datos',
     gdprRightsInfo:
       'De acuerdo con el GDPR, tienes derecho a obtener una copia de todos los datos personales que Alzan Health tiene sobre ti.',
@@ -1748,7 +1755,8 @@ export default {
     logoutConfirmMessage: '¿Estás seguro de que quieres cerrar sesión?',
     logoutAction: 'Cerrar sesión',
     clearCacheTitle: 'Borrar caché',
-    clearCacheConfirmMessage: '¿Estás seguro? Esto borrará todos los datos guardados localmente.',
+    clearCacheConfirmMessage:
+      'Se limpiarán las respuestas temporales sin uso en memoria. Se conservan las listas de compra, los borradores de entreno, las preferencias y tu sesión iniciada.',
     clearCacheAction: 'Borrar',
     passwordsDoNotMatch: 'Las contraseñas no coinciden.',
     changePhotoSoonTitle: 'Próximamente',
@@ -1757,7 +1765,7 @@ export default {
     dataExportErrorTitle: 'Error exportando datos',
     dataExportUnknownError: 'Error desconocido al exportar datos',
     saveSettingsError: 'No se pudieron guardar los ajustes.',
-    cacheClearedSuccess: 'Caché local borrada correctamente.',
+    cacheClearedSuccess: 'Respuestas temporales sin uso eliminadas. Tus datos guardados localmente no han cambiado.',
     cacheClearError: 'No se pudo borrar la caché.',
     allDataDeletedSuccess: 'Todos los datos han sido borrados (excepto tu perfil y último peso).',
     deleteAllDataError: 'No se pudieron borrar todos los datos. Inténtalo de nuevo.',

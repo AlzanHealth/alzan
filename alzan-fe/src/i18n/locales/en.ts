@@ -555,7 +555,7 @@ const en = {
     shoppingListLocalSaveError: 'Could not save on this device',
     shoppingListRemotePending: 'Server sync pending.',
     shoppingListAccessibility: 'Open shopping list',
-    shoppingListBackAccessibility: 'Back to nutrition',
+    shoppingListBackAccessibility: 'Go back',
     shoppingListStartDayTitle: 'SHOPPING CYCLE',
     shoppingListStartDayLabel: 'Cycle starts on',
     shoppingListStartDayHint: 'Your list covers 7 days starting on this day.',
@@ -1088,6 +1088,9 @@ const en = {
     averageLabel: 'Average',
     quality: 'Quality',
     lastNight: 'Last Night',
+    latestSleepRecord: 'Latest sleep record',
+    latestWeightRecord: 'Latest weight record',
+    statistics: 'Health statistics',
     registerMeasurements: 'Record Measurements',
     measurements: 'Measurements',
     vs: 'vs',
@@ -1365,6 +1368,9 @@ const en = {
     healthAccountNote: 'You can connect your health account later from Settings',
     healthDescriptionApple: 'Import activity, weight, and health data automatically from Apple Health.',
     healthDescriptionAndroid: 'Import activity, weight, and health data automatically from Google Health Connect.',
+    healthPlatformWeb: 'Health data on the device',
+    healthDescriptionWeb:
+      'Health data can be connected from the native Alzan app on iPhone or Android. This web version cannot request those permissions.',
     finishRegistrationError: 'There was a problem finishing sign-up. Please try again.',
 
     continue: 'Continue',
@@ -1495,6 +1501,7 @@ const en = {
     healthConnectNoDataMessage:
       'Alzan has permission to read Health Connect, but this device has no records from a compatible app yet. Add steps, workouts, sleep, or weight in Health Connect, then try syncing again.',
     fileGeneratedSuccess: 'File generated successfully',
+    dataExportRetry: 'The export could not be completed. Try downloading again.',
     downloadMyData: 'Download my data',
     gdprRightsInfo:
       'Under GDPR, you have the right to obtain a copy of all personal data that Alzan Health has about you.',
@@ -1729,7 +1736,8 @@ const en = {
     logoutConfirmMessage: 'Are you sure you want to log out?',
     logoutAction: 'Log out',
     clearCacheTitle: 'Clear cache',
-    clearCacheConfirmMessage: 'Are you sure? This will remove all locally saved data.',
+    clearCacheConfirmMessage:
+      'This clears unused temporary responses in memory. Shopping lists, workout drafts, preferences and your signed-in session are preserved.',
     clearCacheAction: 'Clear',
     passwordsDoNotMatch: 'Passwords do not match.',
     changePhotoSoonTitle: 'Coming soon',
@@ -1738,7 +1746,7 @@ const en = {
     dataExportErrorTitle: 'Data export error',
     dataExportUnknownError: 'Unknown error while exporting data',
     saveSettingsError: 'Could not save settings.',
-    cacheClearedSuccess: 'Local cache was cleared successfully.',
+    cacheClearedSuccess: 'Unused temporary responses cleared. Your locally saved data is unchanged.',
     cacheClearError: 'Could not clear cache.',
     allDataDeletedSuccess: 'All data was deleted (except your profile and latest weight).',
     deleteAllDataError: 'Could not delete all data. Please try again.',

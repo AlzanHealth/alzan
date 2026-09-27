@@ -3,7 +3,18 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { RouteProp, useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Settings, Plus, BookOpen, CalendarCheck, MoreVertical, Copy, MoveRight, Trash2, X } from 'lucide-react-native';
+import {
+  Settings,
+  Plus,
+  BookOpen,
+  CalendarCheck,
+  MoreVertical,
+  Copy,
+  MoveRight,
+  Trash2,
+  X,
+  ShoppingCart,
+} from 'lucide-react-native';
 import { addDays, format, isValid, parseISO, subDays } from 'date-fns';
 
 import { CalorieEquationHeader } from '../../modules/nutrition/components/CalorieEquationHeader';
@@ -609,6 +620,16 @@ export const NutritionHomeScreen = () => {
           ref={scrollViewRef}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: topFromScreenBottom + 96 }]}
         >
+          {!isMealSelectionMode && (
+            <TouchableOpacity
+              style={styles.shoppingShortcut}
+              accessibilityRole="button"
+              onPress={() => navigation.navigate('ShoppingList', { date: formattedDate })}
+            >
+              <ShoppingCart size={20} color={themeColors.primary} />
+              <Text style={{ color: themeColors.primary, fontWeight: '600' }}>{t('nutrition.shoppingListTitle')}</Text>
+            </TouchableOpacity>
+          )}
           {isMealSelectionMode ? (
             <View style={[styles.selectionToolbar, { backgroundColor: themeColors.surfaceSolid }]}>
               <View style={styles.selectionToolbarHeader}>
@@ -841,6 +862,15 @@ export const NutritionHomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  shoppingShortcut: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+  },
   container: { flex: 1 },
   topBar: {
     flexDirection: 'row',

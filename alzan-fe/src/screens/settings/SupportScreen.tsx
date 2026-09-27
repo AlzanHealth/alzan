@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing, typography, borderRadius, shadows } from '../../theme';
 import { useSettingsStyles } from '../../hooks/useSettingsStyles';
-import { Book, HelpCircle, Lightbulb, Bug, Send, LucideIcon } from 'lucide-react-native';
+import { Lightbulb, Bug, LucideIcon } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/common/Alert';
@@ -42,14 +42,6 @@ export const SupportScreen = () => {
     </TouchableOpacity>
   );
 
-  const handleOpenGuide = () => {
-    Alert.alert(t('settings.onboardingGuide'), t('settings.startGuideSoonMessage'));
-  };
-
-  const handleOpenFAQ = () => {
-    Alert.alert(t('settings.faq'), t('settings.faqSoonMessage'));
-  };
-
   const handleRequestFeature = () => {
     const email = 'hello@alzanhealth.com';
     const subject = t('settings.featureRequestSubject');
@@ -68,18 +60,6 @@ export const SupportScreen = () => {
     );
   };
 
-  const handleSendLogs = () => {
-    Alert.alert(t('settings.sendLogsTitle'), t('settings.sendLogsPrompt'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('settings.send'),
-        onPress: () => {
-          Alert.alert(t('settings.thanksTitle'), t('settings.logsSentSuccess'));
-        },
-      },
-    ]);
-  };
-
   return (
     <LinearGradient
       colors={[themeColors.gradientStart || themeColors.background, themeColors.gradientEnd || themeColors.background]}
@@ -87,25 +67,6 @@ export const SupportScreen = () => {
     >
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.section}>
-            <SectionHeader title={t('settings.help')} />
-            <View style={[styles.card, dynamicStyles.card]}>
-              <SupportItem
-                icon={Book}
-                label={t('settings.onboardingGuide')}
-                description={t('settings.guideSubtitle')}
-                onPress={handleOpenGuide}
-              />
-              <View style={[styles.divider, dynamicStyles.divider]} />
-              <SupportItem
-                icon={HelpCircle}
-                label={t('settings.faq')}
-                description={t('settings.faqSubtitle')}
-                onPress={handleOpenFAQ}
-              />
-            </View>
-          </View>
-
           <View style={styles.section}>
             <SectionHeader title={t('settings.feedback')} />
             <View style={[styles.card, dynamicStyles.card]}>
@@ -121,18 +82,6 @@ export const SupportScreen = () => {
                 label={t('settings.reportBug')}
                 description={t('settings.improveApp')}
                 onPress={handleReportBug}
-              />
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <SectionHeader title={t('settings.diagnostics')} />
-            <View style={[styles.card, dynamicStyles.card]}>
-              <SupportItem
-                icon={Send}
-                label={t('settings.sendLogs')}
-                description={t('settings.diagnosticSubtitle')}
-                onPress={handleSendLogs}
               />
             </View>
           </View>

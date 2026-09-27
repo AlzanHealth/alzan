@@ -1128,9 +1128,9 @@ export const TrainingHomeScreen = () => {
             onOpenSession={session => navigation.navigate('EnduranceSessionDetail', { sessionId: session.id })}
           />
 
-          {renderDailyPlan()}
-
           {activeSession && <ActiveSessionBanner session={activeSession} />}
+
+          {renderDailyPlan()}
 
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('training.tools')}</Text>

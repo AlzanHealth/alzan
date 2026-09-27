@@ -17,8 +17,13 @@ export const OnboardingHealth = () => {
   const { saveAndNext, skip, saving } = useOnboarding();
 
   const isIOS = Platform.OS === 'ios';
+  const isWeb = Platform.OS === 'web';
   const healthPlatform = isIOS ? 'Apple Health' : 'Google Health Connect';
-  const healthDescription = isIOS ? t('onboarding.healthDescriptionApple') : t('onboarding.healthDescriptionAndroid');
+  const healthDescription = isWeb
+    ? t('onboarding.healthDescriptionWeb')
+    : isIOS
+      ? t('onboarding.healthDescriptionApple')
+      : t('onboarding.healthDescriptionAndroid');
 
   useCallback(async () => {
     // Coming Soon - just proceed to next
@@ -51,12 +56,14 @@ export const OnboardingHealth = () => {
             <Text style={{ fontSize: 60, marginBottom: 20 }}>💚</Text>
           )}
 
-          <Text style={styles.healthTitle}>{healthPlatform}</Text>
+          <Text style={styles.healthTitle}>{isWeb ? t('onboarding.healthPlatformWeb') : healthPlatform}</Text>
           <Text style={styles.healthDescription}>{healthDescription}</Text>
 
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>{t('alzan.comingSoon')}</Text>
-          </View>
+          {isWeb && (
+            <View style={styles.comingSoonBadge}>
+              <Text style={styles.comingSoonText}>{t('alzan.comingSoon')}</Text>
+            </View>
+          )}
         </View>
 
         <Text style={[styles.helperText, { textAlign: 'center', marginTop: 24 }]}>

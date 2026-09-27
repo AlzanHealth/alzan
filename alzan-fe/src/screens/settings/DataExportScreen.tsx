@@ -6,16 +6,25 @@ import { useSettingsStyles } from '../../hooks/useSettingsStyles';
 import { usePrivacy } from '../../hooks/settings/usePrivacy';
 import { Download, CheckCircle } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
+import { formLayout } from '../../components/common/formLayout';
 
 export const DataExportScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors } = useSettingsStyles();
   const { handleExportData, loading } = usePrivacy();
   const [success, setSuccess] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const onExport = async () => {
-    await handleExportData();
-    setSuccess(true);
+    setSuccess(false);
+    setFailed(false);
+    try {
+      const exported = await handleExportData();
+      setSuccess(exported);
+      setFailed(!exported);
+    } catch {
+      setFailed(true);
+    }
   };
 
   return (
@@ -42,6 +51,12 @@ export const DataExportScreen = () => {
             )}
           </TouchableOpacity>
 
+          {failed && !loading && (
+            <Text accessibilityRole="alert" style={[styles.successText, { color: themeColors.danger }]}>
+              {t('settings.dataExportRetry')}
+            </Text>
+          )}
+
           {success && !loading && (
             <View style={styles.successContainer}>
               <CheckCircle size={20} color={themeColors.success} />
@@ -63,6 +78,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
+    ...formLayout.settings,
     borderRadius: borderRadius.l,
     padding: spacing.xl,
     alignItems: 'center',

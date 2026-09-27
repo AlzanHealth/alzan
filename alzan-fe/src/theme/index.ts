@@ -5,7 +5,7 @@ export const colors = {
   surface: 'rgba(255, 255, 255, 0.7)', // Glassy surface
   surfaceHighlight: 'rgba(255, 255, 255, 0.9)',
   textPrimary: '#000000',
-  textSecondary: '#8E8E93',
+  textSecondary: '#5C5C63',
   primary: '#007AFF', // Apple Blue
   secondary: '#5856D6', // Purple
   accent: '#5AC8FA', // Teal/Blue
@@ -40,7 +40,7 @@ export const typography = {
   h4: { fontSize: 18, fontWeight: '600' },
   body: { fontSize: 16, fontWeight: '400' },
   button: { fontSize: 16, fontWeight: '600' },
-  caption: { fontSize: 12, fontWeight: '400', color: '#8E8E93' },
+  caption: { fontSize: 12, fontWeight: '400', color: '#5C5C63' },
 } as const;
 
 export const shadows = {

@@ -4,6 +4,9 @@ import { format, addDays, isSameDay, startOfDay, startOfWeek } from 'date-fns';
 import { useNutritionStyles } from '../../hooks/useNutritionStyles';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
+import { CalendarDatePickerModal } from './CalendarDatePickerModal';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 
 interface DaySwitcherProps {
   selectedDate: Date;
@@ -18,13 +21,15 @@ export interface DaySwitcherRef {
 
 export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
   ({ selectedDate, onSelectDate, markedDates }, ref) => {
+    const { t } = useTranslation();
+    const [calendarVisible, setCalendarVisible] = useState(false);
     const { styles: dynamicStyles, colors: themeColors } = useNutritionStyles();
     const { width: screenWidth } = useWindowDimensions();
 
     const MAX_CONTENT_WIDTH = 450;
-    const PADDING_H = 16;
+    const PADDING_H = screenWidth < 340 ? 6 : 16;
 
-    const { weeks, currentWeekIndex } = useMemo(() => getNutritionCalendarRange(), []);
+    const { weeks, currentWeekIndex, minimumDate, maximumDate } = useMemo(() => getNutritionCalendarRange(), []);
 
     // Find index of the week containing selectedDate
     // This is for initial scroll OR when selectedDate changes (if we want to auto-scroll)
@@ -35,7 +40,7 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
     };
 
     const initialIndex = useMemo(() => {
-      const idx = getIndexForDate(new Date()); // Today
+      const idx = getIndexForDate(selectedDate);
       return idx >= 0 ? idx : currentWeekIndex; // Default to middle
     }, [currentWeekIndex, weeks]);
 
@@ -45,6 +50,7 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
     const scrollToCurrentWeek = () => {
       const idx = getIndexForDate(new Date());
       if (idx >= 0 && flatListRef.current) {
+        setVisibleWeekIndex(idx);
         flatListRef.current.scrollToIndex({ index: idx, animated: true });
       }
     };
@@ -52,6 +58,7 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
     const scrollToDate = (date: Date) => {
       const idx = getIndexForDate(date);
       if (idx >= 0 && flatListRef.current) {
+        setVisibleWeekIndex(idx);
         flatListRef.current.scrollToIndex({ index: idx, animated: true });
       }
     };
@@ -63,9 +70,10 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
 
     useEffect(() => {
       const targetIndex = getIndexForDate(selectedDate);
-      if (targetIndex < 0 || targetIndex === visibleWeekIndex) return;
+      if (targetIndex < 0) return;
+      setVisibleWeekIndex(targetIndex);
       flatListRef.current?.scrollToIndex({ index: targetIndex, animated: true });
-    }, [selectedDate, visibleWeekIndex]);
+    }, [selectedDate]);
 
     // NOTE: Initial scroll is handled by `initialScrollIndex` prop of FlatList usually,
     // but getItemLayout is required for it to work reliably.
@@ -77,6 +85,9 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
           key={date.toISOString()}
           style={[styles.dayItem, dynamicStyles.dayItem, isSelected && dynamicStyles.selectedDayItem]}
           onPress={() => onSelectDate(date)}
+          accessibilityRole="button"
+          accessibilityLabel={format(date, 'PPPP', { locale: getDateFnsLocale() })}
+          accessibilityState={{ selected: isSelected }}
         >
           <Text style={[styles.dayName, dynamicStyles.dayName, isSelected && { color: '#FFFFFF', fontWeight: '700' }]}>
             {format(date, 'EEE', { locale: getDateFnsLocale() }).toUpperCase().slice(0, 3)}
@@ -108,6 +119,51 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
 
     return (
       <View style={styles.container}>
+        <View style={styles.periodRow}>
+          <TouchableOpacity
+            style={styles.periodAction}
+            accessibilityRole="button"
+            accessibilityLabel={t('training.previousWeek')}
+            disabled={visibleWeekIndex === 0}
+            onPress={() => scrollToDate(weeks[visibleWeekIndex - 1])}
+          >
+            <ChevronLeft size={20} color={visibleWeekIndex === 0 ? themeColors.textSecondary : themeColors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.periodTitle}
+            accessibilityRole="button"
+            onPress={() => setCalendarVisible(true)}
+          >
+            <Text style={{ color: themeColors.textPrimary, textAlign: 'center', fontWeight: '600' }}>
+              {format(weeks[visibleWeekIndex], 'd MMM', { locale: getDateFnsLocale() })} –{' '}
+              {format(addDays(weeks[visibleWeekIndex], 6), 'd MMM yyyy', { locale: getDateFnsLocale() })}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.periodAction}
+            accessibilityRole="button"
+            accessibilityLabel={t('training.nextWeek')}
+            disabled={visibleWeekIndex === weeks.length - 1}
+            onPress={() => scrollToDate(weeks[visibleWeekIndex + 1])}
+          >
+            <ChevronRight
+              size={20}
+              color={visibleWeekIndex === weeks.length - 1 ? themeColors.textSecondary : themeColors.primary}
+            />
+          </TouchableOpacity>
+          {(!isSameDay(selectedDate, new Date()) || visibleWeekIndex !== currentWeekIndex) && (
+            <TouchableOpacity
+              style={styles.periodAction}
+              accessibilityRole="button"
+              onPress={() => {
+                onSelectDate(startOfDay(new Date()));
+                scrollToCurrentWeek();
+              }}
+            >
+              <Text style={{ color: themeColors.primary }}>{t('health.today')}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <FlatList
           ref={flatListRef}
           data={weeks}
@@ -136,6 +192,19 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
           // Remove extra padding in content container since we handle it in item
           contentContainerStyle={{ paddingHorizontal: 0 }}
         />
+        <CalendarDatePickerModal
+          visible={calendarVisible}
+          value={selectedDate}
+          title={t('training.selectDate')}
+          minimumDate={minimumDate}
+          maximumDate={maximumDate}
+          onCancel={() => setCalendarVisible(false)}
+          onConfirm={date => {
+            onSelectDate(date);
+            scrollToDate(date);
+            setCalendarVisible(false);
+          }}
+        />
       </View>
     );
   },
@@ -145,8 +214,11 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 16,
     marginBottom: 16,
-    height: 72,
+    minHeight: 116,
   },
+  periodRow: { flexDirection: 'row', alignItems: 'center', width: '100%', maxWidth: 450, alignSelf: 'center' },
+  periodAction: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  periodTitle: { flex: 1, minHeight: 44, justifyContent: 'center' },
   weekRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

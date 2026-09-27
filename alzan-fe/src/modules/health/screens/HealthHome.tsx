@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../../i18n/dateLocale';
 import { useAuth } from '../../../context/AuthContext';
 import { healthQueryKeys } from '../hooks/healthQueryKeys';
+import { parseISO, isValid } from 'date-fns';
 
 export const HealthHome = () => {
   const { t } = useTranslation();
@@ -69,8 +70,10 @@ export const HealthHome = () => {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString(getLocaleTag(), { day: 'numeric', month: 'short' });
+    const date = parseISO(dateString);
+    return isValid(date)
+      ? date.toLocaleDateString(getLocaleTag(), { day: 'numeric', month: 'short', year: 'numeric' })
+      : '';
   };
 
   return (
@@ -80,10 +83,20 @@ export const HealthHome = () => {
         <View style={styles.topBar}>
           <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>{t('health.summary')}</Text>
           <View style={styles.topActions}>
-            <TouchableOpacity onPress={() => navigation.navigate('HealthStatistics')}>
+            <TouchableOpacity
+              style={styles.topAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('health.statistics')}
+              onPress={() => navigation.navigate('HealthStatistics')}
+            >
               <BarChart2 size={24} color={themeColors.textPrimary} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+            <TouchableOpacity
+              style={styles.topAction}
+              accessibilityRole="button"
+              accessibilityLabel={t('tabs.settings')}
+              onPress={() => navigation.navigate('Settings')}
+            >
               <Settings size={24} color={themeColors.textPrimary} />
             </TouchableOpacity>
           </View>
@@ -105,7 +118,7 @@ export const HealthHome = () => {
               <View style={styles.weightHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Scale size={20} color={themeColors.primary} style={{ marginRight: 8 }} />
-                  <Text style={[styles.cardTitle, dynamicStyles.title]}>{t('health.currentWeight')}</Text>
+                  <Text style={[styles.cardTitle, dynamicStyles.title]}>{t('health.latestWeightRecord')}</Text>
                 </View>
 
                 {/* Add Button explicitly requested */}
@@ -231,7 +244,7 @@ export const HealthHome = () => {
               <View style={styles.weightHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Moon size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
-                  <Text style={[styles.cardTitle, dynamicStyles.title]}>{t('health.lastNight')}</Text>
+                  <Text style={[styles.cardTitle, dynamicStyles.title]}>{t('health.latestSleepRecord')}</Text>
                 </View>
                 <TouchableOpacity
                   onPress={e => {
@@ -325,17 +338,16 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '700',
   },
   topActions: {
-    position: 'absolute',
-    right: 16,
-    top: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 4,
   },
+  topAction: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 100,
@@ -365,6 +377,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addWeightButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 8,
     backgroundColor: colors.background,
     borderRadius: 20,
