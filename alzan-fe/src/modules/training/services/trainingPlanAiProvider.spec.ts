@@ -44,11 +44,20 @@ const realTrainingCatalog: TrainingExerciseAiCatalogRow[] = [
     is_custom: false,
   },
 ];
-const realTrainingPrompt = buildTrainingPlanAiPrompt(realTrainingCatalog);
+const realTrainingPrompt = buildTrainingPlanAiPrompt(realTrainingCatalog, '2026-09-28');
 const realChatGptTarget = buildTrainingAiLaunchTarget('chatgpt', realTrainingPrompt);
-assert.equal(realChatGptTarget.mode, 'prefilled');
-assert.ok(realChatGptTarget.url.startsWith('https://chatgpt.com/?prompt='));
-assert.ok(realChatGptTarget.url.includes(encodeURIComponent(realTrainingPrompt)));
+assert.ok(realChatGptTarget.url.length <= 12_000);
+if (realChatGptTarget.mode === 'prefilled') {
+  assert.equal(new URL(realChatGptTarget.url).searchParams.get('prompt'), realTrainingPrompt);
+} else {
+  const clipboard = buildAiClipboardText(
+    realChatGptTarget,
+    realTrainingPrompt,
+    'ejercicios.csv\nexercises_rows\nSentadilla',
+  );
+  assert.ok(clipboard.includes(realTrainingPrompt));
+  assert.ok(clipboard.includes('exercises_rows\nSentadilla'));
+}
 
 const longChatGptTarget = buildTrainingAiLaunchTarget('chatgpt', longPrompt);
 assert.ok(longChatGptTarget);

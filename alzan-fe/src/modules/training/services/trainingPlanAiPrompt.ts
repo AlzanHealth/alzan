@@ -78,10 +78,7 @@ export const serializeTrainingExerciseAiClipboardCsv = (catalog: TrainingExercis
   return ['ejercicios.csv', 'exercises_rows', AI_CLIPBOARD_CATALOG_HEADERS.join(','), ...rows].join('\n');
 };
 
-export const buildTrainingPlanAiPrompt = (
-  catalog: TrainingExerciseAiCatalogRow[],
-  currentDate: string = new Date().toISOString().slice(0, 10),
-): string => {
+export const buildTrainingPlanAiPrompt = (catalog: TrainingExerciseAiCatalogRow[], currentDate: string): string => {
   return `${TRAINING_PLAN_IMPORT_PROMPT.trim()}
 
 ADAPTACIÓN PARA ESTA CONVERSACIÓN
@@ -90,8 +87,7 @@ ADAPTACIÓN PARA ESTA CONVERSACIÓN
 - Si solo hay una sesión y no indica fecha, usa ${currentDate}. Si hay varias sesiones y falta una fecha, devuelve un informe de bloqueo y no inventes fechas.
 - En una sesión concreta conserva deporte, bloques, ejercicios, series, cargas, descansos e intervalos; no la conviertas en un plan semanal.
 - No inventes datos que no aparezcan en la entrada.
-- Cada template_key identifica una familia exacta. Reutilízalo solo si coinciden deporte, workout_goal, modality, jerarquía de pasos o ejercicios, repeticiones, progression_key y todos los objetivos de ritmo o carga.
-- Nunca reutilices template_key si cambia el objetivo (por ejemplo recovery/endurance), target_min/target_max, repeticiones, bloques, children, orden de ejercicios o progresión; crea una clave nueva y descriptiva.
+- Aplica las reglas de familias y bloques de 7 días anteriores también a esta entrada breve.
 - Para ejercicios de strength, selecciona exactamente exercise_name_es de una fila real de exercises_rows usando el nombre, el músculo principal y el equipamiento.
 - Omite exercise_id. No inventes UUID: Alzan resolverá el UUID al importar el JSON mediante el nombre canónico seleccionado.
 - Si no hay coincidencia segura, conserva el nombre fuente; el frontend pedirá selección y no importará hasta resolverlo.
