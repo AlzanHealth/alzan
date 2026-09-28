@@ -78,11 +78,18 @@ export const serializeTrainingExerciseAiClipboardCsv = (catalog: TrainingExercis
   return ['ejercicios.csv', 'exercises_rows', AI_CLIPBOARD_CATALOG_HEADERS.join(','), ...rows].join('\n');
 };
 
-export const buildTrainingPlanAiPrompt = (catalog: TrainingExerciseAiCatalogRow[]): string => {
+export const buildTrainingPlanAiPrompt = (
+  catalog: TrainingExerciseAiCatalogRow[],
+  currentDate: string = new Date().toISOString().slice(0, 10),
+): string => {
   return `${TRAINING_PLAN_IMPORT_PROMPT.trim()}
 
 ADAPTACIÓN PARA ESTA CONVERSACIÓN
-- No necesitas un DOCX ni un CSV adjunto. El catálogo completo y actualizado se pegará como una sección llamada exercises_rows.
+- No necesitas DOCX ni CSV adjuntos. El catálogo se pegará como una sección exercises_rows.
+- Puede ser una única sesión escrita, una fotografía o un documento breve; extrae solo lo visible o escrito.
+- Si solo hay una sesión y no indica fecha, usa ${currentDate}. Si hay varias sesiones y falta una fecha, devuelve un informe de bloqueo y no inventes fechas.
+- En una sesión concreta conserva deporte, bloques, ejercicios, series, cargas, descansos e intervalos; no la conviertas en un plan semanal.
+- No inventes datos que no aparezcan en la entrada.
 - Para ejercicios de strength, selecciona exactamente exercise_name_es de una fila real de exercises_rows usando el nombre, el músculo principal y el equipamiento.
 - Omite exercise_id. No inventes UUID: Alzan resolverá el UUID al importar el JSON mediante el nombre canónico seleccionado.
 - Si no hay coincidencia segura, conserva el nombre fuente; el frontend pedirá selección y no importará hasta resolverlo.

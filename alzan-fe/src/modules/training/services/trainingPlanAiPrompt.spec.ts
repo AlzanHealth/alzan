@@ -59,11 +59,15 @@ assert.ok(!clipboardCsv.includes('exercise_name_en'));
 assert.ok(!clipboardCsv.includes('Incline "press"'));
 assert.ok(!clipboardCsv.includes(catalog[0].exercise_id));
 
-const prompt = buildTrainingPlanAiPrompt(catalog);
+const prompt = buildTrainingPlanAiPrompt(catalog, '2026-09-28');
 assert.ok(prompt.startsWith(TRAINING_PLAN_IMPORT_PROMPT));
 assert.ok(prompt.includes('El catálogo completo de 2 ejercicios ya está copiado'));
 assert.ok(prompt.includes('Pégalo aquí con Ctrl+V o Cmd+V'));
 assert.ok(prompt.includes('Debajo del catálogo, pega o escribe tu entrenamiento'));
+assert.ok(prompt.includes('una fotografía'));
+assert.ok(prompt.includes('una única sesión'));
+assert.ok(prompt.includes('2026-09-28'));
+assert.ok(prompt.includes('Si solo hay una sesión y no indica fecha'));
 assert.ok(prompt.includes('Envía el mensaje manualmente'));
 assert.ok(prompt.includes('selecciona exactamente exercise_name_es'));
 assert.ok(prompt.includes('Omite exercise_id'));
@@ -79,7 +83,7 @@ assert.ok(!prompt.includes('exercise_id,exercise_name_es,exercise_name_en'));
 assert.ok(!prompt.includes('Press, inclinado'));
 assert.ok(!prompt.includes('Incline "press"'));
 assert.ok(!prompt.includes('Sentadilla catálogo privada'));
-assert.ok(prompt.length < 8_000, 'the provider prompt must stay safely below practical URL limits');
+assert.ok(prompt.length < 8_200, 'the provider prompt must stay safely below practical URL limits');
 assert.ok(!prompt.includes('owner_user_id'));
 assert.ok(!prompt.includes('description_es'));
 

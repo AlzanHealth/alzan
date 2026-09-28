@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
+import { format } from 'date-fns';
 import * as Linking from 'expo-linking';
 import { copyTextToClipboard, copyTextToClipboardAsync, copyTextToClipboardSync } from '../../../utils/clipboard';
 import { preloadTrainingExerciseAiCatalog } from '../services/trainingPlanAiCatalogService';
@@ -65,7 +66,7 @@ export const useTrainingPlanAi = () => {
         return { ok: false, kind: isLaunching ? 'open-error' : 'catalog-error' };
       }
 
-      const prompt = buildTrainingPlanAiPrompt(cachedCatalog);
+      const prompt = buildTrainingPlanAiPrompt(cachedCatalog, format(new Date(), 'yyyy-MM-dd'));
       const target = buildTrainingAiLaunchTarget(provider, prompt);
       const exerciseCsv = serializeTrainingExerciseAiClipboardCsv(cachedCatalog);
       const clipboardText = buildAiClipboardText(target, prompt, exerciseCsv);
