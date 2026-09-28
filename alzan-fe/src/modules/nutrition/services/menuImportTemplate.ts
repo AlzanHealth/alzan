@@ -58,7 +58,10 @@ FIDELIDAD
 - No diseñes, optimices, corrijas raciones, mezcles recetas ni añadas comidas o ingredientes.
 - Expande las recetas del documento; no conviertas una lista de la compra en una comida.
 - Conserva el texto de alternativas y condiciones en el nombre de la comida solo cuando forme parte de la asignación del día; no combines alternativas ni elijas una por tu cuenta.
-- Convierte unidades a gramos solo con una equivalencia explícita del DOCX. Para intervalos, usa un único número únicamente si el DOCX fija cuál corresponde a ese día; no uses medias, extremos ni estimaciones.
+- El contrato solo admite gramos. Si el documento usa ml, l, unidades, piezas, cucharadas, cucharaditas, tazas, vasos u otra medida, busca una equivalencia fiable en internet o en una base de datos nutricional reconocida y conviértela a gramos.
+- Para líquidos y alimentos cuya densidad depende del producto, usa la densidad específica del alimento o de la marca cuando esté disponible; no trates todos los mililitros como gramos. Si solo existe una equivalencia genérica con incertidumbre relevante, devuelve un informe de bloqueo indicando el alimento y la medida.
+- No conviertas usando una búsqueda de una marca distinta si el documento identifica la marca o el producto. Conserva la cantidad equivalente consumida, redondeada de forma razonable, y no añadas la fuente ni la unidad al JSON final.
+- Para intervalos, usa un único número únicamente si el documento o la equivalencia fiable fija cuál corresponde a ese día; no uses medias, extremos ni estimaciones arbitrarias.
 - Si una comida no tiene una opción o cantidad única explícita y no puede representarse con quantity_g sin inventar, no fabriques datos: devuelve un informe de bloqueo que indique la fecha y la comida concretas. No bloquees todo el menú por documentos de entrenamiento irrelevantes.
 
 INGREDIENTES

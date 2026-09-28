@@ -106,7 +106,9 @@ GIMNASIO
 - Conserva series, repeticiones, pesos, descansos y orden; cambia solo la referencia.
 
 PLANTILLAS Y VALIDACIÓN
-- Reutiliza template_key solo cuando la estructura sea la misma; usa otra si cambia la estructura o la progresión.
+- Reutiliza template_key solo cuando coincidan exactamente el deporte, workout_goal, modality, la jerarquía de pasos o ejercicios, las repeticiones, progression_key y todos los objetivos de ritmo o carga. La distancia total, duración y nombre pueden cambiar si esa estructura y sus objetivos siguen siendo iguales.
+- Nunca reutilices template_key si cambia workout_goal (por ejemplo recovery frente a endurance), target_min/target_max, repeticiones, la cantidad o el tipo de bloques, los children, el orden de ejercicios o la progresión. En ese caso crea una clave nueva y descriptiva, por ejemplo easy-recovery-4k-recovery y easy-recovery-4k-endurance.
+- Si no puedes demostrar que dos sesiones tienen la misma estructura completa, usa template_key distintos; es preferible crear dos plantillas que mezclar estructuras incompatibles.
 - En running, progression_key debe ser estable y único dentro de cada sesión.
 - Comprueba fechas, weekday, propiedades permitidas, order_index consecutivo y un bloque válido por deporte. Los ejercicios de gimnasio deben proceder del CSV; si una coincidencia no es segura, conserva el nombre fuente para que Alzan lo deje pendiente de selección manual.
 - Si los datos del entrenamiento no permiten construir la estructura, devuelve un informe de bloqueo breve; no generes JSON truncado. Si la estructura sí es válida, devuelve solo el JSON:

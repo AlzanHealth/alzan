@@ -23,6 +23,9 @@ ENTRADAS POSIBLES
 INGREDIENTES Y CANTIDADES
 - Para cada ingrediente usa el nombre más claro y común en español. No inventes alimentos ni IDs.
 - Conserva toda cantidad explícita. Si no hay cantidad, estima una cantidad razonable en gramos.
+- El contrato solo admite gramos. Si aparece ml, l, unidades, piezas, cucharadas, cucharaditas, tazas, vasos u otra medida, busca una equivalencia fiable en internet o en una base de datos nutricional reconocida y conviértela a gramos.
+- Para líquidos o productos con densidad específica, usa la densidad del alimento o de la marca cuando esté disponible; no supongas que 1 ml equivale siempre a 1 g. Si la equivalencia no es suficientemente fiable, devuelve un informe de bloqueo en vez de inventarla.
+- No uses una equivalencia de otra marca cuando la entrada identifica una marca concreta. El JSON final debe contener solo el número en gramos, sin unidades, fuentes ni propiedades adicionales.
 - No añadas alimentos que no estén visibles, escritos o incluidos en la receta.
 - Si no puedes identificar con seguridad un alimento, devuelve un informe de bloqueo que identifique el ingrediente; no inventes una coincidencia.
 

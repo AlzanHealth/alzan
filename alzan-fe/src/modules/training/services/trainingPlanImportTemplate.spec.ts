@@ -38,6 +38,8 @@ assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('mismo patrón de movimiento'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('10 min'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('límite inferior'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('progression_key'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('objetivos de ritmo'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Nunca reutilices template_key'));
 assert.ok(!TRAINING_PLAN_IMPORT_PROMPT.includes('caso real'));
 assert.ok(!TRAINING_PLAN_IMPORT_PROMPT.includes('23/06'));
 assert.doesNotMatch(TRAINING_PLAN_IMPORT_PROMPT, /conserva.*notes/i);

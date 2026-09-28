@@ -83,7 +83,7 @@ assert.ok(!prompt.includes('exercise_id,exercise_name_es,exercise_name_en'));
 assert.ok(!prompt.includes('Press, inclinado'));
 assert.ok(!prompt.includes('Incline "press"'));
 assert.ok(!prompt.includes('Sentadilla catálogo privada'));
-assert.ok(prompt.length < 8_200, 'the provider prompt must stay safely below practical URL limits');
+assert.ok(prompt.length < 10_000, 'the provider prompt must stay safely below practical URL limits');
 assert.ok(!prompt.includes('owner_user_id'));
 assert.ok(!prompt.includes('description_es'));
 

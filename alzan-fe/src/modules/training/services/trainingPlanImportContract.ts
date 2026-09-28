@@ -689,7 +689,7 @@ export const parseTrainingPlanJson = (rawText: string): TrainingPlanParseResult 
           errors,
           'incompatible_template_family',
           `weeks[${weekIndex}].sessions[${sessionIndex}].template_key`,
-          `Template family "${session.template_key}" contains incompatible workout structures`,
+          `Template family "${session.template_key}" contains incompatible workout structures; use a different template_key when sport, workout_goal, modality, blocks, progression or targets differ`,
         );
       } else {
         signaturesByFamily.set(familyKey, signature);

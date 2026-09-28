@@ -348,6 +348,7 @@ const incompatibleTemplateFamily = parseTrainingPlanJson(
 assert.equal(incompatibleTemplateFamily.ok, false);
 if (!incompatibleTemplateFamily.ok) {
   assert.ok(incompatibleTemplateFamily.errors.some(error => error.code === 'incompatible_template_family'));
+  assert.ok(incompatibleTemplateFamily.errors.some(error => error.message.includes('different template_key')));
 }
 
 const tooManyExercises = parseTrainingPlanJson(

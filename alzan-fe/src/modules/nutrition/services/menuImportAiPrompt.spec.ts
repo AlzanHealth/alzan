@@ -10,6 +10,8 @@ assert.ok(!prompt.includes('ingredients_rows'));
 assert.ok(!prompt.includes('catálogo'));
 assert.ok(prompt.includes('fotografía'));
 assert.ok(prompt.includes('estima una cantidad razonable en gramos'));
+assert.ok(prompt.includes('busca una equivalencia fiable'));
+assert.ok(prompt.includes('densidad específica'));
 assert.ok(prompt.includes('meal_type: "unspecified"'));
 assert.ok(prompt.includes('exactamente una comida'));
 assert.ok(prompt.includes('varias comidas'));
