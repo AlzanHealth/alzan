@@ -62,12 +62,13 @@ FIDELIDAD
 - Para líquidos y alimentos cuya densidad depende del producto, usa la densidad específica del alimento o de la marca cuando esté disponible; no trates todos los mililitros como gramos. Si solo existe una equivalencia genérica con incertidumbre relevante, devuelve un informe de bloqueo indicando el alimento y la medida.
 - No conviertas usando una búsqueda de una marca distinta si el documento identifica la marca o el producto. Conserva la cantidad equivalente consumida, redondeada de forma razonable, y no añadas la fuente ni la unidad al JSON final.
 - Para intervalos, usa un único número únicamente si el documento o la equivalencia fiable fija cuál corresponde a ese día; no uses medias, extremos ni estimaciones arbitrarias.
-- Si una comida no tiene una opción o cantidad única explícita y no puede representarse con quantity_g sin inventar, no fabriques datos: devuelve un informe de bloqueo que indique la fecha y la comida concretas. No bloquees todo el menú por documentos de entrenamiento irrelevantes.
+- Si una comida no tiene una opción o cantidad única explícita y no puede representarse con quantity_g sin inventar, bloquea indicando la fecha y comida concretas. No bloquees todo el menú por documentos de entrenamiento irrelevantes.
 
 INGREDIENTES
 - Conserva el nombre del ingrediente tal como aparece en el documento y no inventes alimentos distintos. Acepta diferencias de ortografía, acentos, singular/plural y sinónimos sin cambiar la identidad del alimento.
 - Si el CSV de ingredientes contiene una coincidencia segura, prioriza su nombre canónico exacto en name_es sin cambiar la identidad ni la cantidad del ingrediente.
 - Conserva siempre la cantidad original.
+- Distingue peso en crudo, cocido, escurrido y consumido; no cambies de estado sin una equivalencia fiable. No confundas peso del envase con cantidad consumida.
 - Mantén meal_type entre breakfast, almuerzo, lunch, merienda, dinner y snack.
 - No inventes nombres, IDs, calorías ni macronutrientes. No superes ${MENU_IMPORT_MAX_TOTAL_INGREDIENTS} ingredientes totales ni ${MENU_IMPORT_MAX_UNIQUE_INGREDIENTS} nombres distintos.
 

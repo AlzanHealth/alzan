@@ -18,6 +18,8 @@ assert.ok(MENU_IMPORT_PROMPT.includes('CSV de ingredientes'));
 assert.ok(MENU_IMPORT_PROMPT.includes('coincidencia segura'));
 assert.ok(MENU_IMPORT_PROMPT.includes('busca una equivalencia fiable'));
 assert.ok(MENU_IMPORT_PROMPT.includes('densidad específica'));
+assert.ok(MENU_IMPORT_PROMPT.includes('peso en crudo, cocido, escurrido y consumido'));
+assert.ok(MENU_IMPORT_PROMPT.includes('No confundas peso del envase'));
 assert.ok(!MENU_IMPORT_PROMPT.includes('exercise_name_es'));
 assert.ok(MENU_IMPORT_PROMPT.includes('No bloquees por la ausencia de un DOCX de entrenamiento'));
 assert.ok(MENU_IMPORT_PROMPT.includes('Procesa todos los días del DOCX'));
