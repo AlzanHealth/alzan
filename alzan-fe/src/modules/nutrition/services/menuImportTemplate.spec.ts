@@ -15,7 +15,7 @@ assert.ok(MENU_IMPORT_PROMPT.includes('aunque tenga otro nombre'));
 assert.ok(MENU_IMPORT_PROMPT.includes('CSV de ejercicios'));
 assert.ok(MENU_IMPORT_PROMPT.includes('name_es'));
 assert.ok(MENU_IMPORT_PROMPT.includes('CSV de ingredientes'));
-assert.ok(MENU_IMPORT_PROMPT.includes('coincidencia segura'));
+assert.ok(MENU_IMPORT_PROMPT.includes('coincidencia es inequívoca'));
 assert.ok(MENU_IMPORT_PROMPT.includes('busca una equivalencia fiable'));
 assert.ok(MENU_IMPORT_PROMPT.includes('densidad específica'));
 assert.ok(MENU_IMPORT_PROMPT.includes('peso en crudo, cocido, escurrido y consumido'));

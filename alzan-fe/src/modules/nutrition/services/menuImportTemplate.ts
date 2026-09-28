@@ -35,7 +35,7 @@ export const MENU_IMPORT_PROMPT = `Convierte el DOCX de nutrición adjunto en un
 ARCHIVOS
 - Usa como fuente principal el DOCX que contiene el plan de nutrición y léelo completo, aunque tenga otro nombre.
 - Si también hay un DOCX de entrenamiento o un CSV de ejercicios, ignóralos por completo. No bloquees por la ausencia de un DOCX de entrenamiento, exercises_rows o cualquier otro archivo que no sea necesario para nutrición.
-- Si se adjunta un CSV de ingredientes (distinto de un CSV de ejercicios), úsalo únicamente como catálogo de nombres: cuando exista una coincidencia segura, copia exactamente el valor name_es de la fila correspondiente. No inventes nombres ni uses el CSV de ejercicios para resolver ingredientes.
+- Si se adjunta un CSV de ingredientes (distinto de un CSV de ejercicios), lee su cabecera real: el nombre canónico puede estar en name_es o en ingrediente. Usa solo la columna que exista; no afirmes que falta name_es si existe ingrediente. El CSV es un catálogo de nombres, no una fuente para añadir comidas, ingredientes o cantidades.
 
 SALIDA
 - Devuelve únicamente JSON válido, sin markdown, comentarios ni texto adicional.
@@ -66,7 +66,8 @@ FIDELIDAD
 
 INGREDIENTES
 - Conserva el nombre del ingrediente tal como aparece en el documento y no inventes alimentos distintos. Acepta diferencias de ortografía, acentos, singular/plural y sinónimos sin cambiar la identidad del alimento.
-- Si el CSV de ingredientes contiene una coincidencia segura, prioriza su nombre canónico exacto en name_es sin cambiar la identidad ni la cantidad del ingrediente.
+- Para cada ingrediente del documento, busca primero coincidencia normalizada en el CSV (mayúsculas, acentos, singular/plural); admite sinónimos solo si designan el mismo alimento y la misma variedad/estado. Si la coincidencia es inequívoca, copia exactamente el valor de name_es o ingrediente, según la cabecera real. Si no existe o cambia la identidad, conserva el nombre del documento: Alzan pedirá resolverlo antes de guardar. No conviertas automáticamente «Pimiento» en «Pimiento morrón» sin que el documento especifique esa variedad.
+- Omite «Especias secas sin sal» y otras mezclas genéricas de especias complementarias sin producto ni cantidad concretos. No sustituyas con ellas ingredientes principales del plato: conserva curry, tikka masala y las salsas o mezclas concretas cuando la fuente las identifique; si el catálogo no tiene una entrada equivalente, deja su nombre original pendiente de resolución. No confundas curry en polvo con una salsa o un plato al curry.
 - Conserva siempre la cantidad consumida original, expresada en gramos tras la conversión verificada cuando sea necesaria; no copies un número en ml como si fueran gramos.
 - Distingue peso en crudo, cocido, escurrido y consumido; no cambies de estado sin una equivalencia fiable. No confundas peso del envase con cantidad consumida.
 - Mantén meal_type entre breakfast, almuerzo, lunch, merienda, dinner y snack.

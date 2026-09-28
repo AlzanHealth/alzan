@@ -22,6 +22,9 @@ ENTRADAS POSIBLES
 
 INGREDIENTES Y CANTIDADES
 - Para cada ingrediente usa el nombre más claro y común en español. No inventes alimentos ni IDs.
+- Si el usuario aporta un CSV de ingredientes, lee su cabecera real y busca el nombre canónico en name_es o ingrediente, según exista. Usa una fila solo cuando identifique con seguridad el mismo alimento, variedad y estado; copia el nombre exacto de esa fila. Si no hay coincidencia inequívoca, conserva el nombre fuente para que Alzan pida resolverlo. No supongas que el catálogo está adjunto automáticamente.
+- No cambies «Pimiento» por «Pimiento morrón» sin que la entrada precise esa variedad.
+- Omite «Especias secas sin sal» y otras especias genéricas complementarias sin producto ni cantidad concretos. Conserva curry, tikka masala y salsas o mezclas específicas cuando sean parte identificable del plato; no los sustituyas por especias genéricas ni confundas curry en polvo con salsa o plato al curry.
 - Conserva toda cantidad explícita. Solo estima una cantidad cuando se trate de una foto o porción visible y la estimación sea razonablemente clara; en documentos y menús escritos no inventes cantidades ausentes.
 - El contrato solo admite gramos. Si aparece ml, l, unidades, piezas, cucharadas, cucharaditas, tazas, vasos u otra medida, busca una equivalencia fiable en internet o en una base de datos nutricional reconocida y conviértela a gramos.
 - Para líquidos o productos con densidad específica, usa la densidad del alimento o de la marca cuando esté disponible; no supongas que 1 ml equivale siempre a 1 g. Si la equivalencia no es suficientemente fiable, devuelve un informe de bloqueo en vez de inventarla.

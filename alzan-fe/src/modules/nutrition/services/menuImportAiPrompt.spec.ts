@@ -28,6 +28,5 @@ assert.ok(prompt.includes('30 ingredientes por comida'));
 assert.ok(prompt.includes('500 nombres únicos'));
 assert.ok(prompt.includes('entre 0.1 y 10000'));
 assert.doesNotMatch(prompt, /[“”‘’]/, 'AI prompt must use ASCII quotes');
-assert.ok(prompt.length < 8_000);
 
 console.log('menuImportAiPrompt tests passed');

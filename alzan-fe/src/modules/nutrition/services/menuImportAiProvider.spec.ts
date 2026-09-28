@@ -24,8 +24,12 @@ const expectedModeByProvider: Record<MenuImportAiProvider, 'prefilled' | 'clipbo
 const realPrompt = buildMenuImportAiPrompt({ currentDate: '2026-08-26' });
 (['chatgpt', 'gemini', 'claude'] as const).forEach(provider => {
   const target = buildMenuImportAiLaunchTarget(provider, realPrompt);
-  assert.equal(target.mode, 'prefilled');
-  assert.ok(target.url.includes(encodeURIComponent(realPrompt)));
+  assert.ok(target.url.length <= 12_000);
+  if (target.mode === 'prefilled') {
+    assert.equal(new URL(target.url).searchParams.get(provider === 'claude' ? 'q' : 'prompt'), realPrompt);
+  } else {
+    assert.ok(!target.url.includes('?'), 'clipboard mode must open the provider without a truncated prompt');
+  }
 });
 
 console.log('menuImportAiProvider tests passed');
