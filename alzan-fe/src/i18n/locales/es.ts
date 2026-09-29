@@ -422,6 +422,7 @@ export default {
     pdfNoMealsLoggedForDay: 'No hay comidas registradas este día',
     pdfVacationDay: 'Día de vacaciones',
     pdfVacationDayDescription: 'Este día estaba marcado como vacaciones, sin obligación de registrar comidas.',
+    pdfOverTargetDay: 'MARCADO MANUALMENTE: se consumió más cantidad, alcohol, azúcar o más calorías de lo habitual.',
     pdfPlannedTarget: 'Planificado',
     pdfActualIntake: 'Real',
     pdfPendingMeal: 'Pendiente',

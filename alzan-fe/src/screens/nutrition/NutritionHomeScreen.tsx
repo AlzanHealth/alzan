@@ -37,6 +37,8 @@ import {
   useSaveMealWithIngredients,
   useWaterIntake,
   useVacationDateSet,
+  useOverTargetDateSet,
+  useSetNutritionDayOverTarget,
 } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
 import { MEAL_TYPES, MEAL_TYPE_LABELS, getMealTypeByHour } from '../../modules/nutrition/constants';
@@ -209,6 +211,8 @@ export const NutritionHomeScreen = () => {
   const vacationRangeStart = format(subDays(selectedDate, 35), 'yyyy-MM-dd');
   const vacationRangeEnd = format(addDays(selectedDate, 35), 'yyyy-MM-dd');
   const { data: vacationDates } = useVacationDateSet(vacationRangeStart, vacationRangeEnd);
+  const { data: overTargetDates } = useOverTargetDateSet(vacationRangeStart, vacationRangeEnd);
+  const setNutritionDayOverTarget = useSetNutritionDayOverTarget();
 
   // Data Hook (The brain)
   const { meals, totals, targets, isVacationDay } = useDayNutrition(selectedDate);
@@ -610,9 +614,23 @@ export const NutritionHomeScreen = () => {
           ref={daySwitcherRef}
           selectedDate={selectedDate}
           markedDates={vacationDates}
+          overTargetDates={overTargetDates}
           onSelectDate={date => {
             isAutoSelectedDateRef.current = false;
             setSelectedDate(date);
+          }}
+          onPressDate={date => {
+            const dateKey = format(date, 'yyyy-MM-dd');
+            if (dateKey !== formattedDate) {
+              isAutoSelectedDateRef.current = false;
+              setSelectedDate(date);
+              return;
+            }
+
+            setNutritionDayOverTarget.mutate({
+              date: dateKey,
+              isOverTarget: !overTargetDates.has(dateKey),
+            });
           }}
         />
 

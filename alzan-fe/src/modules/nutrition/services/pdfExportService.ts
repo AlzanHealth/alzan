@@ -56,6 +56,7 @@ const loadAssetAsBase64 = async (module: number): Promise<string | null> => {
 interface DaySummary {
   date: string;
   isVacation: boolean;
+  isOverTarget: boolean;
   logs: MealLogWithItems[];
   plannedMeals: PlannedMealWithLog[];
   totals: {
@@ -201,7 +202,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
 
     const { data: dayStatuses, error: dayStatusesError } = await supabase
       .from('nutrition_day_statuses')
-      .select('user_id, date, status, note, created_at, updated_at')
+      .select('user_id, date, status, note, is_over_target, created_at, updated_at')
       .eq('user_id', userId)
       .gte('date', startDate)
       .lte('date', endDate)
@@ -209,6 +210,11 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
 
     if (dayStatusesError) throw new Error(getErrorMessage(dayStatusesError));
     const vacationDates = createVacationDateSet(dayStatuses);
+    const overTargetDates = new Set(
+      (dayStatuses ?? [])
+        .filter(status => Boolean((status as NutritionDayStatus & { is_over_target?: boolean }).is_over_target))
+        .map(status => status.date),
+    );
 
     const logIds = safeLogs.map(l => l.id);
     const { data: items, error: itemsError } =
@@ -245,6 +251,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       daysMap.set(date, {
         date,
         isVacation: vacationDates.has(date),
+        isOverTarget: overTargetDates.has(date),
         logs: [],
         plannedMeals: [],
         totals: { kcal: 0, protein: 0, carbs: 0, fats: 0 },
@@ -257,6 +264,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
         daysMap.set(date, {
           date,
           isVacation: vacationDates.has(date),
+          isOverTarget: overTargetDates.has(date),
           logs: [],
           plannedMeals: [],
           totals: { kcal: 0, protein: 0, carbs: 0, fats: 0 },
@@ -578,6 +586,15 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
                     margin-top: 30px;
                     margin-bottom: 15px;
                 }
+                .day-block-over-target .day-header {
+                    background: #d97706;
+                }
+                .day-warning {
+                    color: #92400e;
+                    font-weight: 700;
+                    font-size: 11px;
+                    margin: -6px 0 10px;
+                }
                 .day-date {
                     font-weight: 600;
                     font-size: 16px;
@@ -751,11 +768,12 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             ${Array.from(daysMap.values())
               .map(
                 day => `
-                <div class="day-block avoid-break">
+                <div class="day-block avoid-break ${day.isOverTarget ? 'day-block-over-target' : ''}">
                     <div class="day-header">
                         <span class="day-date">${escapeHtml(format(parseISO(day.date), dayDatePattern, { locale: dateLocale }))}</span>
                         <span class="day-total">${escapeHtml(convertEnergyToUi(day.totals.kcal, energyUnit).label)}</span>
                     </div>
+                    ${day.isOverTarget ? `<div class="day-warning">${escapeHtml(t('nutrition.pdfOverTargetDay'))}</div>` : ''}
                     <div class="macro-line">
                         ${escapeHtml(`${t('nutrition.proteins')}: ${Math.round(day.totals.protein)}g · ${t('nutrition.carbs')}: ${Math.round(day.totals.carbs)}g · ${t('nutrition.fats')}: ${Math.round(day.totals.fats)}g`)}
                     </div>

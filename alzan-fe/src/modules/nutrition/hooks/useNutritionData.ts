@@ -174,6 +174,36 @@ export function useVacationDateSet(startDate: string, endDate: string) {
   };
 }
 
+export function useOverTargetDateSet(startDate: string, endDate: string) {
+  const query = useNutritionDayStatuses(startDate, endDate);
+  const overTargetDates = useMemo(
+    () =>
+      new Set(
+        (query.data || [])
+          .filter(status => Boolean((status as { is_over_target?: boolean }).is_over_target))
+          .map(status => status.date),
+      ),
+    [query.data],
+  );
+  return { ...query, data: overTargetDates };
+}
+
+export function useSetNutritionDayOverTarget() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (variables: { date: string; isOverTarget: boolean }) => {
+      if (!user) throw new Error('No user');
+      await nutritionService.setNutritionDayOverTarget(user.id, variables.date, variables.isOverTarget);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nutritionDayStatuses'] });
+      queryClient.invalidateQueries({ queryKey: ['dayNutrition'] });
+    },
+  });
+}
+
 export function useSetNutritionVacationDates() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

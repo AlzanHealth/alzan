@@ -417,6 +417,7 @@ const en = {
     pdfNoMealsLoggedForDay: 'No meals logged for this day',
     pdfVacationDay: 'Vacation day',
     pdfVacationDayDescription: 'This day was marked as vacation, with no meal logging required.',
+    pdfOverTargetDay: 'MANUALLY MARKED: higher intake, alcohol, sugar, or extra calories reported for this day.',
     pdfPlannedTarget: 'Planned',
     pdfActualIntake: 'Actual',
     pdfPendingMeal: 'Pending',

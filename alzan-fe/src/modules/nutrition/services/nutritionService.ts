@@ -124,7 +124,7 @@ export const nutritionService = {
 
     const { data, error } = await supabase
       .from('nutrition_day_statuses')
-      .select('user_id, date, status, note, created_at, updated_at')
+      .select('user_id, date, status, note, is_over_target, created_at, updated_at')
       .eq('user_id', userId)
       .gte('date', startDate)
       .lte('date', endDate)
@@ -150,7 +150,7 @@ export const nutritionService = {
     const { data, error } = await supabase
       .from('nutrition_day_statuses')
       .upsert(payload, { onConflict: 'user_id,date' })
-      .select('user_id, date, status, note, created_at, updated_at')
+      .select('user_id, date, status, note, is_over_target, created_at, updated_at')
       .returns<NutritionDayStatus[]>();
 
     if (error) throw error;
@@ -166,6 +166,22 @@ export const nutritionService = {
       .delete()
       .eq('user_id', userId)
       .in('date', uniqueDates);
+
+    if (error) throw error;
+  },
+
+  async setNutritionDayOverTarget(userId: string, date: string, isOverTarget: boolean): Promise<void> {
+    if (!userId || !date) throw new Error('Invalid nutrition day');
+
+    const { error } = await supabase.from('nutrition_day_statuses').upsert(
+      {
+        user_id: userId,
+        date,
+        is_over_target: isOverTarget,
+        updated_at: new Date().toISOString(),
+      } as never,
+      { onConflict: 'user_id,date' },
+    );
 
     if (error) throw error;
   },
