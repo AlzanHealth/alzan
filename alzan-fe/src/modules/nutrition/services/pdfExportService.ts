@@ -150,21 +150,6 @@ const getMappedDayOfWeek = (date: string): number => {
   return day === 0 ? 7 : day;
 };
 
-const getAdherenceLabel = (status: string | null | undefined): string => {
-  switch (status) {
-    case 'done_as_planned':
-      return t('nutrition.pdfDoneAsPlanned');
-    case 'done_with_changes':
-      return t('nutrition.pdfDoneWithChanges');
-    case 'skipped':
-      return t('nutrition.pdfSkippedMeal');
-    case 'extra_meal':
-      return t('nutrition.pdfExtraMeal');
-    default:
-      return t('nutrition.pdfLoggedMeal');
-  }
-};
-
 export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow, returnHtml }: PDFExportOptions) => {
   try {
     const userId = user.id;
@@ -375,10 +360,9 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       `;
     };
 
-    const renderLoggedMeal = (meal: MealLogWithItems, plannedMeal?: DietTemplateMeal): string => {
+    const renderLoggedMeal = (meal: MealLogWithItems): string => {
       const isSkipped = meal.adherence_status === 'skipped';
-      const plannedName = normalizeText(plannedMeal?.base_name);
-      const displayName = normalizeText(meal.name) ?? plannedName;
+      const displayName = normalizeText(meal.name);
       const actualValues = {
         kcal: isSkipped ? 0 : meal.kcal || 0,
         protein: isSkipped ? 0 : meal.protein_g || 0,
@@ -392,44 +376,14 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             <div class="meal-name">
               ${escapeHtml(translateMealType(meal.meal_type))}
               ${displayName ? `— <span style="font-weight:400">${escapeHtml(displayName)}</span>` : ''}
-              <span class="meal-status">${escapeHtml(getAdherenceLabel(meal.adherence_status))}</span>
             </div>
             <div class="meal-total">${escapeHtml(convertEnergyToUi(actualValues.kcal, energyUnit).label)}</div>
           </div>
-          ${
-            plannedMeal
-              ? renderMacroLine(t('nutrition.pdfPlannedTarget'), {
-                  kcal: plannedMeal.target_kcal || 0,
-                  protein: plannedMeal.target_protein_g || 0,
-                  carbs: plannedMeal.target_carbs_g || 0,
-                  fats: plannedMeal.target_fats_g || 0,
-                })
-              : ''
-          }
           ${renderMacroLine(t('nutrition.pdfActualIntake'), actualValues)}
           ${isSkipped ? '' : renderMealItemsTable(meal)}
         </div>
       `;
     };
-
-    const renderPendingPlannedMeal = (plan: DietTemplateMeal): string => `
-      <div class="meal-block meal-block-pending avoid-break">
-        <div class="meal-header">
-          <div class="meal-name">
-            ${escapeHtml(translateMealType(plan.meal_type))}
-            — <span style="font-weight:400">${escapeHtml(plan.base_name)}</span>
-            <span class="meal-status">${escapeHtml(t('nutrition.pdfPendingMeal'))}</span>
-          </div>
-          <div class="meal-total">${escapeHtml(convertEnergyToUi(plan.target_kcal || 0, energyUnit).label)}</div>
-        </div>
-        ${renderMacroLine(t('nutrition.pdfPlannedTarget'), {
-          kcal: plan.target_kcal || 0,
-          protein: plan.target_protein_g || 0,
-          carbs: plan.target_carbs_g || 0,
-          fats: plan.target_fats_g || 0,
-        })}
-      </div>
-    `;
 
     const renderDayMeals = (day: DaySummary): string => {
       const vacationHtml = day.isVacation
@@ -438,7 +392,6 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             <div class="meal-header">
               <div class="meal-name">
                 ${escapeHtml(t('nutrition.pdfVacationDay'))}
-                <span class="meal-status">${escapeHtml(t('nutrition.pdfVacationDay'))}</span>
               </div>
               <div class="meal-total">-</div>
             </div>
@@ -446,14 +399,12 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
           </div>
         `
         : '';
-      const plannedHtml = day.plannedMeals
-        .map(({ plan, log }) => (log ? renderLoggedMeal(log, plan) : renderPendingPlannedMeal(plan)))
+      const loggedMealsHtml = day.logs
+        .filter(log => log.adherence_status !== 'skipped')
+        .map(log => renderLoggedMeal(log))
         .join('');
-      const plannedLogIds = new Set(day.plannedMeals.map(({ log }) => log?.id).filter((id): id is string => !!id));
-      const extraLogs = day.logs.filter(log => !plannedLogIds.has(log.id));
-      const extraHtml = extraLogs.map(log => renderLoggedMeal(log)).join('');
 
-      if (vacationHtml || plannedHtml || extraHtml) return `${vacationHtml}${plannedHtml}${extraHtml}`;
+      if (vacationHtml || loggedMealsHtml) return `${vacationHtml}${loggedMealsHtml}`;
 
       return `
         <div class="meal-block avoid-break">
