@@ -35,7 +35,15 @@ import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { TemplateListManagementMenu } from './components/TemplateListManagementMenu';
-import { getTemplateIdsForBulkDelete, sortTemplateList, TemplateListSort } from './helpers/templateList.helper';
+import { TemplateSelectionCheckbox } from './components/TemplateSelectionCheckbox';
+import { TemplateSelectionToolbar } from './components/TemplateSelectionToolbar';
+import {
+  getSelectedTemplateIdsForBulkDelete,
+  getTemplateIdsForBulkDelete,
+  sortTemplateList,
+  TemplateListSort,
+  toggleTemplateSelection,
+} from './helpers/templateList.helper';
 
 export const GymRoutinesListScreen = () => {
   const { t, i18n } = useTranslation();
@@ -52,6 +60,8 @@ export const GymRoutinesListScreen = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = React.useState<'my' | 'templates'>('my');
   const [showInfoModal, setShowInfoModal] = React.useState(false);
+  const [isSelectionMode, setIsSelectionMode] = React.useState(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = React.useState<Set<string>>(() => new Set());
 
   // Template handling state
   const [selectedTemplate, setSelectedTemplate] = React.useState<PredefinedTemplate | null>(null);
@@ -143,6 +153,43 @@ export const GymRoutinesListScreen = () => {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const cancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedTemplateIds(new Set());
+  };
+  const deleteSelected = () => {
+    const ids = getSelectedTemplateIdsForBulkDelete(sortedRoutines, selectedTemplateIds);
+    if (!ids.length || isDeleting) return;
+    Alert.alert(
+      t('training.deleteSelectedTemplatesTitle'),
+      t('training.deleteSelectedTemplatesMessage', { count: ids.length }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('training.deleteSelectedTemplatesAction', { count: ids.length }),
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeleting(true);
+            let completed = 0;
+            try {
+              for (const id of ids) {
+                await deleteRoutine.mutateAsync(id);
+                completed += 1;
+              }
+              cancelSelection();
+            } catch (error) {
+              console.error('Error deleting selected routines:', error);
+              setSelectedTemplateIds(new Set(ids.slice(completed)));
+              Alert.alert(t('common.error'), t('training.deleteTemplateError'), [{ text: t('common.ok') }]);
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleCreate = () => {
@@ -250,6 +297,7 @@ export const GymRoutinesListScreen = () => {
             {assignToDate ? t('training.selectRoutine') : t('training.routines')}
           </Text>
           {!assignToDate &&
+            !isSelectionMode &&
             (activeTab === 'my' ? (
               <View style={styles.headerActions}>
                 <TemplateListManagementMenu
@@ -258,6 +306,10 @@ export const GymRoutinesListScreen = () => {
                   isDeleting={isDeleting}
                   onSortChange={setSortOrder}
                   onDeleteAll={handleDeleteAll}
+                  onStartSelection={() => {
+                    setSelectedTemplateIds(new Set());
+                    setIsSelectionMode(true);
+                  }}
                 />
                 <TouchableOpacity style={styles.addButton} onPress={handleCreate}>
                   <Plus size={24} color={themeColors.primary} />
@@ -270,7 +322,7 @@ export const GymRoutinesListScreen = () => {
             ))}
         </View>
 
-        {!assignToDate && (
+        {!assignToDate && !isSelectionMode && (
           <View
             style={[styles.tabSelector, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
           >
@@ -342,6 +394,18 @@ export const GymRoutinesListScreen = () => {
                 <View key={routine.id} style={styles.cardWrapper}>
                   <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
                     <View style={styles.cardContent}>
+                      {isSelectionMode && (
+                        <TemplateSelectionCheckbox
+                          accessibilityLabel={t('training.selectTemplateNamed', { name: routine.base_name })}
+                          checked={selectedTemplateIds.has(routine.id)}
+                          disabled={isDeleting}
+                          onPress={() =>
+                            setSelectedTemplateIds(current => toggleTemplateSelection(current, routine.id))
+                          }
+                          primaryColor={themeColors.primary}
+                          borderColor={themeColors.border}
+                        />
+                      )}
                       <View style={styles.cardInfo}>
                         <Text style={[styles.cardTitle, dynamicStyles.title]}>{routine.base_name}</Text>
                         <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
@@ -386,7 +450,7 @@ export const GymRoutinesListScreen = () => {
                           </Text>
                         </TouchableOpacity>
                       </View>
-                    ) : (
+                    ) : isSelectionMode ? null : (
                       <View
                         style={[
                           styles.cardFooter,
@@ -503,6 +567,15 @@ export const GymRoutinesListScreen = () => {
             </>
           )}
         </ScrollView>
+
+        {isSelectionMode && !assignToDate && (
+          <TemplateSelectionToolbar
+            selectedCount={getSelectedTemplateIdsForBulkDelete(sortedRoutines, selectedTemplateIds).length}
+            isDeleting={isDeleting}
+            onCancel={cancelSelection}
+            onDelete={deleteSelected}
+          />
+        )}
 
         {/* Loading overlay */}
         {(isDeleting || isCopying) && (

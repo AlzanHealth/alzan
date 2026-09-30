@@ -21,7 +21,15 @@ import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
 import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { TemplateListManagementMenu } from './components/TemplateListManagementMenu';
-import { getTemplateIdsForBulkDelete, sortTemplateList, TemplateListSort } from './helpers/templateList.helper';
+import { TemplateSelectionCheckbox } from './components/TemplateSelectionCheckbox';
+import { TemplateSelectionToolbar } from './components/TemplateSelectionToolbar';
+import {
+  getSelectedTemplateIdsForBulkDelete,
+  getTemplateIdsForBulkDelete,
+  sortTemplateList,
+  TemplateListSort,
+  toggleTemplateSelection,
+} from './helpers/templateList.helper';
 
 export const SportTemplatesListScreen = () => {
   const { t, i18n } = useTranslation();
@@ -35,6 +43,8 @@ export const SportTemplatesListScreen = () => {
   const { getOptionLabel } = useSportCatalog();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [sortOrder, setSortOrder] = React.useState<TemplateListSort>('created');
+  const [isSelectionMode, setIsSelectionMode] = React.useState(false);
+  const [selectedTemplateIds, setSelectedTemplateIds] = React.useState<Set<string>>(() => new Set());
 
   const sortedTemplates = React.useMemo(
     () =>
@@ -104,6 +114,43 @@ export const SportTemplatesListScreen = () => {
     }
   };
 
+  const cancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedTemplateIds(new Set());
+  };
+  const deleteSelected = () => {
+    const ids = getSelectedTemplateIdsForBulkDelete(sortedTemplates, selectedTemplateIds);
+    if (!ids.length || isDeleting) return;
+    Alert.alert(
+      t('training.deleteSelectedTemplatesTitle'),
+      t('training.deleteSelectedTemplatesMessage', { count: ids.length }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('training.deleteSelectedTemplatesAction', { count: ids.length }),
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeleting(true);
+            let completed = 0;
+            try {
+              for (const id of ids) {
+                await deleteTemplate.mutateAsync(id);
+                completed += 1;
+              }
+              cancelSelection();
+            } catch (error) {
+              console.error('Error deleting selected templates:', error);
+              setSelectedTemplateIds(new Set(ids.slice(completed)));
+              Alert.alert(t('common.error'), t('training.deleteTemplateError'), [{ text: t('common.ok') }]);
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleEdit = (id: string) => {
     navigation.navigate('EnduranceWorkoutBuilder', { templateId: id });
   };
@@ -150,7 +197,7 @@ export const SportTemplatesListScreen = () => {
           <Text style={[styles.title, dynamicStyles.headerTitle]}>
             {assignToDate ? t('training.selectTemplate') : t('training.myTemplates')}
           </Text>
-          {!assignToDate && (
+          {!assignToDate && !isSelectionMode && (
             <View style={styles.headerActions}>
               <TemplateListManagementMenu
                 itemCount={templates.length}
@@ -158,6 +205,10 @@ export const SportTemplatesListScreen = () => {
                 isDeleting={isDeleting}
                 onSortChange={setSortOrder}
                 onDeleteAll={handleDeleteAll}
+                onStartSelection={() => {
+                  setSelectedTemplateIds(new Set());
+                  setIsSelectionMode(true);
+                }}
               />
               <TouchableOpacity style={styles.addButton} onPress={handleCreate}>
                 <Plus size={24} color={themeColors.primary} />
@@ -190,6 +241,16 @@ export const SportTemplatesListScreen = () => {
               <View key={template.id} style={styles.cardWrapper}>
                 <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
                   <View style={styles.cardContent}>
+                    {isSelectionMode && (
+                      <TemplateSelectionCheckbox
+                        accessibilityLabel={t('training.selectTemplateNamed', { name: template.base_name })}
+                        checked={selectedTemplateIds.has(template.id)}
+                        disabled={isDeleting}
+                        onPress={() => setSelectedTemplateIds(current => toggleTemplateSelection(current, template.id))}
+                        primaryColor={themeColors.primary}
+                        borderColor={themeColors.border}
+                      />
+                    )}
                     <View
                       style={[
                         styles.iconContainer,
@@ -234,7 +295,7 @@ export const SportTemplatesListScreen = () => {
                         </Text>
                       </TouchableOpacity>
                     </View>
-                  ) : (
+                  ) : isSelectionMode ? null : (
                     <View
                       style={[
                         styles.cardFooter,
@@ -274,6 +335,15 @@ export const SportTemplatesListScreen = () => {
             );
           })}
         </ScrollView>
+
+        {isSelectionMode && !assignToDate && (
+          <TemplateSelectionToolbar
+            selectedCount={getSelectedTemplateIdsForBulkDelete(sortedTemplates, selectedTemplateIds).length}
+            isDeleting={isDeleting}
+            onCancel={cancelSelection}
+            onDelete={deleteSelected}
+          />
+        )}
 
         {/* Loading overlay */}
         {isDeleting && (

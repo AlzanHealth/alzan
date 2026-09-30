@@ -2196,6 +2196,13 @@ const en = {
     deleteAllTemplatesMessage:
       'This will permanently delete {{count}} templates and their future scheduled workouts. Completed workouts will be kept.',
     deleteAllTemplatesAction: 'Delete all',
+    selectTemplates: 'Select templates',
+    selectTemplateNamed: 'Select {{name}}',
+    selectedTemplatesCount: 'Selected: {{count}}',
+    deleteSelectedTemplatesAction: 'Delete selected ({{count}})',
+    deleteSelectedTemplatesTitle: 'Delete selected templates?',
+    deleteSelectedTemplatesMessage:
+      'This will permanently delete {{count}} selected templates and their future scheduled workouts. Completed workouts will be kept.',
     deleteTemplateError: 'Could not delete the template. Please try again.',
     selectDate: 'Select Date',
     preview: 'Preview',

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Check, MoreHorizontal, Trash2 } from 'lucide-react-native';
+import { Check, ListChecks, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../../context/ThemeContext';
 import { Alert } from '../../../components/common/Alert';
@@ -13,6 +13,7 @@ type TemplateListManagementMenuProps = {
   isDeleting: boolean;
   onSortChange: (sort: TemplateListSort) => void;
   onDeleteAll: () => void;
+  onStartSelection: () => void;
 };
 
 const SORT_OPTIONS: readonly TemplateListSort[] = ['name', 'created', 'usage'];
@@ -23,6 +24,7 @@ export const TemplateListManagementMenu = ({
   isDeleting,
   onSortChange,
   onDeleteAll,
+  onStartSelection,
 }: TemplateListManagementMenuProps) => {
   const { t } = useTranslation();
   const { colors } = useTheme();
@@ -81,6 +83,27 @@ export const TemplateListManagementMenu = ({
             ))}
 
             <View style={[styles.separator, { backgroundColor: colors.border }]} />
+            <TouchableOpacity
+              style={[styles.option, styles.deleteOption]}
+              onPress={() => {
+                setVisible(false);
+                onStartSelection();
+              }}
+              disabled={itemCount === 0 || isDeleting}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.selectTemplates')}
+              accessibilityState={{ disabled: itemCount === 0 || isDeleting }}
+            >
+              <ListChecks size={20} color={itemCount === 0 ? colors.textSecondary : colors.primary} />
+              <Text
+                style={[
+                  styles.optionText,
+                  { color: itemCount === 0 ? colors.textSecondary : colors.primary, fontWeight: '700' },
+                ]}
+              >
+                {t('training.selectTemplates')}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.option, styles.deleteOption]}
               onPress={handleDeleteAll}

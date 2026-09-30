@@ -2222,6 +2222,13 @@ export default {
     deleteAllTemplatesMessage:
       'Se borrarán {{count}} plantillas y sus entrenamientos futuros programados. Los entrenamientos completados se conservarán.',
     deleteAllTemplatesAction: 'Borrar todas',
+    selectTemplates: 'Seleccionar plantillas',
+    selectTemplateNamed: 'Seleccionar {{name}}',
+    selectedTemplatesCount: 'Seleccionadas: {{count}}',
+    deleteSelectedTemplatesAction: 'Eliminar seleccionadas ({{count}})',
+    deleteSelectedTemplatesTitle: '¿Eliminar las plantillas seleccionadas?',
+    deleteSelectedTemplatesMessage:
+      'Se eliminarán {{count}} plantillas seleccionadas y sus entrenamientos futuros programados. Los completados se conservarán.',
     deleteTemplateError: 'No se pudo borrar la plantilla. Inténtalo de nuevo.',
     selectDate: 'Seleccionar Fecha',
     preview: 'Vista previa',

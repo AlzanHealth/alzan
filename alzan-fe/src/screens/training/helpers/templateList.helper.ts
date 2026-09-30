@@ -34,3 +34,15 @@ export const sortTemplateList = <T extends TemplateListItem>(
 
 export const getTemplateIdsForBulkDelete = (items: readonly TemplateListItem[]): string[] =>
   items.map(item => item.id).filter((id, index, ids) => id.length > 0 && ids.indexOf(id) === index);
+
+export const toggleTemplateSelection = (selectedIds: ReadonlySet<string>, templateId: string): Set<string> => {
+  const nextSelectedIds = new Set(selectedIds);
+  if (nextSelectedIds.has(templateId)) nextSelectedIds.delete(templateId);
+  else nextSelectedIds.add(templateId);
+  return nextSelectedIds;
+};
+
+export const getSelectedTemplateIdsForBulkDelete = <T extends TemplateListItem>(
+  items: readonly T[],
+  selectedIds: ReadonlySet<string>,
+): string[] => getTemplateIdsForBulkDelete(items.filter(item => selectedIds.has(item.id)));
