@@ -5,6 +5,7 @@ import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { supabase } from '../../../lib/supabaseClient';
+import { generateDailyProgressHtml } from '../../nutrition/services/dailyProgressPdf';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import i18n from '../../../i18n';
 import { TranslationKey } from '../../../i18n/locales/en';
@@ -24,6 +25,7 @@ interface PDFExportOptions {
   };
   webPrintWindow?: WebExportWindow | null;
   returnHtml?: boolean;
+  includeDailyProgress?: boolean;
 }
 
 interface WebExportWindow {
@@ -232,7 +234,14 @@ const getLatestMeasurementByType = (
   }, {});
 };
 
-export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWindow, returnHtml }: PDFExportOptions) => {
+export const generateHealthPDF = async ({
+  startDate,
+  endDate,
+  user,
+  webPrintWindow,
+  returnHtml,
+  includeDailyProgress = true,
+}: PDFExportOptions) => {
   try {
     const start = parseISO(startDate);
     const end = parseISO(endDate);
@@ -664,7 +673,7 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
         })
         .join('');
 
-    const html = `
+    const baseHtml = `
       <html>
       <head>
         <meta charset="utf-8" />
@@ -906,6 +915,9 @@ export const generateHealthPDF = async ({ startDate, endDate, user, webPrintWind
       </body>
       </html>
     `;
+
+    const dailyProgressHtml = includeDailyProgress ? await generateDailyProgressHtml(user.id, startDate, endDate) : '';
+    const html = dailyProgressHtml ? baseHtml.replace('</body>', `${dailyProgressHtml}</body>`) : baseHtml;
 
     const rawFileName = `${t('health.pdfFilePrefix')}_${startDate}_${endDate}.pdf`;
     const fileName = rawFileName.replace(/[\\/:*?"<>|]/g, '-');

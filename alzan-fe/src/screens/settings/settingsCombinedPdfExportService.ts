@@ -12,6 +12,7 @@ import { generateDietPDF } from '../../modules/nutrition/services/pdfExportServi
 import { generateTrainingPDF } from '../../modules/training/services/trainingPdfExportService';
 import { HomePdfSectionKey, normalizeHomePdfSectionOrder } from '../../constants/homeSettings';
 import { createCombinedPdfHtml, createStatusSectionHtml } from './settingsCombinedPdfHtml';
+import { generateDailyProgressHtml } from '../../modules/nutrition/services/dailyProgressPdf';
 
 type CombinedPdfUser = {
   id: string;
@@ -110,6 +111,7 @@ export const generateCombinedSettingsPDF = async ({
             email: user.email,
           },
           returnHtml: true,
+          includeDailyProgress: false,
         }),
     },
     training: {
@@ -125,6 +127,7 @@ export const generateCombinedSettingsPDF = async ({
             email: user.email,
           },
           returnHtml: true,
+          includeDailyProgress: false,
         }),
     },
     nutrition: {
@@ -140,6 +143,7 @@ export const generateCombinedSettingsPDF = async ({
             email: user.email,
           },
           returnHtml: true,
+          includeDailyProgress: false,
         }),
     },
   };
@@ -174,6 +178,17 @@ export const generateCombinedSettingsPDF = async ({
         });
       }
     }
+  }
+
+  try {
+    sections.push({
+      label: t('progressPdf.title'),
+      html: await generateDailyProgressHtml(user.id, startDate, endDate),
+    });
+    exportedLabels.push(t('progressPdf.title'));
+  } catch (error) {
+    failedLabels.push(t('progressPdf.title'));
+    console.error('[SettingsCombinedPdfExport] Daily progress section failed:', getErrorMessage(error) || error);
   }
 
   if (exportedLabels.length === 0) {

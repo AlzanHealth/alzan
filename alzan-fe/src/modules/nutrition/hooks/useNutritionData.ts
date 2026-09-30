@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMemo } from 'react';
 import { nutritionService } from '../services/nutritionService';
 import { createVacationDateSet } from '../services/nutritionVacation';
+import { getNutritionDayStatusDates } from '../services/nutritionDayStatus';
 import {
   DietTemplateInsert,
   DietTemplateUpdate,
@@ -176,26 +177,18 @@ export function useVacationDateSet(startDate: string, endDate: string) {
 
 export function useOverTargetDateSet(startDate: string, endDate: string) {
   const query = useNutritionDayStatuses(startDate, endDate);
-  const overTargetDates = useMemo(
-    () =>
-      new Set(
-        (query.data || [])
-          .filter(status => Boolean((status as { is_over_target?: boolean }).is_over_target))
-          .map(status => status.date),
-      ),
-    [query.data],
-  );
+  const overTargetDates = useMemo(() => getNutritionDayStatusDates(query.data, 'over_target'), [query.data]);
   return { ...query, data: overTargetDates };
 }
 
-export function useSetNutritionDayOverTarget() {
+export function useSetNutritionDayStatus() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (variables: { date: string; isOverTarget: boolean }) => {
+    mutationFn: async (variables: { date: string; status: 'normal' | 'over_target' | 'vacation' }) => {
       if (!user) throw new Error('No user');
-      await nutritionService.setNutritionDayOverTarget(user.id, variables.date, variables.isOverTarget);
+      await nutritionService.setNutritionDayStatus(user.id, variables.date, variables.status);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['nutritionDayStatuses'] });

@@ -12,6 +12,7 @@ import i18n from '../../../i18n';
 import { TranslationKey } from '../../../i18n/locales/en';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import { createVacationDateSet, getNutritionExportAverageDayCount } from './nutritionVacation';
+import { generateDailyProgressHtml } from './dailyProgressPdf';
 
 import iconSource from '../../../../assets/icon.png';
 
@@ -76,6 +77,7 @@ interface PDFExportOptions {
   };
   webPrintWindow?: WebExportWindow | null;
   returnHtml?: boolean;
+  includeDailyProgress?: boolean;
 }
 
 interface WebExportWindow {
@@ -150,7 +152,14 @@ const getMappedDayOfWeek = (date: string): number => {
   return day === 0 ? 7 : day;
 };
 
-export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow, returnHtml }: PDFExportOptions) => {
+export const generateDietPDF = async ({
+  startDate,
+  endDate,
+  user,
+  webPrintWindow,
+  returnHtml,
+  includeDailyProgress = true,
+}: PDFExportOptions) => {
   try {
     const userId = user.id;
     if (!userId) throw new Error('User ID not provided');
@@ -187,7 +196,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
 
     const { data: dayStatuses, error: dayStatusesError } = await supabase
       .from('nutrition_day_statuses')
-      .select('user_id, date, status, note, is_over_target, created_at, updated_at')
+      .select('user_id, date, status, note, created_at, updated_at')
       .eq('user_id', userId)
       .gte('date', startDate)
       .lte('date', endDate)
@@ -196,9 +205,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
     if (dayStatusesError) throw new Error(getErrorMessage(dayStatusesError));
     const vacationDates = createVacationDateSet(dayStatuses);
     const overTargetDates = new Set(
-      (dayStatuses ?? [])
-        .filter(status => Boolean((status as NutritionDayStatus & { is_over_target?: boolean }).is_over_target))
-        .map(status => status.date),
+      (dayStatuses ?? []).filter(status => status.status === 'over_target').map(status => status.date),
     );
 
     const logIds = safeLogs.map(l => l.id);
@@ -415,7 +422,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
       `;
     };
 
-    const html = `
+    const baseHtml = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -711,6 +718,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             </div>
             </div> <!-- end summary-page -->
 
+            <div class="legacy-daily-meal-diary" style="display:none">
             <div class="page-break"></div>
 
             <!-- Page 3+: Daily Logs -->
@@ -734,6 +742,7 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
             `,
               )
               .join('')}
+            </div>
 
 
             <!-- Footer -->
@@ -743,6 +752,9 @@ export const generateDietPDF = async ({ startDate, endDate, user, webPrintWindow
         </body>
         </html>
         `;
+
+    const dailyProgressHtml = includeDailyProgress ? await generateDailyProgressHtml(userId, startDate, endDate) : '';
+    const html = dailyProgressHtml ? baseHtml.replace('</body>', `${dailyProgressHtml}</body>`) : baseHtml;
 
     if (returnHtml) return html;
 

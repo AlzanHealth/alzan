@@ -82,7 +82,9 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
 
     const renderDayItem = (date: Date) => {
       const isSelected = isSameDay(date, selectedDate);
-      const isOverTarget = overTargetDates?.has(format(date, 'yyyy-MM-dd'));
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const isOverTarget = overTargetDates?.has(dateKey);
+      const isVacation = markedDates?.has(dateKey);
       return (
         <TouchableOpacity
           key={date.toISOString()}
@@ -91,10 +93,12 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
             dynamicStyles.dayItem,
             isSelected && dynamicStyles.selectedDayItem,
             isOverTarget && styles.overTargetDayItem,
+            isVacation && styles.vacationDayItem,
           ]}
           onPress={() => (onPressDate ? onPressDate(date) : onSelectDate(date))}
           accessibilityRole="button"
           accessibilityLabel={format(date, 'PPPP', { locale: getDateFnsLocale() })}
+          accessibilityHint={t('progressPdf.dayStatusCycleHint')}
           accessibilityState={{ selected: isSelected }}
         >
           <Text style={[styles.dayName, dynamicStyles.dayName, isSelected && { color: '#FFFFFF', fontWeight: '700' }]}>
@@ -105,10 +109,11 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
               {format(date, 'd')}
             </Text>
           </View>
-          {markedDates?.has(format(date, 'yyyy-MM-dd')) && (
-            <View style={[styles.dot, { backgroundColor: isSelected ? '#FFFFFF' : themeColors.primary }]} />
+          {(isVacation || isOverTarget) && (
+            <View
+              style={[styles.dot, { backgroundColor: isSelected ? '#FFFFFF' : isVacation ? '#7C3AED' : '#D97706' }]}
+            />
           )}
-          {isOverTarget && <View style={[styles.dot, { backgroundColor: isSelected ? '#FFFFFF' : '#D97706' }]} />}
         </TouchableOpacity>
       );
     };
@@ -260,6 +265,10 @@ const styles = StyleSheet.create({
   overTargetDayItem: {
     borderWidth: 2,
     borderColor: '#D97706',
+  },
+  vacationDayItem: {
+    borderWidth: 2,
+    borderColor: '#7C3AED',
   },
   dot: {
     width: 4,

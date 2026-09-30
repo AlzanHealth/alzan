@@ -38,7 +38,7 @@ import {
   useWaterIntake,
   useVacationDateSet,
   useOverTargetDateSet,
-  useSetNutritionDayOverTarget,
+  useSetNutritionDayStatus,
 } from '../../modules/nutrition/hooks/useNutritionData';
 import { DailyMealItem } from '../../modules/nutrition/types';
 import { MEAL_TYPES, MEAL_TYPE_LABELS, getMealTypeByHour } from '../../modules/nutrition/constants';
@@ -63,6 +63,7 @@ import { Alert } from '../../components/common/Alert';
 import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { getNutritionDayDate, normalizeNutritionDayRolloverTime } from '../../modules/nutrition/services/nutritionDay';
 import { getNutritionCalendarRange } from '../../modules/nutrition/services/nutritionCalendarRange';
+import { getNextNutritionDayStatus } from '../../modules/nutrition/services/nutritionDayStatus';
 import { CopyMealModal, CopyMealDestination } from '../../modules/nutrition/components/CopyMealModal';
 import { QuickMealEditModal } from '../../modules/nutrition/components/QuickMealEditModal';
 import { MealBatchActionsMenu, MealBatchAction } from '../../modules/nutrition/components/MealBatchActionsMenu';
@@ -212,7 +213,7 @@ export const NutritionHomeScreen = () => {
   const vacationRangeEnd = format(addDays(selectedDate, 35), 'yyyy-MM-dd');
   const { data: vacationDates } = useVacationDateSet(vacationRangeStart, vacationRangeEnd);
   const { data: overTargetDates } = useOverTargetDateSet(vacationRangeStart, vacationRangeEnd);
-  const setNutritionDayOverTarget = useSetNutritionDayOverTarget();
+  const setNutritionDayStatus = useSetNutritionDayStatus();
 
   // Data Hook (The brain)
   const { meals, totals, targets, isVacationDay } = useDayNutrition(selectedDate);
@@ -627,9 +628,11 @@ export const NutritionHomeScreen = () => {
               return;
             }
 
-            setNutritionDayOverTarget.mutate({
+            setNutritionDayStatus.mutate({
               date: dateKey,
-              isOverTarget: !overTargetDates.has(dateKey),
+              status: getNextNutritionDayStatus(
+                vacationDates.has(dateKey) ? 'vacation' : overTargetDates.has(dateKey) ? 'over_target' : 'normal',
+              ),
             });
           }}
         />

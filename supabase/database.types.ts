@@ -3021,7 +3021,6 @@ export type Database = {
         Row: {
           created_at: string
           date: string
-          is_over_target: boolean
           note: string | null
           status: string
           updated_at: string
@@ -3030,7 +3029,6 @@ export type Database = {
         Insert: {
           created_at?: string
           date: string
-          is_over_target?: boolean
           note?: string | null
           status?: string
           updated_at?: string
@@ -3039,7 +3037,6 @@ export type Database = {
         Update: {
           created_at?: string
           date?: string
-          is_over_target?: boolean
           note?: string | null
           status?: string
           updated_at?: string

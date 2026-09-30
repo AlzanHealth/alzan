@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { supabase } from '../../../lib/supabaseClient';
+import { generateDailyProgressHtml } from '../../nutrition/services/dailyProgressPdf';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import { format, parseISO } from 'date-fns';
@@ -43,6 +44,7 @@ interface PDFExportOptions {
   };
   webPrintWindow?: WebExportWindow | null;
   returnHtml?: boolean;
+  includeDailyProgress?: boolean;
 }
 
 interface WebExportWindow {
@@ -286,6 +288,7 @@ export const generateTrainingPDF = async ({
   user,
   webPrintWindow,
   returnHtml,
+  includeDailyProgress = true,
 }: PDFExportOptions) => {
   try {
     const userId = user.id;
@@ -413,7 +416,6 @@ export const generateTrainingPDF = async ({
       .eq('user_id', userId)
       .gte('date', startDate)
       .lte('date', endDate)
-      .gt('total_steps', 0)
       .order('date', { ascending: true });
 
     if (dailyStepsError) throw new Error(getErrorMessage(dailyStepsError));
@@ -882,7 +884,7 @@ export const generateTrainingPDF = async ({
       `;
     };
 
-    const html = `
+    const baseHtml = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -1308,6 +1310,9 @@ export const generateTrainingPDF = async ({
       </body>
       </html>
     `;
+
+    const dailyProgressHtml = includeDailyProgress ? await generateDailyProgressHtml(userId, startDate, endDate) : '';
+    const html = dailyProgressHtml ? baseHtml.replace('</body>', `${dailyProgressHtml}</body>`) : baseHtml;
 
     const rawFileName = `${t('training.pdfFilePrefix')}_${startDate}_${endDate}.pdf`;
     const fileName = rawFileName.replace(/[\\/:*?"<>|]/g, '-');

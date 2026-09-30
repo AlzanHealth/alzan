@@ -20,6 +20,7 @@ import { IngredientInput } from '../types/db';
 import { getLocalizedIngredientName } from '../../../services/localization';
 import { Locale } from '../../../i18n';
 import { MIN_INGREDIENT_QUANTITY_G } from '../constants';
+import type { NutritionDayStatusValue } from './nutritionDayStatus';
 import type { DeletedMealSnapshot } from './mealUndoPlanner';
 
 // Final gate before inserting into meal_items: any positive quantity is clamped to
@@ -124,7 +125,7 @@ export const nutritionService = {
 
     const { data, error } = await supabase
       .from('nutrition_day_statuses')
-      .select('user_id, date, status, note, is_over_target, created_at, updated_at')
+      .select('user_id, date, status, note, created_at, updated_at')
       .eq('user_id', userId)
       .gte('date', startDate)
       .lte('date', endDate)
@@ -150,7 +151,7 @@ export const nutritionService = {
     const { data, error } = await supabase
       .from('nutrition_day_statuses')
       .upsert(payload, { onConflict: 'user_id,date' })
-      .select('user_id, date, status, note, is_over_target, created_at, updated_at')
+      .select('user_id, date, status, note, created_at, updated_at')
       .returns<NutritionDayStatus[]>();
 
     if (error) throw error;
@@ -170,16 +171,22 @@ export const nutritionService = {
     if (error) throw error;
   },
 
-  async setNutritionDayOverTarget(userId: string, date: string, isOverTarget: boolean): Promise<void> {
+  async setNutritionDayStatus(userId: string, date: string, status: NutritionDayStatusValue): Promise<void> {
     if (!userId || !date) throw new Error('Invalid nutrition day');
+
+    if (status === 'normal') {
+      const { error } = await supabase.from('nutrition_day_statuses').delete().eq('user_id', userId).eq('date', date);
+      if (error) throw error;
+      return;
+    }
 
     const { error } = await supabase.from('nutrition_day_statuses').upsert(
       {
         user_id: userId,
         date,
-        is_over_target: isOverTarget,
+        status,
         updated_at: new Date().toISOString(),
-      } as never,
+      },
       { onConflict: 'user_id,date' },
     );
 
