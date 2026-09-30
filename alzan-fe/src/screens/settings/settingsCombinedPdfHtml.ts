@@ -116,6 +116,16 @@ export const createCombinedPdfHtml = ({
           color: #C7C7CC;
         }
         ${sectionStyles}
+        .combined-report-section .daily-progress {
+          break-before: auto;
+          page-break-before: auto;
+        }
+        .combined-report-footer {
+          position: static;
+          margin-top: 24px;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
       </style>
     </head>
     <body>
@@ -129,7 +139,7 @@ export const createCombinedPdfHtml = ({
           `,
         )
         .join('')}
-      <div class="footer">${escapeHtml(footer)}</div>
+      <div class="footer combined-report-footer">${escapeHtml(footer)}</div>
     </body>
     </html>
   `;
