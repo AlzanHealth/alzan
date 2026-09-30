@@ -4,16 +4,19 @@ import { Trash2 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../../context/ThemeContext';
 import { borderRadius, spacing } from '../../../theme';
+import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../../navigation/tabBarLayout';
 
 type Props = { selectedCount: number; isDeleting: boolean; onCancel: () => void; onDelete: () => void };
 
 export const TemplateSelectionToolbar = ({ selectedCount, isDeleting, onCancel, onDelete }: Props) => {
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const { topFromScreenBottom, safeAreaBottom } = useTabBarLayout();
   const disabled = selectedCount === 0 || isDeleting;
+  const bottom = Math.max(0, topFromScreenBottom - safeAreaBottom) + TAB_BAR_CLEARANCE;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surfaceSolid, borderColor: colors.border }]}>
+    <View style={[styles.container, { backgroundColor: colors.surfaceSolid, borderColor: colors.border, bottom }]}>
       <Text style={[styles.count, { color: colors.textPrimary }]}>
         {t('training.selectedTemplatesCount', { count: selectedCount })}
       </Text>
@@ -42,7 +45,17 @@ export const TemplateSelectionToolbar = ({ selectedCount, isDeleting, onCancel, 
 };
 
 const styles = StyleSheet.create({
-  container: { borderTopWidth: 1, paddingHorizontal: spacing.l, paddingVertical: spacing.s, gap: spacing.s },
+  container: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 8,
+    borderTopWidth: 1,
+    paddingHorizontal: spacing.l,
+    paddingVertical: spacing.s,
+    gap: spacing.s,
+  },
   count: { fontSize: 14, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: spacing.s },
   button: {

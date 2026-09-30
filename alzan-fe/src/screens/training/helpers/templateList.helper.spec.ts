@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict';
 import {
+  getTemplateListContentBottomPadding,
+  getTemplateMetadataLabel,
   getSelectedTemplateIdsForBulkDelete,
   sortTemplateList,
   TemplateListSort,
   toggleTemplateSelection,
 } from './templateList.helper';
+
+assert.equal(getTemplateListContentBottomPadding(100, false), 124);
+assert.equal(getTemplateListContentBottomPadding(100, true), 224);
+assert.equal(getTemplateListContentBottomPadding(-10, false), 24);
+
+assert.equal(getTemplateMetadataLabel('Ciclismo', 'Threshold', '30 sep 2026'), 'Ciclismo • Threshold • 30 sep 2026');
+assert.equal(getTemplateMetadataLabel('Ciclismo', 'Threshold'), 'Ciclismo • Threshold');
 
 const items = [
   { id: 'b', name: 'Zancadas', createdAt: '2026-08-02T10:00:00.000Z', usageCount: 1 },

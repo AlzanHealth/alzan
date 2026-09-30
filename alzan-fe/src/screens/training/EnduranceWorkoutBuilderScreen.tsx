@@ -1099,7 +1099,17 @@ export const EnduranceWorkoutBuilderScreen = () => {
           : isEditMode
             ? t('training.workoutUpdatedSuccessfully')
             : t('training.workoutSavedSuccessfully'),
-        [{ text: t('common.ok'), onPress: onSaved ?? (() => navigation.navigate('TrainingHome')) }],
+        [
+          {
+            text: t('common.ok'),
+            onPress:
+              onSaved ??
+              (() => {
+                if (navigation.canGoBack()) navigation.goBack();
+                else navigation.navigate('TrainingHome');
+              }),
+          },
+        ],
       );
     } catch (e) {
       console.error(e);

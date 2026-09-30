@@ -32,7 +32,10 @@ import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { TemplateListManagementMenu } from './components/TemplateListManagementMenu';
 import { TemplateSelectionCheckbox } from './components/TemplateSelectionCheckbox';
 import { TemplateSelectionToolbar } from './components/TemplateSelectionToolbar';
+import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import {
+  getTemplateListContentBottomPadding,
+  getTemplateMetadataLabel,
   getSelectedTemplateIdsForBulkDelete,
   getTemplateIdsForBulkDelete,
   sortTemplateList,
@@ -43,6 +46,7 @@ import {
 export const SportTemplatesListScreen = () => {
   const { t, i18n } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
+  const { topFromScreenBottom } = useTabBarLayout();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'SportTemplatesList'>>();
   const { assignToDate } = route.params || {}; // YYYY-MM-DD string
@@ -227,7 +231,10 @@ export const SportTemplatesListScreen = () => {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: getTemplateListContentBottomPadding(topFromScreenBottom, isSelectionMode) },
+          ]}
           refreshControl={<RefreshControl refreshing={isLoading} tintColor={themeColors.primary} />}
         >
           {templates?.length === 0 && !isLoading && (
@@ -260,7 +267,7 @@ export const SportTemplatesListScreen = () => {
                   }
                 >
                   <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
-                    <View style={styles.cardContent}>
+                    <View style={[styles.cardContent, isSelectionMode && styles.selectionCardContent]}>
                       {isSelectionMode && (
                         <TemplateSelectionCheckbox
                           checked={selectedTemplateIds.has(template.id)}
@@ -280,8 +287,14 @@ export const SportTemplatesListScreen = () => {
                       </View>
                       <View style={styles.cardInfo}>
                         <Text style={[styles.cardTitle, dynamicStyles.title]}>{template.base_name}</Text>
-                        <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
-                          {getSportLabel(template.sport_type)} • {goalLabel}
+                        <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={2}>
+                          {getTemplateMetadataLabel(
+                            getSportLabel(template.sport_type),
+                            goalLabel,
+                            template.created_at
+                              ? format(new Date(template.created_at), 'dd MMM yyyy', { locale: getDateFnsLocale() })
+                              : undefined,
+                          )}
                         </Text>
                       </View>
                     </View>
@@ -413,7 +426,6 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
   content: {
     padding: spacing.l,
-    paddingBottom: 100,
   },
   emptyState: {
     alignItems: 'center',
@@ -452,6 +464,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.m,
   },
+  selectionCardContent: { marginBottom: 0 },
   iconContainer: {
     width: 40,
     height: 40,

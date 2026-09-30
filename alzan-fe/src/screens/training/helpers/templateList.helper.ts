@@ -1,5 +1,14 @@
 export type TemplateListSort = 'name' | 'created' | 'usage';
 
+export const getTemplateMetadataLabel = (...parts: (string | undefined)[]): string =>
+  parts
+    .map(part => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(' • ');
+
+export const getTemplateListContentBottomPadding = (topFromScreenBottom: number, isSelectionMode: boolean): number =>
+  Math.max(0, topFromScreenBottom) + 24 + (isSelectionMode ? 100 : 0);
+
 export type TemplateListItem = {
   id: string;
   name: string;

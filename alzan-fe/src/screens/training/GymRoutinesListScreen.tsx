@@ -38,7 +38,9 @@ import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { TemplateListManagementMenu } from './components/TemplateListManagementMenu';
 import { TemplateSelectionCheckbox } from './components/TemplateSelectionCheckbox';
 import { TemplateSelectionToolbar } from './components/TemplateSelectionToolbar';
+import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import {
+  getTemplateListContentBottomPadding,
   getSelectedTemplateIdsForBulkDelete,
   getTemplateIdsForBulkDelete,
   sortTemplateList,
@@ -49,6 +51,7 @@ import {
 export const GymRoutinesListScreen = () => {
   const { t, i18n } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
+  const { topFromScreenBottom } = useTabBarLayout();
   const { getOptionLabel } = useSportCatalog();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'GymRoutinesList'>>();
@@ -373,7 +376,10 @@ export const GymRoutinesListScreen = () => {
         )}
 
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: getTemplateListContentBottomPadding(topFromScreenBottom, isSelectionMode) },
+          ]}
           refreshControl={<RefreshControl refreshing={isLoading} tintColor={themeColors.primary} />}
         >
           {activeTab === 'my' ? (
@@ -405,7 +411,7 @@ export const GymRoutinesListScreen = () => {
                     }
                   >
                     <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
-                      <View style={styles.cardContent}>
+                      <View style={[styles.cardContent, isSelectionMode && styles.selectionCardContent]}>
                         {isSelectionMode && (
                           <TemplateSelectionCheckbox
                             checked={selectedTemplateIds.has(routine.id)}
@@ -862,7 +868,6 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.l,
     paddingTop: spacing.m,
-    paddingBottom: 100,
   },
   tabSelector: {
     flexDirection: 'row',
@@ -929,6 +934,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.m,
   },
+  selectionCardContent: { marginBottom: 0 },
   cardInfo: {
     flex: 1,
   },
