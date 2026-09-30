@@ -9,6 +9,9 @@ export const getTemplateMetadataLabel = (...parts: (string | undefined)[]): stri
 export const getTemplateListContentBottomPadding = (topFromScreenBottom: number, isSelectionMode: boolean): number =>
   Math.max(0, topFromScreenBottom) + 24 + (isSelectionMode ? 100 : 0);
 
+export const getTemplateListHeaderAction = (isSelectionFlow: boolean, isBulkSelectionMode = false): 'back' | 'close' =>
+  isSelectionFlow || isBulkSelectionMode ? 'back' : 'close';
+
 export type TemplateListItem = {
   id: string;
   name: string;

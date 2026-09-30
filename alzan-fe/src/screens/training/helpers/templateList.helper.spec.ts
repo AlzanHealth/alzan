@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 import {
   getTemplateListContentBottomPadding,
+  getTemplateListHeaderAction,
   getTemplateMetadataLabel,
   getSelectedTemplateIdsForBulkDelete,
   sortTemplateList,
   TemplateListSort,
   toggleTemplateSelection,
 } from './templateList.helper';
+
+assert.equal(getTemplateListHeaderAction(false), 'close');
+assert.equal(getTemplateListHeaderAction(true), 'back');
+assert.equal(getTemplateListHeaderAction(false, true), 'back');
 
 assert.equal(getTemplateListContentBottomPadding(100, false), 124);
 assert.equal(getTemplateListContentBottomPadding(100, true), 224);

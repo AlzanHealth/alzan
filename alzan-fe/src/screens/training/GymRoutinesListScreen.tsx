@@ -41,6 +41,7 @@ import { TemplateSelectionToolbar } from './components/TemplateSelectionToolbar'
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import {
   getTemplateListContentBottomPadding,
+  getTemplateListHeaderAction,
   getSelectedTemplateIdsForBulkDelete,
   getTemplateIdsForBulkDelete,
   sortTemplateList,
@@ -55,8 +56,12 @@ export const GymRoutinesListScreen = () => {
   const { getOptionLabel } = useSportCatalog();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'GymRoutinesList'>>();
-  const { assignToDate } = route.params || {};
-
+  const { assignToDate, selectMode, targetDate } = route.params || {};
+  const selectionDate = assignToDate ?? (selectMode ? targetDate : undefined);
+  const isRoutineSelectionMode = Boolean(selectionDate);
+  const selectionDateLabel = selectionDate
+    ? format(new Date(selectionDate), 'dd MMM', { locale: getDateFnsLocale() })
+    : '';
   const { user } = useAuth();
   const { routines, isLoading, deleteRoutine } = useGymRoutines();
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -66,6 +71,7 @@ export const GymRoutinesListScreen = () => {
   const [showInfoModal, setShowInfoModal] = React.useState(false);
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedTemplateIds, setSelectedTemplateIds] = React.useState<Set<string>>(() => new Set());
+  const headerAction = getTemplateListHeaderAction(isRoutineSelectionMode, isSelectionMode);
 
   // Template handling state
   const [selectedTemplate, setSelectedTemplate] = React.useState<PredefinedTemplate | null>(null);
@@ -205,12 +211,12 @@ export const GymRoutinesListScreen = () => {
   };
 
   const handleAssign = async (routine: WorkoutTemplate) => {
-    if (!user || !assignToDate) return;
+    if (!user || !selectionDate) return;
 
     try {
       const { error } = await supabase.from('workout_plans').insert({
         user_id: user.id,
-        planned_date: assignToDate,
+        planned_date: selectionDate,
         gym_template_id: routine.id,
         status: 'planned',
       });
@@ -292,15 +298,22 @@ export const GymRoutinesListScreen = () => {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.navigate('TrainingHome')} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => {
+              if (isSelectionMode) cancelSelection();
+              else if (headerAction === 'back') navigation.goBack();
+              else navigation.navigate('TrainingHome');
+            }}
+            style={styles.backButton}
+          >
             <Text style={[styles.backText, { color: themeColors.primary }]}>
-              {assignToDate ? t('common.cancel') : t('training.close')}
+              {headerAction === 'back' ? t('common.back') : t('common.close')}
             </Text>
           </TouchableOpacity>
           <Text style={[styles.title, dynamicStyles.headerTitle]}>
-            {assignToDate ? t('training.selectRoutine') : t('training.routines')}
+            {isRoutineSelectionMode ? t('training.selectRoutine') : t('training.routines')}
           </Text>
-          {!assignToDate &&
+          {!isRoutineSelectionMode &&
             !isSelectionMode &&
             (activeTab === 'my' ? (
               <View style={styles.headerActions}>
@@ -326,7 +339,7 @@ export const GymRoutinesListScreen = () => {
             ))}
         </View>
 
-        {!assignToDate && !isSelectionMode && (
+        {!isRoutineSelectionMode && !isSelectionMode && (
           <View
             style={[styles.tabSelector, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
           >
@@ -437,7 +450,7 @@ export const GymRoutinesListScreen = () => {
                         </View>
                       </View>
 
-                      {assignToDate ? (
+                      {isRoutineSelectionMode ? (
                         <View
                           style={[
                             styles.cardFooter,
@@ -457,9 +470,7 @@ export const GymRoutinesListScreen = () => {
                           >
                             <Plus size={16} color={themeColors.primary} style={{ marginRight: 6 }} />
                             <Text style={[styles.startButtonText, { color: themeColors.primary }]}>
-                              {`${t('training.addTo')} ${format(new Date(assignToDate), 'dd MMM', {
-                                locale: getDateFnsLocale(),
-                              })}`}
+                              {`${t('training.addTo')} ${selectionDateLabel}`}
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -582,7 +593,7 @@ export const GymRoutinesListScreen = () => {
           )}
         </ScrollView>
 
-        {isSelectionMode && !assignToDate && (
+        {isSelectionMode && !isRoutineSelectionMode && (
           <TemplateSelectionToolbar
             selectedCount={getSelectedTemplateIdsForBulkDelete(sortedRoutines, selectedTemplateIds).length}
             isDeleting={isDeleting}

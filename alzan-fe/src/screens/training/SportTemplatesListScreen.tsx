@@ -35,6 +35,7 @@ import { TemplateSelectionToolbar } from './components/TemplateSelectionToolbar'
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import {
   getTemplateListContentBottomPadding,
+  getTemplateListHeaderAction,
   getTemplateMetadataLabel,
   getSelectedTemplateIdsForBulkDelete,
   getTemplateIdsForBulkDelete,
@@ -50,6 +51,10 @@ export const SportTemplatesListScreen = () => {
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'SportTemplatesList'>>();
   const { assignToDate } = route.params || {}; // YYYY-MM-DD string
+  const isTemplateSelectionMode = Boolean(assignToDate);
+  const selectionDateLabel = assignToDate
+    ? format(new Date(assignToDate), 'dd MMM', { locale: getDateFnsLocale() })
+    : '';
 
   const { user } = useAuth();
   const { templates, isLoading, deleteTemplate } = useEnduranceTemplates();
@@ -58,6 +63,7 @@ export const SportTemplatesListScreen = () => {
   const [sortOrder, setSortOrder] = React.useState<TemplateListSort>('created');
   const [isSelectionMode, setIsSelectionMode] = React.useState(false);
   const [selectedTemplateIds, setSelectedTemplateIds] = React.useState<Set<string>>(() => new Set());
+  const headerAction = getTemplateListHeaderAction(isTemplateSelectionMode, isSelectionMode);
 
   const sortedTemplates = React.useMemo(
     () =>
@@ -202,15 +208,22 @@ export const SportTemplatesListScreen = () => {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => {
+              if (isSelectionMode) cancelSelection();
+              else if (headerAction === 'back') navigation.goBack();
+              else navigation.navigate('TrainingHome');
+            }}
+            style={styles.backButton}
+          >
             <Text style={[styles.backText, { color: themeColors.primary }]}>
-              {assignToDate ? t('common.cancel') : t('common.back')}
+              {headerAction === 'back' ? t('common.back') : t('common.close')}
             </Text>
           </TouchableOpacity>
           <Text style={[styles.title, dynamicStyles.headerTitle]}>
-            {assignToDate ? t('training.selectTemplate') : t('training.myTemplates')}
+            {isTemplateSelectionMode ? t('training.selectTemplate') : t('training.myTemplates')}
           </Text>
-          {!assignToDate && !isSelectionMode && (
+          {!isTemplateSelectionMode && !isSelectionMode && (
             <View style={styles.headerActions}>
               <TemplateListManagementMenu
                 itemCount={templates.length}
@@ -299,7 +312,7 @@ export const SportTemplatesListScreen = () => {
                       </View>
                     </View>
 
-                    {assignToDate ? (
+                    {isTemplateSelectionMode ? (
                       <View
                         style={[
                           styles.cardFooter,
@@ -319,9 +332,7 @@ export const SportTemplatesListScreen = () => {
                         >
                           <Plus size={16} color="#FFFFFF" />
                           <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
-                            {`${t('training.addTo')} ${format(new Date(assignToDate), 'dd MMM', {
-                              locale: getDateFnsLocale(),
-                            })}`}
+                            {`${t('training.addTo')} ${selectionDateLabel}`}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -369,7 +380,7 @@ export const SportTemplatesListScreen = () => {
           })}
         </ScrollView>
 
-        {isSelectionMode && !assignToDate && (
+        {isSelectionMode && !isTemplateSelectionMode && (
           <TemplateSelectionToolbar
             selectedCount={getSelectedTemplateIdsForBulkDelete(sortedTemplates, selectedTemplateIds).length}
             isDeleting={isDeleting}
