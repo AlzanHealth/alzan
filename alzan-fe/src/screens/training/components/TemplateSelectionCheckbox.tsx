@@ -1,34 +1,17 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { borderRadius, spacing } from '../../../theme';
 
 type TemplateSelectionCheckboxProps = {
-  accessibilityLabel: string;
   checked: boolean;
-  disabled: boolean;
-  onPress: () => void;
   primaryColor: string;
   borderColor: string;
 };
 
-export const TemplateSelectionCheckbox = ({
-  accessibilityLabel,
-  checked,
-  disabled,
-  onPress,
-  primaryColor,
-  borderColor,
-}: TemplateSelectionCheckboxProps) => (
+export const TemplateSelectionCheckbox = ({ checked, primaryColor, borderColor }: TemplateSelectionCheckboxProps) => (
   <View style={styles.wrapper}>
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      style={[styles.target, { opacity: disabled ? 0.5 : 1 }]}
-      accessibilityRole="checkbox"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ checked, disabled }}
-    >
+    <View accessible={false} style={styles.target}>
       <View
         style={[
           styles.checkbox,
@@ -40,7 +23,7 @@ export const TemplateSelectionCheckbox = ({
       >
         {checked && <Check size={16} color="#FFFFFF" strokeWidth={3} />}
       </View>
-    </TouchableOpacity>
+    </View>
   </View>
 );
 

@@ -1,5 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Pressable,
+  RefreshControl,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
@@ -239,98 +248,109 @@ export const SportTemplatesListScreen = () => {
 
             return (
               <View key={template.id} style={styles.cardWrapper}>
-                <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
-                  <View style={styles.cardContent}>
-                    {isSelectionMode && (
-                      <TemplateSelectionCheckbox
-                        accessibilityLabel={t('training.selectTemplateNamed', { name: template.base_name })}
-                        checked={selectedTemplateIds.has(template.id)}
-                        disabled={isDeleting}
-                        onPress={() => setSelectedTemplateIds(current => toggleTemplateSelection(current, template.id))}
-                        primaryColor={themeColors.primary}
-                        borderColor={themeColors.border}
-                      />
-                    )}
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        {
-                          backgroundColor: SPORT_COLORS[template.sport_type] || themeColors.primary,
-                        },
-                      ]}
-                    >
-                      <SportIcon sport={template.sport_type} size={20} color="#FFFFFF" />
-                    </View>
-                    <View style={styles.cardInfo}>
-                      <Text style={[styles.cardTitle, dynamicStyles.title]}>{template.base_name}</Text>
-                      <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
-                        {getSportLabel(template.sport_type)} • {goalLabel}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {assignToDate ? (
-                    <View
-                      style={[
-                        styles.cardFooter,
-                        { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                      ]}
-                    >
-                      <TouchableOpacity
+                <Pressable
+                  disabled={!isSelectionMode || isDeleting}
+                  onPress={() => setSelectedTemplateIds(current => toggleTemplateSelection(current, template.id))}
+                  accessibilityRole={isSelectionMode ? 'checkbox' : undefined}
+                  accessibilityLabel={t('training.selectTemplateNamed', { name: template.base_name })}
+                  accessibilityState={
+                    isSelectionMode
+                      ? { checked: selectedTemplateIds.has(template.id), disabled: isDeleting }
+                      : undefined
+                  }
+                >
+                  <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
+                    <View style={styles.cardContent}>
+                      {isSelectionMode && (
+                        <TemplateSelectionCheckbox
+                          checked={selectedTemplateIds.has(template.id)}
+                          primaryColor={themeColors.primary}
+                          borderColor={themeColors.border}
+                        />
+                      )}
+                      <View
                         style={[
-                          styles.actionButton,
+                          styles.iconContainer,
                           {
-                            backgroundColor: themeColors.primary,
-                            width: '100%',
-                            justifyContent: 'center',
+                            backgroundColor: SPORT_COLORS[template.sport_type] || themeColors.primary,
                           },
                         ]}
-                        onPress={() => handleAssign(template)}
                       >
-                        <Plus size={16} color="#FFFFFF" />
-                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
-                          {`${t('training.addTo')} ${format(new Date(assignToDate), 'dd MMM', {
-                            locale: getDateFnsLocale(),
-                          })}`}
+                        <SportIcon sport={template.sport_type} size={20} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.cardInfo}>
+                        <Text style={[styles.cardTitle, dynamicStyles.title]}>{template.base_name}</Text>
+                        <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
+                          {getSportLabel(template.sport_type)} • {goalLabel}
                         </Text>
-                      </TouchableOpacity>
+                      </View>
                     </View>
-                  ) : isSelectionMode ? null : (
-                    <View
-                      style={[
-                        styles.cardFooter,
-                        { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                      ]}
-                    >
-                      <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: themeColors.primary, marginRight: 'auto' }]}
-                        onPress={() => navigation.navigate('EnduranceSessionForm', { templateId: template.id })}
-                      >
-                        <Play size={16} color="#FFFFFF" />
-                        <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>{t('training.register')}</Text>
-                      </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={[styles.actionButton, dynamicStyles.secondaryButton]}
-                        onPress={() => handleEdit(template.id)}
+                    {assignToDate ? (
+                      <View
+                        style={[
+                          styles.cardFooter,
+                          { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                        ]}
                       >
-                        <Edit2 size={18} color={themeColors.primary} />
-                        <Text style={[styles.actionButtonText, { color: themeColors.primary }]}>
-                          {t('common.edit')}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.deleteButton, dynamicStyles.dangerButton]}
-                        onPress={() => handleDelete(template.id, template.base_name)}
+                        <TouchableOpacity
+                          style={[
+                            styles.actionButton,
+                            {
+                              backgroundColor: themeColors.primary,
+                              width: '100%',
+                              justifyContent: 'center',
+                            },
+                          ]}
+                          onPress={() => handleAssign(template)}
+                        >
+                          <Plus size={16} color="#FFFFFF" />
+                          <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
+                            {`${t('training.addTo')} ${format(new Date(assignToDate), 'dd MMM', {
+                              locale: getDateFnsLocale(),
+                            })}`}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : isSelectionMode ? null : (
+                      <View
+                        style={[
+                          styles.cardFooter,
+                          { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                        ]}
                       >
-                        <Trash2 size={18} color={themeColors.danger} />
-                        <Text style={[styles.actionButtonText, styles.deleteButtonText, { color: themeColors.danger }]}>
-                          {t('common.delete')}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </GlassCard>
+                        <TouchableOpacity
+                          style={[styles.actionButton, { backgroundColor: themeColors.primary, marginRight: 'auto' }]}
+                          onPress={() => navigation.navigate('EnduranceSessionForm', { templateId: template.id })}
+                        >
+                          <Play size={16} color="#FFFFFF" />
+                          <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>{t('training.register')}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionButton, dynamicStyles.secondaryButton]}
+                          onPress={() => handleEdit(template.id)}
+                        >
+                          <Edit2 size={18} color={themeColors.primary} />
+                          <Text style={[styles.actionButtonText, { color: themeColors.primary }]}>
+                            {t('common.edit')}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.deleteButton, dynamicStyles.dangerButton]}
+                          onPress={() => handleDelete(template.id, template.base_name)}
+                        >
+                          <Trash2 size={18} color={themeColors.danger} />
+                          <Text
+                            style={[styles.actionButtonText, styles.deleteButtonText, { color: themeColors.danger }]}
+                          >
+                            {t('common.delete')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </GlassCard>
+                </Pressable>
               </View>
             );
           })}

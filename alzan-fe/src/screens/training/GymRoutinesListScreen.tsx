@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   View,
+  Pressable,
   Text,
   StyleSheet,
   ScrollView,
@@ -392,107 +393,114 @@ export const GymRoutinesListScreen = () => {
 
               {sortedRoutines.map(routine => (
                 <View key={routine.id} style={styles.cardWrapper}>
-                  <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
-                    <View style={styles.cardContent}>
-                      {isSelectionMode && (
-                        <TemplateSelectionCheckbox
-                          accessibilityLabel={t('training.selectTemplateNamed', { name: routine.base_name })}
-                          checked={selectedTemplateIds.has(routine.id)}
-                          disabled={isDeleting}
-                          onPress={() =>
-                            setSelectedTemplateIds(current => toggleTemplateSelection(current, routine.id))
-                          }
-                          primaryColor={themeColors.primary}
-                          borderColor={themeColors.border}
-                        />
-                      )}
-                      <View style={styles.cardInfo}>
-                        <Text style={[styles.cardTitle, dynamicStyles.title]}>{routine.base_name}</Text>
-                        <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
-                          {routine.workout_goal || routine.modality
-                            ? `${routine.workout_goal ? getOptionLabel('strength', routine.workout_goal, 'goal') : ''}${routine.workout_goal ? ' • ' : ''}${getOptionLabel('strength', routine.modality || 'gym', 'modality')}`
-                            : routine.description || t('training.noDescription')}
-                        </Text>
-                        {routine.created_at && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                            <Calendar size={12} color={themeColors.textSecondary} style={{ marginRight: 4 }} />
-                            <Text style={{ color: themeColors.textSecondary, fontSize: 12 }}>
-                              {format(new Date(routine.created_at), 'dd MMM yyyy', { locale: getDateFnsLocale() })}
-                            </Text>
-                          </View>
+                  <Pressable
+                    disabled={!isSelectionMode || isDeleting}
+                    onPress={() => setSelectedTemplateIds(current => toggleTemplateSelection(current, routine.id))}
+                    accessibilityRole={isSelectionMode ? 'checkbox' : undefined}
+                    accessibilityLabel={t('training.selectTemplateNamed', { name: routine.base_name })}
+                    accessibilityState={
+                      isSelectionMode
+                        ? { checked: selectedTemplateIds.has(routine.id), disabled: isDeleting }
+                        : undefined
+                    }
+                  >
+                    <GlassCard style={[styles.card, dynamicStyles.glassCard]}>
+                      <View style={styles.cardContent}>
+                        {isSelectionMode && (
+                          <TemplateSelectionCheckbox
+                            checked={selectedTemplateIds.has(routine.id)}
+                            primaryColor={themeColors.primary}
+                            borderColor={themeColors.border}
+                          />
                         )}
+                        <View style={styles.cardInfo}>
+                          <Text style={[styles.cardTitle, dynamicStyles.title]}>{routine.base_name}</Text>
+                          <Text style={[styles.cardDescription, dynamicStyles.subtitle]} numberOfLines={1}>
+                            {routine.workout_goal || routine.modality
+                              ? `${routine.workout_goal ? getOptionLabel('strength', routine.workout_goal, 'goal') : ''}${routine.workout_goal ? ' • ' : ''}${getOptionLabel('strength', routine.modality || 'gym', 'modality')}`
+                              : routine.description || t('training.noDescription')}
+                          </Text>
+                          {routine.created_at && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                              <Calendar size={12} color={themeColors.textSecondary} style={{ marginRight: 4 }} />
+                              <Text style={{ color: themeColors.textSecondary, fontSize: 12 }}>
+                                {format(new Date(routine.created_at), 'dd MMM yyyy', { locale: getDateFnsLocale() })}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
-                    </View>
 
-                    {assignToDate ? (
-                      <View
-                        style={[
-                          styles.cardFooter,
-                          { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                        ]}
-                      >
-                        <TouchableOpacity
+                      {assignToDate ? (
+                        <View
                           style={[
-                            styles.startButton,
-                            {
-                              width: '100%',
-                              alignItems: 'center',
-                              backgroundColor: isDark ? 'rgba(0, 122, 255, 0.2)' : 'rgba(0, 122, 255, 0.1)',
-                            },
+                            styles.cardFooter,
+                            { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
                           ]}
-                          onPress={() => handleAssign(routine)}
                         >
-                          <Plus size={16} color={themeColors.primary} style={{ marginRight: 6 }} />
-                          <Text style={[styles.startButtonText, { color: themeColors.primary }]}>
-                            {`${t('training.addTo')} ${format(new Date(assignToDate), 'dd MMM', {
-                              locale: getDateFnsLocale(),
-                            })}`}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : isSelectionMode ? null : (
-                      <View
-                        style={[
-                          styles.cardFooter,
-                          { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                        ]}
-                      >
-                        <TouchableOpacity
-                          style={[styles.actionButton, dynamicStyles.secondaryButton]}
-                          onPress={() => navigation.navigate('GymRoutineEditor', { routineId: routine.id })}
-                        >
-                          <Edit2 size={16} color={themeColors.primary} />
-                          <Text style={[styles.actionButtonText, { color: themeColors.primary }]}>
-                            {t('common.edit')}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.deleteButton, dynamicStyles.dangerButton]}
-                          onPress={() => handleDelete(routine.id, routine.base_name)}
-                        >
-                          <Trash2 size={16} color={themeColors.danger} />
-                          <Text
-                            style={[styles.actionButtonText, styles.deleteButtonText, { color: themeColors.danger }]}
+                          <TouchableOpacity
+                            style={[
+                              styles.startButton,
+                              {
+                                width: '100%',
+                                alignItems: 'center',
+                                backgroundColor: isDark ? 'rgba(0, 122, 255, 0.2)' : 'rgba(0, 122, 255, 0.1)',
+                              },
+                            ]}
+                            onPress={() => handleAssign(routine)}
                           >
-                            {t('common.delete')}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
+                            <Plus size={16} color={themeColors.primary} style={{ marginRight: 6 }} />
+                            <Text style={[styles.startButtonText, { color: themeColors.primary }]}>
+                              {`${t('training.addTo')} ${format(new Date(assignToDate), 'dd MMM', {
+                                locale: getDateFnsLocale(),
+                              })}`}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : isSelectionMode ? null : (
+                        <View
                           style={[
-                            styles.startButton,
-                            {
-                              backgroundColor: isDark ? 'rgba(0, 122, 255, 0.2)' : 'rgba(0, 122, 255, 0.1)',
-                            },
+                            styles.cardFooter,
+                            { borderTopColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
                           ]}
-                          onPress={() => navigation.navigate('StartWorkout', { templateId: routine.id })}
                         >
-                          <Text style={[styles.startButtonText, { color: themeColors.primary }]}>
-                            {t('training.start')}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </GlassCard>
+                          <TouchableOpacity
+                            style={[styles.actionButton, dynamicStyles.secondaryButton]}
+                            onPress={() => navigation.navigate('GymRoutineEditor', { routineId: routine.id })}
+                          >
+                            <Edit2 size={16} color={themeColors.primary} />
+                            <Text style={[styles.actionButtonText, { color: themeColors.primary }]}>
+                              {t('common.edit')}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.deleteButton, dynamicStyles.dangerButton]}
+                            onPress={() => handleDelete(routine.id, routine.base_name)}
+                          >
+                            <Trash2 size={16} color={themeColors.danger} />
+                            <Text
+                              style={[styles.actionButtonText, styles.deleteButtonText, { color: themeColors.danger }]}
+                            >
+                              {t('common.delete')}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.startButton,
+                              {
+                                backgroundColor: isDark ? 'rgba(0, 122, 255, 0.2)' : 'rgba(0, 122, 255, 0.1)',
+                              },
+                            ]}
+                            onPress={() => navigation.navigate('StartWorkout', { templateId: routine.id })}
+                          >
+                            <Text style={[styles.startButtonText, { color: themeColors.primary }]}>
+                              {t('training.start')}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </GlassCard>
+                  </Pressable>
                 </View>
               ))}
             </>
