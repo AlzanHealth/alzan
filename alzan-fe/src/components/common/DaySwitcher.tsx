@@ -98,7 +98,7 @@ export const DaySwitcher = forwardRef<DaySwitcherRef, DaySwitcherProps>(
           onPress={() => (onPressDate ? onPressDate(date) : onSelectDate(date))}
           accessibilityRole="button"
           accessibilityLabel={format(date, 'PPPP', { locale: getDateFnsLocale() })}
-          accessibilityHint={t('progressPdf.dayStatusCycleHint')}
+          accessibilityHint={onPressDate ? t('progressPdf.dayStatusCycleHint') : undefined}
           accessibilityState={{ selected: isSelected }}
         >
           <Text style={[styles.dayName, dynamicStyles.dayName, isSelected && { color: '#FFFFFF', fontWeight: '700' }]}>
