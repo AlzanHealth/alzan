@@ -89,8 +89,9 @@ const renderDailyCard = (day: DailyProgress, t: ProgressPdfTranslator, locale: L
 };
 
 export const createDailyProgressHtml = (days: DailyProgress[], t: ProgressPdfTranslator, locale: Locale): string => {
+  const orderedDays = [...days].sort((a, b) => a.date.localeCompare(b.date));
   const groupedByWeek = new Map<string, DailyProgress[]>();
-  days.forEach(day => {
+  orderedDays.forEach(day => {
     const key = weekKey(day.date);
     const group = groupedByWeek.get(key) ?? [];
     group.push(day);
@@ -107,24 +108,24 @@ export const createDailyProgressHtml = (days: DailyProgress[], t: ProgressPdfTra
       : '';
     return `<section class="week-section"><div class="week-summary"><h2>${escapeHtml(format(parseISO(startDate), 'd MMM', { locale }))} – ${escapeHtml(endDate)}</h2><p>${escapeHtml(`${loggedDays}/${weekDays.length} ${t('progressPdf.daysWithFood')} · ${trainingCount} ${t('progressPdf.trainingDays')} · ${markedCount} ${t('progressPdf.markedDays')}`)}</p>${context}</div>${weekDays.map(day => renderDailyCard(day, t, locale)).join('')}</section>`;
   }).join('');
-  const weights = days
+  const weights = orderedDays
     .flatMap(day => day.weights.map(row => ({ date: row.measured_at, value: row.weight_kg })))
     .sort((a, b) => a.date.localeCompare(b.date));
   const weightTrend =
     weights.length > 1
       ? `${weights[0].value} kg → ${weights[weights.length - 1].value} kg`
       : t('progressPdf.noTrendData');
-  const missingFoodDates = days
+  const missingFoodDates = orderedDays
     .filter(day => day.meals.length === 0 && day.status !== 'vacation')
     .map(day => format(parseISO(day.date), 'd MMM yyyy', { locale }));
-  const markedDates = days
+  const markedDates = orderedDays
     .filter(day => day.status !== 'normal')
     .map(
       day =>
         `${format(parseISO(day.date), 'd MMM yyyy', { locale })}: ${day.status === 'vacation' ? t('progressPdf.vacation') : t('progressPdf.overTarget')}`,
     );
   const measurementsByType = new Map<string, DailyProgress['measurements']>();
-  days.forEach(day =>
+  orderedDays.forEach(day =>
     day.measurements.forEach(measurement => {
       const rows = measurementsByType.get(measurement.measurement_type) ?? [];
       rows.push(measurement);
@@ -152,6 +153,7 @@ export const createDailyProgressHtml = (days: DailyProgress[], t: ProgressPdfTra
     .daily-progress h1{font-size:24px;margin:0 0 16px}.daily-progress h2{font-size:17px;margin:0 0 8px}
     .status-legend,.week-summary,.period-close{background:#f5f6f8;border-radius:10px;padding:14px;margin:12px 0}
     .status-legend p,.week-summary p{font-size:11px;margin:5px 0;color:#45484d}
+    .week-summary{break-after:avoid;page-break-after:avoid}.week-summary p{overflow-wrap:anywhere}
     .day-card{border:1px solid #dfe1e5;border-left:4px solid #aeb4bd;border-radius:8px;margin:10px 0;padding:12px;break-inside:avoid}
     .day-card.over-target{border-left-color:#d97706}.day-card.vacation{border-left-color:#7c3aed}
     .day-card header{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}.day-card h3{font-size:14px;margin:0;text-transform:capitalize}.day-card header span{font-size:10px;font-weight:600}
