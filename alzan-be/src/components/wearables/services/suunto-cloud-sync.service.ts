@@ -35,6 +35,7 @@ export interface SuuntoSyncResult {
   provider: 'suunto';
   jobId: string;
   status: 'running' | 'success' | 'partial';
+  retryAfterAt?: string | null;
   activitiesImported: number;
   activitiesSkipped: number;
   activitiesRepaired: number;
@@ -91,7 +92,7 @@ export class SuuntoCloudSyncService {
       syncDomain: 'activities',
       leaseSeconds: 1800,
     });
-    if (job.action === 'active') return this.buildActiveJobResult(job.jobId);
+    if (job.action === 'active') return this.buildActiveJobResult(job);
     const stopLeaseHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
     const phaseDurationsMs: Record<string, number> = {};
     try {
@@ -193,11 +194,12 @@ export class SuuntoCloudSyncService {
     return (await this.getUsableToken(userId)).accessToken;
   }
 
-  private buildActiveJobResult(jobId: string): SuuntoSyncResult {
+  private buildActiveJobResult(job: { jobId: string; retryAfterAt: string | null }): SuuntoSyncResult {
     return {
       provider: 'suunto',
-      jobId,
+      jobId: job.jobId,
       status: 'running',
+      retryAfterAt: job.retryAfterAt,
       activitiesImported: 0,
       activitiesSkipped: 0,
       activitiesRepaired: 0,

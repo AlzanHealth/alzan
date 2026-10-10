@@ -11,6 +11,9 @@ export class CloudProviderSyncOutputDto {
   status?: string;
 
   @Expose()
+  retry_after_at?: string | null;
+
+  @Expose()
   activities_imported!: number;
 
   @Expose()

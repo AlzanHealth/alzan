@@ -57,6 +57,7 @@ export class CloudProviderSyncController {
       phase_durations_ms: result.phaseDurationsMs,
       last_success_at: result.lastSuccessAt,
       health_sync_status: health?.status ?? 'skipped',
+      retry_after_at: result.status === 'running' ? result.retryAfterAt : health?.retryAfterAt,
       health_sync_error: health?.errorCode,
       health_samples_imported: health?.healthSamplesImported ?? 0,
       health_days_imported: health?.healthDaysImported ?? 0,

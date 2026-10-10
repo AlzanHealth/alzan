@@ -119,7 +119,16 @@ export function useSuuntoConnection() {
     onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
       if (result.status === 'running') {
-        Alert.alert(t('settings.syncAlreadyRunningTitle'), t('settings.syncAlreadyRunningMessage'));
+        const retryAt = result.retry_after_at ? Date.parse(result.retry_after_at) : Number.NaN;
+        const remainingMinutes = Number.isFinite(retryAt)
+          ? Math.max(1, Math.ceil((retryAt - Date.now()) / 60_000))
+          : null;
+        Alert.alert(
+          t('settings.syncAlreadyRunningTitle'),
+          remainingMinutes == null
+            ? t('settings.syncAlreadyRunningMessage')
+            : t('settings.syncAlreadyRunningRetryMessage', { minutes: remainingMinutes }),
+        );
         return;
       }
       invalidateTrainingCalendar(queryClient);

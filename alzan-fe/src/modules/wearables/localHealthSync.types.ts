@@ -87,6 +87,7 @@ export type CloudProviderSyncResult = {
   provider: WearableProviderKey;
   job_id?: string;
   status?: 'running' | 'success' | 'partial';
+  retry_after_at?: string | null;
   activities_imported: number;
   activities_skipped?: number;
   activities_updated?: number;

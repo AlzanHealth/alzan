@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { Insert } from '../../../types/requests.types';
@@ -22,6 +22,7 @@ type SyncOutcome = {
   recoveriesImported: number;
   errorCode?: string;
   lastSyncedAt: string | null;
+  retryAfterAt?: string | null;
 };
 
 const MS_PER_DAY = 86_400_000;
@@ -30,6 +31,8 @@ const MAX_API_WINDOW_DAYS = 28;
 
 @Injectable()
 export class SuuntoHealthSyncService {
+  private readonly logger = new Logger(SuuntoHealthSyncService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly suunto: SuuntoCloudSyncService,
@@ -60,6 +63,7 @@ export class SuuntoHealthSyncService {
     }
 
     let job: Awaited<ReturnType<WearableImportLifecycleService['claimSyncJob']>> | null = null;
+    let stopLeaseHeartbeat: (() => void) | null = null;
     try {
       job = await this.lifecycle.claimSyncJob({
         userId,
@@ -67,7 +71,8 @@ export class SuuntoHealthSyncService {
         syncDomain: 'health_metrics',
         leaseSeconds: 1800,
       });
-      if (job.action === 'active') return this.outcome('running');
+      if (job.action === 'active') return this.outcome('running', undefined, job.retryAfterAt);
+      stopLeaseHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
       const accessToken = await this.suunto.getHealthAccessToken(userId);
       const now = Date.now();
       const previousCursor = await this.states.getCursor({
@@ -231,7 +236,19 @@ export class SuuntoHealthSyncService {
           .catch(() => undefined);
       }
       return this.outcome('partial', errorCode);
+    } finally {
+      stopLeaseHeartbeat?.();
     }
+  }
+
+  private startLeaseHeartbeat(jobId: string, leaseToken: string): () => void {
+    const timer = setInterval(() => {
+      void this.lifecycle.renewSyncJob(jobId, leaseToken).catch(error => {
+        this.logger.error('Failed to renew Suunto health sync job lease', error as Error);
+      });
+    }, 60_000);
+    timer.unref();
+    return () => clearInterval(timer);
   }
 
   private async fetchWindowedSamples(
@@ -414,7 +431,7 @@ export class SuuntoHealthSyncService {
     return error instanceof Error && /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'SUUNTO_247_SYNC_FAILED';
   }
 
-  private outcome(status: SyncOutcome['status'], errorCode?: string): SyncOutcome {
+  private outcome(status: SyncOutcome['status'], errorCode?: string, retryAfterAt?: string | null): SyncOutcome {
     return {
       status,
       healthSamplesImported: 0,
@@ -423,6 +440,7 @@ export class SuuntoHealthSyncService {
       recoveriesImported: 0,
       errorCode,
       lastSyncedAt: null,
+      retryAfterAt,
     };
   }
 }

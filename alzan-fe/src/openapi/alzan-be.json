@@ -1107,6 +1107,7 @@
           "provider": { "type": "string" },
           "job_id": { "type": "string" },
           "status": { "type": "string" },
+          "retry_after_at": { "type": "string", "nullable": true },
           "activities_imported": { "type": "number" },
           "activities_skipped": { "type": "number" },
           "activities_updated": { "type": "number" },

@@ -1768,6 +1768,8 @@ export default {
     syncPartialTitle: 'Sincronización completada con errores',
     syncAlreadyRunningTitle: 'Sincronización en curso',
     syncAlreadyRunningMessage: 'Ya hay otra sincronización activa. No se ha iniciado un proceso duplicado.',
+    syncAlreadyRunningRetryMessage:
+      'Hay una sincronización activa. Podrás volver a intentarlo en aproximadamente {{minutes}} min.',
     syncActivitiesSummary:
       'Importadas: {{imported}} · Omitidas: {{skipped}} · Reparadas: {{repaired}} · Fallidas: {{failed}}',
     healthDataConsentTitle: 'Consentimiento de datos de salud',

@@ -1748,6 +1748,7 @@ const en = {
     syncPartialTitle: 'Sync completed with errors',
     syncAlreadyRunningTitle: 'Sync already running',
     syncAlreadyRunningMessage: 'Another activity sync is still in progress. No duplicate sync was started.',
+    syncAlreadyRunningRetryMessage: 'A sync is still active. You can try again in approximately {{minutes}} min.',
     syncActivitiesSummary:
       'Imported: {{imported}} · Skipped: {{skipped}} · Repaired: {{repaired}} · Failed: {{failed}}',
     healthDataConsentTitle: 'Health data consent',
