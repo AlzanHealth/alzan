@@ -1120,7 +1120,13 @@
           "health_consent_required": { "type": "boolean" },
           "backfill_complete": { "type": "boolean" },
           "backfill_next_date": { "type": "string", "nullable": true },
-          "fit_pending": { "type": "number" }
+          "fit_pending": { "type": "number" },
+          "health_sync_status": { "type": "string" },
+          "health_sync_error": { "type": "string" },
+          "health_samples_imported": { "type": "number" },
+          "health_sleeps_imported": { "type": "number" },
+          "health_recoveries_imported": { "type": "number" },
+          "health_last_synced_at": { "type": "string", "nullable": true }
         },
         "required": ["provider", "activities_imported", "last_success_at"]
       },

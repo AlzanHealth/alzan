@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {
+  addSuuntoSamplePage,
   aggregateDailyActivity,
   countStressStates,
+  createSuuntoSampleAggregate,
   getHealthSummaryCardWidth,
   getStressStateCategory,
   summarizeHealthValues,
@@ -66,10 +68,47 @@ function mapsLatestStressReadingToItsRecordedCategory(): void {
 function summarizesMetricValuesAndHandlesEmptyPeriods(): void {
   assert.deepEqual(summarizeHealthValues([55.2, 73.8, 88]), { average: 72, min: 55, max: 88 });
   assert.equal(summarizeHealthValues([]), null);
+  const longHistory = Array.from({ length: 200_000 }, (_, index) => (index === 199_999 ? 120 : 60));
+  assert.deepEqual(summarizeHealthValues(longHistory), { average: 60, min: 60, max: 120 });
 }
 
 function keepsSummaryCardsCompactAcrossScreenSizes(): void {
   assert.equal(getHealthSummaryCardWidth(), '48%');
+}
+
+function aggregatesSamplePagesWithoutRetainingIndividualReadings(): void {
+  const aggregate = createSuuntoSampleAggregate();
+  const bucketSize = 60 * 60_000;
+  addSuuntoSamplePage(
+    aggregate,
+    [
+      { metric_type: 'heart_rate', value: 60, recorded_at: '2026-10-10T10:00:00.000Z' },
+      { metric_type: 'heart_rate', value: 90, recorded_at: '2026-10-10T10:30:00.000Z' },
+      { metric_type: 'hrv_rmssd', value: 40, recorded_at: '2026-10-10T10:35:00.000Z' },
+      { metric_type: 'recovery_balance', value: 0.5, recorded_at: '2026-10-10T10:35:00.000Z' },
+      { metric_type: 'stress_state', value: 1, recorded_at: '2026-10-10T10:35:00.000Z' },
+    ],
+    bucketSize,
+  );
+  addSuuntoSamplePage(
+    aggregate,
+    [
+      { metric_type: 'heart_rate', value: 120, recorded_at: '2026-10-10T11:00:00.000Z' },
+      { metric_type: 'hrv_rmssd', value: 60, recorded_at: '2026-10-10T11:00:00.000Z' },
+      { metric_type: 'recovery_balance', value: 0.7, recorded_at: '2026-10-10T11:00:00.000Z' },
+      { metric_type: 'stress_state', value: 4, recorded_at: '2026-10-10T11:00:00.000Z' },
+    ],
+    bucketSize,
+  );
+
+  assert.equal(aggregate.sampleCount, 9);
+  assert.deepEqual(aggregate.heartRate, { sum: 270, count: 3 });
+  assert.deepEqual(aggregate.hrv, { sum: 100, count: 2 });
+  assert.equal(aggregate.heartRateBuckets[Date.parse('2026-10-10T10:00:00.000Z')]?.sum, 150);
+  assert.equal(Object.keys(aggregate.heartRateBuckets).length, 2);
+  assert.equal(aggregate.latestRecoveryBalance, 0.7);
+  assert.equal(aggregate.latestStressState, 4);
+  assert.deepEqual(aggregate.stressCounts, { relaxing: 1, active: 0, passive: 0, stressful: 1 });
 }
 
 aggregatesStepsAndEnergyByCalendarDay();
@@ -77,3 +116,4 @@ countsOnlyKnownStressStates();
 mapsLatestStressReadingToItsRecordedCategory();
 summarizesMetricValuesAndHandlesEmptyPeriods();
 keepsSummaryCardsCompactAcrossScreenSizes();
+aggregatesSamplePagesWithoutRetainingIndividualReadings();

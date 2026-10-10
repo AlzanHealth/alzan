@@ -37,6 +37,18 @@ async function propagatesPageErrors(): Promise<void> {
   );
 }
 
+async function loadsRowsBeyondTheFormerFiftyThousandRowLimit(): Promise<void> {
+  const allRows = Array.from({ length: 50_001 }, (_, index) => index);
+  const result = await loadAllSuuntoPages(async (offset, pageSize) => ({
+    data: allRows.slice(offset, offset + pageSize),
+    error: null,
+  }));
+
+  assert.equal(result.length, allRows.length);
+  assert.equal(result.at(-1), 50_000);
+}
+
 void exposesRequestedDetailPeriodsAndUsesRollingRanges();
 void loadsEveryPageIncludingTheFinalPartialPage();
 void propagatesPageErrors();
+void loadsRowsBeyondTheFormerFiftyThousandRowLimit();

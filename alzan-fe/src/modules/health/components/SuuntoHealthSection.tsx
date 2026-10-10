@@ -23,11 +23,11 @@ import { SimpleChart, ChartDataPoint } from '../../../components/stats/SimpleCha
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { healthQueryKeys } from '../hooks/healthQueryKeys';
 import {
+  addSuuntoSamplePage,
   aggregateDailyActivity,
-  countStressStates,
+  createSuuntoSampleAggregate,
   getStressStateCategory,
   getHealthSummaryCardWidth,
-  summarizeHealthValues,
 } from '../helpers/suuntoHealthPresentation';
 import { getSuuntoHealthEducation, suuntoEducationTopicTitles } from '../helpers/suuntoHealthEducation';
 import {
@@ -72,6 +72,7 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   const [metric, setMetric] = React.useState<Metric>('heart_rate');
   const selectedPeriod = activeDetail ? detailPeriod : period;
   const from = getSuuntoPeriodStart(selectedPeriod);
+  const bucketSize = selectedPeriod === 'D' ? 30 * 60_000 : selectedPeriod === 'W' ? 2 * 60 * 60_000 : 24 * 60 * 60_000;
   React.useEffect(() => {
     if (sleepDetailsRequest > 0) {
       setDetailPeriod('M');
@@ -87,21 +88,28 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
     queryKey: [...healthQueryKeys.all(user?.id), 'suunto-24-7', selectedPeriod],
     enabled: !!user,
     queryFn: async () => {
-      if (!user) return { samples: [], sleeps: [], steps: [], syncState: null };
+      if (!user) return { samples: createSuuntoSampleAggregate(), sleeps: [], steps: [], syncState: null };
       const loadSamples = async () => {
-        return loadAllSuuntoPages((offset, pageSize) => {
+        const aggregate = createSuuntoSampleAggregate();
+        const pageSize = 1000;
+        for (let offset = 0; ; offset += pageSize) {
           let request = supabase
             .from('health_metric_samples')
-            .select('id, metric_type, value, unit, recorded_at, local_date')
+            .select('id, metric_type, value, recorded_at')
             .eq('user_id', user.id)
             .eq('provider', 'suunto')
             .eq('source_channel', 'cloud')
             .in('metric_type', ['heart_rate', 'hrv_rmssd', 'recovery_balance', 'stress_state', 'spo2'])
             .order('recorded_at', { ascending: true })
+            .order('id', { ascending: true })
             .range(offset, offset + pageSize - 1);
           if (from) request = request.gte('recorded_at', from);
-          return request;
-        });
+          const { data, error } = await request;
+          if (error) throw error;
+          addSuuntoSamplePage(aggregate, data ?? [], bucketSize);
+          if (!data || data.length < pageSize) break;
+        }
+        return aggregate;
       };
       const loadSleeps = () =>
         loadAllSuuntoPages((offset, pageSize) => {
@@ -152,48 +160,25 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
     },
     staleTime: 60_000,
   });
-  const values = query.data?.samples.filter(sample => sample.metric_type === metric) ?? [];
-  const heartSummary = summarizeHealthValues(
-    (query.data?.samples ?? [])
-      .filter(sample => sample.metric_type === 'heart_rate')
-      .map(sample => Number(sample.value)),
-  );
-  const hrvSummary = summarizeHealthValues(
-    (query.data?.samples ?? [])
-      .filter(sample => sample.metric_type === 'hrv_rmssd')
-      .map(sample => Number(sample.value)),
-  );
-  const bucketSize = selectedPeriod === 'D' ? 30 * 60_000 : selectedPeriod === 'W' ? 2 * 60 * 60_000 : 24 * 60 * 60_000;
-  const buckets = new Map<number, number[]>();
-  for (const sample of values) {
-    const time = new Date(sample.recorded_at).getTime();
-    const bucket = Math.floor(time / bucketSize) * bucketSize;
-    const bucketValues = buckets.get(bucket) ?? [];
-    bucketValues.push(Number(sample.value));
-    buckets.set(bucket, bucketValues);
-  }
-  const points: ChartDataPoint[] = [...buckets.entries()].map(([time, bucketValues]) => ({
-    value: Math.round(bucketValues.reduce((sum, value) => sum + value, 0) / bucketValues.length),
-    date: new Date(time),
-    label: new Date(time).toLocaleString(),
+  const sampleData = query.data?.samples;
+  const heartSummary = sampleData?.heartRate.count
+    ? { average: Math.round(sampleData.heartRate.sum / sampleData.heartRate.count) }
+    : null;
+  const hrvSummary = sampleData?.hrv.count ? { average: Math.round(sampleData.hrv.sum / sampleData.hrv.count) } : null;
+  const buckets = metric === 'heart_rate' ? sampleData?.heartRateBuckets : sampleData?.hrvBuckets;
+  const points: ChartDataPoint[] = Object.entries(buckets ?? {}).map(([time, bucket]) => ({
+    value: Math.round(bucket.sum / bucket.count),
+    date: new Date(Number(time)),
+    label: new Date(Number(time)).toLocaleString(),
   }));
   const latest = (type: string) =>
-    [...(query.data?.samples ?? [])].reverse().find(row => row.metric_type === type)?.value;
+    type === 'recovery_balance' ? sampleData?.latestRecoveryBalance : sampleData?.latestStressState;
   const latestSleep = query.data?.sleeps[0];
   const sleepRows = query.data?.sleeps ?? [];
-  const recoveryRows = query.data?.samples.filter(row => row.metric_type === 'recovery_balance') ?? [];
-  const recoveryBuckets = new Map<number, number[]>();
-  for (const row of recoveryRows) {
-    const day = new Date(row.recorded_at);
-    day.setHours(0, 0, 0, 0);
-    const readings = recoveryBuckets.get(day.getTime()) ?? [];
-    readings.push(Number(row.value) * 100);
-    recoveryBuckets.set(day.getTime(), readings);
-  }
-  const recoveryPoints: ChartDataPoint[] = [...recoveryBuckets.entries()].map(([time, readings]) => ({
-    value: readings.reduce((sum, value) => sum + value, 0) / readings.length,
-    date: new Date(time),
-    label: new Date(time).toLocaleDateString(),
+  const recoveryPoints: ChartDataPoint[] = Object.entries(sampleData?.recoveryBuckets ?? {}).map(([time, bucket]) => ({
+    value: bucket.sum / bucket.count,
+    date: new Date(Number(time)),
+    label: new Date(Number(time)).toLocaleDateString(),
   }));
   const sleepDurations = sleepRows.map(row => row.total_sleep_min).filter((value): value is number => value != null);
   const avgSleep = sleepDurations.length
@@ -218,8 +203,7 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   const totalEnergy = rowsWithEnergy.length ? rowsWithEnergy.reduce((sum, row) => sum + row.calories_kcal, 0) : null;
   const stepPoints = aggregateDailyActivity(query.data?.steps ?? [], 'steps');
   const energyPoints = aggregateDailyActivity(query.data?.steps ?? [], 'energy');
-  const stressRows = query.data?.samples.filter(row => row.metric_type === 'stress_state') ?? [];
-  const stressCounts = countStressStates(stressRows.map(row => Number(row.value)));
+  const stressCounts = sampleData?.stressCounts ?? { relaxing: 0, active: 0, passive: 0, stressful: 0 };
   const stressReadingCount = Object.values(stressCounts).reduce((sum, value) => sum + value, 0);
   const cardWidth = getHealthSummaryCardWidth();
   const detailPoints =
@@ -295,6 +279,14 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
       ) : query.isError ? (
         <GlassCard style={[styles.stateCard, healthStyles.glassCard]}>
           <Text style={[styles.stateText, { color: colors.textSecondary }]}>{t('health.suuntoError')}</Text>
+          <Pressable
+            onPress={() => void query.refetch()}
+            accessibilityRole="button"
+            accessibilityLabel={t('nutrition.retry')}
+            style={styles.retryButton}
+          >
+            <Text style={{ color: colors.primary }}>{t('nutrition.retry')}</Text>
+          </Pressable>
         </GlassCard>
       ) : (
         <>
@@ -382,7 +374,7 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
               onPress={() => showDetail('energy')}
             />
           </View>
-          {!query.data?.samples.length && !query.data?.sleeps.length && !query.data?.steps.length && (
+          {!query.data?.samples.sampleCount && !query.data?.sleeps.length && !query.data?.steps.length && (
             <Text style={[styles.empty, { color: colors.textSecondary }]}>{t('health.suuntoNoData')}</Text>
           )}
         </>
@@ -817,6 +809,7 @@ const styles = StyleSheet.create({
   selectedPeriodText: { color: '#FFF' },
   stateCard: { padding: 20, borderRadius: 20 },
   stateText: { fontSize: 14 },
+  retryButton: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', marginTop: 8 },
   value: { fontSize: 29, fontWeight: '800' },
   unit: { fontSize: 14, fontWeight: '600', color: '#82858A' },
   empty: { paddingVertical: 18, fontSize: 14, textAlign: 'center' },

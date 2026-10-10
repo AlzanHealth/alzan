@@ -192,8 +192,10 @@ async function assertBatchMetricWritesAreIdempotent(): Promise<void> {
       const query = {
         select: () => query,
         eq: () => query,
+        is: () => query,
         gte: () => query,
         lt: () => query,
+        order: () => query,
         range: async () => ({ data: [...existingIds].map(source_record_id => ({ source_record_id })), error: null }),
         insert: async (rows: Array<Record<string, unknown>>) => {
           inserted.push(...rows);
@@ -222,9 +224,269 @@ async function assertBatchMetricWritesAreIdempotent(): Promise<void> {
   );
 }
 
+async function assertCorrectedSampleUpdatesWithoutChangingOtherOwners(): Promise<void> {
+  const recordedAt = '2026-09-10T12:00:00.000Z';
+  const sourceRecordId = `heart_rate:${recordedAt}`;
+  const stored = [
+    {
+      id: 'own',
+      user_id: 'user-1',
+      provider: 'suunto',
+      source_channel: 'cloud',
+      source_package: null,
+      source_record_id: sourceRecordId,
+      recorded_at: recordedAt,
+      value: 70,
+      unit: 'bpm',
+      local_date: '2026-09-10',
+      timezone: 'UTC',
+      raw_payload: { HR: 70 },
+    },
+    {
+      id: 'other-user',
+      user_id: 'user-2',
+      provider: 'suunto',
+      source_channel: 'cloud',
+      source_package: null,
+      source_record_id: sourceRecordId,
+      recorded_at: recordedAt,
+      value: 90,
+      unit: 'bpm',
+      local_date: '2026-09-10',
+      timezone: 'UTC',
+      raw_payload: { HR: 90 },
+    },
+    {
+      id: 'other-provider',
+      user_id: 'user-1',
+      provider: 'garmin',
+      source_channel: 'cloud',
+      source_package: null,
+      source_record_id: sourceRecordId,
+      recorded_at: recordedAt,
+      value: 100,
+      unit: 'bpm',
+      local_date: '2026-09-10',
+      timezone: 'UTC',
+      raw_payload: { HR: 100 },
+    },
+    {
+      id: 'other-package',
+      user_id: 'user-1',
+      provider: 'suunto',
+      source_channel: 'cloud',
+      source_package: 'other-app',
+      source_record_id: sourceRecordId,
+      recorded_at: recordedAt,
+      value: 110,
+      unit: 'bpm',
+      local_date: '2026-09-10',
+      timezone: 'UTC',
+      raw_payload: { HR: 110 },
+    },
+  ];
+  let updates = 0;
+  let inserts = 0;
+  const client = {
+    from: () => {
+      const filters = new Map<string, unknown>();
+      const query = {
+        select: () => query,
+        eq: (column: string, value: unknown) => {
+          filters.set(column, value);
+          return query;
+        },
+        is: (column: string, value: unknown) => {
+          filters.set(column, value);
+          return query;
+        },
+        gte: () => query,
+        lt: () => query,
+        order: () => query,
+        range: async () => ({
+          data: stored.filter(row => [...filters].every(([key, value]) => row[key as keyof typeof row] === value)),
+          error: null,
+        }),
+        update: (patch: Record<string, unknown>) => {
+          const updateFilters = new Map<string, unknown>();
+          const updateQuery = {
+            eq: (column: string, value: unknown) => {
+              updateFilters.set(column, value);
+              return updateQuery;
+            },
+            is: (column: string, value: unknown) => {
+              updateFilters.set(column, value);
+              return updateQuery;
+            },
+            then: (resolve: (result: { error: null }) => void) => {
+              const target = stored.find(row =>
+                [...updateFilters].every(([key, value]) => row[key as keyof typeof row] === value),
+              );
+              if (target) Object.assign(target, patch);
+              updates += 1;
+              resolve({ error: null });
+            },
+          };
+          return updateQuery;
+        },
+        insert: async () => {
+          inserts += 1;
+          return { error: null };
+        },
+      };
+      return query;
+    },
+  };
+  const writer = new CanonicalHealthWriterService({ client } as never, {} as never);
+  const input = {
+    userId: 'user-1',
+    provider: 'suunto',
+    sourceChannel: 'cloud',
+    from: '2026-09-10T00:00:00.000Z',
+    to: '2026-09-11T00:00:00.000Z',
+    rows: [
+      {
+        user_id: 'user-1',
+        provider: 'suunto',
+        source_channel: 'cloud',
+        source_record_id: sourceRecordId,
+        recorded_at: recordedAt,
+        metric_type: 'heart_rate',
+        value: 75,
+        unit: 'bpm',
+        local_date: '2026-09-10',
+        timezone: 'UTC',
+        raw_payload: { HR: 75 },
+      },
+    ],
+  } as never;
+  assert.equal(await writer.replaceHealthMetricSamples(input), 0);
+  assert.equal(stored[0].value, 75);
+  assert.equal(stored[1].value, 90);
+  assert.equal(stored[2].value, 100);
+  assert.equal(stored[3].value, 110);
+  assert.equal(stored[0].raw_payload.HR, 75);
+  assert.equal(updates, 1);
+  assert.equal(inserts, 0);
+  assert.equal(await writer.replaceHealthMetricSamples(input), 0);
+  assert.equal(updates, 1);
+  const revised = (input as { rows: Array<{ unit: string; timezone: string }> }).rows[0];
+  revised.unit = 'beats/min';
+  revised.timezone = 'UTC+02:00';
+  assert.equal(await writer.replaceHealthMetricSamples(input), 0);
+  assert.equal(stored[0].unit, 'beats/min');
+  assert.equal(stored[0].timezone, 'UTC+02:00');
+  assert.equal(updates, 2);
+  assert.equal(await writer.replaceHealthMetricSamples(input), 0);
+  assert.equal(updates, 2);
+}
+
+async function assertExistingSamplesUseStablePagination(): Promise<void> {
+  const existing = Array.from({ length: 1001 }, (_, index) => ({
+    id: `id-${String(index).padStart(4, '0')}`,
+    source_record_id: `heart_rate:${new Date(Date.UTC(2026, 8, 10, 0, index)).toISOString()}`,
+    value: 70,
+    unit: 'bpm',
+    recorded_at: new Date(Date.UTC(2026, 8, 10, 0, index)).toISOString(),
+    local_date: '2026-09-10',
+    timezone: 'UTC',
+    raw_payload: null,
+  }));
+  const ranges: number[] = [];
+  let orderedById = false;
+  let inserted = 0;
+  const client = {
+    from: () => {
+      const query = {
+        select: () => query,
+        eq: () => query,
+        is: () => query,
+        gte: () => query,
+        lt: () => query,
+        order: (column: string) => {
+          orderedById = column === 'id';
+          return query;
+        },
+        range: async (from: number, to: number) => {
+          ranges.push(from);
+          return { data: existing.slice(from, to + 1), error: null };
+        },
+        insert: async () => {
+          inserted += 1;
+          return { error: null };
+        },
+      };
+      return query;
+    },
+  };
+  const writer = new CanonicalHealthWriterService({ client } as never, {} as never);
+  const result = await writer.replaceHealthMetricSamples({
+    userId: 'user-1',
+    provider: 'suunto',
+    sourceChannel: 'cloud',
+    from: '2026-09-10T00:00:00.000Z',
+    to: '2026-09-11T00:00:00.000Z',
+    rows: [
+      { ...existing[1000], user_id: 'user-1', provider: 'suunto', source_channel: 'cloud', metric_type: 'heart_rate' },
+    ],
+  } as never);
+  assert.equal(result, 0);
+  assert.equal(inserted, 0);
+  assert.equal(orderedById, true);
+  assert.deepEqual(ranges, [0, 1000]);
+}
+
+async function assertHealthWriteFailurePreservesCursor(): Promise<void> {
+  const originalGet = axios.get;
+  axios.get = (async () => ({ data: [] })) as typeof axios.get;
+  let savedStates = 0;
+  let markedError = '';
+  let finishedStatus = '';
+  try {
+    const service = new SuuntoHealthSyncService(
+      {
+        get: (key: string) =>
+          key === 'SUUNTO_247_ENABLED' ? 'true' : key === 'SUUNTO_247_SUBSCRIPTION_KEY' ? 'key' : undefined,
+      } as never,
+      { getHealthAccessToken: async () => 'token' } as never,
+      {
+        replaceHealthMetricSamples: async () => {
+          throw new Error('WEARABLE_HEALTH_SAMPLES_UPDATE_FAILED');
+        },
+      } as never,
+      {
+        getCursor: async () => '2026-09-10T00:00:00.000Z',
+        saveState: async () => {
+          savedStates += 1;
+        },
+        markFailed: async (_identity: unknown, error: string) => {
+          markedError = error;
+        },
+      } as never,
+      {
+        claimSyncJob: async () => ({ action: 'acquired', jobId: 'job', leaseToken: 'lease' }),
+        finishSyncJob: async ({ status }: { status: string }) => {
+          finishedStatus = status;
+        },
+      } as never,
+    );
+    const result = await service.sync('user-1');
+    assert.equal(result.status, 'partial');
+    assert.equal(result.errorCode, 'WEARABLE_HEALTH_SAMPLES_UPDATE_FAILED');
+    assert.equal(savedStates, 0);
+    assert.equal(markedError, 'WEARABLE_HEALTH_SAMPLES_UPDATE_FAILED');
+    assert.equal(finishedStatus, 'error');
+  } finally {
+    axios.get = originalGet;
+  }
+}
+
 void (async () => {
   await assertMissingPartnerAccessDoesNotClaimJob();
   await assertHealthSyncUsesIndependentDomainAndMapsPayloads();
   await assertHealthFailureIsPartial();
   await assertBatchMetricWritesAreIdempotent();
+  await assertCorrectedSampleUpdatesWithoutChangingOtherOwners();
+  await assertExistingSamplesUseStablePagination();
+  await assertHealthWriteFailurePreservesCursor();
 })();

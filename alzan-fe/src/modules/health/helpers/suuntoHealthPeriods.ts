@@ -36,7 +36,7 @@ type PageLoader<Row> = (
 
 export const loadAllSuuntoPages = async <Row>(loadPage: PageLoader<Row>, pageSize = 1000): Promise<Row[]> => {
   const rows: Row[] = [];
-  for (let offset = 0; offset < 50_000; offset += pageSize) {
+  for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await loadPage(offset, pageSize);
     if (error) throw error;
     rows.push(...(data ?? []));

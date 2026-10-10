@@ -27,12 +27,85 @@ export const getStressStateCategory = (value: number | null | undefined): Stress
 
 export type HealthValueSummary = { average: number; min: number; max: number };
 
+type ValueBucket = { sum: number; count: number };
+type SuuntoSampleRow = { metric_type: string; value: number; recorded_at: string };
+export type SuuntoSampleAggregate = {
+  sampleCount: number;
+  heartRate: ValueBucket;
+  hrv: ValueBucket;
+  heartRateBuckets: Record<string, ValueBucket>;
+  hrvBuckets: Record<string, ValueBucket>;
+  recoveryBuckets: Record<string, ValueBucket>;
+  latestRecoveryBalance: number | null;
+  latestStressState: number | null;
+  stressCounts: StressStateCounts;
+};
+
+const addBucketValue = (buckets: Record<string, ValueBucket>, key: number, value: number): void => {
+  const bucket = buckets[key] ?? { sum: 0, count: 0 };
+  bucket.sum += value;
+  bucket.count += 1;
+  buckets[key] = bucket;
+};
+
+export const createSuuntoSampleAggregate = (): SuuntoSampleAggregate => ({
+  sampleCount: 0,
+  heartRate: { sum: 0, count: 0 },
+  hrv: { sum: 0, count: 0 },
+  heartRateBuckets: {},
+  hrvBuckets: {},
+  recoveryBuckets: {},
+  latestRecoveryBalance: null,
+  latestStressState: null,
+  stressCounts: { relaxing: 0, active: 0, passive: 0, stressful: 0 },
+});
+
+export const addSuuntoSamplePage = (
+  aggregate: SuuntoSampleAggregate,
+  rows: SuuntoSampleRow[],
+  bucketSizeMs: number,
+): void => {
+  for (const row of rows) {
+    const value = Number(row.value);
+    const recordedAt = Date.parse(row.recorded_at);
+    aggregate.sampleCount += 1;
+    if (row.metric_type === 'heart_rate') {
+      aggregate.heartRate.sum += value;
+      aggregate.heartRate.count += 1;
+      addBucketValue(aggregate.heartRateBuckets, Math.floor(recordedAt / bucketSizeMs) * bucketSizeMs, value);
+    } else if (row.metric_type === 'hrv_rmssd') {
+      aggregate.hrv.sum += value;
+      aggregate.hrv.count += 1;
+      addBucketValue(aggregate.hrvBuckets, Math.floor(recordedAt / bucketSizeMs) * bucketSizeMs, value);
+    } else if (row.metric_type === 'recovery_balance') {
+      aggregate.latestRecoveryBalance = value;
+      const day = new Date(recordedAt);
+      day.setHours(0, 0, 0, 0);
+      addBucketValue(aggregate.recoveryBuckets, day.getTime(), value * 100);
+    } else if (row.metric_type === 'stress_state') {
+      aggregate.latestStressState = value;
+      if (value === 1) aggregate.stressCounts.relaxing += 1;
+      if (value === 2) aggregate.stressCounts.active += 1;
+      if (value === 3) aggregate.stressCounts.passive += 1;
+      if (value === 4) aggregate.stressCounts.stressful += 1;
+    }
+  }
+};
+
 export const summarizeHealthValues = (values: number[]): HealthValueSummary | null => {
   if (values.length === 0) return null;
+  let sum = 0;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const value of values) {
+    sum += value;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
   return {
-    average: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
-    min: Math.round(Math.min(...values)),
-    max: Math.round(Math.max(...values)),
+    average: Math.round(sum / values.length),
+    min: Math.round(min),
+    max: Math.round(max),
   };
 };
 
