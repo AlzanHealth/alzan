@@ -105,6 +105,9 @@ seed_rows AS (
     END AS avg_power,
     CASE
       WHEN sport_fixtures.sport_type <> 'gym' THEN NULL
+      WHEN fixture_days.workout_number = 51 THEN 1905
+      WHEN fixture_days.workout_number = 52 THEN 1040
+      WHEN fixture_days.workout_number = 53 THEN 975
       WHEN fixture_days.workout_number <= 26 THEN 3500 + (fixture_days.workout_number - 1) * 80
       ELSE 4050 + (fixture_days.workout_number - 27) * 80
     END AS total_volume
@@ -136,8 +139,19 @@ SELECT
   avg_power,
   temperature,
   total_volume,
-  CASE WHEN total_volume IS NULL THEN NULL ELSE 18 END,
-  CASE WHEN total_volume IS NULL THEN NULL ELSE 72 END,
+  CASE
+    WHEN total_volume IS NULL THEN NULL
+    WHEN sport_type = 'gym' AND workout_number = 51 THEN 4
+    WHEN sport_type = 'gym' AND workout_number IN (52, 53) THEN 2
+    ELSE 18
+  END,
+  CASE
+    WHEN total_volume IS NULL THEN NULL
+    WHEN sport_type = 'gym' AND workout_number = 51 THEN 36
+    WHEN sport_type = 'gym' AND workout_number = 52 THEN 16
+    WHEN sport_type = 'gym' AND workout_number = 53 THEN 18
+    ELSE 72
+  END,
   CASE
     WHEN sport_type <> 'gym' THEN NULL
     WHEN workout_number % 2 = 0 THEN '10000000-0000-0000-0000-000000000001'::uuid
