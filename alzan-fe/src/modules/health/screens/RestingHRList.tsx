@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Trash2, Heart } from 'lucide-react-native';
 import { colors, typography } from '../../../theme';
 import { useRestingHRLogs, useAddRestingHRLog, useDeleteRestingHRLog } from '../hooks/useRestingHR';
-import { SimpleChart } from '../../../components/stats/SimpleChart'; // Reuse generic
+import { HealthHistoryChart } from '../components/HealthHistoryChart';
 import { format } from 'date-fns';
 import { RestingHRLog } from '../../../types/requests.types';
 import { Alert } from '../../../components/common/Alert';
@@ -70,8 +70,12 @@ export const RestingHRList = () => {
       ?.map(l => ({
         value: l.resting_hr_bpm,
         label: new Date(l.measured_at).getDate().toString(),
+        date: new Date(l.measured_at),
       }))
       .reverse() || [];
+  const averageBpm = logs?.length
+    ? Math.round(logs.reduce((sum, log) => sum + log.resting_hr_bpm, 0) / logs.length)
+    : null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -93,7 +97,16 @@ export const RestingHRList = () => {
         ListHeaderComponent={
           logs && logs.length > 0 ? (
             <View style={styles.chartContainer}>
-              <SimpleChart data={chartData} type="line" height={150} color={colors.danger} />
+              <HealthHistoryChart
+                data={chartData}
+                height={200}
+                color={colors.danger}
+                unit={t('health.unitBpm')}
+                range="A"
+                summaryValue={averageBpm === null ? '—' : `${averageBpm} ${t('health.unitBpm')}`}
+                summaryDate={t('health.history')}
+                formatSelectedValue={value => `${Math.round(value)} ${t('health.unitBpm')}`}
+              />
             </View>
           ) : null
         }

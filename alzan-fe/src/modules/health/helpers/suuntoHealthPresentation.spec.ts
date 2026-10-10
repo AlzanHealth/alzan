@@ -5,6 +5,7 @@ import {
   countStressStates,
   createSuuntoSampleAggregate,
   getHealthSummaryCardWidth,
+  getSleepSessionForDate,
   getStressStateCategory,
   summarizeHealthValues,
 } from './suuntoHealthPresentation';
@@ -76,6 +77,18 @@ function keepsSummaryCardsCompactAcrossScreenSizes(): void {
   assert.equal(getHealthSummaryCardWidth(), '48%');
 }
 
+function selectsSleepDetailsForTheChartedNight(): void {
+  const sessions = [
+    { date: '2026-10-08', score: 70 },
+    { date: '2026-10-09', score: 82 },
+  ];
+
+  assert.deepEqual(getSleepSessionForDate(sessions, '2026-10-08'), sessions[0]);
+  assert.deepEqual(getSleepSessionForDate(sessions), sessions[0]);
+  assert.deepEqual(getSleepSessionForDate(sessions, '2026-10-07'), sessions[0]);
+  assert.equal(getSleepSessionForDate([], '2026-10-08'), undefined);
+}
+
 function aggregatesSamplePagesWithoutRetainingIndividualReadings(): void {
   const aggregate = createSuuntoSampleAggregate();
   const bucketSize = 60 * 60_000;
@@ -109,6 +122,14 @@ function aggregatesSamplePagesWithoutRetainingIndividualReadings(): void {
   assert.equal(aggregate.latestRecoveryBalance, 0.7);
   assert.equal(aggregate.latestStressState, 4);
   assert.deepEqual(aggregate.stressCounts, { relaxing: 1, active: 0, passive: 0, stressful: 1 });
+  const stressDay = new Date(Date.parse('2026-10-10T10:35:00.000Z'));
+  stressDay.setHours(0, 0, 0, 0);
+  assert.deepEqual(aggregate.stressBuckets[stressDay.getTime()], {
+    relaxing: 1,
+    active: 0,
+    passive: 0,
+    stressful: 1,
+  });
 }
 
 aggregatesStepsAndEnergyByCalendarDay();
@@ -116,4 +137,5 @@ countsOnlyKnownStressStates();
 mapsLatestStressReadingToItsRecordedCategory();
 summarizesMetricValuesAndHandlesEmptyPeriods();
 keepsSummaryCardsCompactAcrossScreenSizes();
+selectsSleepDetailsForTheChartedNight();
 aggregatesSamplePagesWithoutRetainingIndividualReadings();

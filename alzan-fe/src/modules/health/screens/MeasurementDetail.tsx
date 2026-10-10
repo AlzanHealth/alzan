@@ -7,7 +7,7 @@ import { Plus, Trash2 } from 'lucide-react-native';
 import { colors, typography } from '../../../theme';
 import { useMeasurements, useDeleteMeasurement } from '../hooks/useMeasurements';
 import { format } from 'date-fns';
-import { SimpleChart } from '../../../components/stats/SimpleChart';
+import { HealthHistoryChart } from '../components/HealthHistoryChart';
 import { BodyMeasurement } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
@@ -47,8 +47,10 @@ export const MeasurementDetail = () => {
       ?.map(l => ({
         label: new Date(l.measured_at).getDate().toString(),
         value: l.value_cm,
+        date: new Date(l.measured_at),
       }))
       .reverse() || [];
+  const averageCm = logs?.length ? logs.reduce((sum, log) => sum + log.value_cm, 0) / logs.length : null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -74,7 +76,16 @@ export const MeasurementDetail = () => {
           logs && logs.length > 0 ? (
             <View style={styles.chartContainer}>
               <Text style={styles.chartTitle}>{t('health.progress30Days')}</Text>
-              <SimpleChart data={chartData} type="line" height={200} color={colors.secondary} />
+              <HealthHistoryChart
+                data={chartData}
+                height={220}
+                color={colors.secondary}
+                unit={t('health.cm')}
+                range="A"
+                summaryValue={averageCm === null ? '—' : `${averageCm.toFixed(1)} ${t('health.cm')}`}
+                summaryDate={t('health.history')}
+                formatSelectedValue={value => `${value.toFixed(1)} ${t('health.cm')}`}
+              />
             </View>
           ) : null
         }

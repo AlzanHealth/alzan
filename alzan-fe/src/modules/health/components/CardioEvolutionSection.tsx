@@ -340,6 +340,8 @@ export const CardioEvolutionSection = () => {
           <>
             <ScrollView
               horizontal
+              nestedScrollEnabled
+              directionalLockEnabled
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.sportTabs}
               accessibilityRole="tablist"
@@ -381,6 +383,8 @@ export const CardioEvolutionSection = () => {
             <Text style={[styles.periodHeading, healthStyles.subtitle]}>{t('health.cardioPeriodHeading')}</Text>
             <ScrollView
               horizontal
+              nestedScrollEnabled
+              directionalLockEnabled
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.periodTabs}
               accessibilityRole="tablist"

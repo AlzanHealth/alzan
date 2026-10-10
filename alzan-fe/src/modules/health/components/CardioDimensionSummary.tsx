@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SimpleChart, type ChartDataPoint } from '../../../components/stats/SimpleChart';
+import type { ChartDataPoint } from '../../../components/stats/SimpleChart';
 import type { TranslationKey } from '../../../i18n/locales/en';
 import { formatLocalizedDate } from '../../../i18n/dateLocale';
 import type { HealthStyles } from '../../../hooks/useHealthStyles';
@@ -10,8 +10,18 @@ import { normalizeSportType } from '../../../utils/sportTypeNormalization';
 import type { CardioActivity, CardioPeriod } from '../algorithms/cardioEvolution';
 import { getCardioHeartRateTrendSeries, type CardioSportEvaluation } from '../algorithms/cardioSportEvaluation';
 import { getCardioPerformanceChangeCopy } from '../algorithms/cardioSportPresentation';
+import { HealthHistoryChart } from './HealthHistoryChart';
 
 type TranslateCardio = (key: TranslationKey, options?: Record<string, unknown>) => string;
+
+const CARDIO_PERIOD_TRANSLATIONS = {
+  day: 'health.cardioPeriodDay',
+  week: 'health.cardioPeriodWeek',
+  month: 'health.cardioPeriodMonth',
+  three_months: 'health.cardioPeriodThreeMonths',
+  six_months: 'health.cardioPeriodSixMonths',
+  all: 'health.cardioPeriodAll',
+} satisfies Record<CardioPeriod, TranslationKey>;
 
 const formatEvaluationMetric = (
   value: number | null,
@@ -332,13 +342,22 @@ export const CardioDimensionSummary = ({
               {t('health.cardioHeartRateTrendDescription', { bucket: t(trendBucketTranslation) })}
             </Text>
           </View>
-          <SimpleChart
+          <HealthHistoryChart
+            key={`${normalizedSportType}-${period}`}
             data={heartRateTrendData}
-            type="bar"
-            height={165}
+            height={200}
             color={chartColor}
             unit={t('health.cardioBpm')}
             range={chartRange}
+            summaryValue={
+              assessment.cardiovascular.recentMedianBpm === null
+                ? '—'
+                : `${Math.round(assessment.cardiovascular.recentMedianBpm)} ${t('health.cardioBpm')}`
+            }
+            summaryDate={t(CARDIO_PERIOD_TRANSLATIONS[period])}
+            summaryLabel={t('health.cardioMetricHeartRate')}
+            formatSelectedValue={value => `${Math.round(value)} ${t('health.cardioBpm')}`}
+            formatSelectedDate={point => point.label ?? point.dateRange}
           />
         </View>
       ) : null}

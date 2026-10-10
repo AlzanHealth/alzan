@@ -33,6 +33,7 @@ export const CardioEvolutionScreen = () => {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
         >
           <CardioEvolutionSection />
         </ScrollView>
@@ -47,5 +48,5 @@ const styles = StyleSheet.create({
   topBar: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, gap: 10 },
   backButton: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   topBarTitle: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '600' },
-  content: { paddingHorizontal: 18, paddingBottom: 32 },
+  content: { paddingHorizontal: 18, paddingBottom: 120 },
 });

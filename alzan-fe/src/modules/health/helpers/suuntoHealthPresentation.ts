@@ -27,6 +27,11 @@ export const getStressStateCategory = (value: number | null | undefined): Stress
 
 export type HealthValueSummary = { average: number; min: number; max: number };
 
+export const getSleepSessionForDate = <Session extends { date: string }>(
+  sessions: Session[],
+  selectedDate?: string,
+): Session | undefined => sessions.find(session => session.date === selectedDate) ?? sessions[0];
+
 type ValueBucket = { sum: number; count: number };
 type SuuntoSampleRow = { metric_type: string; value: number; recorded_at: string };
 export type SuuntoSampleAggregate = {
@@ -39,6 +44,7 @@ export type SuuntoSampleAggregate = {
   latestRecoveryBalance: number | null;
   latestStressState: number | null;
   stressCounts: StressStateCounts;
+  stressBuckets: Record<string, StressStateCounts>;
 };
 
 const addBucketValue = (buckets: Record<string, ValueBucket>, key: number, value: number): void => {
@@ -58,6 +64,7 @@ export const createSuuntoSampleAggregate = (): SuuntoSampleAggregate => ({
   latestRecoveryBalance: null,
   latestStressState: null,
   stressCounts: { relaxing: 0, active: 0, passive: 0, stressful: 0 },
+  stressBuckets: {},
 });
 
 export const addSuuntoSamplePage = (
@@ -84,10 +91,16 @@ export const addSuuntoSamplePage = (
       addBucketValue(aggregate.recoveryBuckets, day.getTime(), value * 100);
     } else if (row.metric_type === 'stress_state') {
       aggregate.latestStressState = value;
-      if (value === 1) aggregate.stressCounts.relaxing += 1;
-      if (value === 2) aggregate.stressCounts.active += 1;
-      if (value === 3) aggregate.stressCounts.passive += 1;
-      if (value === 4) aggregate.stressCounts.stressful += 1;
+      const category =
+        value === 1 ? 'relaxing' : value === 2 ? 'active' : value === 3 ? 'passive' : value === 4 ? 'stressful' : null;
+      if (category) {
+        aggregate.stressCounts[category] += 1;
+        const day = new Date(recordedAt);
+        day.setHours(0, 0, 0, 0);
+        const dayKey = String(day.getTime());
+        const dayCounts = (aggregate.stressBuckets[dayKey] ??= { relaxing: 0, active: 0, passive: 0, stressful: 0 });
+        dayCounts[category] += 1;
+      }
     }
   }
 };

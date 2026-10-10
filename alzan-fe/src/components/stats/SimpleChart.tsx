@@ -466,6 +466,8 @@ export const SimpleChart: React.FC<SimpleChartProps> = ({
       <ScrollView
         ref={scrollRef}
         horizontal
+        nestedScrollEnabled
+        directionalLockEnabled
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ width: computedWidth }}
         style={styles.scrollView}

@@ -19,7 +19,7 @@ import { Modal, Pressable, ScrollView, StyleProp, StyleSheet, Text, View, ViewSt
 import { supabase } from '../../../lib/supabaseClient';
 import { useAuth } from '../../../context/AuthContext';
 import { GlassCard } from '../../../components/GlassCard';
-import { SimpleChart, ChartDataPoint } from '../../../components/stats/SimpleChart';
+import type { ChartDataPoint, ChartDataPointSelect } from '../../../components/stats/SimpleChart';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { healthQueryKeys } from '../hooks/healthQueryKeys';
 import {
@@ -28,8 +28,10 @@ import {
   createSuuntoSampleAggregate,
   getStressStateCategory,
   getHealthSummaryCardWidth,
+  getSleepSessionForDate,
 } from '../helpers/suuntoHealthPresentation';
 import { getSuuntoHealthEducation, suuntoEducationTopicTitles } from '../helpers/suuntoHealthEducation';
+import { HealthHistoryChart } from './HealthHistoryChart';
 import {
   getSuuntoChartRange,
   getSuuntoPeriodStart,
@@ -70,6 +72,8 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   const [period, setPeriod] = React.useState<Period>('W');
   const [detailPeriod, setDetailPeriod] = React.useState<SuuntoDetailPeriod>('W');
   const [metric, setMetric] = React.useState<Metric>('heart_rate');
+  const [selectedSleepDate, setSelectedSleepDate] = React.useState<string>();
+  const [selectedStressDate, setSelectedStressDate] = React.useState<number>();
   const selectedPeriod = activeDetail ? detailPeriod : period;
   const from = getSuuntoPeriodStart(selectedPeriod);
   const bucketSize = selectedPeriod === 'D' ? 30 * 60_000 : selectedPeriod === 'W' ? 2 * 60 * 60_000 : 24 * 60 * 60_000;
@@ -81,6 +85,8 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   }, [sleepDetailsRequest]);
   const showDetail = (detail: SummaryMetric) => {
     setDetailPeriod(detail === 'sleep' ? 'M' : period === '2M' ? 'W' : period);
+    setSelectedSleepDate(undefined);
+    setSelectedStressDate(undefined);
     setActiveDetail(detail);
   };
 
@@ -173,8 +179,8 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   }));
   const latest = (type: string) =>
     type === 'recovery_balance' ? sampleData?.latestRecoveryBalance : sampleData?.latestStressState;
-  const latestSleep = query.data?.sleeps[0];
   const sleepRows = query.data?.sleeps ?? [];
+  const selectedSleep = getSleepSessionForDate(sleepRows, selectedSleepDate);
   const recoveryPoints: ChartDataPoint[] = Object.entries(sampleData?.recoveryBuckets ?? {}).map(([time, bucket]) => ({
     value: bucket.sum / bucket.count,
     date: new Date(Number(time)),
@@ -203,19 +209,37 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   const totalEnergy = rowsWithEnergy.length ? rowsWithEnergy.reduce((sum, row) => sum + row.calories_kcal, 0) : null;
   const stepPoints = aggregateDailyActivity(query.data?.steps ?? [], 'steps');
   const energyPoints = aggregateDailyActivity(query.data?.steps ?? [], 'energy');
-  const stressCounts = sampleData?.stressCounts ?? { relaxing: 0, active: 0, passive: 0, stressful: 0 };
-  const stressReadingCount = Object.values(stressCounts).reduce((sum, value) => sum + value, 0);
+  const periodStressCounts = sampleData?.stressCounts ?? { relaxing: 0, active: 0, passive: 0, stressful: 0 };
+  const selectedStressCounts =
+    selectedStressDate === undefined
+      ? periodStressCounts
+      : (sampleData?.stressBuckets[String(selectedStressDate)] ?? {
+          relaxing: 0,
+          active: 0,
+          passive: 0,
+          stressful: 0,
+        });
+  const periodStressReadingCount = Object.values(periodStressCounts).reduce((sum, value) => sum + value, 0);
+  const stressReadingCount = Object.values(selectedStressCounts).reduce((sum, value) => sum + value, 0);
+  const stressPoints: ChartDataPoint[] = Object.entries(sampleData?.stressBuckets ?? {})
+    .map(([time, counts]) => ({
+      value: Object.values(counts).reduce((sum, count) => sum + count, 0),
+      date: new Date(Number(time)),
+    }))
+    .sort((left, right) => (left.date?.getTime() ?? 0) - (right.date?.getTime() ?? 0));
   const cardWidth = getHealthSummaryCardWidth();
   const detailPoints =
     activeDetail === 'heart_rate' || activeDetail === 'hrv_rmssd'
       ? points
       : activeDetail === 'recovery'
         ? recoveryPoints
-        : activeDetail === 'steps'
-          ? stepPoints
-          : activeDetail === 'energy'
-            ? energyPoints
-            : [];
+        : activeDetail === 'stress'
+          ? stressPoints
+          : activeDetail === 'steps'
+            ? stepPoints
+            : activeDetail === 'energy'
+              ? energyPoints
+              : [];
   const activeDetailTitle =
     activeDetail === 'heart_rate'
       ? t('health.suuntoHeartRate')
@@ -237,12 +261,24 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
       ? t('health.suuntoPeriodAverage')
       : activeDetail === 'sleep'
         ? t('health.suuntoSleepPeriodAverage')
-        : activeDetail === 'recovery' || activeDetail === 'stress'
+        : activeDetail === 'recovery'
           ? t('health.suuntoLatestInPeriod')
           : t('health.suuntoTotalInPeriod');
   const stressValue = latest('stress_state');
   const stressStateCategory = getStressStateCategory(stressValue == null ? null : Number(stressValue));
   const stressLabel = stressStateCategory ? t(stressStateLabelKeys[stressStateCategory]) : '—';
+  const periodSummaryDate = `${activePeriodSummaryLabel} · ${t(`health.suuntoPeriod${detailPeriod}`)}`;
+  const detailSummaryValues = {
+    heart_rate: heartSummary ? `${heartSummary.average} bpm` : '—',
+    hrv_rmssd: hrvSummary ? `${hrvSummary.average} ms` : '—',
+    recovery: latest('recovery_balance') == null ? '—' : `${Math.round(Number(latest('recovery_balance')) * 100)}%`,
+    sleep: averageSleepLabel,
+    stress: t('health.suuntoStressSamples', { count: periodStressReadingCount }),
+    steps: totalSteps === null ? '—' : totalSteps.toLocaleString(),
+    energy: totalEnergy === null ? '—' : `${Math.round(totalEnergy)} kcal`,
+  };
+  const activeDetailSummaryValue = activeDetail ? getSummaryValue(activeDetail, detailSummaryValues) : '—';
+  const hasActiveDetailTrend = activeDetail === 'sleep' ? sleepPoints.length > 0 : detailPoints.length > 0;
 
   return (
     <View style={styles.section}>
@@ -433,7 +469,11 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                     {SUUNTO_DETAIL_PERIODS.map(item => (
                       <Pressable
                         key={item}
-                        onPress={() => setDetailPeriod(item)}
+                        onPress={() => {
+                          setDetailPeriod(item);
+                          setSelectedSleepDate(undefined);
+                          setSelectedStressDate(undefined);
+                        }}
                         accessibilityRole="tab"
                         accessibilityState={{ selected: detailPeriod === item }}
                         style={[styles.detailPeriodTab, detailPeriod === item && styles.selectedPeriod]}
@@ -452,23 +492,12 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                 ) : query.isError ? (
                   <Text style={[styles.empty, { color: colors.textSecondary }]}>{t('health.suuntoError')}</Text>
                 ) : null}
-                <Text style={[styles.detailValue, healthStyles.title]}>
-                  {getSummaryValue(activeDetail, {
-                    heart_rate: heartSummary ? `${heartSummary.average} bpm` : '—',
-                    hrv_rmssd: hrvSummary ? `${hrvSummary.average} ms` : '—',
-                    recovery:
-                      latest('recovery_balance') == null
-                        ? '—'
-                        : `${Math.round(Number(latest('recovery_balance')) * 100)}%`,
-                    sleep: averageSleepLabel,
-                    stress: stressLabel,
-                    steps: totalSteps === null ? '—' : totalSteps.toLocaleString(),
-                    energy: totalEnergy === null ? '—' : `${Math.round(totalEnergy)} kcal`,
-                  })}
-                </Text>
-                <Text style={[styles.detailPeriod, { color: colors.textSecondary }]}>
-                  {activePeriodSummaryLabel} · {t(`health.suuntoPeriod${detailPeriod}`)}
-                </Text>
+                {!hasActiveDetailTrend ? (
+                  <>
+                    <Text style={[styles.detailValue, healthStyles.title]}>{activeDetailSummaryValue}</Text>
+                    <Text style={[styles.detailPeriod, { color: colors.textSecondary }]}>{periodSummaryDate}</Text>
+                  </>
+                ) : null}
                 <Text style={[styles.detailDescription, { color: colors.textSecondary }]}>
                   {t(summaryDescriptions[activeDetail])}
                 </Text>
@@ -477,24 +506,28 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                     <Text style={[styles.detailSectionTitle, healthStyles.title]}>
                       {t('health.suuntoSleepTrendChart')}
                     </Text>
-                    <SimpleChart
+                    <HealthHistoryChart
+                      key={`sleep-${detailPeriod}`}
                       data={sleepPoints}
-                      type="bar"
-                      height={190}
+                      height={220}
                       color="#8B68E8"
                       range={getSuuntoChartRange(detailPeriod)}
                       unit="h"
-                      showYAxis
+                      summaryValue={averageSleepLabel}
+                      summaryDate={periodSummaryDate}
+                      summaryLabel={t('health.suuntoSleepPeriodAverage')}
+                      formatSelectedValue={value => {
+                        const minutes = Math.round(value * 60);
+                        return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+                      }}
+                      onSelectedPointChange={(point: ChartDataPointSelect | undefined) =>
+                        setSelectedSleepDate(point?.label)
+                      }
                     />
-                    {latestSleep ? (
-                      <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
-                        {t('health.suuntoLatestSleepSession', { date: latestSleep.date })}
-                      </Text>
-                    ) : null}
                   </>
                 ) : null}
                 {activeDetail === 'sleep' ? (
-                  latestSleep ? (
+                  selectedSleep ? (
                     <>
                       <Text style={[styles.detailSectionTitle, healthStyles.title]}>
                         {t('health.suuntoSleepStages')}
@@ -503,7 +536,7 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                         {t('health.suuntoSleepStagesDescription')}
                       </Text>
                       <View style={styles.stageBar}>
-                        {[latestSleep.deep_sleep_min, latestSleep.light_sleep_min, latestSleep.rem_sleep_min].map(
+                        {[selectedSleep.deep_sleep_min, selectedSleep.light_sleep_min, selectedSleep.rem_sleep_min].map(
                           (stage, index) => (
                             <View
                               key={index}
@@ -516,17 +549,17 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                         {[
                           {
                             label: t('health.suuntoDeep'),
-                            minutes: latestSleep.deep_sleep_min,
+                            minutes: selectedSleep.deep_sleep_min,
                             description: t('health.suuntoDeepDescription'),
                           },
                           {
                             label: t('health.suuntoLight'),
-                            minutes: latestSleep.light_sleep_min,
+                            minutes: selectedSleep.light_sleep_min,
                             description: t('health.suuntoLightDescription'),
                           },
                           {
                             label: t('health.suuntoRem'),
-                            minutes: latestSleep.rem_sleep_min,
+                            minutes: selectedSleep.rem_sleep_min,
                             description: t('health.suuntoRemDescription'),
                           },
                         ].map(({ label, minutes, description }, index) => (
@@ -550,37 +583,37 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                       <View style={styles.metricsGrid}>
                         <Metric
                           label={t('health.sleepHeartRate')}
-                          value={latestSleep.avg_heart_rate_bpm}
+                          value={selectedSleep.avg_heart_rate_bpm}
                           unit="bpm"
                           description={t('health.sleepHeartRateDescription')}
                         />
                         <Metric
                           label={t('health.sleepMinHeartRate')}
-                          value={latestSleep.min_heart_rate_bpm}
+                          value={selectedSleep.min_heart_rate_bpm}
                           unit="bpm"
                           description={t('health.sleepMinHeartRateDescription')}
                         />
                         <Metric
                           label={t('health.sleepHrv')}
-                          value={latestSleep.avg_hrv_ms}
+                          value={selectedSleep.avg_hrv_ms}
                           unit="ms"
                           description={t('health.sleepHrvDescription')}
                         />
                         <Metric
                           label={t('health.sleepSpo2Max')}
-                          value={latestSleep.max_spo2_pct}
+                          value={selectedSleep.max_spo2_pct}
                           unit="%"
                           description={t('health.sleepSpo2MaxDescription')}
                         />
                         <Metric
                           label={t('health.suuntoSleepScore')}
-                          value={latestSleep.sleep_score}
+                          value={selectedSleep.sleep_score}
                           unit=""
                           description={t('health.sleepScoreDescription')}
                         />
                         <Metric
                           label={t('health.sleepAwake')}
-                          value={latestSleep.awake_min}
+                          value={selectedSleep.awake_min}
                           unit="min"
                           description={t('health.sleepAwakeDescription')}
                         />
@@ -591,41 +624,58 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                   )
                 ) : activeDetail === 'stress' ? (
                   stressReadingCount > 0 ? (
-                    <View style={styles.stressBreakdown}>
-                      {(
-                        [
-                          ['relaxing', t('health.suuntoStressRelaxing'), stressCounts.relaxing, '#35B779'],
-                          ['active', t('health.suuntoStressActive'), stressCounts.active, '#F4C542'],
-                          ['passive', t('health.suuntoStressPassive'), stressCounts.passive, '#8B68E8'],
-                          ['stressful', t('health.suuntoStressful'), stressCounts.stressful, '#F05252'],
-                        ] as const
-                      ).map(([key, label, count, color]) => {
-                        const share = (count / stressReadingCount) * 100;
-                        return (
-                          <View key={key} style={styles.stressRow}>
-                            <View style={styles.stressLabelRow}>
-                              <Text style={[styles.metricLabel, { color: colors.textPrimary }]}>{label}</Text>
-                              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
-                                {t('health.suuntoStressSamples', { count })}
-                              </Text>
+                    <>
+                      {stressPoints.length > 0 ? (
+                        <HealthHistoryChart
+                          key={`stress-${detailPeriod}`}
+                          data={stressPoints}
+                          height={220}
+                          color="#F59E0B"
+                          range={getSuuntoChartRange(detailPeriod)}
+                          unit={t('health.suuntoStressSamples', { count: 1 })}
+                          summaryValue={t('health.suuntoStressSamples', { count: periodStressReadingCount })}
+                          summaryDate={periodSummaryDate}
+                          summaryLabel={t('health.suuntoTotalInPeriod')}
+                          formatSelectedValue={value => t('health.suuntoStressSamples', { count: Math.round(value) })}
+                          onSelectedPointChange={point => setSelectedStressDate(point?.date?.getTime())}
+                        />
+                      ) : null}
+                      <View style={styles.stressBreakdown}>
+                        {(
+                          [
+                            ['relaxing', t('health.suuntoStressRelaxing'), selectedStressCounts.relaxing, '#35B779'],
+                            ['active', t('health.suuntoStressActive'), selectedStressCounts.active, '#F4C542'],
+                            ['passive', t('health.suuntoStressPassive'), selectedStressCounts.passive, '#8B68E8'],
+                            ['stressful', t('health.suuntoStressful'), selectedStressCounts.stressful, '#F05252'],
+                          ] as const
+                        ).map(([key, label, count, color]) => {
+                          const share = (count / stressReadingCount) * 100;
+                          return (
+                            <View key={key} style={styles.stressRow}>
+                              <View style={styles.stressLabelRow}>
+                                <Text style={[styles.metricLabel, { color: colors.textPrimary }]}>{label}</Text>
+                                <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+                                  {t('health.suuntoStressSamples', { count })}
+                                </Text>
+                              </View>
+                              <View style={styles.stressTrack}>
+                                <View style={[styles.stressFill, { width: `${share}%`, backgroundColor: color }]} />
+                              </View>
                             </View>
-                            <View style={styles.stressTrack}>
-                              <View style={[styles.stressFill, { width: `${share}%`, backgroundColor: color }]} />
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
+                          );
+                        })}
+                      </View>
+                    </>
                   ) : (
                     <Text style={[styles.empty, { color: colors.textSecondary }]}>
                       {t('health.suuntoNoMetricData')}
                     </Text>
                   )
                 ) : detailPoints.length > 0 ? (
-                  <SimpleChart
+                  <HealthHistoryChart
+                    key={`${activeDetail}-${detailPeriod}`}
                     data={detailPoints}
-                    type={activeDetail === 'steps' || activeDetail === 'energy' ? 'bar' : 'line'}
-                    height={190}
+                    height={220}
                     color={
                       activeDetail === 'heart_rate'
                         ? '#F05252'
@@ -644,10 +694,30 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                           : activeDetail === 'recovery'
                             ? '%'
                             : activeDetail === 'steps'
-                              ? 'steps'
+                              ? t('health.suuntoSteps')
                               : 'kcal'
                     }
-                    showYAxis
+                    summaryValue={activeDetailSummaryValue}
+                    summaryDate={periodSummaryDate}
+                    summaryLabel={
+                      activeDetail === 'recovery'
+                        ? t('health.suuntoLatestInPeriod')
+                        : activeDetail === 'steps' || activeDetail === 'energy'
+                          ? t('health.suuntoTotalInPeriod')
+                          : t('health.suuntoPeriodAverage')
+                    }
+                    includeTimeInSelectedDate={
+                      (activeDetail === 'heart_rate' || activeDetail === 'hrv_rmssd') &&
+                      (detailPeriod === 'D' || detailPeriod === 'W')
+                    }
+                    formatSelectedValue={value => {
+                      if (activeDetail === 'heart_rate') return `${Math.round(value)} bpm`;
+                      if (activeDetail === 'hrv_rmssd') return `${Math.round(value)} ms`;
+                      if (activeDetail === 'recovery') return `${Math.round(value)}%`;
+                      if (activeDetail === 'steps')
+                        return `${Math.round(value).toLocaleString()} ${t('health.suuntoSteps').toLowerCase()}`;
+                      return `${Math.round(value)} kcal`;
+                    }}
                   />
                 ) : (
                   <Text style={[styles.empty, { color: colors.textSecondary }]}>{t('health.suuntoNoMetricData')}</Text>
