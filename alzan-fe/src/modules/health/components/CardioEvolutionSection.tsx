@@ -361,7 +361,10 @@ export const CardioEvolutionSection = () => {
                 const label = translationKey
                   ? t(translationKey)
                   : t('health.cardioUnknownSport', { number: unknownSportNumbers.get(option.sportType) ?? 1 });
-                const iconSport = normalizeSportType(option.sportType) ?? 'other';
+                const iconSport =
+                  option.sportType === 'gym' || option.sportType === 'strength'
+                    ? 'gym'
+                    : (normalizeSportType(option.sportType) ?? 'other');
                 return (
                   <Pressable
                     key={option.sportType}
@@ -376,7 +379,7 @@ export const CardioEvolutionSection = () => {
                     accessibilityLabel={label}
                   >
                     <SportIcon
-                      sport={option.sportType === 'strength' ? 'gym' : iconSport}
+                      sport={iconSport}
                       size={16}
                       color={selected ? colors.background : colors.textSecondary}
                     />
