@@ -52,7 +52,10 @@ export const normalizeCardioSportType = (
     .replace(/[\s-]+/g, '_');
   if (normalizedSport === 'other' && subtypeToken && subtypeToken !== 'other') {
     const inferredSubtypeSport = normalizeSportType(sportSubtype);
-    return inferredSubtypeSport && inferredSubtypeSport !== 'other' ? inferredSubtypeSport : `other_${subtypeToken}`;
+    if (inferredSubtypeSport && inferredSubtypeSport !== 'other') {
+      return inferredSubtypeSport === 'strength' ? 'gym' : inferredSubtypeSport;
+    }
+    return `other_${subtypeToken}`;
   }
   if (normalizedSport === 'running' && /(^|_)trail(_|$)/.test(subtypeToken)) return 'trail';
   return normalizedSport === 'strength' ? 'gym' : normalizedSport;
@@ -92,7 +95,10 @@ export const normalizeCardioSportSubtype = (
     if (['pool', 'indoor', 'pool_swimming'].includes(token)) return 'pool';
     if (['openwater', 'open_water', 'outdoor'].includes(token)) return 'open_water';
   }
-  if (normalizedSport === 'strength' && ['gym', 'indoor', 'indoor_strength', 'strength_training'].includes(token))
+  if (
+    (normalizedSport === 'strength' || normalizeCardioSportType(sportType, sportSubtype) === 'gym') &&
+    ['gym', 'indoor', 'indoor_strength', 'strength', 'strength_training'].includes(token)
+  )
     return 'gym';
   if (normalizedSport === 'football') {
     if (['football_7', '7_a_side', 'seven_a_side'].includes(token)) return 'football_7';
