@@ -990,7 +990,7 @@ const en = {
     suuntoAccessNote: 'Available metrics depend on Suunto 24/7 API access and the data recorded by your watch.',
     cardioTitle: 'Your cardio progress',
     cardioScreenTitle: 'Heart-rate analysis',
-    cardioSubtitle: 'See how your heart rate responds across your sports.',
+    cardioSubtitle: 'See how your heart responds and how your performance changes in each sport.',
     cardioCardDescription: 'Compare performance and heart rate for each sport.',
     cardioCardOpen: 'View analysis',
     cardioLoading: 'Reviewing your recent workouts…',
@@ -1005,6 +1005,12 @@ const en = {
     cardioStatusStable: 'No clear change',
     cardioStatusDescriptive: 'Heart-rate response',
     cardioStatusInsufficient: 'More comparable workouts needed',
+    cardioStatusNoActivities: 'No workouts in this period',
+    cardioStatusNoRecentActivities: 'No recent workouts in this period',
+    cardioStatusNoRecentHeartRate: 'No recent heart rate data',
+    cardioStatusNoHeartRate: 'Workouts without recorded HR',
+    cardioStatusInvalidHeartRate: 'HR data cannot be analyzed',
+    cardioStatusNoComparable: 'Sessions are not comparable',
     cardioConfidenceLabel: 'Confidence',
     cardioConfidenceHelp:
       'Based on the number of workouts, how they span several weeks, and recorded conditions; it is not a probability of improvement.',
@@ -1025,7 +1031,9 @@ const en = {
     cardioPacePer100m: 'min/100 m',
     cardioMatchedSessions: '{{count}} matched workout pairs',
     cardioSessionCounts: '{{recent}} recent and {{previous}} earlier workouts with heart rate',
+    cardioActivityCounts: '{{recent}} recent and {{previous}} earlier workouts in this period',
     cardioRecentAverageHr: 'Recent average workout heart rate',
+    cardioPreviousAverageHr: 'Average heart rate in the previous period',
     cardioMeaningTitle: 'What does this mean?',
     cardioRecommendationTitle: 'What can you do?',
     cardioPositiveOutputMeaning:
@@ -1042,6 +1050,18 @@ const en = {
       'The available summaries describe heart-rate response, but there is not enough comparable speed, power or workload to rate performance for this sport.',
     cardioNeedMoreData:
       'At least three comparable workout pairs are needed. We match the same sport, similar duration and heart rate, and avoid mixing different recorded subtypes.',
+    cardioNoActivitiesInPeriod:
+      'There are no workouts for this sport in the selected period. Choose a longer period to review your history.',
+    cardioNoRecentActivitiesMeaning:
+      'There are no workouts in the recent half of this comparison. The previous period is shown for context only.',
+    cardioNoRecentHeartRateMeaning:
+      'Recent workouts are recorded, but none has a valid heart-rate value. The earlier readings cannot describe your current response.',
+    cardioNoHeartRateMeaning:
+      'Workouts are recorded, but they do not include a valid heart-rate value. Without it, we cannot compare your heart response.',
+    cardioInvalidHeartRateMeaning:
+      'The available heart-rate values are outside the expected range for a workout reading. We exclude them from trend calculations.',
+    cardioNoComparableSessionsMeaning:
+      'Heart rate is available, but the sessions differ in duration, subtype or output. Comparing them could be misleading.',
     cardioPositiveRecommendation:
       'Keep your training routine and see whether this signal repeats over the next few weeks. Compare similar routes, duration and effort.',
     cardioDecliningRecommendation:
@@ -1054,6 +1074,18 @@ const en = {
       'Record heart rate together with a consistent workload, such as pace, power or a repeatable interval, to make a stronger comparison.',
     cardioNeedMoreRecommendation:
       'Wear your device for similar sessions and include heart rate plus pace or power when available. More varied data does not automatically make a comparison more reliable.',
+    cardioNoActivitiesRecommendation:
+      'Choose a longer analysis period or record another workout in this sport to see its data.',
+    cardioNoRecentActivitiesRecommendation:
+      'Choose a longer period or record another workout in this sport before comparing trends.',
+    cardioNoRecentHeartRateRecommendation:
+      'Check that heart-rate recording is enabled and the sensor is fitted correctly on your next workout.',
+    cardioNoHeartRateRecommendation:
+      'Turn on heart-rate recording on your watch and check its fit before syncing your next session.',
+    cardioInvalidHeartRateRecommendation:
+      'Check the sensor fit and sync again. If the reading concerns you, discuss it with a health professional.',
+    cardioNoComparableSessionsRecommendation:
+      'Compare sessions with the same subtype and similar duration and effort. In the meantime, review the descriptive metrics available.',
     cardioSwimmingCaution:
       'Wrist optical heart-rate readings can be less reliable in water. Treat swimming comparisons cautiously, especially when the sensor source is unknown.',
     cardioPeriodHeading: 'Analysis period',
@@ -1071,6 +1103,12 @@ const en = {
     cardioContextderived_speed: 'speed estimated from distance and duration',
     cardioContextswimming_sensor: 'swimming sensor accuracy',
     cardioContextdevice: 'different recording device',
+    cardioContextheart_rate_quality: 'some heart-rate readings outside the expected workout range were excluded',
+    cardioContextactivity_quality:
+      'speed, power, distance or duration values looked out of range; they were excluded or checked against available data',
+    cardioContextsubtype: 'a session is missing its subtype, so its modality could not be confirmed',
+    cardioStreamLoadError:
+      'Heart-rate samples could not be loaded. The summary and main comparison remain available, but time-series analysis is omitted.',
     cardioDriftTitle: 'Effort stability in the latest long workout',
     cardioDriftBody:
       'The heart-rate-to-speed or power relationship changed by {{percent}}% between the first and second halves while output stayed similar. This describes that workout and does not identify why it changed.',
@@ -1083,13 +1121,14 @@ const en = {
     cardioIntervalRecoveryUnavailable:
       'Continuous heart-rate samples during the workout are needed to describe interval recovery; an average alone is not enough.',
     cardioWeeklyTitle: 'Cardio summary',
-    cardioLastSevenDays: 'Recorded in the last 7 days',
+    cardioLastSevenDays: 'All sports · last 7 days',
     cardioSessionsWithHr: 'Workouts with HR',
     cardioTrainingTime: 'Time in those workouts',
     cardioMedianHr: 'Median workout HR',
     cardioTimeInZones: 'Recorded time in heart-rate zones',
     cardioZoneDataSource: 'Only workouts that include zone totals',
     cardioNoZoneData: 'No time-in-zone data was saved for these workouts.',
+    cardioZonesLoadError: 'Heart-rate zones could not be loaded. The rest of the cardio analysis remains available.',
     cardioWeeklyDisclaimer:
       'This distribution describes recorded effort. Without your training goal, it cannot tell whether the mix is right for you.',
     cardioStrengthVolume: 'Volume in the same strength routine',

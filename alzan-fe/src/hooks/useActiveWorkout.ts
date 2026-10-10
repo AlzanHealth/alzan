@@ -18,6 +18,7 @@ import { getDefaultGymExerciseTargets } from '../modules/training/helpers/gymExe
 import { getStrengthProgressionDate } from '../modules/training/helpers/strengthProgression.helper';
 import { applyStrengthProgressionsForPlannedDate } from '../modules/training/services/strengthProgressionService';
 import { format } from 'date-fns';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 export type FinishSession = {
   id: string;
@@ -541,6 +542,7 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['activeSession'] });
       queryClient.invalidateQueries({ queryKey: ['completedSessions'] }); // Update 'Terminado' button

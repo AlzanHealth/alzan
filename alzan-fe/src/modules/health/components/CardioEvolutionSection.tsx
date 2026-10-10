@@ -1,22 +1,18 @@
 import React from 'react';
 import {
   Activity,
-  Bike,
   Check,
   ChevronRight,
   CircleHelp,
-  Dumbbell,
-  Footprints,
   HeartPulse,
   Minus,
-  Mountain,
   TrendingDown,
   TrendingUp,
-  Waves,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GlassCard } from '../../../components/GlassCard';
+import { SportIcon } from '../../../components/icons/SportIcon';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { HEART_RATE_ZONE_COLORS } from '../../training/helpers/heartRateZones.helper';
 import type { TranslationKey } from '../../../i18n/locales/en';
@@ -25,32 +21,13 @@ import {
   type CardioConfidence,
   type CardioPeriod,
   type CardioSportEvolution,
-  type CardioTrendStatus,
 } from '../algorithms/cardioEvolution';
+import {
+  getCardioEvolutionPresentation,
+  shouldShowCardioIntervalRecovery,
+} from '../algorithms/cardioEvolutionPresentation';
+import { getPracticedCardioSports, type CardioSportOption } from '../algorithms/cardioSportNormalization';
 import { useCardioEvolution } from '../hooks/useCardioEvolution';
-
-const SPORT_ORDER = [
-  'running',
-  'cycling',
-  'swimming',
-  'strength',
-  'gym',
-  'trail',
-  'hiking',
-  'hyrox',
-  'football',
-  'basketball',
-  'tennis',
-  'padel',
-  'martial_arts',
-  'volleyball',
-  'climbing',
-  'skiing',
-  'snowboard',
-  'surf',
-  'golf',
-  'other',
-];
 
 const SPORT_TRANSLATIONS: Record<string, TranslationKey> = {
   running: 'constants.running',
@@ -88,6 +65,9 @@ const CONTEXT_TRANSLATIONS: Record<CardioSportEvolution['contextWarnings'][numbe
   derived_speed: 'health.cardioContextderived_speed',
   swimming_sensor: 'health.cardioContextswimming_sensor',
   device: 'health.cardioContextdevice',
+  heart_rate_quality: 'health.cardioContextheart_rate_quality',
+  activity_quality: 'health.cardioContextactivity_quality',
+  subtype: 'health.cardioContextsubtype',
 };
 
 const PERIOD_TRANSLATIONS: Record<CardioPeriod, TranslationKey> = {
@@ -100,26 +80,6 @@ const PERIOD_TRANSLATIONS: Record<CardioPeriod, TranslationKey> = {
 };
 
 const CARDIO_PERIODS: CardioPeriod[] = ['day', 'week', 'month', 'three_months', 'six_months', 'all'];
-type SportOption = { key: string; sportType: string; sportSubtype: string | null };
-const INTERVAL_SPORT_TYPES = new Set([
-  'hyrox',
-  'football',
-  'basketball',
-  'tennis',
-  'padel',
-  'martial_arts',
-  'volleyball',
-]);
-
-const getSportIcon = (sportType: string) => {
-  if (sportType === 'running') return Footprints;
-  if (sportType === 'cycling') return Bike;
-  if (sportType === 'swimming') return Waves;
-  if (sportType === 'strength' || sportType === 'gym') return Dumbbell;
-  if (sportType === 'trail' || sportType === 'hiking' || sportType === 'climbing') return Mountain;
-  return Activity;
-};
-
 const formatPace = (speedMetersPerSecond: number, distanceMeters: number): string => {
   if (!Number.isFinite(speedMetersPerSecond) || speedMetersPerSecond <= 0) return '—';
   const totalSeconds = Math.round(distanceMeters / speedMetersPerSecond);
@@ -146,14 +106,6 @@ const formatPerformance = (
   return `${Math.round(value)} ${labels.bpm}`;
 };
 
-const getStatusTranslation = (status: CardioTrendStatus): TranslationKey => {
-  if (status === 'improving') return 'health.cardioStatusPositive';
-  if (status === 'declining') return 'health.cardioStatusDeclining';
-  if (status === 'stable') return 'health.cardioStatusStable';
-  if (status === 'descriptive') return 'health.cardioStatusDescriptive';
-  return 'health.cardioStatusInsufficient';
-};
-
 const getStatusIcon = (status: string) => {
   if (status === 'improving') return TrendingUp;
   if (status === 'declining') return TrendingDown;
@@ -166,48 +118,29 @@ export const CardioEvolutionSection = () => {
   const { t } = useTranslation();
   const { styles: healthStyles, colors } = useHealthStyles();
   const { data, isLoading, isError, refetch, isFetching } = useCardioEvolution();
-  const sportOptions = React.useMemo(() => {
-    const options = new Map<string, SportOption>();
-    for (const activity of data?.activities ?? []) {
-      const key = `${activity.sport_type}::${activity.sport_subtype ?? ''}`;
-      options.set(key, { key, sportType: activity.sport_type, sportSubtype: activity.sport_subtype });
-    }
-    return [...options.values()].sort((left, right) => {
-      const leftOrder = SPORT_ORDER.indexOf(left.sportType);
-      const rightOrder = SPORT_ORDER.indexOf(right.sportType);
-      const orderDifference =
-        (leftOrder < 0 ? SPORT_ORDER.length : leftOrder) - (rightOrder < 0 ? SPORT_ORDER.length : rightOrder);
-      if (orderDifference !== 0) return orderDifference;
-      return (left.sportSubtype ?? '').localeCompare(right.sportSubtype ?? '');
-    });
-  }, [data?.activities]);
+  const sportOptions = React.useMemo<CardioSportOption[]>(
+    () => getPracticedCardioSports(data?.activities ?? []),
+    [data?.activities],
+  );
   const [selectedSportKey, setSelectedSportKey] = React.useState('');
   const [selectedPeriod, setSelectedPeriod] = React.useState<CardioPeriod>('month');
   React.useEffect(() => {
-    if (sportOptions.length > 0 && !sportOptions.some(option => option.key === selectedSportKey)) {
-      setSelectedSportKey(sportOptions[0].key);
+    if (sportOptions.length > 0 && !sportOptions.some(option => option.sportType === selectedSportKey)) {
+      setSelectedSportKey(sportOptions[0].sportType);
     }
   }, [selectedSportKey, sportOptions]);
-  const selectedOption = sportOptions.find(option => option.key === selectedSportKey) ?? sportOptions[0] ?? null;
+  const selectedOption = sportOptions.find(option => option.sportType === selectedSportKey) ?? sportOptions[0] ?? null;
   const selectedSport = selectedOption?.sportType ?? 'running';
-  const selectedSportKeyForMetrics = selectedOption?.key ?? '';
+  const selectedSportKeyForMetrics = selectedSport;
   const analysis = React.useMemo(
     () =>
       data && selectedOption
-        ? analyzeSportEvolution(
-            data.activities.filter(
-              activity =>
-                activity.sport_type === selectedOption.sportType &&
-                activity.sport_subtype === selectedOption.sportSubtype,
-            ),
-            selectedOption.sportType,
-            new Date(),
-            selectedPeriod,
-          )
+        ? analyzeSportEvolution(data.activities, selectedOption.sportType, new Date(), selectedPeriod)
         : null,
     [data, selectedOption, selectedPeriod],
   );
   const week = data?.weeklySummary;
+  const presentation = analysis ? getCardioEvolutionPresentation(analysis, selectedSport) : null;
   const StatusIcon = analysis ? getStatusIcon(analysis.status) : CircleHelp;
   const statusColor =
     analysis?.status === 'improving'
@@ -217,44 +150,10 @@ export const CardioEvolutionSection = () => {
         : analysis?.status === 'stable'
           ? colors.textSecondary
           : colors.primary;
-  const metricLabel =
-    analysis?.metric === 'speed_at_similar_hr'
-      ? t('health.cardioSpeedAtSimilarHr')
-      : analysis?.metric === 'power_at_similar_hr'
-        ? t('health.cardioPowerAtSimilarHr')
-        : analysis?.metric === 'hr_at_similar_output'
-          ? t('health.cardioHrAtSimilarOutput')
-          : analysis?.metric === 'heart_rate_response'
-            ? t('health.cardioHeartRateResponse')
-            : t('health.cardioNoComparableMetric');
-  const explanation =
-    analysis?.status === 'improving'
-      ? analysis.metric === 'hr_at_similar_output'
-        ? t('health.cardioPositiveHrMeaning')
-        : t('health.cardioPositiveOutputMeaning')
-      : analysis?.status === 'declining'
-        ? t('health.cardioDecliningMeaning')
-        : analysis?.status === 'stable'
-          ? t('health.cardioStableMeaning')
-          : analysis?.status === 'descriptive'
-            ? selectedSport === 'strength' || selectedSport === 'gym'
-              ? t('health.cardioStrengthMeaning')
-              : t('health.cardioDescriptiveMeaning')
-            : t('health.cardioNeedMoreData');
-  const recommendation =
-    analysis?.status === 'improving'
-      ? t('health.cardioPositiveRecommendation')
-      : analysis?.status === 'declining'
-        ? t('health.cardioDecliningRecommendation')
-        : analysis?.status === 'stable'
-          ? t('health.cardioStableRecommendation')
-          : analysis?.status === 'descriptive'
-            ? selectedSport === 'strength' || selectedSport === 'gym'
-              ? t('health.cardioStrengthRecommendation')
-              : t('health.cardioDescriptiveRecommendation')
-            : t('health.cardioNeedMoreRecommendation');
-  const hasComparison =
-    analysis !== null && analysis.metric !== 'none' && analysis.previousValue !== null && analysis.recentValue !== null;
+  const metricLabel = presentation ? t(presentation.metricTranslationKey) : '';
+  const explanation = presentation ? t(presentation.meaningTranslationKey) : '';
+  const recommendation = presentation ? t(presentation.recommendationTranslationKey) : '';
+  const hasComparison = presentation?.showsPerformanceComparison ?? false;
   const percentValue = analysis?.changePercent;
   const performanceLabels = {
     bpm: t('health.cardioBpm'),
@@ -262,10 +161,7 @@ export const CardioEvolutionSection = () => {
     pacePerKm: t('health.cardioPacePerKm'),
     pacePer100m: t('health.cardioPacePer100m'),
   };
-  const selectedIsInterval =
-    selectedOption !== null &&
-    (INTERVAL_SPORT_TYPES.has(selectedOption.sportType) ||
-      /hiit|interval|intermitent/i.test(selectedOption.sportSubtype ?? ''));
+  const selectedIsInterval = shouldShowCardioIntervalRecovery(selectedSport, data?.intervalRecoveryBySport ?? {});
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const remaining = minutes % 60;
@@ -318,30 +214,13 @@ export const CardioEvolutionSection = () => {
               accessibilityLabel={t('health.cardioSportSelector')}
             >
               {sportOptions.map(option => {
-                const selected = option.key === selectedSportKeyForMetrics;
-                const SportIcon = getSportIcon(option.sportType);
+                const selected = option.sportType === selectedSportKeyForMetrics;
                 const baseLabel = t(SPORT_TRANSLATIONS[option.sportType] ?? 'constants.other');
-                const subtypeToken = (option.sportSubtype ?? '').toLowerCase().replace(/[\s_-]/g, '');
-                const isWalkingSubtype = /(walk|walking)/.test(subtypeToken);
-                const isHiitSubtype = /(hiit|interval|intermitent)/.test(subtypeToken);
-                const subtypeLabel = isWalkingSubtype
-                  ? t('health.cardioWalkingSport')
-                  : isHiitSubtype
-                    ? t('health.cardioHiitSport')
-                    : option.sportSubtype;
-                const showSubtype =
-                  option.sportType === 'other' ||
-                  isWalkingSubtype ||
-                  sportOptions.filter(candidate => candidate.sportType === option.sportType).length > 1;
-                const label = isWalkingSubtype
-                  ? t('health.cardioWalkingSport')
-                  : showSubtype && subtypeLabel
-                    ? `${baseLabel} · ${subtypeLabel}`
-                    : baseLabel;
+                const label = baseLabel;
                 return (
                   <Pressable
-                    key={option.key}
-                    onPress={() => setSelectedSportKey(option.key)}
+                    key={option.sportType}
+                    onPress={() => setSelectedSportKey(option.sportType)}
                     style={[
                       styles.sportTab,
                       { borderColor: selected ? colors.textPrimary : colors.border },
@@ -351,7 +230,11 @@ export const CardioEvolutionSection = () => {
                     accessibilityState={{ selected }}
                     accessibilityLabel={label}
                   >
-                    <SportIcon size={14} color={selected ? colors.background : colors.textSecondary} />
+                    <SportIcon
+                      sport={option.sportType === 'strength' ? 'gym' : option.sportType}
+                      size={16}
+                      color={selected ? colors.background : colors.textSecondary}
+                    />
                     <Text style={[styles.sportTabText, { color: selected ? colors.background : colors.textSecondary }]}>
                       {label}
                     </Text>
@@ -395,7 +278,7 @@ export const CardioEvolutionSection = () => {
                 <StatusIcon size={17} color={statusColor} />
               </View>
               <Text style={[styles.statusText, { color: statusColor }]}>
-                {t(getStatusTranslation(analysis.status))}
+                {presentation ? t(presentation.statusTranslationKey) : ''}
               </Text>
               <View style={styles.confidence}>
                 <Text style={[styles.confidenceText, healthStyles.subtitle]}>
@@ -445,6 +328,21 @@ export const CardioEvolutionSection = () => {
                 <Text style={[styles.pairCount, healthStyles.subtitle]}>
                   {t('health.cardioMatchedSessions', { count: analysis.matchedPairCount })}
                 </Text>
+                <Text style={[styles.pairCount, healthStyles.subtitle]}>
+                  {t('health.cardioSessionCounts', {
+                    recent: analysis.recentSessionCount,
+                    previous: analysis.previousSessionCount,
+                  })}
+                </Text>
+                {analysis.recentActivityCount !== analysis.recentSessionCount ||
+                analysis.previousActivityCount !== analysis.previousSessionCount ? (
+                  <Text style={[styles.pairCount, healthStyles.subtitle]}>
+                    {t('health.cardioActivityCounts', {
+                      recent: analysis.recentActivityCount,
+                      previous: analysis.previousActivityCount,
+                    })}
+                  </Text>
+                ) : null}
               </View>
             ) : (
               <View style={styles.resultBlock}>
@@ -456,6 +354,17 @@ export const CardioEvolutionSection = () => {
                     <Text style={[styles.resultMetric, healthStyles.subtitle]}>
                       {t('health.cardioRecentAverageHr')}
                     </Text>
+                    {analysis.previousValue !== null ? (
+                      <Text style={[styles.pairCount, healthStyles.subtitle]}>
+                        {t('health.cardioPreviousAverageHr')}:{' '}
+                        {formatPerformance(
+                          analysis.previousValue,
+                          'heart_rate_response',
+                          selectedSport,
+                          performanceLabels,
+                        )}
+                      </Text>
+                    ) : null}
                   </>
                 ) : null}
                 {analysis.strengthVolumeChangePercent !== null ? (
@@ -464,12 +373,25 @@ export const CardioEvolutionSection = () => {
                     {analysis.strengthVolumeChangePercent.toFixed(1)} %
                   </Text>
                 ) : null}
-                <Text style={[styles.pairCount, healthStyles.subtitle]}>
-                  {t('health.cardioSessionCounts', {
-                    recent: analysis.recentSessionCount,
-                    previous: analysis.previousSessionCount,
-                  })}
-                </Text>
+                {analysis.reason !== 'no_activities' ? (
+                  <>
+                    <Text style={[styles.pairCount, healthStyles.subtitle]}>
+                      {t('health.cardioSessionCounts', {
+                        recent: analysis.recentSessionCount,
+                        previous: analysis.previousSessionCount,
+                      })}
+                    </Text>
+                    {analysis.recentActivityCount !== analysis.recentSessionCount ||
+                    analysis.previousActivityCount !== analysis.previousSessionCount ? (
+                      <Text style={[styles.pairCount, healthStyles.subtitle]}>
+                        {t('health.cardioActivityCounts', {
+                          recent: analysis.recentActivityCount,
+                          previous: analysis.previousActivityCount,
+                        })}
+                      </Text>
+                    ) : null}
+                  </>
+                ) : null}
               </View>
             )}
 
@@ -491,6 +413,9 @@ export const CardioEvolutionSection = () => {
                   contexts: analysis.contextWarnings.map(warning => t(CONTEXT_TRANSLATIONS[warning])).join(', '),
                 })}
               </Text>
+            ) : null}
+            {data?.streamDataError ? (
+              <Text style={[styles.cautionText, healthStyles.subtitle]}>{t('health.cardioStreamLoadError')}</Text>
             ) : null}
             {data?.driftBySport[selectedSportKeyForMetrics] ? (
               <View style={[styles.driftNote, { backgroundColor: `${colors.primary}12` }]}>
@@ -536,7 +461,7 @@ export const CardioEvolutionSection = () => {
                       {t('health.cardioIntervalRecoveryAdvice')}
                     </Text>
                   </>
-                ) : (
+                ) : data?.streamDataError ? null : (
                   <Text style={[styles.explanationText, healthStyles.subtitle]}>
                     {t('health.cardioIntervalRecoveryUnavailable')}
                   </Text>
@@ -577,7 +502,9 @@ export const CardioEvolutionSection = () => {
               colors={healthStyles}
             />
           </View>
-          {week.zoneDataAvailable ? (
+          {data?.zoneDataError ? (
+            <Text style={[styles.zoneCaption, healthStyles.subtitle]}>{t('health.cardioZonesLoadError')}</Text>
+          ) : week.zoneDataAvailable ? (
             <View style={styles.zoneBlock}>
               <View style={styles.zoneHeader}>
                 <Text style={[styles.zoneTitle, healthStyles.title]}>{t('health.cardioTimeInZones')}</Text>

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabaseClient';
 import { Row, SportType } from '../types/requests.types';
 import { TranslationKey } from '../i18n/locales/en';
+import { normalizeSportType } from '../utils/sportTypeNormalization';
 
 export type SportCatalogOptionType =
   | 'goal'
@@ -56,11 +57,6 @@ const OPTION_TYPES: SportCatalogOptionType[] = [
 
 const isSportCatalogOptionType = (value: string): value is SportCatalogOptionType =>
   OPTION_TYPES.includes(value as SportCatalogOptionType);
-
-const normalizeSportType = (sportType: string | null | undefined): SportType | null => {
-  if (!sportType) return null;
-  return sportType === 'gym' ? 'strength' : (sportType as SportType);
-};
 
 const LEGACY_TRANSLATION_KEYS: Record<string, TranslationKey> = {
   'cycling:trail': 'training.sportOptionMtb',

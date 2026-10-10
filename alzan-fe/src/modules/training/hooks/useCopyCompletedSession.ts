@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
+import { healthQueryKeys } from '../../health/hooks/healthQueryKeys';
 import {
   copyCompletedSession,
   countActivitySessionsOnDate,
@@ -8,11 +9,13 @@ import {
 
 export const useCopyCompletedSession = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: (input: CopyCompletedSessionInput) => copyCompletedSession(input),
     onSuccess: async () => {
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }),
         queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] }),
         queryClient.invalidateQueries({ queryKey: ['activitySession'] }),
         queryClient.invalidateQueries({ queryKey: ['calendarDots'] }),

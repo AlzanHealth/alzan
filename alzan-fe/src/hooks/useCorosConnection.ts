@@ -13,6 +13,7 @@ import { wearablesLocalHealthApi } from '../modules/wearables';
 import type { CorosHistoryImportResult } from '../modules/wearables/localHealthSync.types';
 import { Providers } from '../openapi/generated/alzan-be/sdk.gen';
 import { appendDocumentAsset, postActivityImportForm } from '../services/activityImportApi';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 const COROS_PROVIDER = 'coros';
 const QUERY_KEY = ['corosConnection'];
@@ -116,6 +117,7 @@ export function useCorosConnection() {
         return;
       }
       invalidateTrainingCalendar(queryClient);
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
       if (result.cancelled) {
@@ -160,6 +162,7 @@ export function useCorosConnection() {
     },
     onSuccess: result => {
       invalidateTrainingCalendar(queryClient);
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
       const failedFiles = result.errorsByFile.map(file => `${file.fileName}: ${file.code}`).join('\n');

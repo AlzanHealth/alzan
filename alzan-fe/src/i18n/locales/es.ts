@@ -1001,7 +1001,7 @@ export default {
       'Las métricas disponibles dependen del acceso a la API Suunto 24/7 y de los datos registrados por el reloj.',
     cardioTitle: 'Tu evolución cardiovascular',
     cardioScreenTitle: 'Análisis de FC',
-    cardioSubtitle: 'Observa cómo responde tu frecuencia cardiaca en cada deporte.',
+    cardioSubtitle: 'Descubre cómo responde tu corazón y cómo evoluciona tu rendimiento en cada deporte.',
     cardioCardDescription: 'Compara tu rendimiento y tu FC en cada deporte.',
     cardioCardOpen: 'Ver análisis',
     cardioLoading: 'Revisando tus entrenamientos recientes…',
@@ -1016,6 +1016,12 @@ export default {
     cardioStatusStable: 'Sin cambios claros',
     cardioStatusDescriptive: 'Respuesta de la FC',
     cardioStatusInsufficient: 'Faltan entrenamientos comparables',
+    cardioStatusNoActivities: 'Sin entrenamientos en este periodo',
+    cardioStatusNoRecentActivities: 'Sin entrenamientos recientes en este periodo',
+    cardioStatusNoRecentHeartRate: 'Sin FC reciente registrada',
+    cardioStatusNoHeartRate: 'Entrenamientos sin FC registrada',
+    cardioStatusInvalidHeartRate: 'FC no válida para analizar',
+    cardioStatusNoComparable: 'Sesiones diferentes entre sí',
     cardioConfidenceLabel: 'Confianza',
     cardioConfidenceHelp:
       'Se basa en el número de entrenos, su distribución en varias semanas y las condiciones registradas; no es una probabilidad de mejora.',
@@ -1036,7 +1042,9 @@ export default {
     cardioPacePer100m: 'min/100 m',
     cardioMatchedSessions: '{{count}} parejas de entrenos comparables',
     cardioSessionCounts: '{{recent}} recientes y {{previous}} anteriores con FC',
+    cardioActivityCounts: '{{recent}} entrenamientos recientes y {{previous}} anteriores en el periodo',
     cardioRecentAverageHr: 'FC media de los entrenos recientes',
+    cardioPreviousAverageHr: 'FC media del periodo anterior',
     cardioMeaningTitle: '¿Qué significa?',
     cardioRecommendationTitle: '¿Qué puedes hacer?',
     cardioPositiveOutputMeaning:
@@ -1053,6 +1061,18 @@ export default {
       'Los resúmenes disponibles describen la respuesta de la FC, pero faltan datos comparables de velocidad, potencia o carga para valorar el rendimiento en este deporte.',
     cardioNeedMoreData:
       'Se necesitan al menos tres parejas de entrenamientos comparables. Se compara el mismo deporte, duración y FC parecidas, sin mezclar subtipos distintos cuando están registrados.',
+    cardioNoActivitiesInPeriod:
+      'No hay entrenamientos de este deporte dentro del periodo elegido. Prueba otro periodo para consultar tu historial.',
+    cardioNoRecentActivitiesMeaning:
+      'No hay entrenamientos en la parte reciente de esta comparación. El periodo anterior solo aparece como referencia.',
+    cardioNoRecentHeartRateMeaning:
+      'Hay entrenamientos recientes, pero ninguno tiene una FC válida. Las mediciones anteriores no describen tu respuesta actual.',
+    cardioNoHeartRateMeaning:
+      'Hay entrenamientos registrados, pero no incluyen una frecuencia cardiaca válida. Sin ese dato no podemos comparar la respuesta del corazón.',
+    cardioInvalidHeartRateMeaning:
+      'Los valores de FC disponibles están fuera del rango esperado para una lectura de entrenamiento. No los usamos para calcular tendencias.',
+    cardioNoComparableSessionsMeaning:
+      'Hay pulsaciones registradas, pero las sesiones difieren en duración, subtipo o rendimiento. Compararlas podría llevar a una conclusión engañosa.',
     cardioPositiveRecommendation:
       'Mantén tu rutina y observa si esta señal se repite durante las próximas semanas. Compara recorridos, duración y esfuerzo similares.',
     cardioDecliningRecommendation:
@@ -1065,6 +1085,18 @@ export default {
       'Registra la FC junto con una carga constante, como ritmo, potencia o intervalos repetibles, para poder comparar mejor.',
     cardioNeedMoreRecommendation:
       'Usa el reloj en sesiones similares y registra FC junto con ritmo o potencia cuando estén disponibles. Tener más datos distintos no hace automáticamente más fiable la comparación.',
+    cardioNoActivitiesRecommendation:
+      'Amplía el periodo de análisis o registra otro entrenamiento de este deporte para ver sus datos.',
+    cardioNoRecentActivitiesRecommendation:
+      'Elige un periodo más largo o registra otro entrenamiento de este deporte antes de comparar tendencias.',
+    cardioNoRecentHeartRateRecommendation:
+      'Comprueba que el reloj registre la FC y esté bien ajustado durante el próximo entrenamiento.',
+    cardioNoHeartRateRecommendation:
+      'Activa el registro de FC en el reloj y comprueba que esté bien ajustado antes de sincronizar la próxima sesión.',
+    cardioInvalidHeartRateRecommendation:
+      'Revisa el ajuste del sensor y sincroniza de nuevo. Si el valor te preocupa, consúltalo con un profesional sanitario.',
+    cardioNoComparableSessionsRecommendation:
+      'Revisa sesiones del mismo subtipo, con duración y esfuerzo parecidos. Mientras tanto, consulta las métricas descriptivas disponibles.',
     cardioSwimmingCaution:
       'Las lecturas ópticas de FC en la muñeca pueden ser menos fiables en el agua. Interpreta con cautela las comparaciones de natación, sobre todo si no se conoce el sensor.',
     cardioPeriodHeading: 'Periodo del análisis',
@@ -1082,6 +1114,13 @@ export default {
     cardioContextderived_speed: 'velocidad estimada a partir de distancia y duración',
     cardioContextswimming_sensor: 'precisión del sensor en el agua',
     cardioContextdevice: 'dispositivo de registro distinto',
+    cardioContextheart_rate_quality: 'se descartaron lecturas de FC fuera del rango esperado para entrenamientos',
+    cardioContextactivity_quality:
+      'se detectaron métricas de velocidad, potencia, distancia o duración fuera de rango; se han excluido o contrastado con los datos disponibles',
+    cardioContextsubtype:
+      'falta el subtipo en alguna sesión; la comparación puede mezclar modalidades que no se pudieron confirmar',
+    cardioStreamLoadError:
+      'No se pudieron cargar las muestras de pulso. El resumen y la comparación principal siguen disponibles, pero se omiten los análisis temporales.',
     cardioDriftTitle: 'Estabilidad del esfuerzo en el último entreno largo',
     cardioDriftBody:
       'La relación entre FC y velocidad o potencia cambió un {{percent}} % entre la primera y la segunda mitad mientras el rendimiento se mantuvo parecido. Describe esa sesión, pero no explica por qué cambió.',
@@ -1094,13 +1133,15 @@ export default {
     cardioIntervalRecoveryUnavailable:
       'Para describir la recuperación en intervalos hacen falta muestras continuas de FC durante la sesión; un promedio no permite calcularla.',
     cardioWeeklyTitle: 'Resumen cardiovascular',
-    cardioLastSevenDays: 'Datos de los últimos 7 días',
+    cardioLastSevenDays: 'Todos los deportes · últimos 7 días',
     cardioSessionsWithHr: 'Entrenos con FC',
     cardioTrainingTime: 'Tiempo en esos entrenos',
     cardioMedianHr: 'FC mediana del entreno',
     cardioTimeInZones: 'Tiempo registrado en zonas de FC',
     cardioZoneDataSource: 'Solo entrenos que incluyen el tiempo por zonas',
     cardioNoZoneData: 'No se guardó tiempo por zonas para estos entrenamientos.',
+    cardioZonesLoadError:
+      'No se pudieron cargar las zonas de FC. El resto del análisis cardiovascular sigue disponible.',
     cardioWeeklyDisclaimer:
       'Este reparto describe el esfuerzo registrado. Sin conocer tu objetivo, no permite saber si la combinación es adecuada para ti.',
     cardioStrengthVolume: 'Volumen de la misma rutina de fuerza',

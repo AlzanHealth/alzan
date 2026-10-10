@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { ActivitySessionSupersetLink, WorkoutSet } from '../types/requests.types';
 import { getCurrentAppLocale, getLocalizedExerciseName } from '../services/localization';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 export interface ExerciseGroup {
   exercise_id: string;
@@ -137,6 +138,7 @@ export const useSessionDetail = (sessionId?: string) => {
 
 export const useUpdateWorkoutSet = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ setId, reps, weight_kg }: { setId: string; reps: number; weight_kg: number }) => {
@@ -155,6 +157,7 @@ export const useUpdateWorkoutSet = () => {
       return data;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });

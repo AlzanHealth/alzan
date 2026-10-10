@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { Providers } from '../openapi/generated/alzan-be/sdk.gen';
 import { wearablesLocalHealthApi } from '../modules/wearables';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 const POLAR_PROVIDER = 'polar';
 const QUERY_KEY = ['polarConnection'];
@@ -38,6 +39,10 @@ export function usePolarConnection() {
     onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
       queryClient.invalidateQueries({ queryKey: ['activeCloudSyncs', user?.id] });
+      if (result.status !== 'running') {
+        queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
+        queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+      }
       if (result.status === 'running') {
         Alert.alert(t('settings.syncAlreadyRunningTitle'), t('settings.syncAlreadyRunningMessage'));
       } else if (result.cancelled) {

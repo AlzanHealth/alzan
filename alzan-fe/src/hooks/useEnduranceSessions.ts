@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { ActivitySessionInsert, ActivitySessionUpdate, ActivitySession } from '../types/requests.types';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 interface UseEnduranceSessionsOptions {
   startDate?: string; // ISO 8601 format YYYY-MM-DD
@@ -155,6 +156,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
@@ -193,6 +195,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['activeSessionBanner'] });
       queryClient.invalidateQueries({ queryKey: ['activeSession'] });
@@ -227,6 +230,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['activeSessionBanner'] });
       queryClient.invalidateQueries({ queryKey: ['activeSession'] });

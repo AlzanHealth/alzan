@@ -19,6 +19,7 @@ import { getCurrentAppLocale, getLocalizedExerciseName } from '../../services/lo
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
 import { WorkoutSet } from '../../types/requests.types';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
+import { healthQueryKeys } from '../../modules/health/hooks/healthQueryKeys';
 
 interface DraftSet {
   key: string;
@@ -249,6 +250,7 @@ export const CompleteExercisesScreen = () => {
         if (sessionError) throw sessionError;
       }
 
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
       queryClient.invalidateQueries({ queryKey: ['activitySession', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });

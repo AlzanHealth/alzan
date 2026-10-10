@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { appendDocumentAsset, postActivityImportForm } from '../services/activityImportApi';
 import { ImportedStrengthActivitySummary } from '../services/strengthActivityImportService';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 const STRENGTH_ACTIVITY_PICKER_TYPES: string[] = Platform.select({
   ios: ['public.item', 'public.content', 'public.data', 'public.json', 'application/octet-stream'],
@@ -43,7 +44,7 @@ async function pickStrengthActivityFile(): Promise<DocumentPicker.DocumentPicker
 
 export const useApplyStrengthActivityImport = () => {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ sessionId }: ApplyStrengthActivityImportParams): Promise<ImportedStrengthActivitySummary> => {
@@ -61,6 +62,7 @@ export const useApplyStrengthActivityImport = () => {
       );
     },
     onSuccess: (_summary, variables) => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });

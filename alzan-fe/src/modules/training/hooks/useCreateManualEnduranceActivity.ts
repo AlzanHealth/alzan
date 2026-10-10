@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabaseClient';
 import { invalidateTrainingCalendar } from '../../../lib/trainingQueryKeys';
+import { useAuth } from '../../../context/AuthContext';
+import { healthQueryKeys } from '../../health/hooks/healthQueryKeys';
 import type { AdvancedSerializedSection, AdvancedSport } from '../helpers/advancedEnduranceSession.helper';
 
 export type ManualEnduranceActivitySession = {
@@ -35,6 +37,7 @@ export type CreateManualEnduranceActivityInput = {
 
 export const useCreateManualEnduranceActivity = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ session, sections }: CreateManualEnduranceActivityInput) => {
@@ -46,6 +49,7 @@ export const useCreateManualEnduranceActivity = () => {
       return data;
     },
     onSuccess: sessionId => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });

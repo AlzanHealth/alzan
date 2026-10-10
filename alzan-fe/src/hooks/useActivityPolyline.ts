@@ -6,6 +6,7 @@ import { Alert } from '../components/common/Alert';
 import { useAuth } from '../context/AuthContext';
 import { appendDocumentAsset, postActivityImportForm } from '../services/activityImportApi';
 import { ParsedRouteImport, SupportedRouteFormat } from '../services/mapService';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 const ROUTE_PICKER_TYPES: string[] = Platform.select({
   ios: [
@@ -218,7 +219,7 @@ export const usePickPolyline = ({
 
 export const useApplyPickedRouteImport = () => {
   const queryClient = useQueryClient();
-  const { session } = useAuth();
+  const { session, user } = useAuth();
 
   return useMutation({
     mutationFn: async ({
@@ -237,6 +238,7 @@ export const useApplyPickedRouteImport = () => {
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });

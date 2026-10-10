@@ -15,6 +15,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -30,6 +31,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { format } from 'date-fns';
 import { Route, Upload, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
+import { healthQueryKeys } from '../../modules/health/hooks/healthQueryKeys';
 import { useApplyStrengthActivityImport } from '../../hooks/useStrengthActivityImport';
 import { useSessionImportedStrengthSummary } from '../../hooks/useSessionImportedStrengthSummary';
 import { STRENGTH_ACTIVITY_UNSUPPORTED_ERROR_TAG } from '../../services/strengthActivityImportService';
@@ -320,6 +322,7 @@ export const EnduranceSessionFormScreen = () => {
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const route = useRoute<RouteProp<TrainingStackParamList, 'EnduranceSessionForm'>>();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Params
   const params = route.params || {};
@@ -1659,6 +1662,8 @@ export const EnduranceSessionFormScreen = () => {
         const { error: rollbackError } = await supabase.from('activity_sessions').delete().eq('id', persistedSessionId);
         if (rollbackError) {
           console.error('[EnduranceSessionForm.save] rollback error:', rollbackError);
+        } else {
+          void queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
         }
       }
 

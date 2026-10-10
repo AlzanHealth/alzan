@@ -57,6 +57,7 @@ import { matchPlansToCompletedSessions } from './helpers/dailyPlanSessionMerge.h
 import { getDailyPlanAction } from './helpers/dailyPlanAction.helper';
 import { invalidateTrainingCalendar } from '../../lib/trainingQueryKeys';
 import { buildTemplateAssociationPayload } from '../../modules/training/helpers/templateAssociation.helper';
+import { healthQueryKeys } from '../../modules/health/hooks/healthQueryKeys';
 
 interface DailyEntry {
   id: string;
@@ -241,6 +242,7 @@ export const TrainingHomeScreen = () => {
         const { error } = await supabase.from('activity_sessions').delete().eq('id', sessionId);
         if (error) throw error;
         // Invalidate both queries to refresh the calendar
+        queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
         queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
       } else {
         // It's a workout plan

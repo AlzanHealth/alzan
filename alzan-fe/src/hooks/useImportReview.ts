@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ActivityImportReview } from '../openapi/generated/alzan-be/sdk.gen';
 import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 import { buildTemplateAssociationPayload } from '../modules/training/helpers/templateAssociation.helper';
+import { useAuth } from '../context/AuthContext';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 interface ReviewActionTarget {
   targetSessionId?: string;
@@ -14,8 +16,10 @@ interface ReviewActionTarget {
  */
 export const useImportReview = (sessionId?: string) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const invalidate = (nextSessionId?: string) => {
+    queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
     queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
     invalidateTrainingCalendar(queryClient);
     queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });

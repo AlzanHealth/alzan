@@ -3,6 +3,7 @@ import {
   analyzeCardiacDrift,
   analyzeIntervalHeartRateRecovery,
   analyzeSportEvolution,
+  selectCardioStreamCandidates,
   summarizeCardioWeek,
   type CardioActivity,
   type CardioStreamSample,
@@ -108,6 +109,31 @@ const cyclingTrend = analyzeSportEvolution(
 assert.equal(cyclingTrend.metric, 'power_at_similar_hr');
 assert.equal(cyclingTrend.status, 'improving');
 
+const cyclingPowerWithoutSpeedTrend = analyzeSportEvolution(
+  [
+    ...[50, 43, 36].map((days, index) =>
+      makeActivity(`cycle-power-only-old-${index}`, days, {
+        sport_type: 'cycling',
+        avg_speed_m_per_s: null,
+        distance_m: null,
+        avg_power_w: 150 + index,
+      }),
+    ),
+    ...[22, 15, 8].map((days, index) =>
+      makeActivity(`cycle-power-only-new-${index}`, days, {
+        sport_type: 'cycling',
+        avg_speed_m_per_s: null,
+        distance_m: null,
+        avg_power_w: 165 + index,
+      }),
+    ),
+  ],
+  'cycling',
+  referenceDate,
+);
+assert.equal(cyclingPowerWithoutSpeedTrend.metric, 'power_at_similar_hr');
+assert.equal(cyclingPowerWithoutSpeedTrend.contextWarnings.includes('derived_speed'), false);
+
 const lowerHrAtSimilarPace = analyzeSportEvolution(
   [
     makeActivity('same-output-old-1', 50),
@@ -139,10 +165,19 @@ const walkingTrend = analyzeSportEvolution(
     sport_subtype: 'urban_walk',
     avg_speed_m_per_s: activity.start_time === comparableRuns[0].start_time ? 1.3 : activity.avg_speed_m_per_s,
   })),
-  'other',
+  'hiking',
   referenceDate,
 );
 assert.equal(walkingTrend.metric, 'speed_at_similar_hr');
+
+const trailRunningTrend = analyzeSportEvolution(
+  [makeActivity('trail-running', 1, { sport_type: 'running', sport_subtype: 'trail' })],
+  'trail',
+  referenceDate,
+  'week',
+);
+assert.equal(trailRunningTrend.recentActivityCount, 1);
+assert.equal(trailRunningTrend.recentSessionCount, 1);
 
 const misleadingAggregateTrend = analyzeSportEvolution(
   [
@@ -171,6 +206,318 @@ const lowDataTrend = analyzeSportEvolution(comparableRuns.slice(0, 4), 'running'
 assert.equal(lowDataTrend.status, 'insufficient');
 assert.equal(lowDataTrend.changePercent, null);
 
+const subtypeGroupedRuns = [
+  makeActivity('outdoor-old', 42, { sport_subtype: 'outdoor' }),
+  makeActivity('outdoor-recent-1', 22, { sport_subtype: 'outdoor' }),
+  makeActivity('outdoor-recent-2', 15, { sport_subtype: 'outdoor' }),
+  makeActivity('missing-hr-recent', 8, { sport_subtype: null, avg_heart_rate: null }),
+];
+const subtypeGroupedTrend = analyzeSportEvolution(subtypeGroupedRuns, 'running', referenceDate, 'month');
+assert.equal(subtypeGroupedTrend.recentActivityCount, 3);
+assert.equal(subtypeGroupedTrend.recentSessionCount, 2);
+assert.equal(subtypeGroupedTrend.previousSessionCount, 1);
+assert.equal(subtypeGroupedTrend.matchedPairCount, 1);
+assert.equal(subtypeGroupedTrend.reason, 'not_enough_comparable_pairs');
+
+const differentSubtypesTrend = analyzeSportEvolution(
+  [
+    makeActivity('road-previous', 42, { sport_subtype: 'road' }),
+    makeActivity('indoor-recent', 15, { sport_subtype: 'indoor' }),
+  ],
+  'running',
+  referenceDate,
+  'month',
+);
+assert.equal(differentSubtypesTrend.recentSessionCount, 1);
+assert.equal(differentSubtypesTrend.previousSessionCount, 1);
+assert.equal(differentSubtypesTrend.matchedPairCount, 0);
+assert.equal(differentSubtypesTrend.reason, 'no_comparable_sessions');
+
+const shortSessionsTrend = analyzeSportEvolution(
+  [
+    makeActivity('short-previous', 10, { duration_s: 15 * 60 }),
+    makeActivity('short-recent', 2, { duration_s: 15 * 60, avg_speed_m_per_s: 3.1 }),
+  ],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(shortSessionsTrend.status, 'insufficient');
+assert.equal(shortSessionsTrend.reason, 'no_comparable_sessions');
+
+const missingSubtypeTrend = analyzeSportEvolution(
+  [
+    ...[50, 43, 36].map((days, index) =>
+      makeActivity(`subtype-known-old-${index}`, days, { sport_subtype: 'road', avg_speed_m_per_s: 3 }),
+    ),
+    ...[22, 15, 8].map((days, index) =>
+      makeActivity(`subtype-unknown-new-${index}`, days, {
+        sport_subtype: null,
+        avg_speed_m_per_s: 3.2,
+      }),
+    ),
+  ],
+  'running',
+  referenceDate,
+);
+assert.equal(missingSubtypeTrend.matchedPairCount, 3);
+assert.equal(missingSubtypeTrend.contextWarnings.includes('subtype'), true);
+assert.notEqual(missingSubtypeTrend.confidence, 'high');
+
+const constrainedMatchesTrend = analyzeSportEvolution(
+  [
+    ...[
+      { speed: 2, days: 50 },
+      { speed: 2.12, days: 43 },
+      { speed: 3, days: 36 },
+    ].map(({ speed, days }, index) =>
+      makeActivity(`constrained-old-${index}`, days, {
+        avg_heart_rate: 140,
+        avg_speed_m_per_s: speed,
+        distance_m: speed * 2400,
+      }),
+    ),
+    ...[
+      { speed: 2.01, days: 22 },
+      { speed: 1.9, days: 15 },
+      { speed: 3, days: 8 },
+    ].map(({ speed, days }, index) =>
+      makeActivity(`constrained-new-${index}`, days, {
+        avg_heart_rate: 150,
+        avg_speed_m_per_s: speed,
+        distance_m: speed * 2400,
+      }),
+    ),
+  ],
+  'running',
+  referenceDate,
+);
+assert.equal(constrainedMatchesTrend.matchedPairCount, 3);
+assert.equal(constrainedMatchesTrend.status, 'declining');
+
+const tieBreakMatchingTrend = analyzeSportEvolution(
+  [
+    ...[
+      { speed: 3, days: 50 },
+      { speed: 3.18, days: 43 },
+      { speed: 3.36, days: 36 },
+    ].map(({ speed, days }, index) =>
+      makeActivity(`tie-break-old-${index}`, days, {
+        avg_heart_rate: 140,
+        avg_speed_m_per_s: speed,
+        distance_m: speed * 2400,
+      }),
+    ),
+    ...[
+      { speed: 3.06, days: 22 },
+      { speed: 3.24, days: 15 },
+      { speed: 3.03, days: 8 },
+    ].map(({ speed, days }, index) =>
+      makeActivity(`tie-break-new-${index}`, days, {
+        avg_heart_rate: 160,
+        avg_speed_m_per_s: speed,
+        distance_m: speed * 2400,
+      }),
+    ),
+  ],
+  'running',
+  referenceDate,
+);
+assert.equal(tieBreakMatchingTrend.matchedPairCount, 3);
+
+const cyclingSpeedFallbackTrend = analyzeSportEvolution(
+  [
+    ...[50, 43, 36].map((days, index) =>
+      makeActivity(`cycle-speed-old-${index}`, days, {
+        sport_type: 'cycling',
+        sport_subtype: 'outdoor',
+        avg_speed_m_per_s: 7,
+        avg_power_w: index === 0 ? 150 : null,
+      }),
+    ),
+    ...[22, 15, 8].map((days, index) =>
+      makeActivity(`cycle-speed-new-${index}`, days, {
+        sport_type: 'cycling',
+        sport_subtype: 'outdoor',
+        avg_speed_m_per_s: 7.4,
+        avg_power_w: index === 0 ? 160 : null,
+      }),
+    ),
+  ],
+  'cycling',
+  referenceDate,
+);
+assert.equal(cyclingSpeedFallbackTrend.metric, 'speed_at_similar_hr');
+assert.equal(cyclingSpeedFallbackTrend.status, 'improving');
+
+const implausibleSpeedTrend = analyzeSportEvolution(
+  [
+    ...[50, 43, 36].map((days, index) =>
+      makeActivity(`implausible-old-${index}`, days, {
+        avg_speed_m_per_s: 30,
+        distance_m: 30 * 2400,
+      }),
+    ),
+    ...[22, 15, 8].map((days, index) =>
+      makeActivity(`implausible-new-${index}`, days, {
+        avg_speed_m_per_s: 32,
+        distance_m: 32 * 2400,
+      }),
+    ),
+  ],
+  'running',
+  referenceDate,
+);
+assert.equal(implausibleSpeedTrend.status, 'descriptive');
+assert.equal(implausibleSpeedTrend.reason, 'no_performance_metric');
+assert.equal(implausibleSpeedTrend.contextWarnings.includes('activity_quality'), true);
+
+const streamCandidates = selectCardioStreamCandidates(
+  [
+    makeActivity('latest-long-run', 1, { duration_s: 60 * 60, sport_subtype: 'road' }),
+    makeActivity('latest-run-interval', 0, { duration_s: 30 * 60, sport_subtype: 'hiit' }),
+  ],
+  referenceDate,
+);
+assert.equal(streamCandidates.length, 2);
+assert.equal(streamCandidates.find(candidate => candidate.activity.id === 'latest-long-run')?.analyzeDrift, true);
+assert.equal(
+  streamCandidates.find(candidate => candidate.activity.id === 'latest-run-interval')?.analyzeIntervalRecovery,
+  true,
+);
+
+const normalizedStrengthTrend = analyzeSportEvolution(
+  [
+    ...[50, 43, 36].map((days, index) =>
+      makeActivity(`gym-old-${index}`, days, {
+        sport_type: index % 2 === 0 ? 'gym' : 'strength',
+        sport_subtype: null,
+        workout_template_id: 'same-template',
+        total_volume_kg: 1000,
+      }),
+    ),
+    ...[22, 15, 8].map((days, index) =>
+      makeActivity(`gym-new-${index}`, days, {
+        sport_type: index % 2 === 0 ? 'strength' : 'gym',
+        sport_subtype: null,
+        workout_template_id: 'same-template',
+        total_volume_kg: 1200,
+      }),
+    ),
+  ],
+  'gym',
+  referenceDate,
+  'month',
+);
+assert.equal(normalizedStrengthTrend.recentSessionCount, 3);
+assert.equal(normalizedStrengthTrend.previousSessionCount, 3);
+assert.equal(normalizedStrengthTrend.strengthVolumeChangePercent, 20);
+
+const noActivitiesTrend = analyzeSportEvolution([], 'running', referenceDate, 'week');
+assert.equal(noActivitiesTrend.reason, 'no_activities');
+assert.equal(noActivitiesTrend.recentActivityCount, 0);
+
+const historyOutsideSelectedPeriodTrend = analyzeSportEvolution(
+  [makeActivity('old-running', 20)],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(historyOutsideSelectedPeriodTrend.reason, 'no_recent_activities');
+assert.equal(historyOutsideSelectedPeriodTrend.recentActivityCount, 0);
+
+const oldAllHistory = [
+  ...[350, 330, 310].map((days, index) => makeActivity(`all-old-${index}`, days)),
+  ...[250, 230, 210].map((days, index) => makeActivity(`all-recent-${index}`, days, { avg_speed_m_per_s: 3.2 })),
+];
+const oldAllHistoryTrend = analyzeSportEvolution(oldAllHistory, 'running', referenceDate, 'all');
+assert.equal(oldAllHistoryTrend.status, 'improving');
+assert.equal(oldAllHistoryTrend.recentActivityCount, 3);
+assert.equal(oldAllHistoryTrend.previousActivityCount, 3);
+
+const activitiesWithoutHeartRateTrend = analyzeSportEvolution(
+  [makeActivity('no-hr', 1, { avg_heart_rate: null })],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(activitiesWithoutHeartRateTrend.reason, 'no_heart_rate');
+assert.equal(activitiesWithoutHeartRateTrend.recentActivityCount, 1);
+assert.equal(activitiesWithoutHeartRateTrend.recentSessionCount, 0);
+
+const noRecentActivitiesTrend = analyzeSportEvolution(
+  [makeActivity('previous-only', 10)],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(noRecentActivitiesTrend.reason, 'no_recent_activities');
+assert.equal(noRecentActivitiesTrend.recentActivityCount, 0);
+assert.equal(noRecentActivitiesTrend.previousSessionCount, 1);
+
+const noRecentHeartRateTrend = analyzeSportEvolution(
+  [makeActivity('previous-with-hr', 10), makeActivity('recent-without-hr', 1, { avg_heart_rate: null })],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(noRecentHeartRateTrend.reason, 'no_recent_heart_rate');
+assert.equal(noRecentHeartRateTrend.recentActivityCount, 1);
+assert.equal(noRecentHeartRateTrend.previousSessionCount, 1);
+
+const invalidHeartRateTrend = analyzeSportEvolution(
+  [makeActivity('invalid-hr', 1, { avg_heart_rate: 240 })],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(invalidHeartRateTrend.reason, 'invalid_heart_rate');
+
+const mixedHeartRateQualityTrend = analyzeSportEvolution(
+  [...comparableRuns, makeActivity('invalid-hr-with-valid-data', 4, { avg_heart_rate: 240 })],
+  'running',
+  referenceDate,
+);
+assert.equal(mixedHeartRateQualityTrend.contextWarnings.includes('heart_rate_quality'), true);
+assert.equal(mixedHeartRateQualityTrend.confidence, 'low');
+
+const heartRateOnlyTrend = analyzeSportEvolution(
+  [
+    makeActivity('hr-only-old', 10, { avg_speed_m_per_s: null, distance_m: null }),
+    makeActivity('hr-only-recent', 2, { avg_speed_m_per_s: null, distance_m: null }),
+  ],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(heartRateOnlyTrend.status, 'descriptive');
+assert.equal(heartRateOnlyTrend.reason, 'no_performance_metric');
+assert.equal(heartRateOnlyTrend.metric, 'heart_rate_response');
+assert.equal(heartRateOnlyTrend.changePercent, null);
+
+const timezoneBoundaryTrend = analyzeSportEvolution(
+  [
+    makeActivity('before-week-boundary', 6, { start_time: '2026-10-03T13:00:00+02:00' }),
+    makeActivity('after-week-boundary', 1, { start_time: '2026-10-09T14:00:00+02:00' }),
+  ],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(timezoneBoundaryTrend.recentActivityCount, 1);
+assert.equal(timezoneBoundaryTrend.previousActivityCount, 1);
+assert.equal(timezoneBoundaryTrend.recentSessionCount, 1);
+assert.equal(timezoneBoundaryTrend.previousSessionCount, 1);
+
+const duplicateActivityTrend = analyzeSportEvolution(
+  [makeActivity('same-session', 1), makeActivity('same-session', 1, { avg_heart_rate: 200 })],
+  'running',
+  referenceDate,
+  'week',
+);
+assert.equal(duplicateActivityTrend.recentActivityCount, 1);
+assert.equal(duplicateActivityTrend.recentSessionCount, 1);
+
 const mismatchedTrend = analyzeSportEvolution(
   comparableRuns.map((activity, index) => ({
     ...activity,
@@ -180,7 +527,8 @@ const mismatchedTrend = analyzeSportEvolution(
   referenceDate,
 );
 assert.equal(mismatchedTrend.status, 'insufficient');
-assert.equal(mismatchedTrend.matchedPairCount, 0);
+assert.ok(mismatchedTrend.matchedPairCount < 3);
+assert.equal(mismatchedTrend.reason, 'not_enough_comparable_pairs');
 
 const strengthTrend = analyzeSportEvolution(
   comparableRuns.map((activity, index) => ({
@@ -251,7 +599,7 @@ const zones: CardioZoneTime[] = [
   { session_id: 'today-run', zone: 3, duration_s: 300 },
 ];
 const weeklySummary = summarizeCardioWeek(
-  [makeActivity('today-run', 0), makeActivity('last-month-run', 20)],
+  [makeActivity('today-run', 0), makeActivity('today-run', 0), makeActivity('last-month-run', 20)],
   zones,
   referenceDate,
 );
