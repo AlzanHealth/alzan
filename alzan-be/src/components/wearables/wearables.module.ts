@@ -19,6 +19,7 @@ import { PolarAccessLinkService } from './services/polar-access-link.service';
 import { ProviderOriginService } from './services/provider-origin.service';
 import { RawPayloadService } from './services/raw-payload.service';
 import { SuuntoCloudSyncService } from './services/suunto-cloud-sync.service';
+import { SuuntoHealthSyncService } from './services/suunto-health-sync.service';
 import { CorosCloudSyncService } from './services/coros-cloud-sync.service';
 import { CorosWebhookService } from './services/coros-webhook.service';
 import { CorosConnectionService } from './services/coros-connection.service';
@@ -50,6 +51,7 @@ import { WearableImportLifecycleService } from './services/wearable-import-lifec
     PolarAccessLinkService,
     WearableImportLifecycleService,
     SuuntoCloudSyncService,
+    SuuntoHealthSyncService,
     CorosCloudSyncService,
     CorosWebhookService,
     CorosConnectionService,

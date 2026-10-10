@@ -51,4 +51,22 @@ export class CloudProviderSyncOutputDto {
 
   @Expose()
   fit_pending?: number;
+
+  @Expose()
+  health_sync_status?: string;
+
+  @Expose()
+  health_sync_error?: string;
+
+  @Expose()
+  health_samples_imported?: number;
+
+  @Expose()
+  health_sleeps_imported?: number;
+
+  @Expose()
+  health_recoveries_imported?: number;
+
+  @Expose()
+  health_last_synced_at?: string | null;
 }

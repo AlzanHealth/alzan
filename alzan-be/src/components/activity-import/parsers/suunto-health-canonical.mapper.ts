@@ -42,21 +42,38 @@ function extractEntryData(payload: unknown): JsonRecord {
   return isRecord(payload.entryData) ? payload.entryData : payload;
 }
 
+function extractTimestampSource(payload: unknown, entryData: JsonRecord): string {
+  return (
+    readString(isRecord(payload) ? payload.timestamp : null) ??
+    readString(entryData.DateTime) ??
+    readString(entryData.BedtimeStart) ??
+    new Date(0).toISOString()
+  );
+}
+
 function extractTimestamp(payload: unknown, entryData: JsonRecord): string {
-  const timestamp =
-    normaliseTimestamp(isRecord(payload) ? payload.timestamp : null) ??
-    normaliseTimestamp(entryData.DateTime) ??
-    normaliseTimestamp(entryData.BedtimeStart) ??
-    new Date(0).toISOString();
-  return timestamp;
+  return normaliseTimestamp(extractTimestampSource(payload, entryData)) ?? new Date(0).toISOString();
 }
 
 function extractTimezoneFromTimestamp(timestamp: string): string {
+  const offset = timestamp.match(/([+-]\d{2}:\d{2})$/)?.[1];
+  if (offset) return `UTC${offset}`;
   return timestamp.endsWith('Z') ? 'UTC' : 'UTC';
 }
 
 function extractDate(timestamp: string): string {
-  return timestamp.slice(0, 10);
+  const localDate = timestamp.match(/^(\d{4}-\d{2}-\d{2})/)?.[1];
+  if (localDate) return localDate;
+  return normaliseTimestamp(timestamp)?.slice(0, 10) ?? '1970-01-01';
+}
+
+function readIdentifier(value: unknown): string | null {
+  return readString(value) ?? (typeof value === 'number' && Number.isFinite(value) ? String(value) : null);
+}
+
+function normaliseSpo2(value: number | null): number | null {
+  if (value == null) return null;
+  return value > 0 && value <= 1 ? value * 100 : value;
 }
 
 function secondsToMinutes(value: number | null): number | null {
@@ -66,16 +83,18 @@ function secondsToMinutes(value: number | null): number | null {
 
 export function mapSuuntoDailyActivityToCanonical(payload: unknown): SuuntoDailyActivityCanonical {
   const entryData = extractEntryData(payload);
-  const timestamp = extractTimestamp(payload, entryData);
+  const timestampSource = extractTimestampSource(payload, entryData);
+  const timestamp = normaliseTimestamp(timestampSource) ?? new Date(0).toISOString();
   const steps = readNumber(entryData.StepCount) ?? readNumber(entryData.Steps) ?? readNumber(entryData.steps);
+  const energy = readNumber(entryData.EnergyConsumption);
   const calories =
-    readNumber(entryData.EnergyConsumption) ?? readNumber(entryData.Calories) ?? readNumber(entryData.calories);
+    (energy != null ? energy / 4184 : null) ?? readNumber(entryData.Calories) ?? readNumber(entryData.calories);
   const distance = readNumber(entryData.Distance) ?? readNumber(entryData.distance);
 
   return {
     source: 'suunto',
-    date: extractDate(timestamp),
-    timezone: extractTimezoneFromTimestamp(timestamp),
+    date: extractDate(timestampSource),
+    timezone: extractTimezoneFromTimestamp(timestampSource),
     totalSteps: steps != null ? Math.round(steps) : null,
     caloriesKcal: calories,
     distanceM: distance,
@@ -95,44 +114,71 @@ export function mapSuuntoDailyActivityToCanonical(payload: unknown): SuuntoDaily
 
 export function mapSuuntoSleepToCanonical(payload: unknown): SuuntoSleepCanonical {
   const entryData = extractEntryData(payload);
-  const bedtimeStart = normaliseTimestamp(entryData.BedtimeStart) ?? extractTimestamp(payload, entryData);
-  const bedtimeEnd = normaliseTimestamp(entryData.BedtimeEnd) ?? bedtimeStart;
+  const bedtimeStartSource = readString(entryData.BedtimeStart) ?? extractTimestamp(payload, entryData);
+  const bedtimeEndSource = readString(entryData.BedtimeEnd) ?? bedtimeStartSource;
+  const bedtimeStart = normaliseTimestamp(bedtimeStartSource) ?? new Date(0).toISOString();
+  const bedtimeEnd = normaliseTimestamp(bedtimeEndSource) ?? bedtimeStart;
+  const spo2 = readNumber(entryData.AvgSpo2) ?? readNumber(entryData.MaxSpo2);
+  const officialDurationSeconds = readNumber(entryData.Duration);
+  const sleepDurationSeconds =
+    officialDurationSeconds ?? readNumber(entryData.TotalSleepDuration) ?? readNumber(entryData.SleepDuration);
+  const stageSleepSeconds =
+    (readNumber(entryData.DeepSleepDuration) ?? 0) +
+    (readNumber(entryData.LightSleepDuration) ?? 0) +
+    (readNumber(entryData.RemSleepDuration) ?? readNumber(entryData.REMSleepDuration) ?? 0);
+  const awakeSeconds = readNumber(entryData.AwakeDuration) ?? readNumber(entryData.AwakeTime);
+  const asleepSeconds =
+    sleepDurationSeconds == null
+      ? null
+      : officialDurationSeconds != null && stageSleepSeconds > 0
+        ? stageSleepSeconds
+        : officialDurationSeconds != null && awakeSeconds != null
+          ? Math.max(officialDurationSeconds - awakeSeconds, 0)
+          : sleepDurationSeconds;
+  const inBedSeconds =
+    officialDurationSeconds ?? (sleepDurationSeconds == null ? null : sleepDurationSeconds + (awakeSeconds ?? 0));
 
   return {
     source: 'suunto',
-    sourceSleepId: readString(entryData.SleepId) ?? readString(entryData.sleepId),
-    date: extractDate(bedtimeStart),
-    timezone: extractTimezoneFromTimestamp(bedtimeStart),
+    sourceSleepId: readIdentifier(entryData.SleepId) ?? readIdentifier(entryData.sleepId),
+    date: extractDate(bedtimeStartSource),
+    timezone: extractTimezoneFromTimestamp(bedtimeStartSource),
     startTime: bedtimeStart,
     endTime: bedtimeEnd,
     bedtimeStart,
     bedtimeEnd,
     isNap: readBoolean(entryData.IsNap) ?? false,
-    totalSleepMin: secondsToMinutes(readNumber(entryData.TotalSleepDuration) ?? readNumber(entryData.SleepDuration)),
-    awakeMin: secondsToMinutes(readNumber(entryData.AwakeDuration) ?? readNumber(entryData.AwakeTime)),
+    totalSleepMin: secondsToMinutes(asleepSeconds),
+    durationInBedMin: secondsToMinutes(inBedSeconds),
+    awakeMin: secondsToMinutes(
+      awakeSeconds ??
+        (officialDurationSeconds != null && stageSleepSeconds > 0 ? officialDurationSeconds - stageSleepSeconds : null),
+    ),
     lightSleepMin: secondsToMinutes(readNumber(entryData.LightSleepDuration)),
     deepSleepMin: secondsToMinutes(readNumber(entryData.DeepSleepDuration)),
     remSleepMin: secondsToMinutes(readNumber(entryData.RemSleepDuration) ?? readNumber(entryData.REMSleepDuration)),
     sleepLatencyMin: secondsToMinutes(readNumber(entryData.SleepOnsetLatencyDuration)),
     wasoMin: secondsToMinutes(readNumber(entryData.WakeAfterSleepOnsetDuration)),
     afterWakeupMin: secondsToMinutes(readNumber(entryData.WakeBeforeOffBedDuration)),
-    sleepScore: readNumber(entryData.SleepScore) ?? readNumber(entryData.SleepQuality),
-    avgHeartRateBpm: readNumber(entryData.AvgHeartRate) ?? readNumber(entryData.AvgHR),
-    minHeartRateBpm: readNumber(entryData.MinHeartRate) ?? readNumber(entryData.MinHR),
+    sleepScore:
+      readNumber(entryData.SleepQualityScore) ?? readNumber(entryData.SleepScore) ?? readNumber(entryData.SleepQuality),
+    avgHeartRateBpm: readNumber(entryData.HRAvg) ?? readNumber(entryData.AvgHeartRate) ?? readNumber(entryData.AvgHR),
+    minHeartRateBpm: readNumber(entryData.HRMin) ?? readNumber(entryData.MinHeartRate) ?? readNumber(entryData.MinHR),
     avgHrvMs: readNumber(entryData.AvgHRV),
-    avgSpo2Pct: readNumber(entryData.AvgSpo2) ?? readNumber(entryData.MaxSpo2),
+    avgSpo2Pct: normaliseSpo2(spo2),
     rawPayload: isRecord(payload) ? payload : entryData,
   };
 }
 
 export function mapSuuntoRecoveryToCanonical(payload: unknown): SuuntoRecoveryCanonical {
   const entryData = extractEntryData(payload);
-  const timestamp = extractTimestamp(payload, entryData);
+  const timestampSource = extractTimestampSource(payload, entryData);
+  const timestamp = normaliseTimestamp(timestampSource) ?? new Date(0).toISOString();
 
   return {
     source: 'suunto',
-    date: extractDate(timestamp),
-    timezone: extractTimezoneFromTimestamp(timestamp),
+    date: extractDate(timestampSource),
+    timezone: extractTimezoneFromTimestamp(timestampSource),
     timestamp,
     balance: readNumber(entryData.Balance),
     stressState: readNumber(entryData.StressState),

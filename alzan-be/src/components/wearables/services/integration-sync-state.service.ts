@@ -47,6 +47,20 @@ export class IntegrationSyncStateService {
     await this.saveState({ ...input, status: 'error', lastError: errorMessage });
   }
 
+  public async getCursor(input: SyncStateIdentity): Promise<string | null> {
+    let query = this.supabaseAdminService.client
+      .from('integration_sync_state')
+      .select('cursor_token')
+      .eq('user_id', input.userId)
+      .eq('provider', input.provider)
+      .eq('source_channel', input.sourceChannel)
+      .eq('sync_domain', input.syncDomain);
+    query = input.sourcePackage ? query.eq('source_package', input.sourcePackage) : query.is('source_package', null);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw new BadRequestException('SYNC_STATE_LOOKUP_FAILED');
+    return data?.cursor_token ?? null;
+  }
+
   private toJson(value: Record<string, unknown> | null | undefined): Json | null {
     if (!value) return null;
     return value as Json;

@@ -6,6 +6,7 @@ import { CloudProviderSyncOutputDto } from '../dto/cloud-provider-sync.dto';
 import { PolarAccessLinkService } from '../services/polar-access-link.service';
 import { SuuntoCloudSyncService } from '../services/suunto-cloud-sync.service';
 import { CorosCloudSyncService } from '../services/coros-cloud-sync.service';
+import { SuuntoHealthSyncService } from '../services/suunto-health-sync.service';
 
 @ApiTags('Wearables')
 @Controller('wearables/cloud')
@@ -14,6 +15,7 @@ export class CloudProviderSyncController {
   constructor(
     private readonly polarAccessLinkService: PolarAccessLinkService,
     private readonly suuntoCloudSyncService: SuuntoCloudSyncService,
+    private readonly suuntoHealthSyncService: SuuntoHealthSyncService,
     private readonly corosCloudSyncService: CorosCloudSyncService,
   ) {}
 
@@ -32,19 +34,35 @@ export class CloudProviderSyncController {
   @ApiOkResponse({ type: CloudProviderSyncOutputDto })
   public async syncSuunto(@UserContext() ctx: UserCtx): Promise<CloudProviderSyncOutputDto> {
     const result = await this.suuntoCloudSyncService.syncActivities(ctx.user.id);
+    const health = result.status === 'running' ? null : await this.suuntoHealthSyncService.sync(ctx.user.id);
+    const status =
+      result.status === 'running' || health?.status === 'running'
+        ? 'running'
+        : result.status === 'partial' || health?.status !== 'success'
+          ? 'partial'
+          : 'success';
+    const errorsByCode = { ...result.errorsByCode };
+    if (health?.errorCode) errorsByCode[health.errorCode] = (errorsByCode[health.errorCode] ?? 0) + 1;
     return {
       provider: result.provider,
       job_id: result.jobId,
-      status: result.status,
+      status,
       activities_imported: result.activitiesImported,
       activities_skipped: result.activitiesSkipped,
       activities_updated: 0,
       activities_repaired: result.activitiesRepaired,
       activities_failed: result.activitiesFailed,
       activities_reconciled: result.activitiesReconciled,
-      errors_by_code: result.errorsByCode,
+      errors_by_code: errorsByCode,
       phase_durations_ms: result.phaseDurationsMs,
       last_success_at: result.lastSuccessAt,
+      health_sync_status: health?.status ?? 'skipped',
+      health_sync_error: health?.errorCode,
+      health_samples_imported: health?.healthSamplesImported ?? 0,
+      health_days_imported: health?.healthDaysImported ?? 0,
+      health_sleeps_imported: health?.sleepsImported ?? 0,
+      health_recoveries_imported: health?.recoveriesImported ?? 0,
+      health_last_synced_at: health?.lastSyncedAt ?? null,
     };
   }
 

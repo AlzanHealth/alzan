@@ -604,3 +604,118 @@ ON CONFLICT (user_id, calculated_for_date) DO UPDATE SET
   input_snapshot = EXCLUDED.input_snapshot,
   composition_calculated_at = now(),
   updated_at = now();
+
+-- ---------------------------------------------------------------------------
+-- Suunto 24/7 demo data (56 days; safe to re-run)
+-- Covers continuous HR, night HRV/SpO2, sleep stages, recovery, steps and energy.
+-- ---------------------------------------------------------------------------
+DELETE FROM public.health_metric_samples
+WHERE user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78'
+  AND provider = 'suunto' AND source_channel = 'cloud'
+  AND source_record_id LIKE 'seed-suunto:%';
+
+DELETE FROM public.step_intervals
+WHERE daily_steps_id IN (
+  SELECT id FROM public.daily_steps WHERE user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78'
+    AND source = 'suunto' AND source_record_id LIKE 'seed-suunto-steps:%'
+);
+DELETE FROM public.daily_steps
+WHERE user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78' AND source = 'suunto'
+  AND source_record_id LIKE 'seed-suunto-steps:%';
+
+DELETE FROM public.sleep_stage_intervals
+WHERE sleep_session_id IN (
+  SELECT id FROM public.sleep_sessions WHERE user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78'
+    AND source = 'suunto' AND source_sleep_id LIKE 'seed-suunto-sleep:%'
+);
+DELETE FROM public.sleep_sessions
+WHERE user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78' AND source = 'suunto'
+  AND source_sleep_id LIKE 'seed-suunto-sleep:%';
+
+INSERT INTO public.daily_steps (
+  user_id, date, timezone, source, total_steps, distance_m, calories_kcal,
+  active_calories_kcal, data_quality, source_channel, source_record_id
+)
+SELECT
+  '4424c5d6-5751-4038-aa39-bd85895ddb78', day::date, 'Europe/Madrid', 'suunto',
+  (5200 + (day_index % 7) * 830 + (day_index % 3) * 400)::integer,
+  (5200 + (day_index % 7) * 830 + (day_index % 3) * 400) * 0.72,
+  round((5200 + (day_index % 7) * 830 + (day_index % 3) * 400) * 0.045),
+  round((5200 + (day_index % 7) * 830 + (day_index % 3) * 400) * 0.022),
+  'complete', 'cloud', 'seed-suunto-steps:' || to_char(day::date, 'YYYY-MM-DD')
+FROM generate_series(CURRENT_DATE - 55, CURRENT_DATE, INTERVAL '1 day') WITH ORDINALITY AS days(day, day_index);
+
+INSERT INTO public.sleep_sessions (
+  user_id, source, source_channel, date, timezone, start_time, end_time, sleep_start, sleep_end,
+  is_main_sleep, is_nap, duration_in_bed_min, total_sleep_min, awake_min,
+  light_sleep_min, deep_sleep_min, rem_sleep_min, sleep_score,
+  avg_heart_rate_bpm, min_heart_rate_bpm, avg_hrv_ms, avg_spo2_pct,
+  data_quality, source_sleep_id, source_record_id
+)
+SELECT
+  '4424c5d6-5751-4038-aa39-bd85895ddb78', 'suunto', 'cloud', day::date, 'Europe/Madrid',
+  (day::date - 1) + TIME '22:45' AT TIME ZONE 'Europe/Madrid',
+  day::date + TIME '06:45' AT TIME ZONE 'Europe/Madrid',
+  (day::date - 1) + TIME '22:55' AT TIME ZONE 'Europe/Madrid',
+  day::date + TIME '06:30' AT TIME ZONE 'Europe/Madrid',
+  true, false, 480, 425 + (day_index % 5) * 7, 55 - (day_index % 5) * 2,
+  185 + (day_index % 4) * 5, 90 + (day_index % 3) * 4, 150 + (day_index % 6) * 3,
+  68 + (day_index % 25), 47 + (day_index % 8), 42 + (day_index % 5),
+  38 + (day_index % 20), 96.5 + (day_index % 4) * 0.5,
+  'complete', 'seed-suunto-sleep:' || to_char(day::date, 'YYYY-MM-DD'),
+  'seed-suunto-sleep:' || to_char(day::date, 'YYYY-MM-DD')
+FROM generate_series(CURRENT_DATE - 55, CURRENT_DATE, INTERVAL '1 day') WITH ORDINALITY AS days(day, day_index);
+
+INSERT INTO public.sleep_stage_intervals (
+  user_id, sleep_session_id, source, start_time, end_time, duration_min, stage, provider_stage
+)
+SELECT
+  s.user_id, s.id, 'suunto', s.start_time + stage.start_offset * INTERVAL '1 minute',
+  s.start_time + (stage.start_offset + stage.duration_min) * INTERVAL '1 minute',
+  stage.duration_min, stage.stage::public.sleep_stage_enum, stage.stage
+FROM public.sleep_sessions s
+CROSS JOIN LATERAL (
+  VALUES ('light', 0, 75), ('deep', 75, 90), ('rem', 165, 80),
+         ('light', 245, 100), ('deep', 345, 60), ('rem', 405, 75)
+) AS stage(stage, start_offset, duration_min)
+WHERE s.user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78'
+  AND s.source = 'suunto' AND s.source_sleep_id LIKE 'seed-suunto-sleep:%';
+
+-- Heart-rate samples during the day plus nightly HRV/SpO2 and recovery readings.
+INSERT INTO public.health_metric_samples (
+  user_id, provider, source_channel, source_package, source_record_id, metric_type,
+  recorded_at, local_date, timezone, value, unit, raw_payload
+)
+SELECT
+  '4424c5d6-5751-4038-aa39-bd85895ddb78', 'suunto', 'cloud', NULL,
+  'seed-suunto:' || metric.metric_type || ':' || to_char(day::date, 'YYYY-MM-DD') || ':' || metric.sample_no,
+  metric.metric_type,
+  (day::date + metric.sample_hour * INTERVAL '1 hour') AT TIME ZONE 'Europe/Madrid',
+  day::date, 'Europe/Madrid', metric.value, metric.unit,
+  jsonb_build_object('seed', true, 'sample', metric.sample_no)
+FROM generate_series(CURRENT_DATE - 55, CURRENT_DATE, INTERVAL '1 day') WITH ORDINALITY AS days(day, day_index)
+CROSS JOIN LATERAL (
+  VALUES
+    ('heart_rate', 1, 8, 61 + (day_index % 8), 'bpm'),
+    ('heart_rate', 2, 11, 73 + (day_index % 11), 'bpm'),
+    ('heart_rate', 3, 14, 82 + (day_index % 9), 'bpm'),
+    ('heart_rate', 4, 17, 68 + (day_index % 10), 'bpm'),
+    ('heart_rate', 5, 20, 64 + (day_index % 7), 'bpm'),
+    ('hrv_rmssd', 1, 3, 39 + (day_index % 20), 'ms'),
+    ('spo2', 1, 3, 96 + (day_index % 4), '%'),
+    ('recovery_balance', 1, 7, 0.52 + (day_index % 40) / 100.0, 'fraction'),
+    ('stress_state', 1, 9, 1 + (day_index % 4), 'enum'),
+    ('stress_state', 2, 15, 1 + ((day_index + 2) % 4), 'enum')
+) AS metric(metric_type, sample_no, sample_hour, value, unit);
+
+DELETE FROM public.integration_sync_state
+WHERE user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78'
+  AND provider = 'suunto' AND source_channel = 'cloud' AND sync_domain = 'health_metrics';
+INSERT INTO public.integration_sync_state (
+  user_id, provider, source_channel, source_package, sync_domain,
+  cursor_token, last_record_at, last_attempt_at, last_success_at, status, metadata
+)
+VALUES (
+  '4424c5d6-5751-4038-aa39-bd85895ddb78', 'suunto', 'cloud', NULL, 'health_metrics',
+  now()::text, now(), now(), now(), 'success', jsonb_build_object('seed', true, 'windowDays', 56)
+);

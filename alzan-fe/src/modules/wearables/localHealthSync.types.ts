@@ -98,6 +98,12 @@ export type CloudProviderSyncResult = {
   last_success_at: string | null;
   health_days_imported?: number;
   health_consent_required?: boolean;
+  health_sync_status?: 'success' | 'partial' | 'unavailable' | 'running' | 'skipped';
+  health_sync_error?: string;
+  health_samples_imported?: number;
+  health_sleeps_imported?: number;
+  health_recoveries_imported?: number;
+  health_last_synced_at?: string | null;
   backfill_complete?: boolean;
   backfill_next_date?: string | null;
   fit_pending?: number;

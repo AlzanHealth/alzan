@@ -188,6 +188,11 @@ export class SuuntoCloudSyncService {
     }
   }
 
+  /** Shares the existing Suunto OAuth refresh path with the independent 24/7 importer. */
+  public async getHealthAccessToken(userId: string): Promise<string> {
+    return (await this.getUsableToken(userId)).accessToken;
+  }
+
   private buildActiveJobResult(jobId: string): SuuntoSyncResult {
     return {
       provider: 'suunto',

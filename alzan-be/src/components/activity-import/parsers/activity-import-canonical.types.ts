@@ -186,6 +186,7 @@ export interface ProviderSleepCanonical<TSource extends CanonicalActivityProvide
   bedtimeEnd: string | null;
   isNap: boolean;
   totalSleepMin: number | null;
+  durationInBedMin?: number | null;
   awakeMin: number | null;
   lightSleepMin: number | null;
   deepSleepMin: number | null;

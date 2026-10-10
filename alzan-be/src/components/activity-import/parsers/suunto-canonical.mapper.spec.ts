@@ -1023,7 +1023,7 @@ function assertSuuntoHealthCanonicalParsesWithoutPersistence(): void {
     timestamp: '2026-05-01T12:00:00.000+02:00',
     entryData: {
       StepCount: 9000,
-      EnergyConsumption: 2400,
+      EnergyConsumption: 10041600,
       Distance: 6800,
     },
   });
@@ -1052,6 +1052,7 @@ function assertSuuntoHealthCanonicalParsesWithoutPersistence(): void {
   assert.equal(sleep.source, 'suunto');
   assert.equal(sleep.sourceSleepId, 'sleep-1');
   assert.equal(sleep.totalSleepMin, 420);
+  assert.equal(sleep.durationInBedMin, 450);
   assert.equal(sleep.deepSleepMin, 90);
   assert.equal(sleep.avgHrvMs, 47);
   assert.equal(sleep.avgSpo2Pct, 98);
@@ -1066,6 +1067,43 @@ function assertSuuntoHealthCanonicalParsesWithoutPersistence(): void {
   assert.equal(recovery.source, 'suunto');
   assert.equal(recovery.balance, 0.93);
   assert.equal(recovery.stressState, 3);
+}
+
+function assertOfficialSuuntoSleepPayloadMapsCorrectly(): void {
+  const sleep = mapSuuntoSleepToCanonical({
+    timestamp: '2025-01-05T23:29:00.000+02:00',
+    entryData: {
+      DeepSleepDuration: 2850,
+      LightSleepDuration: 22470,
+      REMSleepDuration: 5280,
+      Duration: 32460,
+      HRAvg: 45,
+      HRMin: 42,
+      SleepQualityScore: 81,
+      SleepId: 1736112540,
+      BedtimeStart: '2025-01-05T23:29:00.000+02:00',
+      BedtimeEnd: '2025-01-06T08:30:00.000+02:00',
+      MaxSpo2: 1,
+      AvgHRV: 47,
+      IsNap: false,
+      SleepOnsetLatencyDuration: 1200,
+      WakeAfterSleepOnsetDuration: 630,
+      WakeBeforeOffBedDuration: 30,
+    },
+  });
+
+  assert.equal(sleep.date, '2025-01-05');
+  assert.equal(sleep.timezone, 'UTC+02:00');
+  assert.equal(sleep.totalSleepMin, 510);
+  assert.equal(sleep.durationInBedMin, 541);
+  assert.equal(sleep.awakeMin, 31);
+  assert.equal(sleep.deepSleepMin, 47.5);
+  assert.equal(sleep.avgHeartRateBpm, 45);
+  assert.equal(sleep.minHeartRateBpm, 42);
+  assert.equal(sleep.sleepScore, 81);
+  assert.equal(sleep.avgSpo2Pct, 100);
+  assert.equal(sleep.avgHrvMs, 47);
+  assert.equal(sleep.sourceSleepId, '1736112540');
 }
 
 assertSuuntoSportMapping();
@@ -1087,3 +1125,4 @@ assertSuuntoFitWithoutGpsStillParsesAsRouteImport();
 assertSuuntoJsonCanonicalParsesSummary();
 assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks();
 assertSuuntoHealthCanonicalParsesWithoutPersistence();
+assertOfficialSuuntoSleepPayloadMapsCorrectly();

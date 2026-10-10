@@ -125,14 +125,21 @@ export function useSuuntoConnection() {
       invalidateTrainingCalendar(queryClient);
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+      queryClient.invalidateQueries({ queryKey: ['health', user?.id], refetchType: 'active' });
+      const healthSummary =
+        result.health_sync_status === 'success'
+          ? t('settings.suuntoHealthImported', { count: result.health_samples_imported ?? 0 })
+          : result.health_sync_status === 'running'
+            ? t('settings.suuntoHealthRunning')
+            : t('settings.suuntoHealthUnavailable');
       Alert.alert(
         result.status === 'partial' ? t('settings.syncPartialTitle') : t('settings.syncCompleteTitle'),
-        t('settings.syncActivitiesSummary', {
+        `${t('settings.syncActivitiesSummary', {
           imported: result.activities_imported,
           skipped: result.activities_skipped ?? 0,
           repaired: result.activities_repaired ?? 0,
           failed: result.activities_failed ?? 0,
-        }),
+        })}\n${healthSummary}`,
       );
     },
     onError: (error: Error) => {
