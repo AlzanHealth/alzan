@@ -1055,7 +1055,8 @@ function assertSuuntoHealthCanonicalParsesWithoutPersistence(): void {
   assert.equal(sleep.durationInBedMin, 450);
   assert.equal(sleep.deepSleepMin, 90);
   assert.equal(sleep.avgHrvMs, 47);
-  assert.equal(sleep.avgSpo2Pct, 98);
+  assert.equal(sleep.avgSpo2Pct, null);
+  assert.equal(sleep.maxSpo2Pct, 98);
 
   const recovery = mapSuuntoRecoveryToCanonical({
     timestamp: '2026-05-02T07:00:00.000+02:00',
@@ -1101,7 +1102,8 @@ function assertOfficialSuuntoSleepPayloadMapsCorrectly(): void {
   assert.equal(sleep.avgHeartRateBpm, 45);
   assert.equal(sleep.minHeartRateBpm, 42);
   assert.equal(sleep.sleepScore, 81);
-  assert.equal(sleep.avgSpo2Pct, 100);
+  assert.equal(sleep.avgSpo2Pct, null);
+  assert.equal(Reflect.get(sleep, 'maxSpo2Pct'), 100);
   assert.equal(sleep.avgHrvMs, 47);
   assert.equal(sleep.sourceSleepId, '1736112540');
 }

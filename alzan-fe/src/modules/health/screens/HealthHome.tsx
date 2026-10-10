@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { HealthScreenNavigationProp, TabParamList } from '../../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Scale, Ruler, Moon, Plus, BarChart2, ChevronRight, Activity, Settings } from 'lucide-react-native';
+import { Scale, Ruler, Plus, BarChart2, ChevronRight, Activity, Settings } from 'lucide-react-native';
 import { colors, typography } from '../../../theme';
 
 import { useHealthInsights } from '../hooks/useHealthInsights';
@@ -20,6 +20,7 @@ import { healthQueryKeys } from '../hooks/healthQueryKeys';
 import { parseISO, isValid } from 'date-fns';
 import { SuuntoHealthSection } from '../components/SuuntoHealthSection';
 import { CardioEvolutionCard } from '../components/CardioEvolutionCard';
+import { UnifiedSleepCard } from '../components/UnifiedSleepCard';
 
 export const HealthHome = () => {
   const { t } = useTranslation();
@@ -32,6 +33,7 @@ export const HealthHome = () => {
 
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = React.useState(false);
+  const [sleepDetailsRequest, setSleepDetailsRequest] = React.useState(0);
   const scrollViewRef = React.useRef<ScrollView>(null);
 
   const onRefresh = React.useCallback(async () => {
@@ -239,91 +241,26 @@ export const HealthHome = () => {
             </TouchableOpacity>
           </GlassCard>
 
-          {/* 4. Sleep Section */}
-          <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>{t('settings.sleep')}</Text>
-          <GlassCard style={[styles.sleepCard, dynamicStyles.glassCard]}>
-            <TouchableOpacity onPress={() => navigation.navigate('SleepList')} activeOpacity={0.7}>
-              <View style={styles.weightHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Moon size={20} color="#8B5CF6" style={{ marginRight: 8 }} />
-                  <Text style={[styles.cardTitle, dynamicStyles.title]}>{t('health.latestSleepRecord')}</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={e => {
-                    e.stopPropagation();
-                    navigation.navigate('SleepAdd');
-                  }}
-                  style={[styles.addWeightButton, dynamicStyles.iconContainer]}
-                >
-                  <Plus size={20} color="#8B5CF6" />
-                </TouchableOpacity>
-              </View>
+          <CardioEvolutionCard />
 
-              {latestSleep ? (
-                <>
-                  <Text style={[styles.cardDate, dynamicStyles.subtitle]}>{formatDate(latestSleep.date)}</Text>
-                  <View style={styles.weightContent}>
-                    <Text style={[styles.bigValue, dynamicStyles.title]}>
-                      {latestSleep.total_sleep_min
-                        ? `${Math.floor(latestSleep.total_sleep_min / 60)}h ${latestSleep.total_sleep_min % 60}m`
-                        : '--'}
-                    </Text>
-                  </View>
-                  {latestSleep.sleep_score != null && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 4 }}>
-                      <View
-                        style={{
-                          backgroundColor:
-                            latestSleep.sleep_score >= 85
-                              ? 'rgba(16, 185, 129, 0.15)'
-                              : latestSleep.sleep_score >= 70
-                                ? 'rgba(245, 158, 11, 0.15)'
-                                : 'rgba(239, 68, 68, 0.15)',
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          borderRadius: 12,
-                          marginRight: 8,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color:
-                              latestSleep.sleep_score >= 85
-                                ? '#10B981'
-                                : latestSleep.sleep_score >= 70
-                                  ? '#F59E0B'
-                                  : '#EF4444',
-                            fontWeight: '700',
-                            fontSize: 14,
-                          }}
-                        >
-                          {latestSleep.sleep_score}
-                        </Text>
-                      </View>
-                      <Text style={[dynamicStyles.subtitle, { fontSize: 13 }]}>
-                        {t('health.sleepScore', 'Sleep Score')}
-                      </Text>
-                    </View>
-                  )}
-                  {avgSleepMinutes > 0 && (
-                    <Text style={[styles.comparisonText, dynamicStyles.subtitle, { marginTop: 12 }]}>
-                      {t('health.avgLast30Days')} {Math.floor(avgSleepMinutes / 60)}h {Math.round(avgSleepMinutes % 60)}
-                      m
-                    </Text>
-                  )}
-                </>
-              ) : (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={[styles.emptyStateText, dynamicStyles.subtitle]}>{t('health.noSleepRecords')}</Text>
-                  <Text style={[styles.emptyStateHint, dynamicStyles.subtitle]}>{t('health.addFirstSleepRecord')}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </GlassCard>
+          {/* 4. A single sleep summary combines stages and the wellness metrics available for this session. */}
+          <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>{t('settings.sleep')}</Text>
+          <UnifiedSleepCard
+            session={latestSleep}
+            averageSleepMinutes={avgSleepMinutes}
+            formattedDate={formatDate(latestSleep?.date)}
+            onOpen={() => {
+              if (latestSleep?.source === 'suunto') {
+                setSleepDetailsRequest(request => request + 1);
+              } else {
+                navigation.navigate('SleepList');
+              }
+            }}
+            onAdd={() => navigation.navigate('SleepAdd')}
+          />
           <Text style={[styles.recommendationText, dynamicStyles.subtitle]}>{t('health.autoCompCalcDisclaimer')}</Text>
 
-          <SuuntoHealthSection />
-          <CardioEvolutionCard />
+          <SuuntoHealthSection sleepDetailsRequest={sleepDetailsRequest} />
 
           {/* Shortcuts Floating or Bottom? User didn't specify but removed from prominent view to focus on Weight */}
         </ScrollView>
@@ -505,46 +442,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     letterSpacing: -0.5,
-  },
-  // Sleep section styles
-  sleepCard: {
-    padding: 24,
-    marginBottom: 16,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
-  },
-  sleepQualityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    gap: 8,
-  },
-  qualityLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  qualityStars: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  qualityStar: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  emptyStateContainer: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  emptyStateHint: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    opacity: 0.7,
   },
   recommendationText: {
     ...typography.caption,

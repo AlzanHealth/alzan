@@ -191,20 +191,24 @@ export function mapAppleHealthSleepToCanonical(payload: unknown): AppleHealthSle
   const light = (minutesByStage.asleepcore ?? 0) + (minutesByStage.light ?? 0);
   const deep = (minutesByStage.asleepdeep ?? 0) + (minutesByStage.deep ?? 0);
   const rem = (minutesByStage.asleeprem ?? 0) + (minutesByStage.rem ?? 0);
+  const classifiedSleepMinutes = light + deep + rem;
+  const unspecifiedSleepMinutes =
+    (minutesByStage.asleep ?? 0) + (minutesByStage.asleepunspecified ?? 0) + (minutesByStage.sleeping ?? 0);
   const awake = (minutesByStage.awake ?? 0) + (minutesByStage.asleepawake ?? 0);
+  const root = isRecord(payload) ? payload : {};
   return {
     source: 'apple_health',
     sourcePackage: sleepRecords[0] ? readSourcePackage(sleepRecords[0]) : null,
     sourceSleepId: readString(sleepRecords[0]?.parentId) ?? readString(sleepRecords[0]?.id),
     sourceRecordId: readString(sleepRecords[0]?.parentId) ?? readString(sleepRecords[0]?.id),
-    date: readDateFromTimestamp(firstStart),
-    timezone: sleepRecords[0] ? readTimezone(sleepRecords[0]) : 'UTC',
+    date: readString(root.date) ?? readDateFromTimestamp(firstStart),
+    timezone: readString(root.timezone) ?? (sleepRecords[0] ? readTimezone(sleepRecords[0]) : 'UTC'),
     startTime: firstStart,
     endTime: lastEnd,
     bedtimeStart: firstStart,
     bedtimeEnd: lastEnd,
     isNap: false,
-    totalSleepMin: light + deep + rem || null,
+    totalSleepMin: classifiedSleepMinutes || unspecifiedSleepMinutes || null,
     awakeMin: awake || null,
     lightSleepMin: light || null,
     deepSleepMin: deep || null,

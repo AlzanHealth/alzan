@@ -36,7 +36,7 @@ export const CardioEvolutionCard = () => {
 };
 
 const styles = StyleSheet.create({
-  card: { marginTop: 24, padding: 0, borderRadius: 20 },
+  card: { marginTop: 4, marginBottom: 12, padding: 0, borderRadius: 20 },
   pressable: { minHeight: 92, flexDirection: 'row', alignItems: 'center', padding: 15, gap: 12 },
   icon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, gap: 3 },

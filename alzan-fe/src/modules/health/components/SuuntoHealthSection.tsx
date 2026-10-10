@@ -51,7 +51,9 @@ const summaryDescriptions = {
   energy: 'health.suuntoEnergyDescription',
 } as const;
 
-export const SuuntoHealthSection = () => {
+type Props = { sleepDetailsRequest: number };
+
+export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { styles: healthStyles, colors } = useHealthStyles();
@@ -61,6 +63,12 @@ export const SuuntoHealthSection = () => {
   const [metric, setMetric] = React.useState<Metric>('heart_rate');
   const selectedPeriod = activeDetail ? detailPeriod : period;
   const from = getSuuntoPeriodStart(selectedPeriod);
+  React.useEffect(() => {
+    if (sleepDetailsRequest > 0) {
+      setDetailPeriod('W');
+      setActiveDetail('sleep');
+    }
+  }, [sleepDetailsRequest]);
   const showDetail = (detail: SummaryMetric) => {
     setDetailPeriod(period === '2M' ? 'W' : period);
     setActiveDetail(detail);
@@ -91,7 +99,7 @@ export const SuuntoHealthSection = () => {
           let request = supabase
             .from('sleep_sessions')
             .select(
-              'id, date, total_sleep_min, awake_min, deep_sleep_min, light_sleep_min, rem_sleep_min, avg_heart_rate_bpm, min_heart_rate_bpm, avg_hrv_ms, avg_spo2_pct, sleep_score, source',
+              'id, date, total_sleep_min, awake_min, deep_sleep_min, light_sleep_min, rem_sleep_min, avg_heart_rate_bpm, min_heart_rate_bpm, avg_hrv_ms, max_spo2_pct, sleep_score, source',
             )
             .eq('user_id', user.id)
             .eq('source', 'suunto')
@@ -332,69 +340,6 @@ export const SuuntoHealthSection = () => {
               hint={t('health.suuntoOpenDetails')}
               onPress={() => showDetail('recovery')}
             />
-            <SummaryCard
-              width={cardWidth}
-              cardStyle={healthStyles.glassCard}
-              textColor={colors.textPrimary}
-              secondaryTextColor={colors.textSecondary}
-              icon={<Moon size={18} color="#8B68E8" />}
-              label={t('health.suuntoSleepTrend')}
-              value={averageSleepLabel}
-              description={t('health.suuntoSleepCardDescription')}
-              hint={t('health.suuntoOpenSleepDetails')}
-              onPress={() => showDetail('sleep')}
-            />
-          </View>
-
-          <View>
-            <Text style={[styles.subheading, healthStyles.sectionTitle]}>{t('health.suuntoSleep')}</Text>
-            {latestSleep ? (
-              <GlassCard style={[styles.dataCard, healthStyles.glassCard]}>
-                <View style={styles.dataHeader}>
-                  <Moon size={18} color="#8B5CF6" />
-                  <Text style={[styles.dataTitle, healthStyles.title]}>
-                    {new Date(`${latestSleep.date}T12:00:00`).toLocaleDateString()}
-                  </Text>
-                </View>
-                <Text style={[styles.value, healthStyles.title]}>
-                  {latestSleep.total_sleep_min == null
-                    ? '—'
-                    : `${Math.floor(latestSleep.total_sleep_min / 60)}h ${Math.round(latestSleep.total_sleep_min % 60)}m`}
-                </Text>
-                <View style={styles.stageBar}>
-                  {[latestSleep.deep_sleep_min, latestSleep.light_sleep_min, latestSleep.rem_sleep_min].map(
-                    (stage, index) => (
-                      <View
-                        key={index}
-                        style={{ flex: Math.max(stage ?? 0, 1), backgroundColor: zoneColors[index + 1] }}
-                      />
-                    ),
-                  )}
-                </View>
-                <View style={styles.stageLegend}>
-                  {[t('health.suuntoDeep'), t('health.suuntoLight'), t('health.suuntoRem')].map((label, index) => (
-                    <View key={label} style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: zoneColors[index + 1] }]} />
-                      <Text style={styles.metricLabel}>{label}</Text>
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.metricsGrid}>
-                  <Metric label={t('health.suuntoSleepHeartRate')} value={latestSleep.avg_heart_rate_bpm} unit="bpm" />
-                  <Metric
-                    label={t('health.suuntoSleepMinHeartRate')}
-                    value={latestSleep.min_heart_rate_bpm}
-                    unit="bpm"
-                  />
-                  <Metric label={t('health.suuntoSleepHrv')} value={latestSleep.avg_hrv_ms} unit="ms" />
-                  <Metric label={t('health.suuntoSleepSpo2')} value={latestSleep.avg_spo2_pct} unit="%" />
-                  <Metric label={t('health.suuntoSleepScore')} value={latestSleep.sleep_score} unit="" />
-                  <Metric label={t('health.suuntoAwake')} value={latestSleep.awake_min} unit="min" />
-                </View>
-              </GlassCard>
-            ) : (
-              <Text style={[styles.empty, { color: colors.textSecondary }]}>{t('health.suuntoNoSleep')}</Text>
-            )}
           </View>
 
           <Text style={[styles.subheading, healthStyles.sectionTitle]}>{t('health.suuntoRecovery')}</Text>
@@ -621,40 +566,40 @@ export const SuuntoHealthSection = () => {
                       </Text>
                       <View style={styles.metricsGrid}>
                         <Metric
-                          label={t('health.suuntoSleepHeartRate')}
+                          label={t('health.sleepHeartRate')}
                           value={latestSleep.avg_heart_rate_bpm}
                           unit="bpm"
-                          description={t('health.suuntoSleepHeartRateDescription')}
+                          description={t('health.sleepHeartRateDescription')}
                         />
                         <Metric
-                          label={t('health.suuntoSleepMinHeartRate')}
+                          label={t('health.sleepMinHeartRate')}
                           value={latestSleep.min_heart_rate_bpm}
                           unit="bpm"
-                          description={t('health.suuntoSleepMinHeartRateDescription')}
+                          description={t('health.sleepMinHeartRateDescription')}
                         />
                         <Metric
-                          label={t('health.suuntoSleepHrv')}
+                          label={t('health.sleepHrv')}
                           value={latestSleep.avg_hrv_ms}
                           unit="ms"
-                          description={t('health.suuntoSleepHrvDescription')}
+                          description={t('health.sleepHrvDescription')}
                         />
                         <Metric
-                          label={t('health.suuntoSleepSpo2')}
-                          value={latestSleep.avg_spo2_pct}
+                          label={t('health.sleepSpo2Max')}
+                          value={latestSleep.max_spo2_pct}
                           unit="%"
-                          description={t('health.suuntoSleepSpo2Description')}
+                          description={t('health.sleepSpo2MaxDescription')}
                         />
                         <Metric
                           label={t('health.suuntoSleepScore')}
                           value={latestSleep.sleep_score}
                           unit=""
-                          description={t('health.suuntoSleepScoreDescription')}
+                          description={t('health.sleepScoreDescription')}
                         />
                         <Metric
-                          label={t('health.suuntoAwake')}
+                          label={t('health.sleepAwake')}
                           value={latestSleep.awake_min}
                           unit="min"
-                          description={t('health.suuntoAwakeDescription')}
+                          description={t('health.sleepAwakeDescription')}
                         />
                       </View>
                     </>
@@ -884,9 +829,6 @@ const styles = StyleSheet.create({
   value: { fontSize: 29, fontWeight: '800' },
   unit: { fontSize: 14, fontWeight: '600', color: '#82858A' },
   empty: { paddingVertical: 18, fontSize: 14, textAlign: 'center' },
-  dataCard: { padding: 16, borderRadius: 20 },
-  dataHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  dataTitle: { fontSize: 14, fontWeight: '600' },
   stageBar: { height: 8, flexDirection: 'row', overflow: 'hidden', borderRadius: 6, gap: 2, marginVertical: 14 },
   stageLegend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -7, marginBottom: 8 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },

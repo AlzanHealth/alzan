@@ -300,6 +300,25 @@ function assertAppleHealthSleepMapsWithoutPersistence(): void {
   assert.equal(sleep.awakeMin, 30);
 }
 
+function assertAppleHealthGenericAsleepAndLocalDateArePreserved(): void {
+  const sleep = mapAppleHealthSleepToCanonical({
+    date: '2026-05-01',
+    timezone: 'Europe/Madrid',
+    sleep: [
+      {
+        id: 'sleep-unspecified',
+        stage: 'asleep',
+        startDate: '2026-05-01T22:30:00.000Z',
+        endDate: '2026-05-02T05:30:00.000Z',
+      },
+    ],
+  });
+
+  assert.equal(sleep.date, '2026-05-01');
+  assert.equal(sleep.timezone, 'Europe/Madrid');
+  assert.equal(sleep.totalSleepMin, 420);
+}
+
 function assertAppleHealthRecoveryMapsWithoutPersistence(): void {
   const recovery = mapAppleHealthRecoveryToCanonical({
     data: {
@@ -341,4 +360,5 @@ assertAppleHealthWalkingMapsToHikingUrbanWalk();
 assertAppleHealthStrengthParsesInStrengthFlow();
 assertAppleHealthDailyActivityMapsWithoutPersistence();
 assertAppleHealthSleepMapsWithoutPersistence();
+assertAppleHealthGenericAsleepAndLocalDateArePreserved();
 assertAppleHealthRecoveryMapsWithoutPersistence();

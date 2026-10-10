@@ -86,12 +86,12 @@
     "id": "suunto-daily-activity-health-json",
     "provider": "suunto",
     "domain": "daily_activity",
-    "sourceUrl": "https://apizone.suunto.com/fit-description",
+    "sourceUrl": "https://apizone.suunto.com/webhooks",
     "payload": {
       "timestamp": "2026-05-01T12:00:00Z",
       "entryData": {
         "StepCount": 9400,
-        "EnergyConsumption": 530,
+        "EnergyConsumption": 2217520,
         "Distance": 7200
       }
     },

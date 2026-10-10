@@ -73,7 +73,8 @@ function readIdentifier(value: unknown): string | null {
 
 function normaliseSpo2(value: number | null): number | null {
   if (value == null) return null;
-  return value > 0 && value <= 1 ? value * 100 : value;
+  if (value <= 0 || value > 100) return null;
+  return value <= 1 ? value * 100 : value;
 }
 
 function secondsToMinutes(value: number | null): number | null {
@@ -118,7 +119,8 @@ export function mapSuuntoSleepToCanonical(payload: unknown): SuuntoSleepCanonica
   const bedtimeEndSource = readString(entryData.BedtimeEnd) ?? bedtimeStartSource;
   const bedtimeStart = normaliseTimestamp(bedtimeStartSource) ?? new Date(0).toISOString();
   const bedtimeEnd = normaliseTimestamp(bedtimeEndSource) ?? bedtimeStart;
-  const spo2 = readNumber(entryData.AvgSpo2) ?? readNumber(entryData.MaxSpo2);
+  const averageSpo2 = normaliseSpo2(readNumber(entryData.AvgSpo2));
+  const maximumSpo2 = normaliseSpo2(readNumber(entryData.MaxSpo2));
   const officialDurationSeconds = readNumber(entryData.Duration);
   const sleepDurationSeconds =
     officialDurationSeconds ?? readNumber(entryData.TotalSleepDuration) ?? readNumber(entryData.SleepDuration);
@@ -165,7 +167,8 @@ export function mapSuuntoSleepToCanonical(payload: unknown): SuuntoSleepCanonica
     avgHeartRateBpm: readNumber(entryData.HRAvg) ?? readNumber(entryData.AvgHeartRate) ?? readNumber(entryData.AvgHR),
     minHeartRateBpm: readNumber(entryData.HRMin) ?? readNumber(entryData.MinHeartRate) ?? readNumber(entryData.MinHR),
     avgHrvMs: readNumber(entryData.AvgHRV),
-    avgSpo2Pct: normaliseSpo2(spo2),
+    avgSpo2Pct: averageSpo2,
+    maxSpo2Pct: maximumSpo2,
     rawPayload: isRecord(payload) ? payload : entryData,
   };
 }

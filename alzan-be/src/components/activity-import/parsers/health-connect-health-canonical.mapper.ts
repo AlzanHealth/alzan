@@ -190,6 +190,7 @@ export function mapHealthConnectSleepToCanonical(payload: unknown): HealthConnec
   const startTime = normaliseTimestamp(sleep.startTime ?? sleep.start) ?? new Date(0).toISOString();
   const endTime = normaliseTimestamp(sleep.endTime ?? sleep.end) ?? startTime;
   const stages = sleep.stages;
+  const stagedSleepMinutes = readStageMinutes(stages, ['deep', 'light', 'core', 'rem', 'sleeping', 'asleep']);
 
   return {
     source: 'health_connect',
@@ -204,7 +205,7 @@ export function mapHealthConnectSleepToCanonical(payload: unknown): HealthConnec
     bedtimeStart: startTime,
     bedtimeEnd: endTime,
     isNap: Boolean(sleep.isNap) || readString(sleep.title)?.toLowerCase().includes('nap') === true,
-    totalSleepMin: readMetricNumber(sleep, 'totalSleepMin', 'durationMinutes'),
+    totalSleepMin: stagedSleepMinutes ?? readMetricNumber(sleep, 'totalSleepMin', 'durationMinutes'),
     awakeMin: readStageMinutes(stages, ['awake']),
     lightSleepMin: readStageMinutes(stages, ['light', 'core']),
     deepSleepMin: readStageMinutes(stages, ['deep']),

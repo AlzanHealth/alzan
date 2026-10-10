@@ -3836,6 +3836,7 @@ export type Database = {
           light_sleep_min: number | null
           max_heart_rate_bpm: number | null
           max_respiratory_rpm: number | null
+          max_spo2_pct: number | null
           min_heart_rate_bpm: number | null
           min_respiratory_rpm: number | null
           min_spo2_pct: number | null
@@ -3902,6 +3903,7 @@ export type Database = {
           light_sleep_min?: number | null
           max_heart_rate_bpm?: number | null
           max_respiratory_rpm?: number | null
+          max_spo2_pct?: number | null
           min_heart_rate_bpm?: number | null
           min_respiratory_rpm?: number | null
           min_spo2_pct?: number | null
@@ -3968,6 +3970,7 @@ export type Database = {
           light_sleep_min?: number | null
           max_heart_rate_bpm?: number | null
           max_respiratory_rpm?: number | null
+          max_spo2_pct?: number | null
           min_heart_rate_bpm?: number | null
           min_respiratory_rpm?: number | null
           min_spo2_pct?: number | null

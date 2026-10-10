@@ -260,10 +260,17 @@ function assertHealthMappersWorkWithoutPersistence(): void {
     id: 'sleep-1',
     startTime: '2026-05-01T22:00:00Z',
     endTime: '2026-05-02T06:00:00Z',
-    stages: [{ type: 'STAGE_TYPE_DEEP', startTime: '2026-05-01T23:00:00Z', endTime: '2026-05-02T00:00:00Z' }],
+    durationMinutes: 480,
+    stages: [
+      { type: 'STAGE_TYPE_DEEP', startTime: '2026-05-01T23:00:00Z', endTime: '2026-05-02T00:00:00Z' },
+      { type: 'STAGE_TYPE_LIGHT', startTime: '2026-05-02T00:00:00Z', endTime: '2026-05-02T03:00:00Z' },
+      { type: 'STAGE_TYPE_REM', startTime: '2026-05-02T03:00:00Z', endTime: '2026-05-02T04:30:00Z' },
+      { type: 'STAGE_TYPE_AWAKE', startTime: '2026-05-02T04:30:00Z', endTime: '2026-05-02T06:00:00Z' },
+    ],
   });
   assert.equal(sleep.source, 'health_connect');
   assert.equal(sleep.deepSleepMin, 60);
+  assert.equal(sleep.totalSleepMin, 330);
 
   const recovery = mapHealthConnectRecoveryToCanonical({
     date: '2026-05-02',

@@ -124,16 +124,17 @@ class AlzanAppleHealth: NSObject {
     }
 
     let sleepRecords = try await fetchSleepRecords(start: start, end: now)
-    for sleepSession in groupSleepSessions(sleepRecords) {
+    for sleepSession in AppleHealthSleepSessionGrouper.group(sleepRecords) {
       guard let first = sleepSession.first else { continue }
       let sourceRecordId = "apple-health-sleep-\(readLocalDate(first["startDate"] as? String ?? ""))-\(readString(first["uuid"]) ?? UUID().uuidString)"
       let sourcePackage = readString(first["source_package"])
+      let sessionLocalDate = readLocalDate(first["startDate"] as? String ?? "")
       records.append(
         localRecord(
           objectType: "sleep",
           sourceRecordId: sourceRecordId,
           sourcePackage: sourcePackage,
-          payload: ["sleep": sleepSession]
+          payload: ["sleep": sleepSession, "date": sessionLocalDate, "timezone": TimeZone.current.identifier]
         )
       )
       sourceRevision = sourceRevision ?? readDictionary(first["sourceRevision"])
@@ -206,7 +207,7 @@ class AlzanAppleHealth: NSObject {
 
   private func allQuantityDescriptors() -> [QuantityDescriptor] {
     var descriptors: [QuantityDescriptor] = [
-      .init(identifier: .heartRate, unit: HKUnit.count().unitDivided(by: HKUnit.minute()), unitLabel: "bpm"),
+      .init(identifier: .heartRate, unit: HKUnit.count().unitDivided(by: HKUnit.minute()), unitLabel: "bpm", metricType: "heart_rate"),
       .init(identifier: .stepCount, unit: HKUnit.count(), unitLabel: "count"),
       .init(identifier: .activeEnergyBurned, unit: HKUnit.kilocalorie(), unitLabel: "kcal"),
       .init(identifier: .basalEnergyBurned, unit: HKUnit.kilocalorie(), unitLabel: "kcal"),
@@ -290,6 +291,7 @@ class AlzanAppleHealth: NSObject {
   private func directHealthQuantityDescriptors() -> [QuantityDescriptor] {
     allQuantityDescriptors().filter { descriptor in
       [
+        HKQuantityTypeIdentifier.heartRate,
         HKQuantityTypeIdentifier.vo2Max,
         .bodyMass,
         .bodyFatPercentage,
@@ -616,30 +618,6 @@ class AlzanAppleHealth: NSObject {
     Dictionary(grouping: records) { record in
       readLocalDate(readString(record["startDate"]) ?? readString(record["recordedAt"]) ?? readString(record["timestamp"]) ?? "")
     }
-  }
-
-  private func groupSleepSessions(_ records: [[String: Any]]) -> [[[String: Any]]] {
-    let sorted = records.sorted { (left, right) in
-      (left["startDate"] as? String ?? "") < (right["startDate"] as? String ?? "")
-    }
-    var groups: [[[String: Any]]] = []
-    var current: [[String: Any]] = []
-    var previousEnd: Date?
-
-    for record in sorted {
-      let start = parseIsoDate(readString(record["startDate"]))
-      if let previousEnd, let start, start.timeIntervalSince(previousEnd) > 6 * 60 * 60, !current.isEmpty {
-        groups.append(current)
-        current = []
-      }
-      current.append(record)
-      previousEnd = parseIsoDate(readString(record["endDate"])) ?? previousEnd
-    }
-
-    if !current.isEmpty {
-      groups.append(current)
-    }
-    return groups
   }
 
   private func latestEndDate(_ records: [[String: Any]]) -> Date? {

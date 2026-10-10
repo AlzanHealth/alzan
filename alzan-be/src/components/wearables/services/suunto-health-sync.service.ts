@@ -155,7 +155,7 @@ export class SuuntoHealthSyncService {
           this.optionalSample('heart_rate_sleep_average', sleep.avgHeartRateBpm, 'bpm', sleep.startTime, entryData),
           this.optionalSample('heart_rate_sleep_minimum', sleep.minHeartRateBpm, 'bpm', sleep.startTime, entryData),
           this.optionalSample('hrv_rmssd', sleep.avgHrvMs, 'ms', sleep.startTime, entryData),
-          this.optionalSample('spo2_max', sleep.avgSpo2Pct, '%', sleep.startTime, entryData),
+          this.optionalSample('spo2_max', sleep.maxSpo2Pct ?? null, '%', sleep.startTime, entryData),
         ].filter((sample): sample is NonNullable<typeof sample> => sample !== null);
         await this.writer.upsertSleep({
           userId,

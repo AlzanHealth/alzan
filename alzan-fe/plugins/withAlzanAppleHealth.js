@@ -3,7 +3,7 @@ const path = require('path');
 
 const { withDangerousMod, withEntitlementsPlist, withInfoPlist, withXcodeProject } = require('expo/config-plugins');
 
-const MODULE_FILES = ['AlzanAppleHealth.swift', 'AlzanAppleHealthBridge.m'];
+const MODULE_FILES = ['AlzanAppleHealth.swift', 'AlzanAppleHealthSleepSessionGrouper.swift', 'AlzanAppleHealthBridge.m'];
 const HEALTH_SHARE_USAGE =
   'Permite a Alzan leer tus entrenamientos, sueño y métricas de salud para sincronizarlos con tu progreso.';
 const REACT_BRIDGE_IMPORT = '#import <React/RCTBridgeModule.h>';

@@ -365,6 +365,7 @@ export class CanonicalHealthWriterService {
       avg_respiratory_rpm: sleep.avgRespiratoryRpm,
       avg_spo2_pct: sleep.avgSpo2Pct,
       min_spo2_pct: sleep.minSpo2Pct,
+      max_spo2_pct: sleep.maxSpo2Pct ?? null,
       data_quality: 'partial',
       source_sleep_id: sleep.sourceSleepId,
       source_record_id: input.provenance.sourceRecordId ?? sleep.sourceRecordId ?? sleep.sourceSleepId,
