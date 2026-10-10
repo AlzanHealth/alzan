@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-  Activity,
-  Check,
-  ChevronRight,
-  CircleHelp,
-  HeartPulse,
-  Minus,
-  TrendingDown,
-  TrendingUp,
-} from 'lucide-react-native';
+import { Activity, Check, CircleHelp, HeartPulse, Minus, TrendingDown, TrendingUp } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GlassCard } from '../../../components/GlassCard';
@@ -16,18 +7,22 @@ import { SportIcon } from '../../../components/icons/SportIcon';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { HEART_RATE_ZONE_COLORS } from '../../training/helpers/heartRateZones.helper';
 import type { TranslationKey } from '../../../i18n/locales/en';
+import { normalizeSportType } from '../../../utils/sportTypeNormalization';
+import { CardioDimensionSummary } from './CardioDimensionSummary';
 import {
   analyzeSportEvolution,
   type CardioConfidence,
   type CardioPeriod,
   type CardioSportEvolution,
 } from '../algorithms/cardioEvolution';
+import { evaluateCardioSport, type CardioSportEvaluation } from '../algorithms/cardioSportEvaluation';
 import {
-  getCardioEvolutionPresentation,
-  shouldShowCardioIntervalRecovery,
-} from '../algorithms/cardioEvolutionPresentation';
+  buildCardioMeaningTranslationOptions,
+  getCardioOnePeriodHeartRateMeaningKey,
+} from '../algorithms/cardioSportPresentation';
+import { shouldShowCardioIntervalRecovery } from '../algorithms/cardioEvolutionPresentation';
 import { getPracticedCardioSports, type CardioSportOption } from '../algorithms/cardioSportNormalization';
-import { useCardioEvolution } from '../hooks/useCardioEvolution';
+import { useCardioEvolution, useCardioEvolutionDetails } from '../hooks/useCardioEvolution';
 
 const SPORT_TRANSLATIONS: Record<string, TranslationKey> = {
   running: 'constants.running',
@@ -79,33 +74,72 @@ const PERIOD_TRANSLATIONS: Record<CardioPeriod, TranslationKey> = {
   all: 'health.cardioPeriodAll',
 };
 
+const LIMITATION_TRANSLATIONS: Record<string, TranslationKey> = {
+  unrecognized_sport_type_generic_analysis: 'health.cardioLimitationUnrecognizedSport',
+  sport_specific_performance_not_recorded: 'health.cardioLimitationNoSportPerformance',
+  heart_rate_missing_in_one_period: 'health.cardioLimitationHeartRateMissing',
+  few_comparable_performance_sessions: 'health.cardioLimitationFewComparableSessions',
+  heart_rate_not_similar_or_not_recorded_for_some_pairs: 'health.cardioLimitationHeartRateNotComparable',
+  some_comparison_context_missing: 'health.cardioLimitationContextMissing',
+  comparable_sessions_do_not_span_two_weeks: 'health.cardioLimitationShortTimeSpan',
+  no_recent_sessions_in_selected_period: 'health.cardioLimitationNoRecentSessions',
+  wrist_heart_rate_and_swim_distance_can_be_less_reliable: 'health.cardioLimitationSwimmingSensor',
+  load_comparison_does_not_verify_technique_or_range_of_motion: 'health.cardioLimitationStrengthTechnique',
+};
+
+const SPORT_CARDIO_MEANING_TRANSLATIONS: Record<string, TranslationKey> = {
+  running: 'health.cardioAssessmentMeaningCRunning',
+  trail: 'health.cardioAssessmentMeaningCTrail',
+  hiking: 'health.cardioAssessmentMeaningCHiking',
+  cycling: 'health.cardioAssessmentMeaningCCycling',
+  swimming: 'health.cardioAssessmentMeaningCSwimming',
+  strength: 'health.cardioAssessmentMeaningCStrength',
+  gym: 'health.cardioAssessmentMeaningCStrength',
+  football: 'health.cardioAssessmentMeaningCIntermittent',
+  basketball: 'health.cardioAssessmentMeaningCIntermittent',
+  tennis: 'health.cardioAssessmentMeaningCRacket',
+  padel: 'health.cardioAssessmentMeaningCRacket',
+  martial_arts: 'health.cardioAssessmentMeaningCMartialArts',
+  volleyball: 'health.cardioAssessmentMeaningCIntermittent',
+  hyrox: 'health.cardioAssessmentMeaningCHyrox',
+  climbing: 'health.cardioAssessmentMeaningCClimbing',
+  surf: 'health.cardioAssessmentMeaningCSurf',
+  skiing: 'health.cardioAssessmentMeaningCSnow',
+  snowboard: 'health.cardioAssessmentMeaningCSnow',
+  golf: 'health.cardioAssessmentMeaningCGolf',
+};
+
+const SPORT_CARDIO_RECOMMENDATION_TRANSLATIONS: Record<string, TranslationKey> = {
+  running: 'health.cardioAssessmentRecommendationRunning',
+  trail: 'health.cardioAssessmentRecommendationTrail',
+  hiking: 'health.cardioAssessmentRecommendationHiking',
+  cycling: 'health.cardioAssessmentRecommendationCycling',
+  swimming: 'health.cardioAssessmentRecommendationSwimming',
+  strength: 'health.cardioAssessmentRecommendationStrength',
+  gym: 'health.cardioAssessmentRecommendationStrength',
+  football: 'health.cardioAssessmentRecommendationIntermittent',
+  basketball: 'health.cardioAssessmentRecommendationIntermittent',
+  tennis: 'health.cardioAssessmentRecommendationRacket',
+  padel: 'health.cardioAssessmentRecommendationRacket',
+  martial_arts: 'health.cardioAssessmentRecommendationMartialArts',
+  volleyball: 'health.cardioAssessmentRecommendationIntermittent',
+  hyrox: 'health.cardioAssessmentRecommendationHyrox',
+  climbing: 'health.cardioAssessmentRecommendationClimbing',
+  surf: 'health.cardioAssessmentRecommendationSurf',
+  skiing: 'health.cardioAssessmentRecommendationSnow',
+  snowboard: 'health.cardioAssessmentRecommendationSnow',
+  golf: 'health.cardioAssessmentRecommendationGolf',
+};
+
 const CARDIO_PERIODS: CardioPeriod[] = ['day', 'week', 'month', 'three_months', 'six_months', 'all'];
-const formatPace = (speedMetersPerSecond: number, distanceMeters: number): string => {
-  if (!Number.isFinite(speedMetersPerSecond) || speedMetersPerSecond <= 0) return '—';
-  const totalSeconds = Math.round(distanceMeters / speedMetersPerSecond);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${seconds}`;
+const ASSESSMENT_LEVEL_TRANSLATIONS: Record<CardioSportEvaluation['level'], TranslationKey> = {
+  A: 'health.cardioAssessmentLevelA',
+  B: 'health.cardioAssessmentLevelB',
+  C: 'health.cardioAssessmentLevelC',
+  D: 'health.cardioAssessmentLevelD',
+  E: 'health.cardioAssessmentLevelE',
+  F: 'health.cardioAssessmentLevelF',
 };
-
-const formatPerformance = (
-  value: number | null,
-  metric: string,
-  sportType: string,
-  labels: { bpm: string; kmPerHour: string; pacePerKm: string; pacePer100m: string },
-): string => {
-  if (value === null || !Number.isFinite(value)) return '—';
-  if (metric === 'power_at_similar_hr') return `${Math.round(value)} W`;
-  if (metric === 'hr_at_similar_output' || metric === 'heart_rate_response')
-    return `${Math.round(value)} ${labels.bpm}`;
-  if (metric === 'speed_at_similar_hr') {
-    if (sportType === 'cycling') return `${(value * 3.6).toFixed(1)} ${labels.kmPerHour}`;
-    if (sportType === 'swimming') return `${formatPace(value, 100)} ${labels.pacePer100m}`;
-    return `${formatPace(value, 1000)} ${labels.pacePerKm}`;
-  }
-  return `${Math.round(value)} ${labels.bpm}`;
-};
-
 const getStatusIcon = (status: string) => {
   if (status === 'improving') return TrendingUp;
   if (status === 'declining') return TrendingDown;
@@ -115,12 +149,14 @@ const getStatusIcon = (status: string) => {
 };
 
 export const CardioEvolutionSection = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const translateCardio = t as unknown as (key: TranslationKey, options?: Record<string, unknown>) => string;
   const { styles: healthStyles, colors } = useHealthStyles();
-  const { data, isLoading, isError, refetch, isFetching } = useCardioEvolution();
+  const cardioQuery = useCardioEvolution();
+  const baseData = cardioQuery.data;
   const sportOptions = React.useMemo<CardioSportOption[]>(
-    () => getPracticedCardioSports(data?.activities ?? []),
-    [data?.activities],
+    () => getPracticedCardioSports(baseData?.activities ?? []),
+    [baseData?.activities],
   );
   const [selectedSportKey, setSelectedSportKey] = React.useState('');
   const [selectedPeriod, setSelectedPeriod] = React.useState<CardioPeriod>('month');
@@ -132,6 +168,22 @@ export const CardioEvolutionSection = () => {
   const selectedOption = sportOptions.find(option => option.sportType === selectedSportKey) ?? sportOptions[0] ?? null;
   const selectedSport = selectedOption?.sportType ?? 'running';
   const selectedSportKeyForMetrics = selectedSport;
+  const detailQuery = useCardioEvolutionDetails(
+    baseData?.activities ?? [],
+    selectedOption?.sportType ?? '',
+    selectedPeriod,
+    cardioQuery.dataUpdatedAt,
+  );
+  const data = React.useMemo(
+    () => (baseData ? { ...baseData, ...(detailQuery.data ?? {}) } : undefined),
+    [baseData, detailQuery.data],
+  );
+  const isLoading = cardioQuery.isLoading || (detailQuery.isLoading && !!selectedOption);
+  const isError = cardioQuery.isError;
+  const isFetching = cardioQuery.isFetching || detailQuery.isFetching;
+  const refetch = () => {
+    void Promise.all([cardioQuery.refetch(), detailQuery.refetch()]);
+  };
   const analysis = React.useMemo(
     () =>
       data && selectedOption
@@ -139,28 +191,102 @@ export const CardioEvolutionSection = () => {
         : null,
     [data, selectedOption, selectedPeriod],
   );
+  const assessment = React.useMemo(
+    () =>
+      data && selectedOption
+        ? evaluateCardioSport(
+            data.activities,
+            selectedOption.sportType,
+            new Date(),
+            selectedPeriod,
+            data.laps,
+            data.workoutSets,
+            data.exerciseNames,
+            i18n.language,
+          )
+        : null,
+    [data, i18n.language, selectedOption, selectedPeriod],
+  );
   const week = data?.weeklySummary;
-  const presentation = analysis ? getCardioEvolutionPresentation(analysis, selectedSport) : null;
-  const StatusIcon = analysis ? getStatusIcon(analysis.status) : CircleHelp;
+  const assessmentPerformanceStatus = assessment?.performance.status ?? 'insufficient';
+  const displayStatus = assessmentPerformanceStatus;
+  const StatusIcon = getStatusIcon(displayStatus);
   const statusColor =
-    analysis?.status === 'improving'
+    displayStatus === 'improving'
       ? colors.success
-      : analysis?.status === 'declining'
+      : displayStatus === 'declining'
         ? colors.danger
-        : analysis?.status === 'stable'
+        : displayStatus === 'stable'
           ? colors.textSecondary
           : colors.primary;
-  const metricLabel = presentation ? t(presentation.metricTranslationKey) : '';
-  const explanation = presentation ? t(presentation.meaningTranslationKey) : '';
-  const recommendation = presentation ? t(presentation.recommendationTranslationKey) : '';
-  const hasComparison = presentation?.showsPerformanceComparison ?? false;
-  const percentValue = analysis?.changePercent;
-  const performanceLabels = {
-    bpm: t('health.cardioBpm'),
-    kmPerHour: t('health.cardioKmPerHour'),
-    pacePerKm: t('health.cardioPacePerKm'),
-    pacePer100m: t('health.cardioPacePer100m'),
-  };
+  const fallbackStatusKey: TranslationKey | null =
+    displayStatus === 'improving'
+      ? 'health.cardioAssessmentOutputImproving'
+      : displayStatus === 'declining'
+        ? 'health.cardioAssessmentOutputDeclining'
+        : displayStatus === 'stable'
+          ? 'health.cardioAssessmentOutputStable'
+          : assessment
+            ? ASSESSMENT_LEVEL_TRANSLATIONS[assessment.level]
+            : null;
+  const confidence = assessment?.confidence ?? 'none';
+  const statusKey = fallbackStatusKey;
+  const assessmentMeaningKey: TranslationKey | null = (() => {
+    if (!assessment) return null;
+    if (assessment.level === 'A') {
+      if (assessment.performance.status === 'improving') return 'health.cardioAssessmentMeaningAImproving';
+      if (assessment.performance.status === 'declining') return 'health.cardioAssessmentMeaningADeclining';
+      return 'health.cardioAssessmentMeaningAStable';
+    }
+    if (assessment.level === 'B') {
+      return assessment.performance.status !== 'descriptive' && assessment.performance.status !== 'insufficient'
+        ? 'health.cardioAssessmentMeaningBTrend'
+        : 'health.cardioAssessmentMeaningB';
+    }
+    if (assessment.level === 'C') {
+      if (assessment.cardiovascular.recentMedianBpm === null || assessment.cardiovascular.previousMedianBpm === null)
+        return getCardioOnePeriodHeartRateMeaningKey(assessment);
+      return SPORT_CARDIO_MEANING_TRANSLATIONS[selectedSport] ?? 'health.cardioAssessmentMeaningC';
+    }
+    if (assessment.level === 'D') {
+      return assessment.volume.recent.durationMinutes === null || assessment.volume.previous.durationMinutes === null
+        ? 'health.cardioAssessmentMeaningDPartial'
+        : 'health.cardioAssessmentMeaningD';
+    }
+    if (assessment.level === 'E') {
+      return assessment.volume.recent.sessionCount > 0
+        ? 'health.cardioAssessmentMeaningERecent'
+        : 'health.cardioAssessmentMeaningEPrior';
+    }
+    return assessment.volume.previous.sessionCount > 0
+      ? 'health.cardioAssessmentMeaningFPrevious'
+      : 'health.cardioAssessmentMeaningF';
+  })();
+  const assessmentMeaningOptions = assessment ? buildCardioMeaningTranslationOptions(assessment) : {};
+  const assessmentRecommendationKey: TranslationKey | null =
+    assessment?.level === 'A' || assessment?.level === 'B'
+      ? selectedSport === 'running' || selectedSport === 'trail'
+        ? 'health.cardioAssessmentRecommendationRunning'
+        : selectedSport === 'cycling'
+          ? 'health.cardioAssessmentRecommendationCycling'
+          : selectedSport === 'swimming'
+            ? 'health.cardioAssessmentRecommendationSwimming'
+            : selectedSport === 'gym'
+              ? 'health.cardioAssessmentRecommendationStrength'
+              : 'health.cardioAssessmentRecommendationGeneric'
+      : assessment?.level === 'C'
+        ? (SPORT_CARDIO_RECOMMENDATION_TRANSLATIONS[selectedSport] ?? 'health.cardioAssessmentRecommendationHeartRate')
+        : assessment?.level === 'D'
+          ? 'health.cardioAssessmentRecommendationVolume'
+          : assessment?.level === 'E'
+            ? assessment.volume.recent.sessionCount > 0
+              ? 'health.cardioAssessmentRecommendationFirstSession'
+              : 'health.cardioAssessmentRecommendationNoRecentSession'
+            : assessment?.level === 'F'
+              ? assessment.volume.previous.sessionCount > 0
+                ? 'health.cardioAssessmentRecommendationNoRecentSession'
+                : 'health.cardioAssessmentRecommendationNoData'
+              : null;
   const selectedIsInterval = shouldShowCardioIntervalRecovery(selectedSport, data?.intervalRecoveryBySport ?? {});
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -168,6 +294,12 @@ export const CardioEvolutionSection = () => {
     return hours > 0 ? `${hours} h ${remaining} min` : `${remaining} min`;
   };
   const maxZoneTime = Math.max(...(week?.zoneTimeSeconds ?? [0]));
+  const unknownSportNumbers = React.useMemo(() => {
+    const entries = sportOptions
+      .filter(option => !SPORT_TRANSLATIONS[option.sportType])
+      .map((option, index) => [option.sportType, index + 1] as const);
+    return new Map(entries);
+  }, [sportOptions]);
 
   return (
     <View style={styles.section}>
@@ -215,8 +347,11 @@ export const CardioEvolutionSection = () => {
             >
               {sportOptions.map(option => {
                 const selected = option.sportType === selectedSportKeyForMetrics;
-                const baseLabel = t(SPORT_TRANSLATIONS[option.sportType] ?? 'constants.other');
-                const label = baseLabel;
+                const translationKey = SPORT_TRANSLATIONS[option.sportType];
+                const label = translationKey
+                  ? t(translationKey)
+                  : t('health.cardioUnknownSport', { number: unknownSportNumbers.get(option.sportType) ?? 1 });
+                const iconSport = normalizeSportType(option.sportType) ?? 'other';
                 return (
                   <Pressable
                     key={option.sportType}
@@ -231,7 +366,7 @@ export const CardioEvolutionSection = () => {
                     accessibilityLabel={label}
                   >
                     <SportIcon
-                      sport={option.sportType === 'strength' ? 'gym' : option.sportType}
+                      sport={option.sportType === 'strength' ? 'gym' : iconSport}
                       size={16}
                       color={selected ? colors.background : colors.textSecondary}
                     />
@@ -277,132 +412,58 @@ export const CardioEvolutionSection = () => {
               <View style={[styles.statusIcon, { backgroundColor: `${statusColor}18` }]}>
                 <StatusIcon size={17} color={statusColor} />
               </View>
-              <Text style={[styles.statusText, { color: statusColor }]}>
-                {presentation ? t(presentation.statusTranslationKey) : ''}
-              </Text>
+              <Text style={[styles.statusText, { color: statusColor }]}>{statusKey ? t(statusKey) : ''}</Text>
               <View style={styles.confidence}>
                 <Text style={[styles.confidenceText, healthStyles.subtitle]}>
-                  {t('health.cardioConfidenceLabel')}: {t(CONFIDENCE_TRANSLATIONS[analysis.confidence])}
+                  {t('health.cardioConfidenceLabel')}: {t(CONFIDENCE_TRANSLATIONS[confidence])}
                 </Text>
               </View>
             </View>
             <Text style={[styles.confidenceHelp, healthStyles.subtitle]}>{t('health.cardioConfidenceHelp')}</Text>
 
-            {hasComparison ? (
-              <View style={styles.resultBlock}>
-                <>
-                  <View style={styles.comparisonValues}>
-                    <View style={styles.comparisonValue}>
-                      <Text style={[styles.comparisonLabel, healthStyles.subtitle]}>{t('health.cardioPrevious')}</Text>
-                      <Text style={[styles.comparisonNumber, healthStyles.title]}>
-                        {formatPerformance(analysis.previousValue, analysis.metric, selectedSport, performanceLabels)}
-                      </Text>
-                    </View>
-                    <ChevronRight size={18} color={colors.textSecondary} />
-                    <View style={styles.comparisonValue}>
-                      <Text style={[styles.comparisonLabel, healthStyles.subtitle]}>{t('health.cardioRecent')}</Text>
-                      <Text style={[styles.comparisonNumber, healthStyles.title]}>
-                        {formatPerformance(analysis.recentValue, analysis.metric, selectedSport, performanceLabels)}
-                      </Text>
-                    </View>
-                  </View>
-                  {percentValue != null ? (
-                    <Text style={[styles.changeValue, { color: statusColor }]}>
-                      {percentValue > 0 ? '+' : ''}
-                      {percentValue.toFixed(1)} %
-                    </Text>
-                  ) : analysis.heartRateDeltaBpm !== null ? (
-                    <Text style={[styles.changeValue, { color: statusColor }]}>
-                      {analysis.heartRateDeltaBpm > 0 ? '+' : ''}
-                      {Math.round(analysis.heartRateDeltaBpm)} {t('health.cardioBpm')}
-                    </Text>
-                  ) : null}
-                  {analysis.strengthVolumeChangePercent !== null ? (
-                    <Text style={[styles.strengthVolume, healthStyles.subtitle]}>
-                      {t('health.cardioStrengthVolume')}: {analysis.strengthVolumeChangePercent > 0 ? '+' : ''}
-                      {analysis.strengthVolumeChangePercent.toFixed(1)} %
-                    </Text>
-                  ) : null}
-                  <Text style={[styles.resultMetric, healthStyles.subtitle]}>{metricLabel}</Text>
-                </>
-                <Text style={[styles.pairCount, healthStyles.subtitle]}>
-                  {t('health.cardioMatchedSessions', { count: analysis.matchedPairCount })}
-                </Text>
-                <Text style={[styles.pairCount, healthStyles.subtitle]}>
-                  {t('health.cardioSessionCounts', {
-                    recent: analysis.recentSessionCount,
-                    previous: analysis.previousSessionCount,
-                  })}
-                </Text>
-                {analysis.recentActivityCount !== analysis.recentSessionCount ||
-                analysis.previousActivityCount !== analysis.previousSessionCount ? (
-                  <Text style={[styles.pairCount, healthStyles.subtitle]}>
-                    {t('health.cardioActivityCounts', {
-                      recent: analysis.recentActivityCount,
-                      previous: analysis.previousActivityCount,
-                    })}
-                  </Text>
-                ) : null}
-              </View>
-            ) : (
-              <View style={styles.resultBlock}>
-                {analysis.status === 'descriptive' && analysis.recentValue !== null ? (
-                  <>
-                    <Text style={[styles.resultValue, healthStyles.title]}>
-                      {formatPerformance(analysis.recentValue, 'heart_rate_response', selectedSport, performanceLabels)}
-                    </Text>
-                    <Text style={[styles.resultMetric, healthStyles.subtitle]}>
-                      {t('health.cardioRecentAverageHr')}
-                    </Text>
-                    {analysis.previousValue !== null ? (
-                      <Text style={[styles.pairCount, healthStyles.subtitle]}>
-                        {t('health.cardioPreviousAverageHr')}:{' '}
-                        {formatPerformance(
-                          analysis.previousValue,
-                          'heart_rate_response',
-                          selectedSport,
-                          performanceLabels,
-                        )}
-                      </Text>
-                    ) : null}
-                  </>
-                ) : null}
-                {analysis.strengthVolumeChangePercent !== null ? (
-                  <Text style={[styles.strengthVolume, healthStyles.subtitle]}>
-                    {t('health.cardioStrengthVolume')}: {analysis.strengthVolumeChangePercent > 0 ? '+' : ''}
-                    {analysis.strengthVolumeChangePercent.toFixed(1)} %
-                  </Text>
-                ) : null}
-                {analysis.reason !== 'no_activities' ? (
-                  <>
-                    <Text style={[styles.pairCount, healthStyles.subtitle]}>
-                      {t('health.cardioSessionCounts', {
-                        recent: analysis.recentSessionCount,
-                        previous: analysis.previousSessionCount,
-                      })}
-                    </Text>
-                    {analysis.recentActivityCount !== analysis.recentSessionCount ||
-                    analysis.previousActivityCount !== analysis.previousSessionCount ? (
-                      <Text style={[styles.pairCount, healthStyles.subtitle]}>
-                        {t('health.cardioActivityCounts', {
-                          recent: analysis.recentActivityCount,
-                          previous: analysis.previousActivityCount,
-                        })}
-                      </Text>
-                    ) : null}
-                  </>
-                ) : null}
-              </View>
-            )}
-
+            {assessment ? (
+              <CardioDimensionSummary
+                assessment={assessment}
+                activities={data?.activities ?? []}
+                sportType={selectedSport}
+                period={selectedPeriod}
+                chartColor={colors.primary}
+                colors={healthStyles}
+                t={translateCardio}
+              />
+            ) : null}
             <View style={[styles.divider, healthStyles.divider]} />
             <View style={styles.explanationBlock}>
               <Text style={[styles.explanationHeading, healthStyles.title]}>{t('health.cardioMeaningTitle')}</Text>
-              <Text style={[styles.explanationText, healthStyles.subtitle]}>{explanation}</Text>
+              <Text style={[styles.explanationText, healthStyles.subtitle]}>
+                {assessmentMeaningKey
+                  ? translateCardio(assessmentMeaningKey, assessmentMeaningOptions)
+                  : t('health.cardioAssessmentMeaningF')}
+              </Text>
+              {assessment && assessment.limitations.length > 0 ? (
+                <View style={styles.limitationsBlock}>
+                  <Text style={[styles.limitationHeading, healthStyles.title]}>
+                    {t('health.cardioLimitationsTitle')}
+                  </Text>
+                  {assessment.limitations.map(limitation => {
+                    const translationKey = LIMITATION_TRANSLATIONS[limitation];
+                    return translationKey ? (
+                      <Text key={limitation} style={[styles.limitationText, healthStyles.subtitle]}>
+                        {'• '}
+                        {t(translationKey)}
+                      </Text>
+                    ) : null;
+                  })}
+                </View>
+              ) : null}
               <Text style={[styles.explanationHeading, styles.recommendationHeading, healthStyles.title]}>
                 {t('health.cardioRecommendationTitle')}
               </Text>
-              <Text style={[styles.explanationText, healthStyles.subtitle]}>{recommendation}</Text>
+              <Text style={[styles.explanationText, healthStyles.subtitle]}>
+                {assessmentRecommendationKey
+                  ? translateCardio(assessmentRecommendationKey)
+                  : t('health.cardioAssessmentRecommendationNoData')}
+              </Text>
             </View>
             {analysis.measurementCaution ? (
               <Text style={[styles.cautionText, healthStyles.subtitle]}>{t('health.cardioSwimmingCaution')}</Text>
@@ -416,6 +477,12 @@ export const CardioEvolutionSection = () => {
             ) : null}
             {data?.streamDataError ? (
               <Text style={[styles.cautionText, healthStyles.subtitle]}>{t('health.cardioStreamLoadError')}</Text>
+            ) : null}
+            {data?.lapDataError ? (
+              <Text style={[styles.cautionText, healthStyles.subtitle]}>{t('health.cardioLapsLoadError')}</Text>
+            ) : null}
+            {data?.strengthDataError && selectedSport === 'gym' ? (
+              <Text style={[styles.cautionText, healthStyles.subtitle]}>{t('health.cardioStrengthLoadError')}</Text>
             ) : null}
             {data?.driftBySport[selectedSportKeyForMetrics] ? (
               <View style={[styles.driftNote, { backgroundColor: `${colors.primary}12` }]}>
@@ -582,7 +649,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   sportTabs: { gap: 8, paddingBottom: 15 },
   sportTab: {
-    minHeight: 42,
+    minHeight: 44,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 22,
     paddingHorizontal: 13,
@@ -595,7 +662,7 @@ const styles = StyleSheet.create({
   periodHeading: { fontSize: 12, fontWeight: '600', marginBottom: 7 },
   periodTabs: { gap: 7, paddingBottom: 15 },
   periodTab: {
-    minHeight: 36,
+    minHeight: 44,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 18,
     paddingHorizontal: 12,
@@ -609,21 +676,16 @@ const styles = StyleSheet.create({
   confidence: { marginLeft: 'auto', maxWidth: '48%' },
   confidenceText: { fontSize: 11, textAlign: 'right' },
   confidenceHelp: { fontSize: 11, lineHeight: 15, marginTop: 1, marginBottom: 2 },
-  resultBlock: { marginTop: 14, marginBottom: 4 },
-  comparisonValues: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  comparisonValue: { flex: 1, minWidth: 0 },
-  comparisonLabel: { fontSize: 12, marginBottom: 3 },
-  comparisonNumber: { fontSize: 20, fontWeight: '700' },
   resultValue: { fontSize: 31, fontWeight: '700', letterSpacing: -0.6 },
   resultMetric: { fontSize: 13, marginTop: 3 },
-  changeValue: { fontSize: 17, fontWeight: '700', marginTop: 12 },
-  strengthVolume: { fontSize: 12, fontWeight: '600', marginTop: 8 },
-  pairCount: { fontSize: 11, marginTop: 7 },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 15 },
   explanationBlock: { gap: 5 },
   explanationHeading: { fontSize: 14, fontWeight: '700', marginTop: 2 },
   recommendationHeading: { marginTop: 10 },
   explanationText: { fontSize: 13, lineHeight: 19 },
+  limitationsBlock: { gap: 3, marginTop: 7 },
+  limitationHeading: { fontSize: 12, fontWeight: '600' },
+  limitationText: { fontSize: 11, lineHeight: 16 },
   cautionText: { fontSize: 12, lineHeight: 18, marginTop: 11 },
   driftNote: { borderRadius: 13, padding: 12, marginTop: 14, gap: 4 },
   driftHeading: { fontSize: 13, fontWeight: '700' },

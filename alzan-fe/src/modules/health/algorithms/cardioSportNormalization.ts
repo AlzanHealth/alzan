@@ -8,7 +8,7 @@ export type CardioSportActivity = {
 };
 
 export type CardioSportOption = {
-  sportType: SportType;
+  sportType: string;
   lastActivityTimestamp: number;
 };
 
@@ -37,12 +37,23 @@ const DISPLAY_SPORT_ORDER: readonly SportType[] = [
 export const normalizeCardioSportType = (
   sportType: string | null | undefined,
   sportSubtype?: string | null,
-): SportType => {
-  const normalizedSport = normalizeSportType(sportType, sportSubtype) ?? 'other';
+): string => {
+  const normalizedSport = normalizeSportType(sportType, sportSubtype);
+  if (!normalizedSport) {
+    const token = (sportType ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+    return token || 'unknown';
+  }
   const subtypeToken = (sportSubtype ?? '')
     .trim()
     .toLowerCase()
     .replace(/[\s-]+/g, '_');
+  if (normalizedSport === 'other' && subtypeToken && subtypeToken !== 'other') {
+    const inferredSubtypeSport = normalizeSportType(sportSubtype);
+    return inferredSubtypeSport && inferredSubtypeSport !== 'other' ? inferredSubtypeSport : `other_${subtypeToken}`;
+  }
   if (normalizedSport === 'running' && /(^|_)trail(_|$)/.test(subtypeToken)) return 'trail';
   return normalizedSport === 'strength' ? 'gym' : normalizedSport;
 };
@@ -62,7 +73,7 @@ export const normalizeCardioSportSubtype = (
     .replace(/[\s-]+/g, '_');
   const typeEncodesSubtype = typeToken !== normalizedSport ? typeToken : '';
   const token = subtypeToken || typeEncodesSubtype;
-  if (!normalizedSport) return null;
+  if (!normalizedSport) return subtypeToken || null;
   if (normalizedSport === 'trail' && (token === 'trail' || token === 'trail_running' || typeToken === 'trail'))
     return 'trail';
   if (token.length === 0) return null;
@@ -110,7 +121,7 @@ export const isSameCardioSportSubtype = (
 };
 
 export const getPracticedCardioSports = (activities: readonly CardioSportActivity[]): CardioSportOption[] => {
-  const latestBySport = new Map<SportType, number>();
+  const latestBySport = new Map<string, number>();
   for (const activity of activities) {
     const sportType = normalizeCardioSportType(activity.sport_type, activity.sport_subtype);
     const parsedDate = Date.parse(activity.start_time);
@@ -123,7 +134,12 @@ export const getPracticedCardioSports = (activities: readonly CardioSportActivit
     .sort((left, right) => {
       const recencyDifference = right.lastActivityTimestamp - left.lastActivityTimestamp;
       if (recencyDifference !== 0) return recencyDifference;
-      return DISPLAY_SPORT_ORDER.indexOf(left.sportType) - DISPLAY_SPORT_ORDER.indexOf(right.sportType);
+      const leftOrder = DISPLAY_SPORT_ORDER.findIndex(sport => sport === left.sportType);
+      const rightOrder = DISPLAY_SPORT_ORDER.findIndex(sport => sport === right.sportType);
+      return (
+        (leftOrder === -1 ? DISPLAY_SPORT_ORDER.length : leftOrder) -
+        (rightOrder === -1 ? DISPLAY_SPORT_ORDER.length : rightOrder)
+      );
     });
 };
 

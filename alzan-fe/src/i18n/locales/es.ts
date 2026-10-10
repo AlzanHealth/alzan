@@ -1145,6 +1145,197 @@ export default {
     cardioWeeklyDisclaimer:
       'Este reparto describe el esfuerzo registrado. Sin conocer tu objetivo, no permite saber si la combinación es adecuada para ti.',
     cardioStrengthVolume: 'Volumen de la misma rutina de fuerza',
+    cardioAssessmentLevelA: 'Tendencia en sesiones comparables',
+    cardioAssessmentLevelB: 'Datos parciales de rendimiento',
+    cardioAssessmentLevelC: 'Respuesta cardiovascular registrada',
+    cardioAssessmentLevelD: 'Volumen y constancia',
+    cardioAssessmentLevelE: 'Primera referencia',
+    cardioAssessmentLevelF: 'Sin datos en este periodo',
+    cardioAssessmentOutputImproving: 'Posible mejora en sesiones comparables',
+    cardioAssessmentOutputDeclining: 'Menor rendimiento observado en sesiones comparables',
+    cardioAssessmentOutputStable: 'Sin tendencia clara en sesiones comparables',
+    cardioAssessmentMeaningAImproving:
+      'En sesiones repartidas durante varias semanas, se repite un mayor rendimiento con una FC media similar. Es una señal favorable de evolución deportiva, no una prueba clínica ni un diagnóstico.',
+    cardioAssessmentMeaningADeclining:
+      'En sesiones repartidas durante varias semanas se repite un menor rendimiento con una FC media similar. Describe una tendencia deportiva; el calor, el desnivel, el descanso y el sensor también pueden influir.',
+    cardioAssessmentMeaningAStable:
+      'Las sesiones comparables repartidas durante varias semanas no muestran un cambio claro del rendimiento con una FC media similar. La tendencia se mantiene estable dentro de los datos disponibles.',
+    cardioAssessmentMeaningB:
+      'Hay datos de rendimiento, distancia o cargas para describir estos periodos, pero no suficientes sesiones comparables para concluir una tendencia fiable. La FC y el rendimiento se muestran por separado cuando no se puede confirmar un esfuerzo parecido.',
+    cardioAssessmentMeaningBTrend:
+      'Este resultado utiliza datos de rendimiento de varios entrenamientos comparables. Como falta la respuesta de la FC o parte del contexto, es una evaluación parcial y no demuestra un cambio en la eficiencia cardiovascular.',
+    cardioAssessmentMeaningC:
+      'La mediana de FC media por sesión fue {{recent}} ppm frente a {{previous}} ppm (cambio de {{delta}} ppm). Describe una respuesta distinta en {{sessions}} sesiones recientes; por sí sola no demuestra mejora ni empeoramiento físico.',
+    cardioAssessmentMeaningCRunning:
+      'Esta comparación describe la FC media registrada en tus sesiones de running. El ritmo, la distancia, la ruta y las condiciones cambian el esfuerzo; sin rodajes comparables, la FC por sí sola no demuestra que estés mejorando o empeorando.',
+    cardioAssessmentMeaningCTrail:
+      'Esta comparación describe la FC media registrada en tus salidas de trail. El desnivel, la dificultad del terreno y las condiciones cambian mucho el esfuerzo; sin rutas comparables, la FC por sí sola no demuestra una mejora en el rendimiento.',
+    cardioAssessmentMeaningCHiking:
+      'Esta comparación describe la FC media registrada en tus rutas de senderismo. El desnivel, la mochila, el terreno y el tiempo en movimiento influyen en la respuesta; la FC por sí sola no mide tu progreso en la ruta.',
+    cardioAssessmentMeaningCRacket:
+      'Esta comparación describe la respuesta de tu corazón durante el tenis o el pádel. La superficie, jugar individuales o dobles, la duración de los puntos y las pausas cambian la carga; la FC media no mide la calidad del juego.',
+    cardioAssessmentMeaningCMartialArts:
+      'Esta comparación describe la respuesta de tu corazón durante las sesiones de artes marciales. La modalidad, los asaltos, los descansos y el tiempo realmente activo cambian la carga; la FC no mide la técnica ni el resultado.',
+    cardioAssessmentMeaningCCycling:
+      'Esta comparación describe la FC media registrada en tus salidas o sesiones de ciclismo. La velocidad exterior depende de la ruta, el viento y las paradas; para valorar el rendimiento hacen falta sesiones comparables y, si está disponible, potencia.',
+    cardioAssessmentMeaningCSwimming:
+      'Esta comparación describe la FC media registrada al nadar. El estilo, la distancia, la piscina o aguas abiertas y el sensor influyen; la FC de muñeca en el agua puede ser menos fiable y no demuestra por sí sola una mejora en natación.',
+    cardioAssessmentMeaningCStrength:
+      'Esta comparación describe cómo respondió tu corazón durante las sesiones de fuerza. La FC y la duración no miden cuánto trabajaron tus músculos; para seguir la fuerza compara la misma rutina, ejercicios, cargas y repeticiones.',
+    cardioAssessmentMeaningCIntermittent:
+      'La FC resume la respuesta del corazón durante estos partidos o sesiones intermitentes. Las pausas, el tiempo de juego y el papel que desempeñas cambian mucho la exigencia; esta cifra no mide tu técnica ni tu rendimiento en el deporte.',
+    cardioAssessmentMeaningCHyrox:
+      'La FC resume la respuesta del corazón durante esta sesión de HYROX. La combinación de carrera y estaciones puede variar entre entrenamientos; sin tiempos por tramo, cargas y repeticiones comparables no podemos valorar el rendimiento específico.',
+    cardioAssessmentMeaningCClimbing:
+      'La FC resume la respuesta del corazón durante la escalada. La dificultad de la vía, el estilo, las pausas y el tiempo escalando influyen; estos datos no indican si escalaste vías más difíciles o mejoraste tu técnica.',
+    cardioAssessmentMeaningCSurf:
+      'La FC resume la respuesta del corazón durante el surf, incluidas las esperas y las remadas. El oleaje y el tiempo realmente activo cambian cada sesión; esta cifra no mide olas surfeadas ni habilidad.',
+    cardioAssessmentMeaningCSnow:
+      'La FC resume la respuesta del corazón durante la sesión en nieve. Puede incluir remontes, esperas y descensos; sin separar el tiempo activo y comparar recorridos o desnivel, no permite valorar la mejora en esquí o snowboard.',
+    cardioAssessmentMeaningCGolf:
+      'La FC y la duración describen la respuesta cardiovascular y el tiempo de esta sesión de golf. El recorrido, caminar o usar un carro y las condiciones influyen; estos datos no miden la calidad de los golpes ni el resultado.',
+    cardioAssessmentMeaningCOnlyRecent:
+      'La mediana de FC media fue {{recent}} ppm en {{sessions}} sesiones recientes, pero no hay mediciones válidas anteriores en este periodo. Podemos describir la respuesta registrada, no calcular un cambio.',
+    cardioAssessmentMeaningCOnlyRecentWithEarlierSessions:
+      'La mediana de FC media fue {{recent}} ppm en {{sessions}} entrenos recientes con FC válida. Hay {{previousSessions}} entrenos en el periodo anterior, pero ninguno tiene FC válida. Podemos describir la respuesta registrada, no calcular un cambio.',
+    cardioAssessmentMeaningCOnlyPrevious:
+      'Hay una mediana anterior de {{previous}} ppm, pero no hay sesiones recientes con FC válida. Ese valor histórico no describe tu respuesta actual ni permite calcular una evolución reciente.',
+    cardioAssessmentMeaningCOnlyPreviousWithRecentSessions:
+      'Solo hay FC válida en el periodo anterior ({{previous}} ppm). Aunque se registraron {{recentTotalSessions}} entrenos recientes, ninguno tiene FC válida; el dato histórico no describe tu respuesta actual ni permite calcular un cambio.',
+    cardioAssessmentMeaningD:
+      'Registraste {{sessions}} sesiones recientes y acumulaste {{minutes}} minutos, frente a {{previousSessions}} sesiones y {{previousMinutes}} minutos en el periodo anterior. Esto describe tu volumen; sin métricas de intensidad o rendimiento no permite valorar tu forma física.',
+    cardioAssessmentMeaningDPartial:
+      'Hay {{sessions}} sesiones recientes y {{previousSessions}} anteriores, pero falta la duración en al menos uno de los periodos. Los datos de arriba indican qué registros están disponibles; no bastan para valorar tu condición física.',
+    cardioAssessmentMeaningERecent:
+      'Hay una sesión reciente registrada en este periodo. Sus datos sirven como primera referencia para comparaciones futuras; todavía no existe un periodo previo comparable.',
+    cardioAssessmentMeaningEPrior:
+      'Solo aparece una sesión en el periodo anterior y ninguna en el reciente. Todavía no hay una referencia actual para comparar; amplía el periodo o registra otra sesión.',
+    cardioAssessmentMeaningF:
+      'No hay actividades válidas de este deporte en el periodo elegido, así que no se puede calcular una evolución. Esto solo indica que aquí faltan registros para ese intervalo.',
+    cardioAssessmentMeaningFPrevious:
+      'No hay entrenamientos en la parte reciente de este periodo. La parte anterior contiene {{previousSessions}} sesiones, pero no describe tu respuesta actual. Elige un periodo más largo o registra un entrenamiento reciente.',
+    cardioAssessmentRecommendationRunning:
+      'Compara rodajes del mismo tipo y distancia, y registra la FC. El ritmo por sí solo no indica el esfuerzo si cambian la ruta, el desnivel o las condiciones.',
+    cardioAssessmentRecommendationTrail:
+      'Compara salidas de trail con terreno, distancia y desnivel parecidos; registra también la FC. El ritmo puede cambiar mucho según la pendiente y la dificultad del camino.',
+    cardioAssessmentRecommendationHiking:
+      'Compara rutas de senderismo con distancia, desnivel y carga de mochila parecidos. Registra la FC y el tiempo en movimiento; el ritmo aislado no permite comparar el esfuerzo en terrenos distintos.',
+    cardioAssessmentRecommendationCycling:
+      'Si tienes potenciómetro, compara sesiones de duración y esfuerzo parecidos usando potencia y FC. La velocidad en exterior depende también de la ruta, el viento y las paradas.',
+    cardioAssessmentRecommendationSwimming:
+      'Compara sesiones de la misma modalidad, piscina o aguas abiertas, estilo y distancias. Usa con cautela la FC de muñeca en el agua.',
+    cardioAssessmentRecommendationStrength:
+      'Para seguir la fuerza, registra los mismos ejercicios, cargas y repeticiones. La FC aporta contexto cardiovascular, pero no mide por sí sola el trabajo muscular.',
+    cardioAssessmentRecommendationGeneric:
+      'Mantén una métrica externa constante para este deporte y compárala junto con la FC en sesiones parecidas. Si solo hay FC, interpreta el cambio como respuesta cardíaca, no como rendimiento.',
+    cardioAssessmentRecommendationHeartRate:
+      'Registra la FC en sesiones de duración, modalidad y esfuerzo parecidos. Comprueba el sensor y el contexto antes de interpretar una diferencia.',
+    cardioAssessmentRecommendationIntermittent:
+      'Compara sesiones del mismo formato y duración, con pausas parecidas. La FC sirve como contexto; para valorar el rendimiento necesitas además datos propios del deporte, como minutos jugados o acciones registradas.',
+    cardioAssessmentRecommendationRacket:
+      'Compara partidos del mismo deporte y formato, en superficies y duraciones parecidas. Anota individuales o dobles y el tiempo efectivo si está disponible; la FC es contexto, no una medida de puntos ganados.',
+    cardioAssessmentRecommendationMartialArts:
+      'Compara entrenamientos de la misma modalidad, con número y duración de asaltos y descansos parecidos. La FC aporta contexto, pero no indica por sí sola una mejora técnica.',
+    cardioAssessmentRecommendationHyrox:
+      'Compara eventos o entrenamientos con el mismo formato y registra por separado los tiempos de carrera y estaciones, las cargas y las repeticiones. La FC sola no permite saber si mejoraste en HYROX.',
+    cardioAssessmentRecommendationClimbing:
+      'Para comparar la escalada, registra vías de dificultad y estilo parecidos, el tiempo activo y los descansos. Interpreta la FC junto a esos datos, no como medida de habilidad.',
+    cardioAssessmentRecommendationSurf:
+      'Compara sesiones con condiciones y duración parecidas y, si lo registras, separa el tiempo remando del tiempo de espera y anota las olas surfeadas. La FC por sí sola no mide el rendimiento en el agua.',
+    cardioAssessmentRecommendationSnow:
+      'Compara jornadas con modalidad y condiciones parecidas. Registra descensos, tiempo activo y desnivel cuando estén disponibles, porque la duración total puede incluir remontes y esperas.',
+    cardioAssessmentRecommendationGolf:
+      'Compara recorridos y condiciones parecidas y anota si caminaste o usaste un carro. Para seguir tu juego, consulta también golpes y hándicap; la FC solo aporta contexto cardiovascular.',
+    cardioAssessmentRecommendationVolume:
+      'Registra con continuidad la duración y, cuando esté disponible, la distancia, carga o tipo de sesión. Más volumen describe más actividad, no necesariamente mejor condición física.',
+    cardioAssessmentRecommendationFirstSession:
+      'Registra otra sesión de un tipo parecido. Al acumular varias referencias podremos describir cambios sin comparar actividades distintas.',
+    cardioAssessmentRecommendationNoRecentSession:
+      'Elige un periodo más largo o registra una sesión reciente para crear una referencia actual antes de comparar.',
+    cardioAssessmentRecommendationNoData:
+      'Elige un periodo más largo o sincroniza un entrenamiento de este deporte para consultar sus datos.',
+    cardioDimensionSummaryTitle: 'Datos de los periodos comparados',
+    cardioLimitationsTitle: 'Qué limita esta evaluación',
+    cardioLimitationUnrecognizedSport:
+      'Este tipo de actividad no está asociado a un modelo deportivo específico; sus valores se muestran como contexto general.',
+    cardioLimitationNoSportPerformance:
+      'Estas sesiones no incluyen una métrica propia del rendimiento de este deporte.',
+    cardioLimitationHeartRateMissing:
+      'Falta una FC válida en uno o ambos periodos comparados. Las sesiones registradas siguen contando para el volumen de entrenamiento.',
+    cardioLimitationFewComparableSessions: 'Hay menos de tres sesiones comparables para valorar el rendimiento.',
+    cardioLimitationHeartRateNotComparable: 'Algunas sesiones emparejadas no tienen FC o no muestran pulsos similares.',
+    cardioLimitationContextMissing:
+      'Falta parte del contexto, como la temperatura, el dispositivo o el tipo de actividad.',
+    cardioLimitationShortTimeSpan: 'Las sesiones comparables no abarcan al menos dos semanas.',
+    cardioLimitationNoRecentSessions: 'No hay sesiones recientes en el periodo elegido.',
+    cardioLimitationSwimmingSensor: 'La FC de muñeca y la distancia registrada pueden ser menos fiables en el agua.',
+    cardioLimitationStrengthTechnique:
+      'Las cargas anotadas no muestran la técnica, el recorrido, el esfuerzo ni el descanso.',
+    cardioUnknownSport: 'Deporte sin clasificar {{number}}',
+    cardioGenericSportDescription:
+      'Este tipo de actividad no está asociado a un modelo específico del deporte. Las cifras describen las sesiones registradas, pero no permiten determinar el rendimiento propio de esa modalidad.',
+    cardioHeartRateTrendTitle: 'Evolución de la frecuencia cardíaca',
+    cardioHeartRateTrendDescription:
+      'Mediana de la FC media por sesión, agrupada por {{bucket}}. Se omiten las lecturas que faltan; las barras no representan mediciones continuas.',
+    cardioTrendBucketDay: 'día',
+    cardioTrendBucketWeek: 'semana',
+    cardioTrendBucketMonth: 'mes',
+    cardioEvidenceTitle: 'Sesiones mostradas: {{shown}} de {{total}} usadas o disponibles',
+    cardioRecentPeriod: 'Periodo reciente',
+    cardioEarlierPeriod: 'Periodo anterior',
+    cardioEvidenceMore: '{{count}} sesiones más',
+    cardioMetricHeartRate: 'Mediana de FC media por sesión',
+    cardioMetricHeartRateCounts: '{{recent}} sesiones recientes y {{previous}} anteriores con FC',
+    cardioMetricHeartRateChange: 'Cambio de FC: {{change}}',
+    cardioMetricMaximumHeartRate: 'Mediana de FC máxima por sesión',
+    cardioMetricMaximumHeartRateCounts: '{{recent}} sesiones recientes y {{previous}} anteriores con FC máxima válida',
+    cardioMetricSessions: 'Entrenamientos registrados',
+    cardioMetricDuration: 'Tiempo total entrenado',
+    cardioMetricDurationCoverage: 'Duración disponible en {{recent}} sesiones recientes y {{previous}} anteriores',
+    cardioMetricDistance: 'Distancia registrada',
+    cardioMetricDistanceCoverage: 'Distancia disponible en {{recent}} sesiones recientes y {{previous}} anteriores',
+    cardioMetricElevation: 'Desnivel positivo acumulado',
+    cardioMetricElevationCoverage: 'Desnivel disponible en {{recent}} sesiones recientes y {{previous}} anteriores',
+    cardioMetricPower: 'Potencia mediana por sesión',
+    cardioMetricSpeed: 'Velocidad mediana por sesión',
+    cardioMetricPace: 'Ritmo equivalente a la velocidad mediana por sesión',
+    cardioMetricSwimPace: 'Ritmo mediano en largos comparables',
+    cardioMetricPrevious: 'Anterior: {{value}}',
+    cardioMetricAbsoluteChange: 'Diferencia frente al periodo anterior: {{change}}',
+    cardioMetricDerivedSpeed:
+      'La velocidad se estima con la distancia y la duración; esta puede ser el tiempo total y no el tiempo en movimiento.',
+    cardioMetricMixedSpeedSources:
+      'Algunas sesiones usan la velocidad registrada y otras distancia dividida por duración; interpreta el resultado como descriptivo.',
+    cardioMetricSimilarHrSpeedPairs:
+      'Diferencia entre medianas de velocidad: {{change}} % en {{count}} parejas con FC similar. El ritmo superior se expresa como tiempo por distancia: menos tiempo significa más velocidad.',
+    cardioMetricSimilarHrPowerPairs:
+      'Diferencia entre medianas de potencia: {{change}} % en {{count}} parejas con FC similar. Es una tendencia deportiva, no una prueba de condición física.',
+    cardioMetricMatchedSpeedPairs:
+      'Cambio descriptivo de velocidad: {{change}} % en {{count}} parejas de sesiones; {{hrCount}} también tuvieron una FC similar. El ritmo mostrado no es una prueba de condición física.',
+    cardioMetricMatchedPowerPairs:
+      'Cambio descriptivo de potencia: {{change}} % en {{count}} parejas de sesiones; {{hrCount}} también tuvieron una FC similar.',
+    cardioMetricDescriptivePeriodMedians:
+      'Diferencia descriptiva entre medianas de los periodos: {{change}} % ({{recent}} sesiones recientes y {{previous}} anteriores). No son parejas de entrenamientos comparables, así que no representa una tendencia de rendimiento.',
+    cardioMetricLapComparison:
+      'Cambio descriptivo de ritmo: {{change}} % en largos de {{distance}} m ({{recent}} sesiones recientes y {{previous}} anteriores). Un porcentaje positivo significa más velocidad; no confirma una tendencia.',
+    cardioMetricNoMatchedPerformance: 'Aún no hay parejas de sesiones con datos comparables.',
+    cardioUnknownExercise: 'Ejercicio',
+    cardioMetricStrengthVolume: 'Volumen de fuerza registrado',
+    cardioMetricStrengthVolumeCoverage: 'Dato guardado en {{recent}} sesiones recientes y {{previous}} anteriores',
+    cardioMetricStrengthSets: 'Series registradas',
+    cardioMetricStrengthSetsCoverage: 'Series guardadas en {{recent}} sesiones recientes y {{previous}} anteriores',
+    cardioMetricStrengthReps: 'Repeticiones registradas',
+    cardioMetricStrengthRepsCoverage:
+      'Repeticiones guardadas en {{recent}} sesiones recientes y {{previous}} anteriores',
+    cardioLapsLoadError:
+      'No se pudieron cargar los parciales. Seguimos mostrando los resúmenes guardados, pero no se comparan ritmos por largo.',
+    cardioStrengthLoadError:
+      'No se pudieron cargar ejercicios y series. Siguen disponibles el pulso, la duración y el volumen general del entrenamiento.',
+    cardioStrengthComparisonTitle: 'Cargas anotadas en los mismos ejercicios y repeticiones',
+    cardioStrengthComparison:
+      '{{exercise}} · {{reps}} rep.: {{recent}} reciente frente a {{previous}} anterior ({{change}} %; {{recentSessions}}/{{previousSessions}} sesiones)',
+    cardioStrengthComparisonCaution:
+      'Es una comparación descriptiva de las cargas guardadas; no confirma técnica, recorrido, esfuerzo ni progreso muscular.',
     cardioSafetyNote:
       'Estas tendencias son estimaciones de datos del reloj, no una valoración médica. La FC puede variar por esfuerzo, calor, sueño, estrés, enfermedad, hidratación y ajuste del sensor.',
     last: 'Últimos',

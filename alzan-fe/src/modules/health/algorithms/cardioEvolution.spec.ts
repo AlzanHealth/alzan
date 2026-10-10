@@ -626,6 +626,54 @@ assert.ok(drift !== null);
 assert.ok(drift.decouplingPercent > 6 && drift.decouplingPercent < 7);
 assert.equal(analyzeCardiacDrift(driftSamples.slice(0, 10), 'long-run', 'running', 60 * 60), null);
 
+const driftWithLateOutliers: CardioStreamSample[] = [];
+for (const [bucketStart, hasOutlier] of [
+  ...Array.from({ length: 16 }, (_, index) => [60 + index * 60, false] as const),
+  ...Array.from({ length: 16 }, (_, index) => [1380 + index * 60, true] as const),
+]) {
+  driftWithLateOutliers.push(
+    { session_id: 'outlier-run', stream_type: 'heart_rate', offset_s: bucketStart, value: 150 },
+    { session_id: 'outlier-run', stream_type: 'speed', offset_s: bucketStart + 1, value: 3 },
+  );
+  if (hasOutlier) {
+    driftWithLateOutliers.push({
+      session_id: 'outlier-run',
+      stream_type: 'heart_rate',
+      offset_s: bucketStart + 5,
+      value: 150,
+    });
+    driftWithLateOutliers.push({
+      session_id: 'outlier-run',
+      stream_type: 'heart_rate',
+      offset_s: bucketStart + 20,
+      value: 205,
+    });
+  }
+}
+const outlierResistantDrift = analyzeCardiacDrift(driftWithLateOutliers, 'outlier-run', 'running', 45 * 60);
+assert.ok(outlierResistantDrift !== null);
+assert.ok(Math.abs(outlierResistantDrift.decouplingPercent) < 1);
+
+const sparseDriftSamples: CardioStreamSample[] = [];
+for (const [bucketStart, heartRate] of [
+  ...Array.from({ length: 10 }, (_, index) => [index * 60, 140] as const),
+  ...Array.from({ length: 10 }, (_, index) => [1380 + index * 60, 155] as const),
+]) {
+  sparseDriftSamples.push(
+    { session_id: 'sparse-run', stream_type: 'heart_rate', offset_s: bucketStart, value: heartRate },
+    { session_id: 'sparse-run', stream_type: 'speed', offset_s: bucketStart + 1, value: 3 },
+  );
+}
+assert.equal(analyzeCardiacDrift(sparseDriftSamples, 'sparse-run', 'running', 45 * 60), null);
+
+const cyclingDriftWithSparsePower = [
+  ...driftSamples.map(sample => ({ ...sample, session_id: 'cycle-long' })),
+  { session_id: 'cycle-long', stream_type: 'power' as const, offset_s: 0, value: 220 },
+];
+const cyclingDriftFallback = analyzeCardiacDrift(cyclingDriftWithSparsePower, 'cycle-long', 'cycling', 60 * 60);
+assert.ok(cyclingDriftFallback !== null);
+assert.equal(cyclingDriftFallback.outputMetric, 'speed');
+
 const intervalHeartRateSamples: CardioStreamSample[] = [];
 for (let offset = 0; offset < 30 * 60; offset += 30) {
   const peaks = new Map([

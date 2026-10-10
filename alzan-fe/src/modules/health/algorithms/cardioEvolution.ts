@@ -24,6 +24,12 @@ export type CardioActivity = {
   total_sets: number | null;
   total_reps: number | null;
   workout_template_id: string | null;
+  pool_type?: string | null;
+  stroke?: string | null;
+  surface?: string | null;
+  football_session_type?: string | null;
+  ski_type?: string | null;
+  snowboard_type?: string | null;
 };
 
 export type CardioStreamSample = {
@@ -1061,48 +1067,72 @@ export const analyzeCardiacDrift = (
   sessionStartTime?: string,
 ): CardiacDriftResult | null => {
   if (durationSeconds < 45 * 60 || !['running', 'trail', 'cycling'].includes(sportType)) return null;
+  const minimumHalfCoverageSeconds = durationSeconds / 4;
+  const maximumSampleGapSeconds = 5 * 60;
   const hasPower = samples.some(sample => sample.session_id === sessionId && sample.stream_type === 'power');
-  const outputMetric: CardiacDriftResult['outputMetric'] = sportType === 'cycling' && hasPower ? 'power' : 'speed';
-  const paired = new Map<number, { heartRate: number | null; output: number | null }>();
-  for (const sample of samples) {
-    if (sample.session_id !== sessionId) continue;
-    const offset = resolveOffset(sample, sessionStartTime);
-    if (offset === null || offset > durationSeconds) continue;
-    const bucket = Math.floor(offset / 30);
-    const values = paired.get(bucket) ?? { heartRate: null, output: null };
-    if (sample.stream_type === 'heart_rate' && sample.value >= 40 && sample.value <= 220)
-      values.heartRate = sample.value;
-    if (sample.stream_type === outputMetric && sample.value > 0) values.output = sample.value;
-    paired.set(bucket, values);
-  }
-  const halfway = durationSeconds / 2;
-  const firstHalf: { heartRate: number; output: number }[] = [];
-  const secondHalf: { heartRate: number; output: number }[] = [];
-  for (const [bucket, values] of paired) {
-    if (values.heartRate === null || values.output === null) continue;
-    if (outputMetric === 'speed' && values.output < 0.5) continue;
-    if (outputMetric === 'power' && values.output < 10) continue;
-    const entry = { heartRate: values.heartRate, output: values.output };
-    (bucket * 30 < halfway ? firstHalf : secondHalf).push(entry);
-  }
-  if (firstHalf.length < 10 || secondHalf.length < 10) return null;
-  const firstHeartRate = median(firstHalf.map(sample => sample.heartRate));
-  const secondHeartRate = median(secondHalf.map(sample => sample.heartRate));
-  const firstOutput = median(firstHalf.map(sample => sample.output));
-  const secondOutput = median(secondHalf.map(sample => sample.output));
-  if (firstHeartRate === null || secondHeartRate === null || firstOutput === null || secondOutput === null) return null;
-  const outputChangePercent = ((secondOutput - firstOutput) / firstOutput) * 100;
-  if (Math.abs(outputChangePercent) > 10) return null;
-  const firstEfficiency = firstOutput / firstHeartRate;
-  const secondEfficiency = secondOutput / secondHeartRate;
-  return {
-    decouplingPercent: ((firstEfficiency - secondEfficiency) / firstEfficiency) * 100,
-    firstHalfHeartRate: firstHeartRate,
-    secondHalfHeartRate: secondHeartRate,
-    outputChangePercent,
-    outputMetric,
-    pairedSampleCount: firstHalf.length + secondHalf.length,
+  const analyzeWithOutput = (
+    outputMetric: CardiacDriftResult['outputMetric'],
+  ): { result: CardiacDriftResult | null; hasEnoughSamples: boolean } => {
+    const paired = new Map<number, { heartRate: number[]; output: number[] }>();
+    for (const sample of samples) {
+      if (sample.session_id !== sessionId) continue;
+      const offset = resolveOffset(sample, sessionStartTime);
+      if (offset === null || offset > durationSeconds) continue;
+      const bucket = Math.floor(offset / 30);
+      const values = paired.get(bucket) ?? { heartRate: [], output: [] };
+      if (sample.stream_type === 'heart_rate' && sample.value >= 40 && sample.value <= 220)
+        values.heartRate.push(sample.value);
+      if (sample.stream_type === outputMetric && sample.value > 0) values.output.push(sample.value);
+      paired.set(bucket, values);
+    }
+    const halfway = durationSeconds / 2;
+    const firstHalf: { offset: number; heartRate: number; output: number }[] = [];
+    const secondHalf: { offset: number; heartRate: number; output: number }[] = [];
+    for (const [bucket, readings] of paired) {
+      const heartRate = median(readings.heartRate);
+      const output = median(readings.output);
+      if (heartRate === null || output === null) continue;
+      if (outputMetric === 'speed' && output < 0.5) continue;
+      if (outputMetric === 'power' && output < 10) continue;
+      const entry = { offset: bucket * 30, heartRate, output };
+      (bucket * 30 < halfway ? firstHalf : secondHalf).push(entry);
+    }
+    const hasAdequateCoverage = (half: typeof firstHalf) => {
+      if (half.length < 10) return false;
+      const offsets = half.map(entry => entry.offset).sort((left, right) => left - right);
+      if (offsets[offsets.length - 1] - offsets[0] < minimumHalfCoverageSeconds) return false;
+      return offsets.every((offset, index) => index === 0 || offset - offsets[index - 1] <= maximumSampleGapSeconds);
+    };
+    if (!hasAdequateCoverage(firstHalf) || !hasAdequateCoverage(secondHalf))
+      return { result: null, hasEnoughSamples: false };
+    const firstHeartRate = median(firstHalf.map(sample => sample.heartRate));
+    const secondHeartRate = median(secondHalf.map(sample => sample.heartRate));
+    const firstOutput = median(firstHalf.map(sample => sample.output));
+    const secondOutput = median(secondHalf.map(sample => sample.output));
+    if (firstHeartRate === null || secondHeartRate === null || firstOutput === null || secondOutput === null)
+      return { result: null, hasEnoughSamples: false };
+    const outputChangePercent = ((secondOutput - firstOutput) / firstOutput) * 100;
+    if (Math.abs(outputChangePercent) > 10) return { result: null, hasEnoughSamples: true };
+    const firstEfficiency = firstOutput / firstHeartRate;
+    const secondEfficiency = secondOutput / secondHeartRate;
+    return {
+      result: {
+        decouplingPercent: ((firstEfficiency - secondEfficiency) / firstEfficiency) * 100,
+        firstHalfHeartRate: firstHeartRate,
+        secondHalfHeartRate: secondHeartRate,
+        outputChangePercent,
+        outputMetric,
+        pairedSampleCount: firstHalf.length + secondHalf.length,
+      },
+      hasEnoughSamples: true,
+    };
   };
+
+  if (sportType === 'cycling' && hasPower) {
+    const powerAnalysis = analyzeWithOutput('power');
+    if (powerAnalysis.hasEnoughSamples) return powerAnalysis.result;
+  }
+  return analyzeWithOutput('speed').result;
 };
 
 /** Describes HR drop after repeated recorded peaks; it is not a clinical recovery test. */
@@ -1119,7 +1149,9 @@ export const analyzeIntervalHeartRateRecovery = (
     const offset = resolveOffset(sample, sessionStartTime);
     if (offset === null || offset > durationSeconds || !isValidHeartRate(sample.value)) continue;
     const bucket = Math.floor(offset / 30);
-    readingsByBucket.set(bucket, [...(readingsByBucket.get(bucket) ?? []), sample.value]);
+    const readings = readingsByBucket.get(bucket) ?? [];
+    readings.push(sample.value);
+    readingsByBucket.set(bucket, readings);
   }
   const readings = [...readingsByBucket.entries()]
     .map(([bucket, values]) => ({ offset: bucket * 30, heartRate: median(values) }))

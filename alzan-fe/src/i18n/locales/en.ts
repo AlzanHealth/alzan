@@ -1132,6 +1132,193 @@ const en = {
     cardioWeeklyDisclaimer:
       'This distribution describes recorded effort. Without your training goal, it cannot tell whether the mix is right for you.',
     cardioStrengthVolume: 'Volume in the same strength routine',
+    cardioAssessmentLevelA: 'Trend across comparable workouts',
+    cardioAssessmentLevelB: 'Partial performance data',
+    cardioAssessmentLevelC: 'Recorded cardiovascular response',
+    cardioAssessmentLevelD: 'Training volume and consistency',
+    cardioAssessmentLevelE: 'First reference point',
+    cardioAssessmentLevelF: 'No data in this period',
+    cardioAssessmentOutputImproving: 'Possible improvement across comparable workouts',
+    cardioAssessmentOutputDeclining: 'Lower performance observed across comparable workouts',
+    cardioAssessmentOutputStable: 'No clear trend across comparable workouts',
+    cardioAssessmentMeaningAImproving:
+      'Across workouts spread over several weeks, higher performance repeatedly appears at a similar average heart rate. This is a favorable sports-performance signal, not a clinical test or diagnosis.',
+    cardioAssessmentMeaningADeclining:
+      'Across workouts spread over several weeks, lower performance repeatedly appears at a similar average heart rate. This describes a sports trend; heat, elevation, recovery and sensor readings may also affect it.',
+    cardioAssessmentMeaningAStable:
+      'Comparable workouts spread over several weeks show no clear performance change at a similar average heart rate. The trend is stable within the available data.',
+    cardioAssessmentMeaningB:
+      'There is performance, distance or load data to describe these periods, but not enough comparable workouts to conclude a reliable trend. Heart rate and performance are shown separately when similar effort cannot be confirmed.',
+    cardioAssessmentMeaningBTrend:
+      'This result uses performance values from repeated, comparable workouts. Missing heart-rate response or some session conditions make it a partial assessment; it does not establish a change in cardiovascular efficiency.',
+    cardioAssessmentMeaningC:
+      'The median average heart rate per workout was {{recent}} bpm versus {{previous}} bpm (a change of {{delta}} bpm). This describes a different response across {{sessions}} recent workouts; by itself it does not prove improved or worse fitness.',
+    cardioAssessmentMeaningCRunning:
+      'This comparison describes the average heart rate recorded in your running sessions. Pace, distance, route and conditions change the effort; without comparable runs, heart rate alone cannot show that you are improving or declining.',
+    cardioAssessmentMeaningCTrail:
+      'This comparison describes the average heart rate recorded on your trail runs. Elevation, trail difficulty and conditions can greatly change the effort; without comparable routes, heart rate alone cannot show a performance improvement.',
+    cardioAssessmentMeaningCHiking:
+      'This comparison describes the average heart rate recorded on your hikes. Elevation, pack load, terrain and moving time all affect the response; heart rate alone does not measure progress on the route.',
+    cardioAssessmentMeaningCRacket:
+      'This comparison describes your heart’s response during tennis or padel. Surface, singles versus doubles, point length and breaks all change the demand; average heart rate does not measure how well you played.',
+    cardioAssessmentMeaningCMartialArts:
+      'This comparison describes your heart’s response during martial arts sessions. Discipline, rounds, rests and active time all change the demand; heart rate does not measure technique or outcome.',
+    cardioAssessmentMeaningCCycling:
+      'This comparison describes the average heart rate recorded in your cycling sessions. Outdoor speed depends on route, wind and stops; assessing performance requires comparable sessions and, when available, power.',
+    cardioAssessmentMeaningCSwimming:
+      'This comparison describes the average heart rate recorded while swimming. Stroke, distance, pool versus open water and the sensor all matter; wrist readings in water can be less reliable and do not prove improvement by themselves.',
+    cardioAssessmentMeaningCStrength:
+      'This comparison describes how your heart responded during strength sessions. Heart rate and duration do not measure how hard your muscles worked; to track strength, compare the same routine, exercises, loads and repetitions.',
+    cardioAssessmentMeaningCIntermittent:
+      'Heart rate summarizes your heart’s response during these matches or intermittent sessions. Breaks, playing time and your role can change the demand considerably; this number does not measure your technique or sport performance.',
+    cardioAssessmentMeaningCHyrox:
+      'Heart rate summarizes your heart’s response during this HYROX session. The mix of running and stations can vary between workouts; without comparable split times, loads and repetitions, we cannot assess sport-specific performance.',
+    cardioAssessmentMeaningCClimbing:
+      'Heart rate summarizes your heart’s response while climbing. Route grade, style, rests and time spent climbing all matter; these data do not show whether you climbed harder routes or improved your technique.',
+    cardioAssessmentMeaningCSurf:
+      'Heart rate summarizes your heart’s response while surfing, including waiting and paddling. Conditions and active time vary between sessions; this number does not measure waves surfed or skill.',
+    cardioAssessmentMeaningCSnow:
+      'Heart rate summarizes your heart’s response during a snow sport session. It can include lifts, waiting and descents; without separating active time and comparing runs or elevation, it cannot assess improvement in skiing or snowboarding.',
+    cardioAssessmentMeaningCGolf:
+      'Heart rate and duration describe the cardiovascular response and time recorded for this golf session. Course, walking versus riding and conditions all matter; these data do not measure shot quality or score.',
+    cardioAssessmentMeaningCOnlyRecent:
+      'The median average heart rate was {{recent}} bpm across {{sessions}} recent workouts, but there are no valid earlier readings in this period. We can describe the recorded response, not calculate a change.',
+    cardioAssessmentMeaningCOnlyRecentWithEarlierSessions:
+      'The median average heart rate was {{recent}} bpm across {{sessions}} recent workouts with valid heart rate. There are {{previousSessions}} workouts in the earlier period, but none has valid heart-rate data. We can describe the recorded response, not calculate a change.',
+    cardioAssessmentMeaningCOnlyPrevious:
+      'An earlier median of {{previous}} bpm is available, but there are no recent workouts with valid heart rate. That historical value does not describe your current response or show a recent trend.',
+    cardioAssessmentMeaningCOnlyPreviousWithRecentSessions:
+      'Valid heart rate is available only in the earlier period ({{previous}} bpm). Although {{recentTotalSessions}} recent workouts were recorded, none has valid heart-rate data; the historical value cannot describe your current response or show a change.',
+    cardioAssessmentMeaningD:
+      'You recorded {{sessions}} recent workouts totalling {{minutes}} minutes, versus {{previousSessions}} workouts and {{previousMinutes}} minutes in the earlier period. This describes training volume; without intensity or performance measures it cannot assess fitness.',
+    cardioAssessmentMeaningDPartial:
+      'There are {{sessions}} recent workouts and {{previousSessions}} earlier ones, but duration is missing for at least one period. The totals above show which records are available; they are not enough to assess fitness.',
+    cardioAssessmentMeaningERecent:
+      'There is one recent workout recorded in this period. Its data can serve as a starting reference for future comparisons; there is no comparable earlier period yet.',
+    cardioAssessmentMeaningEPrior:
+      'There is one workout in the earlier period and none in the recent one. There is no current reference for comparison yet; choose a longer period or record another workout.',
+    cardioAssessmentMeaningF:
+      'There are no valid activities for this sport in the selected period, so no trend can be calculated. This only means records are missing for this interval.',
+    cardioAssessmentMeaningFPrevious:
+      'There are no workouts in the recent part of this period. The earlier part contains {{previousSessions}} workouts, but it cannot describe your current response. Choose a longer period or record a recent workout.',
+    cardioAssessmentRecommendationRunning:
+      'Compare runs of the same type and distance, and record heart rate. Pace alone does not show effort when routes, elevation or conditions differ.',
+    cardioAssessmentRecommendationTrail:
+      'Compare trail runs with similar terrain, distance and elevation, and record heart rate. Pace can vary substantially with slope and trail difficulty.',
+    cardioAssessmentRecommendationHiking:
+      'Compare hikes with similar distance, elevation gain and pack load. Record heart rate and moving time; pace alone cannot compare effort on different terrain.',
+    cardioAssessmentRecommendationCycling:
+      'If you have a power meter, compare workouts with similar duration and effort using power and heart rate. Outdoor speed also depends on route, wind and stops.',
+    cardioAssessmentRecommendationSwimming:
+      'Compare workouts with the same setting, pool or open water, stroke and distance. Treat wrist heart-rate readings in water cautiously.',
+    cardioAssessmentRecommendationStrength:
+      'To track strength, record the same exercises, loads and repetitions. Heart rate adds cardiovascular context, but does not measure muscular work by itself.',
+    cardioAssessmentRecommendationGeneric:
+      'Keep one external measure consistent for this sport and compare it with heart rate across similar workouts. If only heart rate is available, treat the change as a cardiac response, not performance.',
+    cardioAssessmentRecommendationHeartRate:
+      'Record heart rate in workouts with similar duration, format and effort. Check sensor fit and context before interpreting a difference.',
+    cardioAssessmentRecommendationIntermittent:
+      'Compare sessions with the same format, duration and similar breaks. Heart rate is context; assessing sport performance also requires sport-specific data, such as playing time or recorded actions.',
+    cardioAssessmentRecommendationRacket:
+      'Compare matches in the same sport and format, on similar surfaces and for similar durations. Record singles or doubles and active playing time when available; heart rate is context, not a measure of points won.',
+    cardioAssessmentRecommendationMartialArts:
+      'Compare sessions in the same discipline, with similar round counts, round lengths and rests. Heart rate adds context but cannot show technical improvement by itself.',
+    cardioAssessmentRecommendationHyrox:
+      'Compare events or workouts with the same format, and record run and station splits, loads and repetitions separately. Heart rate alone cannot show whether your HYROX performance improved.',
+    cardioAssessmentRecommendationClimbing:
+      'To compare climbing, record routes with similar grade and style, active time and rests. Interpret heart rate alongside those details, not as a measure of skill.',
+    cardioAssessmentRecommendationSurf:
+      'Compare sessions with similar conditions and duration. If available, separate paddling from waiting time and record waves surfed. Heart rate alone does not measure performance in the water.',
+    cardioAssessmentRecommendationSnow:
+      'Compare days with similar disciplines and conditions. Record runs, active time and elevation when available, since total duration can include lifts and waiting.',
+    cardioAssessmentRecommendationGolf:
+      'Compare similar courses and conditions, and note whether you walked or used a cart. Track shots and handicap for golf progress; heart rate provides cardiovascular context only.',
+    cardioAssessmentRecommendationVolume:
+      'Record duration consistently and include distance, load or session type when available. More volume describes more activity, not necessarily better fitness.',
+    cardioAssessmentRecommendationFirstSession:
+      'Record another workout of a similar type. With several reference sessions, we can describe changes without comparing different activities.',
+    cardioAssessmentRecommendationNoRecentSession:
+      'Choose a longer period or record a recent workout to create a current reference before comparing.',
+    cardioAssessmentRecommendationNoData: 'Choose a longer period or sync a workout in this sport to review its data.',
+    cardioDimensionSummaryTitle: 'Data for the compared periods',
+    cardioLimitationsTitle: 'What limits this assessment',
+    cardioLimitationUnrecognizedSport:
+      'This activity type is not mapped to a sport-specific model; its values are treated as general context.',
+    cardioLimitationNoSportPerformance: 'No sport-specific performance metric is recorded for these sessions.',
+    cardioLimitationHeartRateMissing:
+      'Valid heart-rate data is missing from one or both compared periods. Recorded workouts still count toward training volume.',
+    cardioLimitationFewComparableSessions: 'Fewer than three comparable performance sessions are available.',
+    cardioLimitationHeartRateNotComparable: 'Some paired sessions lack heart rate or do not have a similar heart rate.',
+    cardioLimitationContextMissing:
+      'Some comparison context, such as temperature, device or activity type, is missing.',
+    cardioLimitationShortTimeSpan: 'Comparable sessions do not cover at least two weeks.',
+    cardioLimitationNoRecentSessions: 'There are no recent sessions in the selected period.',
+    cardioLimitationSwimmingSensor: 'Wrist heart rate and recorded swim distance can be less reliable in water.',
+    cardioLimitationStrengthTechnique: 'Logged loads do not show technique, range of motion, effort or rest time.',
+    cardioUnknownSport: 'Unclassified sport {{number}}',
+    cardioGenericSportDescription:
+      'This activity type is not mapped to a sport-specific model. The figures describe the recorded sessions only and cannot establish sport-specific performance.',
+    cardioHeartRateTrendTitle: 'Heart-rate trend',
+    cardioHeartRateTrendDescription:
+      'Median average heart rate per workout, grouped by {{bucket}}. Missing readings are omitted; bars are not continuous measurements.',
+    cardioTrendBucketDay: 'day',
+    cardioTrendBucketWeek: 'week',
+    cardioTrendBucketMonth: 'month',
+    cardioEvidenceTitle: 'Sessions shown: {{shown}} of {{total}} used or available',
+    cardioRecentPeriod: 'Recent period',
+    cardioEarlierPeriod: 'Earlier period',
+    cardioEvidenceMore: '{{count}} more sessions',
+    cardioMetricHeartRate: 'Median average heart rate per workout',
+    cardioMetricHeartRateCounts: '{{recent}} recent and {{previous}} earlier workouts with HR',
+    cardioMetricHeartRateChange: 'Heart-rate change: {{change}}',
+    cardioMetricMaximumHeartRate: 'Median maximum heart rate per workout',
+    cardioMetricMaximumHeartRateCounts: '{{recent}} recent and {{previous}} earlier workouts with valid maximum HR',
+    cardioMetricSessions: 'Recorded workouts',
+    cardioMetricDuration: 'Total training time',
+    cardioMetricDurationCoverage: 'Duration available for {{recent}} recent and {{previous}} earlier workouts',
+    cardioMetricDistance: 'Recorded distance',
+    cardioMetricDistanceCoverage: 'Distance available for {{recent}} recent and {{previous}} earlier workouts',
+    cardioMetricElevation: 'Total elevation gain',
+    cardioMetricElevationCoverage: 'Elevation available for {{recent}} recent and {{previous}} earlier workouts',
+    cardioMetricPower: 'Median power per workout',
+    cardioMetricSpeed: 'Median speed per workout',
+    cardioMetricPace: 'Pace equivalent to median workout speed',
+    cardioMetricSwimPace: 'Median pace across comparable laps',
+    cardioMetricPrevious: 'Earlier: {{value}}',
+    cardioMetricAbsoluteChange: 'Difference vs earlier period: {{change}}',
+    cardioMetricDerivedSpeed:
+      'Speed is estimated from each workout’s distance and duration; it may use elapsed rather than moving time.',
+    cardioMetricMixedSpeedSources:
+      'Some workouts use recorded speed and others use distance divided by duration; treat the period values as descriptive.',
+    cardioMetricSimilarHrSpeedPairs:
+      'Difference between median speeds: {{change}}% across {{count}} session pairs with similar heart rate. Pace above is shown as time per distance, so a lower value means faster speed.',
+    cardioMetricSimilarHrPowerPairs:
+      'Difference between median power values: {{change}}% across {{count}} session pairs with similar heart rate. This is a sports trend, not a fitness test.',
+    cardioMetricMatchedSpeedPairs:
+      'Descriptive speed change: {{change}}% across {{count}} matched session pairs; {{hrCount}} also had similar heart rate. The pace above is not a fitness test.',
+    cardioMetricMatchedPowerPairs:
+      'Descriptive power change: {{change}}% across {{count}} matched session pairs; {{hrCount}} also had similar heart rate.',
+    cardioMetricDescriptivePeriodMedians:
+      'Descriptive difference between period medians: {{change}}% ({{recent}} recent and {{previous}} earlier sessions). These sessions were not paired as comparable workouts; this is not a performance trend.',
+    cardioMetricLapComparison:
+      'Descriptive pace change: {{change}}% across {{distance}} m laps ({{recent}} recent, {{previous}} earlier sessions). A positive percentage means faster speed; this is not a confirmed trend.',
+    cardioMetricNoMatchedPerformance: 'There are not enough paired workouts with comparable data yet.',
+    cardioUnknownExercise: 'Exercise',
+    cardioMetricStrengthVolume: 'Recorded strength volume',
+    cardioMetricStrengthVolumeCoverage: 'Value saved in {{recent}} recent and {{previous}} earlier workouts',
+    cardioMetricStrengthSets: 'Recorded sets',
+    cardioMetricStrengthSetsCoverage: 'Sets saved in {{recent}} recent and {{previous}} earlier workouts',
+    cardioMetricStrengthReps: 'Recorded repetitions',
+    cardioMetricStrengthRepsCoverage: 'Repetitions saved in {{recent}} recent and {{previous}} earlier workouts',
+    cardioLapsLoadError:
+      'Lap splits could not be loaded. Saved workout summaries remain visible, but lap pace is not compared.',
+    cardioStrengthLoadError:
+      'Exercises and sets could not be loaded. Heart rate, duration and general workout totals remain available.',
+    cardioStrengthComparisonTitle: 'Logged loads for the same exercises and repetitions',
+    cardioStrengthComparison:
+      '{{exercise}} · {{reps}} reps: {{recent}} recent versus {{previous}} earlier ({{change}}%; {{recentSessions}}/{{previousSessions}} sessions)',
+    cardioStrengthComparisonCaution:
+      'This is a descriptive comparison of saved loads; it cannot verify technique, range of motion, effort or muscle progress.',
     cardioSafetyNote:
       'These trends are estimates from wearable data, not a medical assessment. Heart rate can vary with effort, heat, sleep, stress, illness, hydration and sensor fit.',
     last: 'Last',

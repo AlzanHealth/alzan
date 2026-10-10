@@ -20,8 +20,12 @@ assert.equal(normalizeCardioSportType('gym', 'indoor'), 'gym');
 assert.equal(normalizeCardioSportSubtype('strength', 'indoor_strength'), 'gym');
 assert.equal(normalizeCardioSportSubtype('gym', 'indoor'), 'gym');
 assert.equal(normalizeCardioSportType('other', 'urban_walk'), 'hiking');
+assert.equal(normalizeCardioSportType('other', 'pickleball'), 'other_pickleball');
+assert.equal(normalizeCardioSportType('other', 'rowing_machine'), 'other_rowing_machine');
 assert.equal(normalizeCardioSportType('trail_running', null), 'trail');
 assert.equal(normalizeCardioSportType('running', 'trail'), 'trail');
+assert.equal(normalizeCardioSportType('Pickle-Ball', null), 'pickle_ball');
+assert.equal(normalizeCardioSportType('rowing_machine', null), 'rowing_machine');
 assert.equal(normalizeCardioSportSubtype('trail_running', null), 'trail');
 assert.equal(normalizeCardioSportSubtype('running_outdoor', null), 'outdoor');
 assert.equal(
@@ -45,7 +49,21 @@ assert.equal(
   ),
   false,
 );
+assert.equal(
+  isSameCardioSportSubtype(
+    { sport_type: 'pickleball', sport_subtype: 'singles' },
+    { sport_type: 'pickleball', sport_subtype: 'doubles' },
+  ),
+  false,
+);
 assert.deepEqual(
   getPracticedCardioSports(activities).map(option => option.sportType),
   ['gym', 'cycling', 'running'],
+);
+assert.deepEqual(
+  getPracticedCardioSports([
+    { sport_type: 'pickleball', sport_subtype: null, start_time: '2026-10-01T10:00:00.000Z' },
+    { sport_type: 'rowing_machine', sport_subtype: null, start_time: '2026-10-02T10:00:00.000Z' },
+  ]).map(option => option.sportType),
+  ['rowing_machine', 'pickleball'],
 );
