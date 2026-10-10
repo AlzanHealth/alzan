@@ -3,6 +3,7 @@ import {
   aggregateDailyActivity,
   countStressStates,
   getHealthSummaryCardWidth,
+  getStressStateCategory,
   summarizeHealthValues,
 } from './suuntoHealthPresentation';
 
@@ -52,6 +53,16 @@ function countsOnlyKnownStressStates(): void {
   });
 }
 
+function mapsLatestStressReadingToItsRecordedCategory(): void {
+  assert.equal(getStressStateCategory(null), null);
+  assert.equal(getStressStateCategory(0), 'invalid');
+  assert.equal(getStressStateCategory(1), 'relaxing');
+  assert.equal(getStressStateCategory(2), 'active');
+  assert.equal(getStressStateCategory(3), 'passive');
+  assert.equal(getStressStateCategory(4), 'stressful');
+  assert.equal(getStressStateCategory(8), 'unknown');
+}
+
 function summarizesMetricValuesAndHandlesEmptyPeriods(): void {
   assert.deepEqual(summarizeHealthValues([55.2, 73.8, 88]), { average: 72, min: 55, max: 88 });
   assert.equal(summarizeHealthValues([]), null);
@@ -63,5 +74,6 @@ function keepsSummaryCardsCompactAcrossScreenSizes(): void {
 
 aggregatesStepsAndEnergyByCalendarDay();
 countsOnlyKnownStressStates();
+mapsLatestStressReadingToItsRecordedCategory();
 summarizesMetricValuesAndHandlesEmptyPeriods();
 keepsSummaryCardsCompactAcrossScreenSizes();

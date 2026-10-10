@@ -13,6 +13,18 @@ export type StressStateCounts = {
   stressful: number;
 };
 
+export type StressStateCategory = 'invalid' | 'relaxing' | 'active' | 'passive' | 'stressful' | 'unknown';
+
+export const getStressStateCategory = (value: number | null | undefined): StressStateCategory | null => {
+  if (value == null) return null;
+  if (value === 0) return 'invalid';
+  if (value === 1) return 'relaxing';
+  if (value === 2) return 'active';
+  if (value === 3) return 'passive';
+  if (value === 4) return 'stressful';
+  return 'unknown';
+};
+
 export type HealthValueSummary = { average: number; min: number; max: number };
 
 export const summarizeHealthValues = (values: number[]): HealthValueSummary | null => {

@@ -928,10 +928,12 @@ const en = {
     suuntoRem: 'REM',
     suuntoNoSleep: 'No Suunto sleep records for this period.',
     suuntoRecovery: 'Recovery and daily activity',
+    suuntoDailyActivity: 'Daily activity',
     suuntoBalance: 'Recovery balance',
     suuntoBalanceDescription:
       'A daily summary Suunto calculates from signals collected by your watch. Use it to notice personal changes alongside sleep and activity; it is not a clinical measurement.',
     suuntoBalanceCardDescription: 'Daily recovery indicator reported by Suunto.',
+    suuntoStressCardDescription: 'The latest stress category recorded by your watch in this period.',
     suuntoBalanceAbout: 'About recovery balance',
     suuntoBalanceWhat:
       'This is a daily recovery indicator provided by Suunto. Alzan shows the value received and does not calculate its own score or have every detail of the watch’s algorithm.',

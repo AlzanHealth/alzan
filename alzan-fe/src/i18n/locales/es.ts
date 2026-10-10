@@ -938,10 +938,12 @@ export default {
     suuntoRem: 'REM',
     suuntoNoSleep: 'No hay registros de sueño de Suunto en este periodo.',
     suuntoRecovery: 'Recuperación y actividad diaria',
+    suuntoDailyActivity: 'Actividad diaria',
     suuntoBalance: 'Balance de recuperación',
     suuntoBalanceDescription:
       'Resumen diario que Suunto calcula con las señales del reloj. Úsalo para observar cambios personales junto al descanso y la actividad; no es una medición clínica.',
     suuntoBalanceCardDescription: 'Indicador de recuperación diario comunicado por Suunto.',
+    suuntoStressCardDescription: 'Última categoría de estrés registrada por el reloj en este periodo.',
     suuntoBalanceAbout: 'Acerca del balance de recuperación',
     suuntoBalanceWhat:
       'Es un indicador diario de recuperación que proporciona Suunto. Alzan muestra el valor recibido y no calcula una puntuación propia ni conoce todos los detalles del algoritmo del reloj.',

@@ -25,6 +25,7 @@ import { healthQueryKeys } from '../hooks/healthQueryKeys';
 import {
   aggregateDailyActivity,
   countStressStates,
+  getStressStateCategory,
   getHealthSummaryCardWidth,
   summarizeHealthValues,
 } from '../helpers/suuntoHealthPresentation';
@@ -49,6 +50,14 @@ const summaryDescriptions = {
   stress: 'health.suuntoStressDescription',
   steps: 'health.suuntoStepsDescription',
   energy: 'health.suuntoEnergyDescription',
+} as const;
+const stressStateLabelKeys = {
+  invalid: 'health.suuntoStressInvalid',
+  relaxing: 'health.suuntoStressRelaxing',
+  active: 'health.suuntoStressActive',
+  passive: 'health.suuntoStressPassive',
+  stressful: 'health.suuntoStressful',
+  unknown: 'health.suuntoStressUnknown',
 } as const;
 
 type Props = { sleepDetailsRequest: number };
@@ -248,20 +257,8 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
           ? t('health.suuntoLatestInPeriod')
           : t('health.suuntoTotalInPeriod');
   const stressValue = latest('stress_state');
-  const stressLabel =
-    stressValue == null
-      ? '—'
-      : Number(stressValue) === 0
-        ? t('health.suuntoStressInvalid')
-        : Number(stressValue) === 1
-          ? t('health.suuntoStressRelaxing')
-          : Number(stressValue) === 2
-            ? t('health.suuntoStressActive')
-            : Number(stressValue) === 3
-              ? t('health.suuntoStressPassive')
-              : Number(stressValue) === 4
-                ? t('health.suuntoStressful')
-                : t('health.suuntoStressUnknown');
+  const stressStateCategory = getStressStateCategory(stressValue == null ? null : Number(stressValue));
+  const stressLabel = stressStateCategory ? t(stressStateLabelKeys[stressStateCategory]) : '—';
 
   return (
     <View style={styles.section}>
@@ -332,10 +329,6 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                 showDetail('hrv_rmssd');
               }}
             />
-          </View>
-
-          <Text style={[styles.subheading, healthStyles.sectionTitle]}>{t('health.suuntoRecovery')}</Text>
-          <View style={styles.summaryGrid}>
             <SummaryCard
               width={cardWidth}
               cardStyle={healthStyles.glassCard}
@@ -346,6 +339,7 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
               value={
                 latest('recovery_balance') == null ? '—' : `${Math.round(Number(latest('recovery_balance')) * 100)}%`
               }
+              description={t('health.suuntoBalanceCardDescription')}
               hint={t('health.suuntoOpenDetails')}
               onPress={() => showDetail('recovery')}
             />
@@ -357,9 +351,14 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
               icon={<RefreshCw size={18} color="#F59E0B" />}
               label={t('health.suuntoStress')}
               value={stressLabel}
+              description={t('health.suuntoStressCardDescription')}
               hint={t('health.suuntoOpenDetails')}
               onPress={() => showDetail('stress')}
             />
+          </View>
+
+          <Text style={[styles.subheading, healthStyles.sectionTitle]}>{t('health.suuntoDailyActivity')}</Text>
+          <View style={styles.summaryGrid}>
             <SummaryCard
               width={cardWidth}
               cardStyle={healthStyles.glassCard}
