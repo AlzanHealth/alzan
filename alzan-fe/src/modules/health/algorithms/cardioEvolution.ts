@@ -365,9 +365,25 @@ const analyzeEnduranceTrend = (
       minimumMeaningfulChangePercent(metric, typicalBaseline, mode),
       medianAbsoluteDeviation * 1.5,
     );
-    const status = getTrendStatus(pairChanges, significanceThreshold);
     const previousValue = median(pairs.map(pair => pair.previousValue));
     const recentValue = median(pairs.map(pair => pair.recentValue));
+    const pairedStatus = getTrendStatus(pairChanges, significanceThreshold);
+    const aggregateChangePercent =
+      previousValue === null || recentValue === null
+        ? null
+        : mode === 'heart_rate'
+          ? ((recentValue - previousValue) / previousValue) * 100
+          : ((previousValue - recentValue) / previousValue) * 100;
+    const aggregateStatus: CardioTrendStatus =
+      aggregateChangePercent === null
+        ? 'insufficient'
+        : aggregateChangePercent >= significanceThreshold
+          ? 'improving'
+          : aggregateChangePercent <= -significanceThreshold
+            ? 'declining'
+            : 'stable';
+    // The headline and the displayed median must never tell opposite stories.
+    const status = pairedStatus === aggregateStatus ? pairedStatus : 'stable';
     const changePercent =
       previousValue === null || recentValue === null ? null : ((recentValue - previousValue) / previousValue) * 100;
     const contextIsRecorded = pairs.every(

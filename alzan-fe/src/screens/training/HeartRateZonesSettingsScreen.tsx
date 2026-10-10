@@ -100,7 +100,13 @@ export const HeartRateZonesSettingsScreen = () => {
 
   const handleSaveManual = async () => {
     const maxHeartRate = parseHeartRateInput(manualMax);
-    if (validation || maxHeartRate === null || maxHeartRate !== manualZones[4].max || maxHeartRate > 250) {
+    if (
+      validation ||
+      maxHeartRate === null ||
+      maxHeartRate < 60 ||
+      maxHeartRate !== manualZones[4].max ||
+      maxHeartRate > 250
+    ) {
       setFeedback(validationMessage ?? t('training.heartRateValidationInvalid'));
       return;
     }

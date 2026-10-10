@@ -21,6 +21,26 @@ function aggregatesStepsAndEnergyByCalendarDay(): void {
     [210, 280],
   );
   assert.equal(aggregateDailyActivity(rows, 'steps')[0]?.label, '2026-10-08');
+  assert.deepEqual(
+    aggregateDailyActivity(
+      [
+        { date: '2026-10-08', total_steps: null, calories_kcal: 210 },
+        { date: '2026-10-09', total_steps: 6300, calories_kcal: null },
+      ],
+      'steps',
+    ).map(point => point.value),
+    [6300],
+  );
+  assert.deepEqual(
+    aggregateDailyActivity(
+      [
+        { date: '2026-10-08', total_steps: null, calories_kcal: 210 },
+        { date: '2026-10-09', total_steps: 6300, calories_kcal: null },
+      ],
+      'energy',
+    ).map(point => point.value),
+    [210],
+  );
 }
 
 function countsOnlyKnownStressStates(): void {

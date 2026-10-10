@@ -74,8 +74,10 @@ export const useHeartRateZones = () => {
           .limit(7),
         supabase
           .from('activity_sessions')
-          .select('id, max_heart_rate, start_time')
+          .select('id, max_heart_rate, start_time, duration_s')
           .eq('user_id', user.id)
+          .eq('status', 'completed')
+          .not('end_time', 'is', null)
           .gte('start_time', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
           .order('start_time', { ascending: false })
           .limit(100),
@@ -104,34 +106,44 @@ export const useHeartRateZones = () => {
           zoneProfile?.maxHeartRate ??
           (currentAge === null ? null : (calculateHeartRateZones(currentAge)?.maxHeartRate ?? null));
         const candidateSessions = recentSessions
-          .filter((session, index) =>
-            referenceMaximum === null
-              ? index < 10
-              : session.max_heart_rate === null || session.max_heart_rate >= referenceMaximum - 10,
+          .filter(
+            (session, index) =>
+              Number.isFinite(session.duration_s) &&
+              Number(session.duration_s) > 0 &&
+              (referenceMaximum === null
+                ? index < 10
+                : session.max_heart_rate === null || session.max_heart_rate >= referenceMaximum - 10),
           )
           .slice(0, 20);
         const streamResults = await Promise.all(
           candidateSessions.map(async session => {
             const result = await supabase
               .from('activity_stream_samples')
-              .select('value')
+              .select('offset_s, value')
               .eq('user_id', user.id)
               .eq('session_id', session.id)
               .eq('stream_type', 'heart_rate')
+              .gte('offset_s', 0)
+              .lte('offset_s', session.duration_s!)
               .order('value', { ascending: false })
-              .limit(5);
+              .limit(20);
             if (result.error) throw result.error;
-            return [session.id, (result.data ?? []).map(sample => Number(sample.value))] as const;
+            return [
+              session.id,
+              (result.data ?? []).map(sample => ({ value: Number(sample.value), offset: sample.offset_s })),
+            ] as const;
           }),
         );
-        const valuesBySession = new Map<string, number[]>();
-        for (const [sessionId, values] of streamResults) {
-          valuesBySession.set(sessionId, values);
+        const samplesBySession = new Map<string, Array<{ value: number; offset: number | null }>>();
+        for (const [sessionId, samples] of streamResults) {
+          samplesBySession.set(sessionId, samples);
         }
         const evidence = analyzeRecentHeartRateSessions(
           (sessionsResult.data ?? []).map(session => ({
             sessionId: session.id,
-            values: valuesBySession.get(session.id) ?? [],
+            values: (samplesBySession.get(session.id) ?? []).map(sample => sample.value),
+            sampleOffsetsSeconds: (samplesBySession.get(session.id) ?? []).map(sample => sample.offset),
+            durationSeconds: session.duration_s,
             maxHeartRate: session.max_heart_rate,
           })),
           zoneProfile?.maxHeartRate,

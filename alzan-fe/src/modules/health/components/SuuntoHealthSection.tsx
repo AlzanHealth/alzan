@@ -65,12 +65,12 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   const from = getSuuntoPeriodStart(selectedPeriod);
   React.useEffect(() => {
     if (sleepDetailsRequest > 0) {
-      setDetailPeriod('W');
+      setDetailPeriod('M');
       setActiveDetail('sleep');
     }
   }, [sleepDetailsRequest]);
   const showDetail = (detail: SummaryMetric) => {
-    setDetailPeriod(period === '2M' ? 'W' : period);
+    setDetailPeriod(detail === 'sleep' ? 'M' : period === '2M' ? 'W' : period);
     setActiveDetail(detail);
   };
 
@@ -199,8 +199,14 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
     }))
     .sort((left, right) => (left.date?.getTime() ?? 0) - (right.date?.getTime() ?? 0));
   const averageSleepLabel = avgSleep == null ? '—' : `${Math.floor(avgSleep / 60)}h ${Math.round(avgSleep % 60)}m`;
-  const totalSteps = query.data?.steps.reduce((sum, row) => sum + (row.total_steps ?? 0), 0) ?? 0;
-  const totalEnergy = query.data?.steps.reduce((sum, row) => sum + (row.calories_kcal ?? 0), 0) ?? 0;
+  const rowsWithSteps = (query.data?.steps ?? []).filter(
+    (row): row is typeof row & { total_steps: number } => row.total_steps != null,
+  );
+  const rowsWithEnergy = (query.data?.steps ?? []).filter(
+    (row): row is typeof row & { calories_kcal: number } => row.calories_kcal != null,
+  );
+  const totalSteps = rowsWithSteps.length ? rowsWithSteps.reduce((sum, row) => sum + row.total_steps, 0) : null;
+  const totalEnergy = rowsWithEnergy.length ? rowsWithEnergy.reduce((sum, row) => sum + row.calories_kcal, 0) : null;
   const stepPoints = aggregateDailyActivity(query.data?.steps ?? [], 'steps');
   const energyPoints = aggregateDailyActivity(query.data?.steps ?? [], 'energy');
   const stressRows = query.data?.samples.filter(row => row.metric_type === 'stress_state') ?? [];
@@ -326,20 +332,6 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                 showDetail('hrv_rmssd');
               }}
             />
-            <SummaryCard
-              width={cardWidth}
-              cardStyle={healthStyles.glassCard}
-              textColor={colors.textPrimary}
-              secondaryTextColor={colors.textSecondary}
-              icon={<Activity size={18} color="#35B779" />}
-              label={t('health.suuntoBalance')}
-              value={
-                latest('recovery_balance') == null ? '—' : `${Math.round(Number(latest('recovery_balance')) * 100)}%`
-              }
-              description={t('health.suuntoBalanceCardDescription')}
-              hint={t('health.suuntoOpenDetails')}
-              onPress={() => showDetail('recovery')}
-            />
           </View>
 
           <Text style={[styles.subheading, healthStyles.sectionTitle]}>{t('health.suuntoRecovery')}</Text>
@@ -375,7 +367,7 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
               secondaryTextColor={colors.textSecondary}
               icon={<Footprints size={18} color="#35B779" />}
               label={t('health.suuntoSteps')}
-              value={totalSteps.toLocaleString()}
+              value={totalSteps === null ? '—' : totalSteps.toLocaleString()}
               hint={t('health.suuntoOpenDetails')}
               onPress={() => showDetail('steps')}
             />
@@ -386,7 +378,7 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
               secondaryTextColor={colors.textSecondary}
               icon={<Zap size={18} color="#F59E0B" />}
               label={t('health.suuntoEnergy')}
-              value={`${Math.round(totalEnergy)} kcal`}
+              value={totalEnergy === null ? '—' : `${Math.round(totalEnergy)} kcal`}
               hint={t('health.suuntoOpenDetails')}
               onPress={() => showDetail('energy')}
             />
@@ -479,8 +471,8 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
                         : `${Math.round(Number(latest('recovery_balance')) * 100)}%`,
                     sleep: averageSleepLabel,
                     stress: stressLabel,
-                    steps: totalSteps.toLocaleString(),
-                    energy: `${Math.round(totalEnergy)} kcal`,
+                    steps: totalSteps === null ? '—' : totalSteps.toLocaleString(),
+                    energy: totalEnergy === null ? '—' : `${Math.round(totalEnergy)} kcal`,
                   })}
                 </Text>
                 <Text style={[styles.detailPeriod, { color: colors.textSecondary }]}>

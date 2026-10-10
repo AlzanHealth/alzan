@@ -83,9 +83,9 @@ export const STEPS_PROVIDER_AUDIT: StepsProviderAuditItem[] = [
   {
     provider: 'suunto',
     channel: 'cloud',
-    status: 'activity_steps_only',
-    feedsDailySteps: false,
-    feedsStepsScreen: false,
+    status: 'complete',
+    feedsDailySteps: true,
+    feedsStepsScreen: true,
     hasPermissionOrScope: true,
     hasFetcher: true,
     hasCanonicalMapper: true,
@@ -94,10 +94,9 @@ export const STEPS_PROVIDER_AUDIT: StepsProviderAuditItem[] = [
     hasRawPayloadStorage: true,
     hasIdempotentDailyWrite: true,
     hasFrontendAggregationCoverage: true,
-    officialDocumentation:
-      'Suunto Cloud API workouts/FIT export; daily activity steps require a confirmed available endpoint',
+    officialDocumentation: 'Suunto 24/7 API activity endpoint, subject to approved partner access and subscription key',
     implementationNotes:
-      'Suunto cloud sync imports workouts and can persist workout total_steps to activity_sessions, but no productive Suunto daily activity path writes daily_steps.',
+      'The separate 24/7 health sync maps daily activity totals and writes daily_steps after approved partner API access is configured; the workout importer remains independent.',
   },
   {
     provider: 'fitbit',

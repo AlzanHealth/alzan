@@ -21,22 +21,23 @@ function assertAuditCoversExpectedProviders(): void {
   ]);
 }
 
-function assertOnlyProductiveLocalProvidersFeedStepsScreen(): void {
+function assertEveryImplementedProviderFeedsTheStepsScreen(): void {
   const summary = getStepsProviderAuditSummary();
-  assert.deepEqual(summary.completeProviders.sort(), ['apple_health', 'health_connect']);
+  assert.deepEqual(summary.completeProviders.sort(), ['apple_health', 'coros', 'health_connect', 'suunto']);
   assert.equal(summary.screenSourceOfTruth, 'daily_steps');
 }
 
-function assertGarminAndSuuntoAreNotOverPromised(): void {
+function assertCloudProvidersMatchAvailableStepSync(): void {
   const garmin = STEPS_PROVIDER_AUDIT.find(item => item.provider === 'garmin');
   const suunto = STEPS_PROVIDER_AUDIT.find(item => item.provider === 'suunto');
   assert.equal(garmin?.status, 'mapper_only');
   assert.equal(garmin?.feedsStepsScreen, false);
-  assert.equal(suunto?.status, 'activity_steps_only');
-  assert.equal(suunto?.feedsDailySteps, false);
+  assert.equal(suunto?.status, 'complete');
+  assert.equal(suunto?.feedsDailySteps, true);
+  assert.equal(suunto?.feedsStepsScreen, true);
 }
 
 assertStepsProviderAuditIsCoherent();
 assertAuditCoversExpectedProviders();
-assertOnlyProductiveLocalProvidersFeedStepsScreen();
-assertGarminAndSuuntoAreNotOverPromised();
+assertEveryImplementedProviderFeedsTheStepsScreen();
+assertCloudProvidersMatchAvailableStepSync();

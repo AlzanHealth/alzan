@@ -144,6 +144,29 @@ const walkingTrend = analyzeSportEvolution(
 );
 assert.equal(walkingTrend.metric, 'speed_at_similar_hr');
 
+const misleadingAggregateTrend = analyzeSportEvolution(
+  [
+    ...[2, 2.4, 2.8, 3.2, 3.6].map((speed, index) =>
+      makeActivity(`aggregate-old-${index}`, 50 - index * 4, {
+        duration_s: 2400,
+        distance_m: Math.round(speed * 2400),
+        avg_speed_m_per_s: speed,
+      }),
+    ),
+    ...[2.08, 2.496, 2.912, 3.328, 2.52].map((speed, index) =>
+      makeActivity(`aggregate-new-${index}`, 22 - index * 4, {
+        duration_s: 2400,
+        distance_m: Math.round(speed * 2400),
+        avg_speed_m_per_s: speed,
+      }),
+    ),
+  ],
+  'running',
+  referenceDate,
+);
+assert.equal(misleadingAggregateTrend.status, 'stable');
+assert.ok(misleadingAggregateTrend.changePercent !== null && misleadingAggregateTrend.changePercent < 0);
+
 const lowDataTrend = analyzeSportEvolution(comparableRuns.slice(0, 4), 'running', referenceDate);
 assert.equal(lowDataTrend.status, 'insufficient');
 assert.equal(lowDataTrend.changePercent, null);

@@ -12,7 +12,13 @@ export type HeartRateZoneProfile = {
 
 export type HeartRateZoneValidationError = 'incomplete' | 'invalid' | 'overlap' | 'gap';
 export type RestingHeartRateBaseline = { bpm: number; sampleCount: number };
-export type HeartRateSessionEvidence = { sessionId: string; values: number[]; maxHeartRate?: number | null };
+export type HeartRateSessionEvidence = {
+  sessionId: string;
+  values: number[];
+  sampleOffsetsSeconds?: Array<number | null>;
+  durationSeconds?: number | null;
+  maxHeartRate?: number | null;
+};
 export type HeartRateTrainingEvidence = {
   sessionCount: number;
   observedPeak: number | null;
@@ -86,7 +92,7 @@ export const calculateRestingHeartRateBaseline = (readings: number[]): RestingHe
 
 /**
  * Summarizes recent exercise HR as observational evidence, never as a physiological max.
- * A session peak is considered sustained only when at least 3 samples sit within 5 bpm of it;
+ * A session peak is considered sustained only when at least 3 samples span 10 seconds within 5 bpm of it;
  * a qualifying peak must recur within 5 bpm on a separate session.
  */
 export const analyzeRecentHeartRateSessions = (
@@ -95,15 +101,39 @@ export const analyzeRecentHeartRateSessions = (
 ): HeartRateTrainingEvidence => {
   const sessionPeaks = sessions
     .map(session => {
-      const values = session.values.filter(value => Number.isInteger(value) && value >= 40 && value <= 250);
+      const readings: Array<{ value: number; offset: number | null }> = [];
+      session.values.forEach((value, index) => {
+        if (!Number.isInteger(value) || value < 40 || value > 250) return;
+        if (session.sampleOffsetsSeconds === undefined) {
+          readings.push({ value, offset: null });
+          return;
+        }
+        const offset = session.sampleOffsetsSeconds[index];
+        if (
+          !Number.isFinite(offset) ||
+          Number(offset) < 0 ||
+          (Number.isFinite(session.durationSeconds) && Number(offset) > Number(session.durationSeconds))
+        ) {
+          return;
+        }
+        readings.push({ value, offset: Number(offset) });
+      });
+      const values = readings.map(reading => reading.value);
       const peak = values.length > 0 ? Math.max(...values) : null;
       const summary = session.maxHeartRate;
+      const nearPeakReadings = peak === null ? [] : readings.filter(reading => reading.value >= peak - 5);
+      const nearPeakOffsets = nearPeakReadings
+        .map(reading => reading.offset)
+        .filter((offset): offset is number => offset !== null);
+      const hasSustainedSamples =
+        session.sampleOffsetsSeconds === undefined ||
+        (nearPeakOffsets.length >= 3 && Math.max(...nearPeakOffsets) - Math.min(...nearPeakOffsets) >= 10);
       return {
         sessionId: session.sessionId,
         peak:
           peak ??
           (Number.isInteger(summary) && Number(summary) >= 40 && Number(summary) <= 250 ? Number(summary) : null),
-        sustained: peak !== null && values.filter(value => value >= peak - 5).length >= 3,
+        sustained: peak !== null && nearPeakReadings.length >= 3 && hasSustainedSamples,
       };
     })
     .filter((session): session is { sessionId: string; peak: number; sustained: boolean } => session.peak !== null);
@@ -195,6 +225,7 @@ export const calculateHeartRateZonesFromReserve = (maxHeartRate: number, resting
 export const validateHeartRateZones = (zones: HeartRateZone[]): HeartRateZoneValidationError | null => {
   if (zones.length !== 5) return 'incomplete';
   if (zones.some(zone => zone.max === 0)) return 'incomplete';
+  if (zones[4]?.max < 60) return 'invalid';
   for (let index = 0; index < zones.length; index += 1) {
     const current = zones[index];
     if (

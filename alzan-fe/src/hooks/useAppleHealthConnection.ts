@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import { signOutAppleHealth, syncAppleHealthNow } from '../modules/apple-health';
 import { useHealthDataConsent } from './useHealthDataConsent';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 const APPLE_HEALTH_PROVIDER = 'apple_health';
 const QUERY_KEY = ['appleHealthConnection'];
@@ -40,8 +41,11 @@ export function useAppleHealthConnection() {
       if (!hasConsent) return;
       await syncAppleHealthNow({ syncDaysBack: 90 });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] }),
+        queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id), refetchType: 'active' }),
+      ]);
     },
     onError: (error: Error) => {
       Alert.alert(t('common.error'), error.message);

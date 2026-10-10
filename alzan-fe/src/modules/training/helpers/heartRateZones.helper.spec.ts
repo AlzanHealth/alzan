@@ -49,6 +49,26 @@ assert.equal(
 assert.equal(
   analyzeRecentHeartRateSessions(
     [
+      { sessionId: 'burst-a', values: [190, 191, 192], sampleOffsetsSeconds: [30, 32, 34] },
+      { sessionId: 'burst-b', values: [188, 189, 190], sampleOffsetsSeconds: [50, 52, 54] },
+    ],
+    180,
+  ).repeatablePeak,
+  null,
+);
+assert.equal(
+  analyzeRecentHeartRateSessions(
+    [
+      { sessionId: 'sustained-a', values: [190, 191, 192], sampleOffsetsSeconds: [30, 36, 43] },
+      { sessionId: 'sustained-b', values: [188, 189, 190], sampleOffsetsSeconds: [50, 57, 63] },
+    ],
+    180,
+  ).qualifiesForReview,
+  true,
+);
+assert.equal(
+  analyzeRecentHeartRateSessions(
+    [
       { sessionId: 'a', values: [], maxHeartRate: 198 },
       { sessionId: 'b', values: [], maxHeartRate: 197 },
     ],
@@ -129,6 +149,16 @@ assert.equal(
   true,
 );
 assert.equal(validateHeartRateZones(calculateZonesFromMaxHeartRate(190)?.zones ?? []), null);
+assert.equal(
+  validateHeartRateZones([
+    { zone: 1, min: 0, max: 29 },
+    { zone: 2, min: 30, max: 35 },
+    { zone: 3, min: 36, max: 41 },
+    { zone: 4, min: 42, max: 47 },
+    { zone: 5, min: 48, max: 59 },
+  ]),
+  'invalid',
+);
 assert.equal(
   validateHeartRateZones([
     { zone: 1, min: 0, max: 100 },

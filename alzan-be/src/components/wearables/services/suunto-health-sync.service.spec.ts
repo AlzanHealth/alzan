@@ -39,6 +39,8 @@ async function assertHealthSyncUsesIndependentDomainAndMapsPayloads(): Promise<v
   let dailyCalories = 0;
   let sleepCount = 0;
   let recoveryCount = 0;
+  const savedSleeps: Array<Record<string, unknown>> = [];
+  const savedRecoveries: Array<Record<string, unknown>> = [];
   const endpointCalls = new Map<string, number>();
   axios.get = (async (url: string) => {
     const call = (endpointCalls.get(url) ?? 0) + 1;
@@ -98,11 +100,13 @@ async function assertHealthSyncUsesIndependentDomainAndMapsPayloads(): Promise<v
           dailySteps = input.dailyActivity.totalSteps;
           dailyCalories = input.dailyActivity.caloriesKcal;
         },
-        upsertSleep: async () => {
+        upsertSleep: async (input: { sleep: Record<string, unknown> }) => {
           sleepCount += 1;
+          savedSleeps.push(input.sleep);
         },
-        upsertRecovery: async () => {
+        upsertRecovery: async (input: { recovery: Record<string, unknown> }) => {
           recoveryCount += 1;
+          savedRecoveries.push(input.recovery);
         },
       } as never,
       {
@@ -127,7 +131,15 @@ async function assertHealthSyncUsesIndependentDomainAndMapsPayloads(): Promise<v
     assert.equal(dailySteps, 8600);
     assert.ok(Math.abs(dailyCalories - 13000 / 4184) < 0.001);
     assert.equal(sleepCount, 1);
+    assert.equal(savedSleeps[0]?.totalSleepMin, 420);
+    assert.equal(savedSleeps[0]?.avgHeartRateBpm, 47);
+    assert.equal(savedSleeps[0]?.minHeartRateBpm, 42);
+    assert.equal(savedSleeps[0]?.avgHrvMs, 52);
+    assert.equal(savedSleeps[0]?.maxSpo2Pct, 99);
+    assert.equal((savedSleeps[0]?.healthSamples as Array<Record<string, unknown>>).length, 4);
     assert.equal(recoveryCount, 1);
+    assert.equal(savedRecoveries[0]?.balance, 0.72);
+    assert.equal(savedRecoveries[0]?.stressState, 2);
     assert.ok(metricRows.some(row => row.metric_type === 'heart_rate' && row.value === 80));
     assert.ok(metricRows.some(row => row.metric_type === 'spo2' && row.value === 98 && row.unit === '%'));
     assert.ok(metricRows.some(row => row.metric_type === 'recovery_balance' && row.value === 0.72));

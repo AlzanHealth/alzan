@@ -28,8 +28,9 @@ export const getHealthSummaryCardWidth = (): number | `${number}%` => '48%';
 
 export const aggregateDailyActivity = (rows: DailyActivityRow[], metric: 'steps' | 'energy'): ChartDataPoint[] =>
   rows
+    .filter(row => (metric === 'steps' ? row.total_steps : row.calories_kcal) !== null)
     .map(row => ({
-      value: metric === 'steps' ? (row.total_steps ?? 0) : (row.calories_kcal ?? 0),
+      value: metric === 'steps' ? row.total_steps! : row.calories_kcal!,
       date: new Date(`${row.date}T12:00:00`),
       label: row.date,
     }))

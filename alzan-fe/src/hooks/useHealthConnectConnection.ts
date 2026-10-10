@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabaseClient';
 import { HealthConnectNoDataSourcesError, signOutHealthConnect, syncHealthConnectNow } from '../modules/health-connect';
 import { wearablesLocalHealthApi } from '../modules/wearables';
 import { useHealthDataConsent } from './useHealthDataConsent';
+import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
 const HEALTH_CONNECT_PROVIDER = 'health_connect';
 const QUERY_KEY = ['healthConnectConnection'];
@@ -50,11 +51,13 @@ export function useHealthConnectConnection() {
         syncDaysBack: 90,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] }),
+        queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id), refetchType: 'active' }),
+      ]);
     },
     onError: (error: Error) => {
-      queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
       if (error instanceof HealthConnectNoDataSourcesError) {
         Alert.alert(t('settings.healthConnectNoDataTitle'), t('settings.healthConnectNoDataMessage'));
         return;
