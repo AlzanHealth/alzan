@@ -12,6 +12,7 @@ import { RestingHRList } from '../modules/health/screens/RestingHRList';
 import { HealthStatisticsScreen } from '../modules/health/screens/HealthStatisticsScreen';
 import { BodyCompositionDetail } from '../modules/health/screens/BodyCompositionDetail';
 import { StepsStatisticsScreen } from '../modules/health/screens/StepsStatisticsScreen';
+import { CardioEvolutionScreen } from '../modules/health/screens/CardioEvolutionScreen';
 import { HealthStackParamList } from '../types/navigation.types';
 
 const Stack = createStackNavigator<HealthStackParamList>();
@@ -20,6 +21,7 @@ export const HealthNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade', cardStyle: { flex: 1 } }}>
       <Stack.Screen name="HealthHome" component={HealthHome} />
+      <Stack.Screen name="CardioEvolution" component={CardioEvolutionScreen} />
       <Stack.Screen name="HealthStatistics" component={HealthStatisticsScreen} />
       <Stack.Screen name="WeightList" component={WeightList} />
 

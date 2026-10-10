@@ -19,6 +19,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { healthQueryKeys } from '../hooks/healthQueryKeys';
 import { parseISO, isValid } from 'date-fns';
 import { SuuntoHealthSection } from '../components/SuuntoHealthSection';
+import { CardioEvolutionCard } from '../components/CardioEvolutionCard';
 
 export const HealthHome = () => {
   const { t } = useTranslation();
@@ -322,6 +323,7 @@ export const HealthHome = () => {
           <Text style={[styles.recommendationText, dynamicStyles.subtitle]}>{t('health.autoCompCalcDisclaimer')}</Text>
 
           <SuuntoHealthSection />
+          <CardioEvolutionCard />
 
           {/* Shortcuts Floating or Bottom? User didn't specify but removed from prominent view to focus on Weight */}
         </ScrollView>

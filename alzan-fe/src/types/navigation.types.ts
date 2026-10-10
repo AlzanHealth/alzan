@@ -166,6 +166,7 @@ export type NutritionStackParamList = {
 
 export type HealthStackParamList = {
   HealthHome: undefined;
+  CardioEvolution: undefined;
   HealthStatistics: { defaultRange?: string; metric?: string; label?: string } | undefined;
   WeightList: { metric?: MetricType; label?: string; defaultRange?: string } | undefined;
   WeightAdd: { date?: string } | undefined;

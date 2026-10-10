@@ -986,6 +986,113 @@ const en = {
     suuntoSource: 'Source: Suunto · last sync: {{date}}',
     suuntoNeverSynced: 'not synced yet',
     suuntoAccessNote: 'Available metrics depend on Suunto 24/7 API access and the data recorded by your watch.',
+    cardioTitle: 'Your cardio progress',
+    cardioScreenTitle: 'Heart-rate analysis',
+    cardioSubtitle: 'See how your heart rate responds across your sports.',
+    cardioCardDescription: 'Compare performance and heart rate for each sport.',
+    cardioCardOpen: 'View analysis',
+    cardioLoading: 'Reviewing your recent workouts…',
+    cardioError: 'Cardio trends could not be loaded.',
+    cardioEmptyTitle: 'No heart-rate workouts yet',
+    cardioEmptyDescription: 'Record or sync workouts with heart rate to compare your own trends here.',
+    cardioSportSelector: 'Choose a sport to review',
+    cardioWalkingSport: 'Walking',
+    cardioHiitSport: 'HIIT',
+    cardioStatusPositive: 'Positive signal',
+    cardioStatusDeclining: 'Lower performance observed',
+    cardioStatusStable: 'No clear change',
+    cardioStatusDescriptive: 'Heart-rate response',
+    cardioStatusInsufficient: 'More comparable workouts needed',
+    cardioConfidenceLabel: 'Confidence',
+    cardioConfidenceHelp:
+      'Based on the number of workouts, how they span several weeks, and recorded conditions; it is not a probability of improvement.',
+    cardioConfidencemedium: 'Medium',
+    cardioConfidencehigh: 'High',
+    cardioConfidencelow: 'Low',
+    cardioConfidencenone: 'Not enough data',
+    cardioPrevious: 'Earlier',
+    cardioRecent: 'Recent',
+    cardioSpeedAtSimilarHr: 'Speed at a similar average heart rate',
+    cardioPowerAtSimilarHr: 'Power at a similar average heart rate',
+    cardioHrAtSimilarOutput: 'Heart rate at a similar speed or power',
+    cardioHeartRateResponse: 'Average workout heart rate',
+    cardioNoComparableMetric: 'No comparable performance metric',
+    cardioBpm: 'bpm',
+    cardioKmPerHour: 'km/h',
+    cardioPacePerKm: 'min/km',
+    cardioPacePer100m: 'min/100 m',
+    cardioMatchedSessions: '{{count}} matched workout pairs',
+    cardioSessionCounts: '{{recent}} recent and {{previous}} earlier workouts with heart rate',
+    cardioRecentAverageHr: 'Recent average workout heart rate',
+    cardioMeaningTitle: 'What does this mean?',
+    cardioRecommendationTitle: 'What can you do?',
+    cardioPositiveOutputMeaning:
+      'You covered more distance or produced more power at a similar average heart rate in comparable workouts. This is a possible positive trend, not a fitness test.',
+    cardioPositiveHrMeaning:
+      'Your average heart rate was lower at a similar speed or power. This is a change in the recorded response; by itself it does not prove improved fitness.',
+    cardioDecliningMeaning:
+      'Comparable workouts showed less speed or power at a similar heart rate, or a higher heart rate at similar output. Heat, hills, effort, recovery and sensor fit can all affect the comparison.',
+    cardioStableMeaning:
+      'The change is not consistent enough across similar workouts to distinguish it from normal session-to-session variation. Keep watching the trend rather than reacting to one workout.',
+    cardioStrengthMeaning:
+      'Average heart rate describes how your heart responded during these sessions; it does not measure how hard your muscles worked. Strength volume is shown separately only when the same routine can be matched.',
+    cardioDescriptiveMeaning:
+      'The available summaries describe heart-rate response, but there is not enough comparable speed, power or workload to rate performance for this sport.',
+    cardioNeedMoreData:
+      'At least three comparable workout pairs are needed. We match the same sport, similar duration and heart rate, and avoid mixing different recorded subtypes.',
+    cardioPositiveRecommendation:
+      'Keep your training routine and see whether this signal repeats over the next few weeks. Compare similar routes, duration and effort.',
+    cardioDecliningRecommendation:
+      'Review the route, temperature, effort and how you felt before changing your training load. A heart-rate change alone cannot identify the cause.',
+    cardioStableRecommendation:
+      'Continue collecting comparable workouts. There is not a clear trend here that calls for a change by itself.',
+    cardioStrengthRecommendation:
+      'For strength progress, compare the same routine, loads and repetitions. Use heart rate as context, not as a measure of muscular effort.',
+    cardioDescriptiveRecommendation:
+      'Record heart rate together with a consistent workload, such as pace, power or a repeatable interval, to make a stronger comparison.',
+    cardioNeedMoreRecommendation:
+      'Wear your device for similar sessions and include heart rate plus pace or power when available. More varied data does not automatically make a comparison more reliable.',
+    cardioSwimmingCaution:
+      'Wrist optical heart-rate readings can be less reliable in water. Treat swimming comparisons cautiously, especially when the sensor source is unknown.',
+    cardioPeriodHeading: 'Analysis period',
+    cardioPeriodDay: 'Day',
+    cardioPeriodWeek: 'Week',
+    cardioPeriodMonth: 'Month',
+    cardioPeriodThreeMonths: '3 months',
+    cardioPeriodSixMonths: '6 months',
+    cardioPeriodAll: 'All',
+    cardioComparisonPeriod: 'Compare {{period}} with the previous period of the same length.',
+    cardioComparisonAll: 'Compare the more recent half of your available history with the half before it.',
+    cardioContextWarning: 'Conditions differed between some matched workouts: {{contexts}}.',
+    cardioContexttemperature: 'temperature',
+    cardioContextelevation: 'climbing',
+    cardioContextderived_speed: 'speed estimated from distance and duration',
+    cardioContextswimming_sensor: 'swimming sensor accuracy',
+    cardioContextdevice: 'different recording device',
+    cardioDriftTitle: 'Effort stability in the latest long workout',
+    cardioDriftBody:
+      'The heart-rate-to-speed or power relationship changed by {{percent}}% between the first and second halves while output stayed similar. This describes that workout and does not identify why it changed.',
+    cardioIntervalRecoveryTitle: 'Response after hard efforts',
+    cardioIntervalRecoveryMetric: 'Median HR drop after one minute',
+    cardioIntervalRecoveryBody:
+      'After {{count}} detected peaks, heart rate dropped by a median of {{drop}} bpm around one minute later. This describes one workout; it does not assess your health.',
+    cardioIntervalRecoveryAdvice:
+      'Compare sessions with similar intervals, rests and effort. Active recovery, heat and sensor readings can change the result.',
+    cardioIntervalRecoveryUnavailable:
+      'Continuous heart-rate samples during the workout are needed to describe interval recovery; an average alone is not enough.',
+    cardioWeeklyTitle: 'Cardio summary',
+    cardioLastSevenDays: 'Recorded in the last 7 days',
+    cardioSessionsWithHr: 'Workouts with HR',
+    cardioTrainingTime: 'Time in those workouts',
+    cardioMedianHr: 'Median workout HR',
+    cardioTimeInZones: 'Recorded time in heart-rate zones',
+    cardioZoneDataSource: 'Only workouts that include zone totals',
+    cardioNoZoneData: 'No time-in-zone data was saved for these workouts.',
+    cardioWeeklyDisclaimer:
+      'This distribution describes recorded effort. Without your training goal, it cannot tell whether the mix is right for you.',
+    cardioStrengthVolume: 'Volume in the same strength routine',
+    cardioSafetyNote:
+      'These trends are estimates from wearable data, not a medical assessment. Heart rate can vary with effort, heat, sleep, stress, illness, hydration and sensor fit.',
     last: 'Last',
     days: 'days',
     settingsData: 'DATA',

@@ -997,6 +997,113 @@ export default {
     suuntoNeverSynced: 'sin sincronizar',
     suuntoAccessNote:
       'Las métricas disponibles dependen del acceso a la API Suunto 24/7 y de los datos registrados por el reloj.',
+    cardioTitle: 'Tu evolución cardiovascular',
+    cardioScreenTitle: 'Análisis de FC',
+    cardioSubtitle: 'Observa cómo responde tu frecuencia cardiaca en cada deporte.',
+    cardioCardDescription: 'Compara tu rendimiento y tu FC en cada deporte.',
+    cardioCardOpen: 'Ver análisis',
+    cardioLoading: 'Revisando tus entrenamientos recientes…',
+    cardioError: 'No se pudo cargar la evolución cardiovascular.',
+    cardioEmptyTitle: 'Aún no hay entrenamientos con frecuencia cardiaca',
+    cardioEmptyDescription: 'Registra o sincroniza entrenamientos con FC para comparar aquí tus propias tendencias.',
+    cardioSportSelector: 'Elige un deporte para consultar',
+    cardioWalkingSport: 'Caminata',
+    cardioHiitSport: 'HIIT',
+    cardioStatusPositive: 'Señal favorable',
+    cardioStatusDeclining: 'Menor rendimiento observado',
+    cardioStatusStable: 'Sin cambios claros',
+    cardioStatusDescriptive: 'Respuesta de la FC',
+    cardioStatusInsufficient: 'Faltan entrenamientos comparables',
+    cardioConfidenceLabel: 'Confianza',
+    cardioConfidenceHelp:
+      'Se basa en el número de entrenos, su distribución en varias semanas y las condiciones registradas; no es una probabilidad de mejora.',
+    cardioConfidencemedium: 'Media',
+    cardioConfidencehigh: 'Alta',
+    cardioConfidencelow: 'Baja',
+    cardioConfidencenone: 'Datos insuficientes',
+    cardioPrevious: 'Anterior',
+    cardioRecent: 'Reciente',
+    cardioSpeedAtSimilarHr: 'Velocidad con una FC media similar',
+    cardioPowerAtSimilarHr: 'Potencia con una FC media similar',
+    cardioHrAtSimilarOutput: 'FC con un ritmo o potencia similares',
+    cardioHeartRateResponse: 'Frecuencia cardiaca media del entreno',
+    cardioNoComparableMetric: 'No hay una métrica de rendimiento comparable',
+    cardioBpm: 'ppm',
+    cardioKmPerHour: 'km/h',
+    cardioPacePerKm: 'min/km',
+    cardioPacePer100m: 'min/100 m',
+    cardioMatchedSessions: '{{count}} parejas de entrenos comparables',
+    cardioSessionCounts: '{{recent}} recientes y {{previous}} anteriores con FC',
+    cardioRecentAverageHr: 'FC media de los entrenos recientes',
+    cardioMeaningTitle: '¿Qué significa?',
+    cardioRecommendationTitle: '¿Qué puedes hacer?',
+    cardioPositiveOutputMeaning:
+      'Has recorrido más distancia o generado más potencia con una FC media parecida en entrenamientos comparables. Es una posible señal favorable, no una prueba de condición física.',
+    cardioPositiveHrMeaning:
+      'Tu frecuencia cardiaca media fue menor con una velocidad o potencia parecida. Es un cambio en la respuesta registrada; por sí solo no demuestra una mejora física.',
+    cardioDecliningMeaning:
+      'En entrenamientos comparables hubo menos velocidad o potencia con una FC similar, o una FC mayor con un rendimiento parecido. El calor, las cuestas, el esfuerzo, el descanso y el sensor pueden influir.',
+    cardioStableMeaning:
+      'Al comparar entrenamientos parecidos, el cambio no se repite con suficiente claridad para distinguirlo de las variaciones normales entre sesiones. Sigue observando la tendencia en lugar de reaccionar a una salida aislada.',
+    cardioStrengthMeaning:
+      'La FC media describe la respuesta del corazón durante estas sesiones; no mide cuánto trabajaron los músculos. El volumen de fuerza se muestra aparte solo si se puede comparar la misma rutina.',
+    cardioDescriptiveMeaning:
+      'Los resúmenes disponibles describen la respuesta de la FC, pero faltan datos comparables de velocidad, potencia o carga para valorar el rendimiento en este deporte.',
+    cardioNeedMoreData:
+      'Se necesitan al menos tres parejas de entrenamientos comparables. Se compara el mismo deporte, duración y FC parecidas, sin mezclar subtipos distintos cuando están registrados.',
+    cardioPositiveRecommendation:
+      'Mantén tu rutina y observa si esta señal se repite durante las próximas semanas. Compara recorridos, duración y esfuerzo similares.',
+    cardioDecliningRecommendation:
+      'Revisa el recorrido, la temperatura, el esfuerzo y cómo te encontrabas antes de cambiar la carga de entrenamiento. Un cambio de FC no identifica por sí solo la causa.',
+    cardioStableRecommendation:
+      'Sigue reuniendo entrenamientos comparables. Esta tendencia, por sí sola, no indica que debas cambiar el plan.',
+    cardioStrengthRecommendation:
+      'Para seguir la fuerza, compara la misma rutina, los pesos y las repeticiones. Usa la FC como contexto, no como medida del esfuerzo muscular.',
+    cardioDescriptiveRecommendation:
+      'Registra la FC junto con una carga constante, como ritmo, potencia o intervalos repetibles, para poder comparar mejor.',
+    cardioNeedMoreRecommendation:
+      'Usa el reloj en sesiones similares y registra FC junto con ritmo o potencia cuando estén disponibles. Tener más datos distintos no hace automáticamente más fiable la comparación.',
+    cardioSwimmingCaution:
+      'Las lecturas ópticas de FC en la muñeca pueden ser menos fiables en el agua. Interpreta con cautela las comparaciones de natación, sobre todo si no se conoce el sensor.',
+    cardioPeriodHeading: 'Periodo del análisis',
+    cardioPeriodDay: 'Día',
+    cardioPeriodWeek: 'Semana',
+    cardioPeriodMonth: 'Mes',
+    cardioPeriodThreeMonths: '3 meses',
+    cardioPeriodSixMonths: '6 meses',
+    cardioPeriodAll: 'Todo',
+    cardioComparisonPeriod: 'Compara {{period}} con el periodo anterior de la misma duración.',
+    cardioComparisonAll: 'Compara la mitad más reciente del historial disponible con la mitad anterior.',
+    cardioContextWarning: 'Algunas condiciones cambiaron entre entrenamientos comparables: {{contexts}}.',
+    cardioContexttemperature: 'temperatura',
+    cardioContextelevation: 'desnivel',
+    cardioContextderived_speed: 'velocidad estimada a partir de distancia y duración',
+    cardioContextswimming_sensor: 'precisión del sensor en el agua',
+    cardioContextdevice: 'dispositivo de registro distinto',
+    cardioDriftTitle: 'Estabilidad del esfuerzo en el último entreno largo',
+    cardioDriftBody:
+      'La relación entre FC y velocidad o potencia cambió un {{percent}} % entre la primera y la segunda mitad mientras el rendimiento se mantuvo parecido. Describe esa sesión, pero no explica por qué cambió.',
+    cardioIntervalRecoveryTitle: 'Respuesta tras esfuerzos intensos',
+    cardioIntervalRecoveryMetric: 'Descenso mediano de FC al minuto',
+    cardioIntervalRecoveryBody:
+      'Después de {{count}} picos detectados, la FC bajó una mediana de {{drop}} ppm en torno a un minuto. El resultado describe esta sesión, no determina tu estado de salud.',
+    cardioIntervalRecoveryAdvice:
+      'Compara sesiones con intervalos, descansos y esfuerzo parecidos. La recuperación activa, el calor y el sensor pueden cambiar la lectura.',
+    cardioIntervalRecoveryUnavailable:
+      'Para describir la recuperación en intervalos hacen falta muestras continuas de FC durante la sesión; un promedio no permite calcularla.',
+    cardioWeeklyTitle: 'Resumen cardiovascular',
+    cardioLastSevenDays: 'Datos de los últimos 7 días',
+    cardioSessionsWithHr: 'Entrenos con FC',
+    cardioTrainingTime: 'Tiempo en esos entrenos',
+    cardioMedianHr: 'FC mediana del entreno',
+    cardioTimeInZones: 'Tiempo registrado en zonas de FC',
+    cardioZoneDataSource: 'Solo entrenos que incluyen el tiempo por zonas',
+    cardioNoZoneData: 'No se guardó tiempo por zonas para estos entrenamientos.',
+    cardioWeeklyDisclaimer:
+      'Este reparto describe el esfuerzo registrado. Sin conocer tu objetivo, no permite saber si la combinación es adecuada para ti.',
+    cardioStrengthVolume: 'Volumen de la misma rutina de fuerza',
+    cardioSafetyNote:
+      'Estas tendencias son estimaciones de datos del reloj, no una valoración médica. La FC puede variar por esfuerzo, calor, sueño, estrés, enfermedad, hidratación y ajuste del sensor.',
     last: 'Últimos',
     days: 'días',
     settingsData: 'DATOS',
