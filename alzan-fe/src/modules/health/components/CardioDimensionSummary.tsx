@@ -90,7 +90,7 @@ export const CardioDimensionSummary = ({
         ? 'health.cardioTrendBucketWeek'
         : 'health.cardioTrendBucketDay';
   const chartRange =
-    period === 'day' ? 'D' : period === 'week' ? 'S' : period === 'all' ? 'A' : period === 'month' ? 'M' : '6M';
+    period === 'day' || period === 'month' ? 'M' : period === 'week' ? 'S' : period === 'all' ? 'A' : '6M';
   const preferredEvidenceIds = assessment.performance.sessionIds.filter(id => periodIds.has(id));
   const heartRateEvidence = activities
     .filter(
