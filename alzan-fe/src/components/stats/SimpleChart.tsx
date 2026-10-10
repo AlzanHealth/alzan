@@ -270,6 +270,12 @@ export const SimpleChart: React.FC<SimpleChartProps> = ({
     return format(date, 'd MMM yyyy', { locale: getDateFnsLocale() });
   };
 
+  const getPointAccessibilityLabel = (point: ChartDataPoint) => {
+    const pointDate = formatDate(point.date) || point.label;
+    const pointValue = point.value === null ? '' : `${formatYValue(point.value)}${unit ? ` ${unit}` : ''}`;
+    return [pointDate, pointValue].filter(Boolean).join(', ');
+  };
+
   const shouldShowXLabel = (index: number) => {
     switch (range) {
       case 'M':
@@ -556,8 +562,12 @@ export const SimpleChart: React.FC<SimpleChartProps> = ({
 
           {/* Touch Targets & Labels */}
           {data.map((d, i) => {
+            if (d.value === null) return null;
             const cx = getPointX(d, i);
             const touchWidth = hasTimeScale ? 28 : pointSpacing;
+            const isSelected = Boolean(
+              selectedPoint?.date && d.date && selectedPoint.date.getTime() === d.date.getTime(),
+            );
             return (
               <View
                 key={`col-${i}`}
@@ -569,7 +579,13 @@ export const SimpleChart: React.FC<SimpleChartProps> = ({
                   height: height,
                 }}
               >
-                <Pressable onPress={() => handlePointPress(d)} style={styles.touchTarget} />
+                <Pressable
+                  onPress={() => handlePointPress(d)}
+                  style={styles.touchTarget}
+                  accessibilityRole="button"
+                  accessibilityLabel={getPointAccessibilityLabel(d)}
+                  accessibilityState={{ selected: isSelected }}
+                />
               </View>
             );
           })}
