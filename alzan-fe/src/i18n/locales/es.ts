@@ -889,6 +889,8 @@ export default {
     suuntoNoSleep: 'No hay registros de sueño de Suunto en este periodo.',
     suuntoRecovery: 'Recuperación y actividad diaria',
     suuntoBalance: 'Balance de recuperación',
+    suuntoBalanceDescription:
+      'Resumen del estado de recuperación que comunica Suunto. Interprétalo como una tendencia personal junto al descanso y la carga de entrenamiento, no como una medición clínica.',
     suuntoStress: 'Estado de estrés',
     suuntoStressInvalid: 'No disponible',
     suuntoStressRelaxing: 'Relajado',
@@ -896,8 +898,16 @@ export default {
     suuntoStressPassive: 'Pasivo',
     suuntoStressful: 'Estresado',
     suuntoStressUnknown: 'Desconocido',
+    suuntoStressDescription:
+      'Suunto agrupa las lecturas en relajado, activo, pasivo o estresado. Este desglose cuenta las lecturas disponibles en el periodo seleccionado.',
+    suuntoStressSamples: '{{count}} lecturas',
     suuntoSteps: 'Pasos',
+    suuntoStepsDescription:
+      'Pasos registrados por el reloj durante el periodo seleccionado. La gráfica compara los totales diarios disponibles.',
     suuntoEnergy: 'Energía',
+    suuntoEnergyDescription:
+      'Estimación de la energía activa registrada por el reloj, expresada en kcal. La gráfica compara los totales diarios disponibles.',
+    suuntoOpenDetails: 'Toca para ver detalles',
     suuntoNoData: 'Sincroniza tu reloj Suunto para ver aquí los datos de salud.',
     suuntoSource: 'Origen: Suunto · última sincronización: {{date}}',
     suuntoNeverSynced: 'sin sincronizar',

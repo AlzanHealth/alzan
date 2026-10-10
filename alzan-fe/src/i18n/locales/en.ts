@@ -879,6 +879,8 @@ const en = {
     suuntoNoSleep: 'No Suunto sleep records for this period.',
     suuntoRecovery: 'Recovery and daily activity',
     suuntoBalance: 'Recovery balance',
+    suuntoBalanceDescription:
+      'A summary of the recovery status reported by Suunto. Read it as a personal trend alongside sleep and training load, not as a clinical measurement.',
     suuntoStress: 'Stress state',
     suuntoStressInvalid: 'Unavailable',
     suuntoStressRelaxing: 'Relaxing',
@@ -886,8 +888,16 @@ const en = {
     suuntoStressPassive: 'Passive',
     suuntoStressful: 'Stressful',
     suuntoStressUnknown: 'Unknown',
+    suuntoStressDescription:
+      'Suunto groups readings as relaxing, active, passive, or stressful. This breakdown counts the available readings in the selected period.',
+    suuntoStressSamples: '{{count}} readings',
     suuntoSteps: 'Steps',
+    suuntoStepsDescription:
+      'Steps recorded by your watch in the selected period. The chart compares available daily totals.',
     suuntoEnergy: 'Energy',
+    suuntoEnergyDescription:
+      'An estimate of active energy recorded by your watch, shown in kcal. The chart compares available daily totals.',
+    suuntoOpenDetails: 'Tap to see details',
     suuntoNoData: 'Sync your Suunto watch to see health data here.',
     suuntoSource: 'Source: Suunto · last sync: {{date}}',
     suuntoNeverSynced: 'not synced yet',
