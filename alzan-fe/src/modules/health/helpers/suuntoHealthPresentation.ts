@@ -13,6 +13,19 @@ export type StressStateCounts = {
   stressful: number;
 };
 
+export type HealthValueSummary = { average: number; min: number; max: number };
+
+export const summarizeHealthValues = (values: number[]): HealthValueSummary | null => {
+  if (values.length === 0) return null;
+  return {
+    average: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
+    min: Math.round(Math.min(...values)),
+    max: Math.round(Math.max(...values)),
+  };
+};
+
+export const getHealthSummaryCardWidth = (): number | `${number}%` => '48%';
+
 export const aggregateDailyActivity = (rows: DailyActivityRow[], metric: 'steps' | 'energy'): ChartDataPoint[] =>
   rows
     .map(row => ({

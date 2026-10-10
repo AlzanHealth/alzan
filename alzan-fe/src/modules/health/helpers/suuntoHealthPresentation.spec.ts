@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
-import { aggregateDailyActivity, countStressStates } from './suuntoHealthPresentation';
+import {
+  aggregateDailyActivity,
+  countStressStates,
+  getHealthSummaryCardWidth,
+  summarizeHealthValues,
+} from './suuntoHealthPresentation';
 
 function aggregatesStepsAndEnergyByCalendarDay(): void {
   const rows = [
@@ -27,5 +32,16 @@ function countsOnlyKnownStressStates(): void {
   });
 }
 
+function summarizesMetricValuesAndHandlesEmptyPeriods(): void {
+  assert.deepEqual(summarizeHealthValues([55.2, 73.8, 88]), { average: 72, min: 55, max: 88 });
+  assert.equal(summarizeHealthValues([]), null);
+}
+
+function keepsSummaryCardsCompactAcrossScreenSizes(): void {
+  assert.equal(getHealthSummaryCardWidth(), '48%');
+}
+
 aggregatesStepsAndEnergyByCalendarDay();
 countsOnlyKnownStressStates();
+summarizesMetricValuesAndHandlesEmptyPeriods();
+keepsSummaryCardsCompactAcrossScreenSizes();

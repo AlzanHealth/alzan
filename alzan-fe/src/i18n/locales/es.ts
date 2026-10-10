@@ -866,21 +866,71 @@ export default {
     suuntoPeriodW: 'Semana',
     suuntoPeriodM: 'Mes',
     suuntoPeriod2M: '2 meses',
+    suuntoPeriod3M: '3 meses',
+    suuntoPeriod6M: '6 meses',
+    suuntoPeriodALL: 'Total',
     suuntoLoading: 'Cargando datos de salud de Suunto…',
     suuntoError: 'No se pudieron cargar los datos de salud de Suunto.',
     suuntoSyncWarning:
       'La última sincronización de salud falló o el acceso 24/7 no está habilitado. Los entrenos siguen disponibles.',
     suuntoHeartRate: 'Frecuencia cardiaca',
+    suuntoHeartRateDescription:
+      'Cuenta cuántas veces late el corazón por minuto. La gráfica muestra las lecturas guardadas por el reloj; los huecos indican que no hubo registro.',
+    suuntoHeartRateCardDescription: 'Latidos por minuto registrados en el periodo elegido.',
+    suuntoHeartRateAbout: 'Acerca de la frecuencia cardiaca',
+    suuntoHeartRateWhat:
+      'La frecuencia cardiaca (FC) indica cuántas veces late el corazón por minuto. Puede subir al caminar o entrenar y bajar durante el descanso; esos cambios forman parte de la respuesta normal del cuerpo.',
+    suuntoHeartRateInterpretation:
+      'Compara periodos parecidos y observa la tendencia, no una lectura aislada. La media de esta pantalla resume las muestras del periodo elegido: no es tu pulso en reposo ni la media de un entrenamiento. Los huecos del gráfico indican que no se guardaron lecturas en esos momentos.',
+    suuntoHeartRateMeasurement:
+      'El reloj registra muestras durante el día y la noche. El movimiento, el ajuste del reloj y la disponibilidad del sensor pueden influir en las lecturas. Solo mostramos los datos recibidos de Suunto; los huecos no se completan con estimaciones.',
     suuntoHrv: 'VFC',
+    suuntoHrvDescription:
+      'Mide cuánto varía el tiempo entre un latido y el siguiente, en milisegundos. No hay un valor ideal igual para todos: resulta más útil observar cómo cambia respecto a tus propios días.',
+    suuntoHrvCardDescription: 'Variación entre latidos; compárala con tu tendencia habitual.',
+    suuntoHrvAbout: 'Acerca de la VFC',
+    suuntoHrvWhat:
+      'La variabilidad de la frecuencia cardiaca (VFC) describe cuánto cambia el intervalo de tiempo entre latidos consecutivos. Aquí se muestra en milisegundos y corresponde al valor RMSSD comunicado por Suunto.',
+    suuntoHrvInterpretation:
+      'No existe una cifra ideal común para todo el mundo. Compárala con tus propios registros, sobre todo entre noches y semanas similares. El descanso, el entrenamiento, el estrés, los viajes o una enfermedad pueden hacer que varíe; un cambio puntual no permite sacar conclusiones por sí solo.',
+    suuntoHrvMeasurement:
+      'Suunto obtiene este dato de los intervalos entre latidos registrados mientras duermes. Para disponer de él, el reloj debe registrar el sueño y enviar la medición. La gráfica solo incluye los valores sincronizados; una ausencia no equivale a VFC cero.',
     suuntoPeriodAverage: 'Media del periodo',
+    suuntoSleepPeriodAverage: 'Promedio por noche',
+    suuntoLatestInPeriod: 'Último valor del periodo',
+    suuntoTotalInPeriod: 'Total del periodo',
     suuntoNoMetricData: 'No hay muestras de esta métrica en el periodo.',
     suuntoSleepTrend: 'Duración del sueño',
+    suuntoSleepTrendChart: 'Duración de cada noche',
+    suuntoLatestSleepSession: 'Última sesión registrada: {{date}}',
+    suuntoSleepDescription:
+      'Tiempo total que has dormido según el reloj. Aquí puedes consultar el último registro, sus etapas y las métricas que Suunto guardó durante la noche.',
+    suuntoSleepStages: 'Etapas del sueño',
+    suuntoSleepStagesDescription:
+      'El reloj reparte el tiempo registrado entre sueño profundo, ligero y REM. Son estimaciones del dispositivo, no una evaluación médica.',
+    suuntoDeepDescription: 'Etapa asociada al descanso físico; el reloj estima cuánto tiempo pasaste en ella.',
+    suuntoLightDescription: 'Etapa que suele ocupar buena parte de la noche y conecta las demás etapas.',
+    suuntoRemDescription: 'Etapa en la que suelen aparecer los sueños más vívidos; su duración cambia cada noche.',
+    suuntoSleepMetrics: 'Otras métricas de la noche',
+    suuntoSleepAbout: 'Acerca del sueño',
+    suuntoSleepWhat:
+      'La duración indica el tiempo que el reloj estima que estuviste dormido; no necesariamente coincide con todo el tiempo que pasaste en la cama. Las etapas profunda, ligera y REM son estimaciones del dispositivo.',
+    suuntoSleepInterpretation:
+      'Observa varias noches y tu horario habitual. Una noche aislada o una etapa concreta no determina por sí sola si has descansado bien. El registro puede estar incompleto si el reloj no detectó toda la sesión.',
+    suuntoSleepMeasurement:
+      'Suunto combina las señales que registra el reloj durante la noche para estimar duración y etapas. La FC, la VFC, la SpO₂ y otras métricas solo aparecen si el dispositivo las midió y Suunto las envió; por eso puede haber campos vacíos.',
     suuntoRecoveryTrend: 'Balance de recuperación',
     suuntoSleep: 'Sueño',
     suuntoSleepHeartRate: 'FC durante el sueño',
     suuntoSleepMinHeartRate: 'FC mínima durante el sueño',
     suuntoSleepHrv: 'VFC durante el sueño',
-    suuntoSleepSpo2: 'SpO₂ máxima',
+    suuntoSleepSpo2: 'SpO₂ media',
+    suuntoSleepHeartRateDescription: 'Promedio de latidos por minuto detectados mientras dormías.',
+    suuntoSleepMinHeartRateDescription: 'Lectura más baja de latidos por minuto registrada durante el sueño.',
+    suuntoSleepHrvDescription: 'Variación media entre latidos durante el sueño, en milisegundos.',
+    suuntoSleepSpo2Description: 'Promedio nocturno de saturación de oxígeno estimado por el reloj.',
+    suuntoSleepScoreDescription: 'Puntuación calculada por Suunto para resumir el sueño; no es un diagnóstico.',
+    suuntoAwakeDescription: 'Tiempo que el reloj detectó como despierto dentro de la sesión.',
     suuntoSleepScore: 'Puntuación del sueño',
     suuntoAwake: 'Despierto',
     suuntoDeep: 'Profundo',
@@ -890,7 +940,17 @@ export default {
     suuntoRecovery: 'Recuperación y actividad diaria',
     suuntoBalance: 'Balance de recuperación',
     suuntoBalanceDescription:
-      'Resumen del estado de recuperación que comunica Suunto. Interprétalo como una tendencia personal junto al descanso y la carga de entrenamiento, no como una medición clínica.',
+      'Resumen diario que Suunto calcula con las señales del reloj. Úsalo para observar cambios personales junto al descanso y la actividad; no es una medición clínica.',
+    suuntoBalanceCardDescription: 'Indicador de recuperación diario comunicado por Suunto.',
+    suuntoBalanceAbout: 'Acerca del balance de recuperación',
+    suuntoBalanceWhat:
+      'Es un indicador diario de recuperación que proporciona Suunto. Alzan muestra el valor recibido y no calcula una puntuación propia ni conoce todos los detalles del algoritmo del reloj.',
+    suuntoBalanceInterpretation:
+      'Úsalo como contexto junto al descanso, la actividad y cómo te encuentras. Resulta más útil seguir tu propia evolución que comparar porcentajes entre personas. Un valor aislado no es un diagnóstico ni debe decidir por sí solo si entrenas.',
+    suuntoBalanceMeasurement:
+      'El dato se importa del resumen de salud de Suunto para cada fecha disponible. Si no aparece un día, significa que no recibimos un valor para esa fecha; la gráfica no inventa ni interpola datos.',
+    suuntoSleepCardDescription: 'Tiempo dormido según las sesiones registradas por Suunto.',
+    suuntoOpenSleepDetails: 'Ver detalle del sueño',
     suuntoStress: 'Estado de estrés',
     suuntoStressInvalid: 'No disponible',
     suuntoStressRelaxing: 'Relajado',
@@ -900,13 +960,37 @@ export default {
     suuntoStressUnknown: 'Desconocido',
     suuntoStressDescription:
       'Suunto agrupa las lecturas en relajado, activo, pasivo o estresado. Este desglose cuenta las lecturas disponibles en el periodo seleccionado.',
+    suuntoStressAbout: 'Acerca del estado de estrés',
+    suuntoStressWhat:
+      'Son categorías que Suunto asigna a las lecturas del reloj: relajado, activo, pasivo o estresado. Describen la clasificación del dispositivo, no necesariamente cómo te sientes emocionalmente.',
+    suuntoStressInterpretation:
+      'El estado «activo» puede coincidir con movimiento o ejercicio; «estresado» no significa que el reloj haya detectado ansiedad. Mira el contexto y la tendencia. El recuento refleja las muestras disponibles, no cuánto tiempo exacto pasaste en cada estado.',
+    suuntoStressMeasurement:
+      'El reloj genera lecturas a lo largo del día y Suunto las agrupa por categoría. El gráfico resume únicamente las muestras sincronizadas del periodo seleccionado; una categoría sin lecturas no implica que su estado fuese cero.',
     suuntoStressSamples: '{{count}} lecturas',
     suuntoSteps: 'Pasos',
     suuntoStepsDescription:
       'Pasos registrados por el reloj durante el periodo seleccionado. La gráfica compara los totales diarios disponibles.',
+    suuntoStepsAbout: 'Acerca de los pasos',
+    suuntoStepsWhat:
+      'El total representa los pasos que Suunto registró para cada día. Es un recuento de movimiento detectado por el reloj, no una medida completa de toda tu actividad física.',
+    suuntoStepsInterpretation:
+      'Compara días en los que llevaste el reloj durante un tiempo parecido. Si no lo llevabas, el total puede quedarse corto. Los pasos no indican por sí solos la intensidad del ejercicio ni la calidad del entrenamiento.',
+    suuntoStepsMeasurement:
+      'La gráfica suma los totales diarios recibidos de Suunto. Solo aparecen fechas con datos; Alzan no estima los pasos de los días sin registro.',
     suuntoEnergy: 'Energía',
     suuntoEnergyDescription:
       'Estimación de la energía activa registrada por el reloj, expresada en kcal. La gráfica compara los totales diarios disponibles.',
+    suuntoEnergyAbout: 'Acerca de la energía activa',
+    suuntoEnergyWhat:
+      'La energía activa es una estimación de las kilocalorías asociadas al movimiento y la actividad que registra Suunto. No equivale a toda la energía que utiliza el cuerpo durante el día.',
+    suuntoEnergyInterpretation:
+      'Tómala como una referencia aproximada y compara tu propia tendencia. El resultado depende del registro del reloj y no es una medición exacta del gasto energético ni una indicación directa de cuánto comer.',
+    suuntoEnergyMeasurement:
+      'Mostramos el total diario de energía activa que Suunto envía, en kcal. El reloj lo estima con sus sensores y su propio método. Los días sin datos quedan vacíos; no calculamos un valor para rellenarlos.',
+    suuntoEducationWhat: 'Qué mide',
+    suuntoEducationInterpretation: 'Cómo interpretarlo',
+    suuntoEducationMeasurement: 'Cómo se obtiene',
     suuntoOpenDetails: 'Toca para ver detalles',
     suuntoNoData: 'Sincroniza tu reloj Suunto para ver aquí los datos de salud.',
     suuntoSource: 'Origen: Suunto · última sincronización: {{date}}',

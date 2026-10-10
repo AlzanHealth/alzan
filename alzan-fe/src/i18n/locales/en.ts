@@ -857,20 +857,70 @@ const en = {
     suuntoPeriodW: 'Week',
     suuntoPeriodM: 'Month',
     suuntoPeriod2M: '2 months',
+    suuntoPeriod3M: '3 months',
+    suuntoPeriod6M: '6 months',
+    suuntoPeriodALL: 'All time',
     suuntoLoading: 'Loading Suunto health data…',
     suuntoError: 'Suunto health data could not be loaded.',
     suuntoSyncWarning: 'The last Suunto health sync failed or 24/7 access is not enabled. Workouts remain available.',
     suuntoHeartRate: 'Heart rate',
+    suuntoHeartRateDescription:
+      'Counts how many times your heart beats per minute. The chart shows readings saved by your watch; gaps mean no reading was recorded.',
+    suuntoHeartRateCardDescription: 'Beats per minute recorded in the selected period.',
+    suuntoHeartRateAbout: 'About heart rate',
+    suuntoHeartRateWhat:
+      'Heart rate (HR) is the number of times your heart beats per minute. It can rise when you walk or exercise and fall while you rest; these changes are part of the body’s normal response.',
+    suuntoHeartRateInterpretation:
+      'Compare similar periods and look at the trend rather than a single reading. The average on this screen summarizes samples from the selected period: it is not your resting heart rate or workout average. Gaps in the chart mean no readings were saved at those times.',
+    suuntoHeartRateMeasurement:
+      'Your watch records samples throughout the day and night. Movement, fit, and sensor availability can affect readings. We only show data received from Suunto; gaps are not filled with estimates.',
     suuntoHrv: 'HRV',
+    suuntoHrvDescription:
+      'Measures how much the time between heartbeats changes, in milliseconds. There is no single ideal value for everyone; it is more useful to compare changes with your own pattern.',
+    suuntoHrvCardDescription: 'Variation between beats; compare it with your usual trend.',
+    suuntoHrvAbout: 'About HRV',
+    suuntoHrvWhat:
+      'Heart rate variability (HRV) describes how much the time between consecutive heartbeats changes. It is shown in milliseconds and corresponds to the RMSSD value reported by Suunto.',
+    suuntoHrvInterpretation:
+      'There is no single ideal number for everyone. Compare your own records, especially across similar nights and weeks. Sleep, training, stress, travel, or illness can affect it; one change on its own does not tell the whole story.',
+    suuntoHrvMeasurement:
+      'Suunto derives this value from heartbeat intervals recorded during sleep. The watch must record sleep and send the measurement for it to appear. The chart only includes synced values; a missing value does not mean HRV was zero.',
     suuntoPeriodAverage: 'Average for this period',
+    suuntoSleepPeriodAverage: 'Average per night',
+    suuntoLatestInPeriod: 'Latest value in period',
+    suuntoTotalInPeriod: 'Total for period',
     suuntoNoMetricData: 'No samples for this metric in this period.',
     suuntoSleepTrend: 'Sleep duration',
+    suuntoSleepTrendChart: 'Duration each night',
+    suuntoLatestSleepSession: 'Most recent recorded session: {{date}}',
+    suuntoSleepDescription:
+      'Total time asleep according to your watch. Here you can review the latest record, its sleep stages, and the measurements Suunto saved overnight.',
+    suuntoSleepStages: 'Sleep stages',
+    suuntoSleepStagesDescription:
+      'Your watch divides recorded time into deep, light, and REM sleep. These are device estimates, not a medical assessment.',
+    suuntoDeepDescription: 'A stage linked with physical rest; your watch estimates how long you spent in it.',
+    suuntoLightDescription: 'A stage that often takes up much of the night and connects the other stages.',
+    suuntoRemDescription: 'A stage when vivid dreams are more common; its duration changes from night to night.',
+    suuntoSleepMetrics: 'Other overnight measurements',
+    suuntoSleepAbout: 'About sleep',
+    suuntoSleepWhat:
+      'Duration is the time your watch estimates you were asleep; it may differ from the total time you spent in bed. Deep, light, and REM stages are device estimates.',
+    suuntoSleepInterpretation:
+      'Look across several nights and compare them with your usual schedule. One night or one stage alone cannot determine whether you rested well. A record may be incomplete if the watch did not detect the whole session.',
+    suuntoSleepMeasurement:
+      'Suunto combines signals recorded by the watch overnight to estimate duration and stages. HR, HRV, SpO₂, and other measurements appear only if the device recorded and sent them, so some fields may be blank.',
     suuntoRecoveryTrend: 'Recovery balance',
     suuntoSleep: 'Sleep',
     suuntoSleepHeartRate: 'Sleep heart rate',
     suuntoSleepMinHeartRate: 'Sleep minimum HR',
     suuntoSleepHrv: 'Sleep HRV',
-    suuntoSleepSpo2: 'Max SpO₂',
+    suuntoSleepSpo2: 'Average SpO₂',
+    suuntoSleepHeartRateDescription: 'Average beats per minute detected while you were asleep.',
+    suuntoSleepMinHeartRateDescription: 'Lowest beats-per-minute reading recorded during sleep.',
+    suuntoSleepHrvDescription: 'Average variation between heartbeats during sleep, in milliseconds.',
+    suuntoSleepSpo2Description: 'Average overnight blood oxygen level estimated by your watch.',
+    suuntoSleepScoreDescription: 'A score Suunto calculates to summarize sleep; it is not a diagnosis.',
+    suuntoAwakeDescription: 'Time your watch detected you were awake during this sleep session.',
     suuntoSleepScore: 'Sleep score',
     suuntoAwake: 'Awake',
     suuntoDeep: 'Deep',
@@ -880,7 +930,17 @@ const en = {
     suuntoRecovery: 'Recovery and daily activity',
     suuntoBalance: 'Recovery balance',
     suuntoBalanceDescription:
-      'A summary of the recovery status reported by Suunto. Read it as a personal trend alongside sleep and training load, not as a clinical measurement.',
+      'A daily summary Suunto calculates from signals collected by your watch. Use it to notice personal changes alongside sleep and activity; it is not a clinical measurement.',
+    suuntoBalanceCardDescription: 'Daily recovery indicator reported by Suunto.',
+    suuntoBalanceAbout: 'About recovery balance',
+    suuntoBalanceWhat:
+      'This is a daily recovery indicator provided by Suunto. Alzan shows the value received and does not calculate its own score or have every detail of the watch’s algorithm.',
+    suuntoBalanceInterpretation:
+      'Use it as context alongside sleep, activity, and how you feel. Your own trend is more useful than comparing percentages between people. A single value is not a diagnosis and should not decide on its own whether you train.',
+    suuntoBalanceMeasurement:
+      'The value is imported from Suunto’s health summary for each available date. If a day is missing, we did not receive a value for it; the chart does not invent or interpolate data.',
+    suuntoSleepCardDescription: 'Time asleep based on sleep sessions recorded by Suunto.',
+    suuntoOpenSleepDetails: 'View sleep details',
     suuntoStress: 'Stress state',
     suuntoStressInvalid: 'Unavailable',
     suuntoStressRelaxing: 'Relaxing',
@@ -890,13 +950,37 @@ const en = {
     suuntoStressUnknown: 'Unknown',
     suuntoStressDescription:
       'Suunto groups readings as relaxing, active, passive, or stressful. This breakdown counts the available readings in the selected period.',
+    suuntoStressAbout: 'About stress state',
+    suuntoStressWhat:
+      'These are categories Suunto assigns to watch readings: relaxing, active, passive, or stressful. They describe the device’s classification, not necessarily how you feel emotionally.',
+    suuntoStressInterpretation:
+      '“Active” may coincide with movement or exercise; “stressful” does not mean the watch detected anxiety. Consider the context and trend. The count reflects available samples, not the exact time spent in each state.',
+    suuntoStressMeasurement:
+      'The watch creates readings throughout the day and Suunto groups them by category. The chart summarizes only samples synced in the selected period; a category with no readings does not mean its state was zero.',
     suuntoStressSamples: '{{count}} readings',
     suuntoSteps: 'Steps',
     suuntoStepsDescription:
       'Steps recorded by your watch in the selected period. The chart compares available daily totals.',
+    suuntoStepsAbout: 'About steps',
+    suuntoStepsWhat:
+      'The total represents steps Suunto recorded for each day. It is a count of movement detected by your watch, not a complete measure of all your physical activity.',
+    suuntoStepsInterpretation:
+      'Compare days when you wore your watch for a similar amount of time. If you were not wearing it, the total may be lower than your actual steps. Steps alone do not show workout intensity or quality.',
+    suuntoStepsMeasurement:
+      'The chart adds up daily totals received from Suunto. Only dates with data appear; Alzan does not estimate steps for days without a record.',
     suuntoEnergy: 'Energy',
     suuntoEnergyDescription:
       'An estimate of active energy recorded by your watch, shown in kcal. The chart compares available daily totals.',
+    suuntoEnergyAbout: 'About active energy',
+    suuntoEnergyWhat:
+      'Active energy is an estimate of kilocalories associated with movement and activity recorded by Suunto. It is not all the energy your body uses during the day.',
+    suuntoEnergyInterpretation:
+      'Treat it as an approximate reference and compare your own trend. The result depends on watch data and is not an exact measurement of energy expenditure or a direct guide to how much to eat.',
+    suuntoEnergyMeasurement:
+      'We show the daily active-energy total sent by Suunto, in kcal. The watch estimates it using its sensors and its own method. Days without data stay blank; we do not calculate a value to fill them.',
+    suuntoEducationWhat: 'What it measures',
+    suuntoEducationInterpretation: 'How to read it',
+    suuntoEducationMeasurement: 'How it is measured',
     suuntoOpenDetails: 'Tap to see details',
     suuntoNoData: 'Sync your Suunto watch to see health data here.',
     suuntoSource: 'Source: Suunto · last sync: {{date}}',
