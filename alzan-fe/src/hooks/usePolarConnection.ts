@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabaseClient';
 import { Providers } from '../openapi/generated/alzan-be/sdk.gen';
 import { wearablesLocalHealthApi } from '../modules/wearables';
 import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
+import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 
 const POLAR_PROVIDER = 'polar';
 const QUERY_KEY = ['polarConnection'];
@@ -42,6 +43,9 @@ export function usePolarConnection() {
       if (result.status !== 'running') {
         queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
         queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+        queryClient.invalidateQueries({ queryKey: ['enduranceSessions-count'] });
+        invalidateTrainingCalendar(queryClient);
+        queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
       }
       if (result.status === 'running') {
         Alert.alert(t('settings.syncAlreadyRunningTitle'), t('settings.syncAlreadyRunningMessage'));
