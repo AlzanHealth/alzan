@@ -14,6 +14,7 @@ import {
   type CardioActivity,
   type CardioStreamSample,
   type CardioZoneTime,
+  summarizeCardioZoneTimes,
   summarizeCardioWeek,
 } from '../algorithms/cardioEvolution';
 import {
@@ -28,6 +29,9 @@ const STREAM_PAGE_SIZE = 1000;
 const ZONE_PAGE_SIZE = 1000;
 const ZONE_SESSION_BATCH_SIZE = 100;
 const DETAIL_SESSION_BATCH_SIZE = 100;
+// WHOOP's canonical mapper stores its provider-supplied zone_durations directly.
+// Other importers can fall back to estimated zones, but provenance is not persisted per row.
+const PROVIDER_REPORTED_ZONE_PROVIDERS: ReadonlySet<string> = new Set(['whoop']);
 
 const getSportKey = (activity: Pick<CardioActivity, 'sport_type' | 'sport_subtype'>): string =>
   normalizeCardioSportType(activity.sport_type, activity.sport_subtype);
@@ -244,11 +248,15 @@ export const useCardioEvolution = () => {
         .sort((left, right) => Date.parse(left.start_time) - Date.parse(right.start_time));
       const streamCandidates = selectCardioStreamCandidates(activities, referenceDate);
       const weekStart = new Date(referenceDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const weeklyIds = activities
-        .filter(activity => Date.parse(activity.start_time) >= Date.parse(weekStart))
+      const weeklyZoneSessionIds = activities
+        .filter(
+          activity =>
+            Date.parse(activity.start_time) >= Date.parse(weekStart) &&
+            PROVIDER_REPORTED_ZONE_PROVIDERS.has(activity.provider.toLowerCase()),
+        )
         .map(activity => activity.id);
       const [zoneResult, streamResult] = await Promise.all([
-        loadZoneTimes(weeklyIds)
+        loadZoneTimes(weeklyZoneSessionIds)
           .then(zoneTimes => ({ zoneTimes, failed: false }))
           .catch(() => ({ zoneTimes: [], failed: true })),
         loadStreamSamples(
@@ -328,6 +336,11 @@ export const useCardioEvolutionDetails = (
           laps: [],
           workoutSets: [],
           exerciseNames: [],
+          periodZoneTimes: {
+            recent: summarizeCardioZoneTimes([], []),
+            previous: summarizeCardioZoneTimes([], []),
+          },
+          periodZoneDataError: false,
           lapDataError: false,
           strengthDataError: false,
         };
@@ -335,7 +348,19 @@ export const useCardioEvolutionDetails = (
       const relevantLaps = ['running', 'cycling', 'swimming', 'trail', 'hiking'].includes(
         normalizeCardioSportType(sportType),
       );
-      const [lapResult, strengthResult] = await Promise.all([
+      const activityProviderById = new Map(activities.map(activity => [activity.id, activity.provider]));
+      const providerZoneSessionIdsByPeriod = {
+        recent: sessionIdsByPeriod.recent.filter(sessionId =>
+          PROVIDER_REPORTED_ZONE_PROVIDERS.has((activityProviderById.get(sessionId) ?? '').toLowerCase()),
+        ),
+        previous: sessionIdsByPeriod.previous.filter(sessionId =>
+          PROVIDER_REPORTED_ZONE_PROVIDERS.has((activityProviderById.get(sessionId) ?? '').toLowerCase()),
+        ),
+      };
+      const providerZoneSessionIds = [
+        ...new Set([...providerZoneSessionIdsByPeriod.previous, ...providerZoneSessionIdsByPeriod.recent]),
+      ];
+      const [lapResult, strengthResult, zoneResult] = await Promise.all([
         relevantLaps
           ? loadLaps(allPeriodIds)
               .then(laps => ({ laps, failed: false }))
@@ -354,11 +379,19 @@ export const useCardioEvolutionDetails = (
               exerciseNames: [] as CardioExerciseName[],
               failed: false,
             }),
+        loadZoneTimes(providerZoneSessionIds)
+          .then(zoneTimes => ({ zoneTimes, failed: false }))
+          .catch(() => ({ zoneTimes: [] as CardioZoneTime[], failed: true })),
       ]);
       return {
         laps: lapResult.laps,
         workoutSets: strengthResult.workoutSets,
         exerciseNames: strengthResult.exerciseNames,
+        periodZoneTimes: {
+          recent: summarizeCardioZoneTimes(zoneResult.zoneTimes, providerZoneSessionIdsByPeriod.recent),
+          previous: summarizeCardioZoneTimes(zoneResult.zoneTimes, providerZoneSessionIdsByPeriod.previous),
+        },
+        periodZoneDataError: zoneResult.failed,
         lapDataError: lapResult.failed,
         strengthDataError: strengthResult.failed,
       };

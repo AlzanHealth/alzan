@@ -1137,9 +1137,11 @@ export default {
     cardioSessionsWithHr: 'Entrenos con FC',
     cardioTrainingTime: 'Tiempo en esos entrenos',
     cardioMedianHr: 'FC mediana del entreno',
-    cardioTimeInZones: 'Tiempo registrado en zonas de FC',
-    cardioZoneDataSource: 'Solo entrenos que incluyen el tiempo por zonas',
-    cardioNoZoneData: 'No se guardó tiempo por zonas para estos entrenamientos.',
+    cardioTimeInZones: 'Tiempo en zonas de FC',
+    cardioZoneDataSource:
+      'Solo se incluyen zonas que el proveedor envía directamente; se omiten las estimaciones calculadas al importar. Algunos relojes no ofrecen este desglose.',
+    cardioNoZoneData: 'No hay tiempos por zonas enviados directamente por el proveedor para estos entrenamientos.',
+    cardioLessThanMinute: 'Menos de 1 min',
     cardioZonesLoadError:
       'No se pudieron cargar las zonas de FC. El resto del análisis cardiovascular sigue disponible.',
     cardioWeeklyDisclaimer:

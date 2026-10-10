@@ -41,6 +41,10 @@ export type CardioStreamSample = {
 };
 
 export type CardioZoneTime = { session_id: string; zone: number; duration_s: number };
+export type CardioZoneSummary = {
+  zoneTimeSeconds: [number, number, number, number, number];
+  zoneDataAvailable: boolean;
+};
 export type CardioTrendStatus = 'improving' | 'declining' | 'stable' | 'insufficient' | 'descriptive';
 export type CardioAnalysisReason =
   | 'no_activities'
@@ -1002,6 +1006,28 @@ export const analyzeSportEvolution = (
 };
 
 /** Weekly counts and zone totals are descriptive; they do not grade training against an unknown goal. */
+export const summarizeCardioZoneTimes = (zoneTimes: CardioZoneTime[], sessionIds: string[]): CardioZoneSummary => {
+  const includedSessionIds = new Set(sessionIds);
+  const zoneTimeSeconds: [number, number, number, number, number] = [0, 0, 0, 0, 0];
+  for (const zoneTime of zoneTimes) {
+    if (
+      !includedSessionIds.has(zoneTime.session_id) ||
+      !Number.isInteger(zoneTime.zone) ||
+      zoneTime.zone < 1 ||
+      zoneTime.zone > 5 ||
+      !Number.isFinite(zoneTime.duration_s) ||
+      zoneTime.duration_s <= 0
+    ) {
+      continue;
+    }
+    zoneTimeSeconds[zoneTime.zone - 1] += zoneTime.duration_s;
+  }
+  return {
+    zoneTimeSeconds,
+    zoneDataAvailable: zoneTimeSeconds.some(seconds => seconds > 0),
+  };
+};
+
 export const summarizeCardioWeek = (
   activities: CardioActivity[],
   zoneTimes: CardioZoneTime[],

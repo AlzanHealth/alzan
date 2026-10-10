@@ -293,7 +293,15 @@ export const CardioEvolutionSection = () => {
     const remaining = minutes % 60;
     return hours > 0 ? `${hours} h ${remaining} min` : `${remaining} min`;
   };
+  const formatZoneDuration = (seconds: number) =>
+    seconds > 0 && seconds < 60 ? t('health.cardioLessThanMinute') : formatDuration(Math.round(seconds / 60));
   const maxZoneTime = Math.max(...(week?.zoneTimeSeconds ?? [0]));
+  const periodZoneTimes = data?.periodZoneTimes;
+  const maxPeriodZoneTime = Math.max(
+    0,
+    ...(periodZoneTimes?.recent.zoneTimeSeconds ?? [0]),
+    ...(periodZoneTimes?.previous.zoneTimeSeconds ?? [0]),
+  );
   const unknownSportNumbers = React.useMemo(() => {
     const entries = sportOptions
       .filter(option => !SPORT_TRANSLATIONS[option.sportType])
@@ -435,6 +443,85 @@ export const CardioEvolutionSection = () => {
                 colors={healthStyles}
                 t={translateCardio}
               />
+            ) : null}
+            {periodZoneTimes ? (
+              <View style={styles.periodZoneBlock}>
+                <View style={styles.zoneHeader}>
+                  <Text style={[styles.zoneTitle, healthStyles.title]}>{t('health.cardioTimeInZones')}</Text>
+                  <Text style={[styles.zoneCaption, healthStyles.subtitle]}>{t('health.cardioZoneDataSource')}</Text>
+                </View>
+                {data?.periodZoneDataError ? (
+                  <Text style={[styles.zoneCaption, healthStyles.subtitle]}>{t('health.cardioZonesLoadError')}</Text>
+                ) : !periodZoneTimes.recent.zoneDataAvailable && !periodZoneTimes.previous.zoneDataAvailable ? (
+                  <Text style={[styles.zoneCaption, healthStyles.subtitle]}>{t('health.cardioNoZoneData')}</Text>
+                ) : (
+                  <>
+                    <View style={styles.zonePeriodColumns}>
+                      <Text style={styles.zonePeriodHeaderBlank} />
+                      <Text style={[styles.zonePeriodHeader, healthStyles.subtitle]}>
+                        {t('health.cardioRecentPeriod')}
+                      </Text>
+                      <Text style={[styles.zonePeriodHeader, healthStyles.subtitle]}>
+                        {t('health.cardioEarlierPeriod')}
+                      </Text>
+                    </View>
+                    {Array.from({ length: 5 }, (_, index) => {
+                      const recentSeconds = periodZoneTimes.recent.zoneTimeSeconds[index];
+                      const previousSeconds = periodZoneTimes.previous.zoneTimeSeconds[index];
+                      const recentWidth =
+                        maxPeriodZoneTime > 0
+                          ? Math.max((recentSeconds / maxPeriodZoneTime) * 100, recentSeconds > 0 ? 2 : 0)
+                          : 0;
+                      const previousWidth =
+                        maxPeriodZoneTime > 0
+                          ? Math.max((previousSeconds / maxPeriodZoneTime) * 100, previousSeconds > 0 ? 2 : 0)
+                          : 0;
+                      return (
+                        <View key={`period-zone-${index + 1}`} style={styles.zonePeriodRow}>
+                          <Text style={[styles.zonePeriodLabel, healthStyles.subtitle]}>
+                            {t('training.heartRateZoneLabel', { zone: index + 1 })}
+                          </Text>
+                          {[
+                            {
+                              key: 'recent',
+                              seconds: recentSeconds,
+                              available: periodZoneTimes.recent.zoneDataAvailable,
+                              width: recentWidth,
+                            },
+                            {
+                              key: 'previous',
+                              seconds: previousSeconds,
+                              available: periodZoneTimes.previous.zoneDataAvailable,
+                              width: previousWidth,
+                            },
+                          ].map(periodZone => (
+                            <View key={periodZone.key} style={styles.zonePeriodCell}>
+                              <Text style={[styles.zonePeriodValue, healthStyles.subtitle]}>
+                                {periodZone.available ? formatZoneDuration(periodZone.seconds) : '—'}
+                              </Text>
+                              <View
+                                style={[
+                                  styles.zonePeriodTrack,
+                                  { backgroundColor: healthStyles.divider.backgroundColor },
+                                ]}
+                              >
+                                {periodZone.available ? (
+                                  <View
+                                    style={[
+                                      styles.zoneFill,
+                                      { width: `${periodZone.width}%`, backgroundColor: HEART_RATE_ZONE_COLORS[index] },
+                                    ]}
+                                  />
+                                ) : null}
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      );
+                    })}
+                  </>
+                )}
+              </View>
             ) : null}
             <View style={[styles.divider, healthStyles.divider]} />
             <View style={styles.explanationBlock}>
@@ -719,6 +806,15 @@ const styles = StyleSheet.create({
   zoneFill: { height: '100%', borderRadius: 3 },
   zoneDuration: { width: 48, fontSize: 10, textAlign: 'right' },
   weeklyDisclaimer: { fontSize: 11, lineHeight: 16, marginTop: 1 },
+  periodZoneBlock: { gap: 8, marginTop: 15 },
+  zonePeriodColumns: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  zonePeriodHeaderBlank: { width: 39 },
+  zonePeriodHeader: { flex: 1, fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  zonePeriodRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 29 },
+  zonePeriodLabel: { width: 39, fontSize: 10 },
+  zonePeriodCell: { flex: 1, minWidth: 0, gap: 3 },
+  zonePeriodValue: { fontSize: 10, textAlign: 'center' },
+  zonePeriodTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
   disclaimerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingHorizontal: 3 },
   disclaimerText: { flex: 1, fontSize: 11, lineHeight: 16 },
 });

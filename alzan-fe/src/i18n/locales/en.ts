@@ -1125,9 +1125,11 @@ const en = {
     cardioSessionsWithHr: 'Workouts with HR',
     cardioTrainingTime: 'Time in those workouts',
     cardioMedianHr: 'Median workout HR',
-    cardioTimeInZones: 'Recorded time in heart-rate zones',
-    cardioZoneDataSource: 'Only workouts that include zone totals',
-    cardioNoZoneData: 'No time-in-zone data was saved for these workouts.',
+    cardioTimeInZones: 'Time in heart-rate zones',
+    cardioZoneDataSource:
+      'Only zone totals supplied directly by the provider are included; import-time estimates are omitted. Some devices do not provide this breakdown.',
+    cardioNoZoneData: 'No provider-reported zone totals are available for these workouts.',
+    cardioLessThanMinute: 'Less than 1 min',
     cardioZonesLoadError: 'Heart-rate zones could not be loaded. The rest of the cardio analysis remains available.',
     cardioWeeklyDisclaimer:
       'This distribution describes recorded effort. Without your training goal, it cannot tell whether the mix is right for you.',
