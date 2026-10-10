@@ -18,6 +18,7 @@ import { NutritionSettingsScreen } from '../screens/nutrition/NutritionSettingsS
 import { HealthSettingsScreen } from '../screens/settings/HealthSettingsScreen';
 import { HomeCardsSettingsScreen } from '../screens/settings/HomeCardsSettingsScreen';
 import { HomeSettingsScreen } from '../screens/settings/HomeSettingsScreen';
+import { HeartRateZonesSettingsScreen } from '../screens/training/HeartRateZonesSettingsScreen';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react-native';
 
@@ -34,6 +35,7 @@ export type SettingsStackParamList = {
   DataExport: undefined;
   DeleteAccount: undefined;
   TrainingSettings: undefined;
+  HeartRateZonesSettings: undefined;
   NutritionSettings: undefined;
   HealthSettings: undefined;
   HomeSettings: undefined;
@@ -112,6 +114,11 @@ export const SettingsNavigator = () => {
         name="TrainingSettings"
         component={TrainingSettingsScreen}
         options={{ title: t('navigation.workoutSettings') }}
+      />
+      <Stack.Screen
+        name="HeartRateZonesSettings"
+        component={HeartRateZonesSettingsScreen}
+        options={{ title: t('training.heartRateZonesTitle') }}
       />
       <Stack.Screen
         name="NutritionSettings"

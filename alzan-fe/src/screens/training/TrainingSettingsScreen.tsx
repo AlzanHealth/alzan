@@ -27,6 +27,7 @@ import type { WebExportWindow } from '../../modules/training/services/trainingPd
 import { supabase } from '../../lib/supabaseClient';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert } from '../../components/common/Alert';
+import { Heart } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import type { TrainingScreenNavigationProp } from '../../types/navigation.types';
 import {
@@ -320,6 +321,20 @@ const TrainingSettingsScreen = () => {
           <View style={styles.section}>
             {renderSectionTitle(t('training.generalAllCaps'), 'general')}
             <View style={[styles.card, dynamicStyles.card]}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.toggleRow}
+                onPress={() => navigation.navigate('HeartRateZonesSettings')}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.toggleLabel, dynamicStyles.label]}>{t('training.heartRateZonesTitle')}</Text>
+                  <Text style={[styles.toggleDesc, dynamicStyles.sublabel]}>
+                    {t('training.heartRateZonesDescription')}
+                  </Text>
+                </View>
+                <Heart size={20} color={themeColors.primary} />
+              </TouchableOpacity>
+              <View style={[styles.separator, dynamicStyles.divider]} />
               <ToggleRow
                 label={t('training.autoTimer')}
                 description={t('training.autoRestDesc')}
