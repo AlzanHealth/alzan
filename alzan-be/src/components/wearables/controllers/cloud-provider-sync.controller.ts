@@ -1,12 +1,17 @@
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { UserContext, UserCtx } from '../../../common/decorators/user-context.decorator';
 import { SupabaseUserAuth } from '../../../core/guards/auth.decorator';
-import { CloudProviderSyncOutputDto } from '../dto/cloud-provider-sync.dto';
+import {
+  ActiveCloudSyncsOutputDto,
+  CancelCloudSyncsOutputDto,
+  CloudProviderSyncOutputDto,
+} from '../dto/cloud-provider-sync.dto';
 import { PolarAccessLinkService } from '../services/polar-access-link.service';
 import { SuuntoCloudSyncService } from '../services/suunto-cloud-sync.service';
 import { CorosCloudSyncService } from '../services/coros-cloud-sync.service';
 import { SuuntoHealthSyncService } from '../services/suunto-health-sync.service';
+import { WearableImportLifecycleService } from '../services/wearable-import-lifecycle.service';
 
 @ApiTags('Wearables')
 @Controller('wearables/cloud')
@@ -17,7 +22,30 @@ export class CloudProviderSyncController {
     private readonly suuntoCloudSyncService: SuuntoCloudSyncService,
     private readonly suuntoHealthSyncService: SuuntoHealthSyncService,
     private readonly corosCloudSyncService: CorosCloudSyncService,
+    private readonly importLifecycleService: WearableImportLifecycleService,
   ) {}
+
+  @Get('active')
+  @ApiOkResponse({ type: ActiveCloudSyncsOutputDto })
+  public async listActiveSyncs(@UserContext() ctx: UserCtx): Promise<ActiveCloudSyncsOutputDto> {
+    const jobs = await this.importLifecycleService.listActiveSyncJobs(ctx.user.id);
+    return {
+      jobs: jobs.map(job => ({
+        id: job.id,
+        provider: job.provider,
+        sync_domain: job.syncDomain,
+        started_at: job.startedAt,
+        updated_at: job.updatedAt,
+        cancellation_requested: job.cancellationRequested,
+      })),
+    };
+  }
+
+  @Post('cancel')
+  @ApiOkResponse({ type: CancelCloudSyncsOutputDto })
+  public async cancelActiveSyncs(@UserContext() ctx: UserCtx): Promise<CancelCloudSyncsOutputDto> {
+    return { requested_count: await this.importLifecycleService.requestActiveSyncCancellation(ctx.user.id) };
+  }
 
   @Post('polar/sync')
   @ApiOkResponse({ type: CloudProviderSyncOutputDto })
@@ -25,6 +53,10 @@ export class CloudProviderSyncController {
     const result = await this.polarAccessLinkService.syncActivities(ctx.user.id);
     return {
       provider: result.provider,
+      job_id: result.jobId,
+      status: result.status,
+      cancelled: result.cancelled,
+      retry_after_at: result.retryAfterAt,
       activities_imported: result.activitiesImported,
       last_success_at: result.lastSuccessAt,
     };
@@ -34,7 +66,8 @@ export class CloudProviderSyncController {
   @ApiOkResponse({ type: CloudProviderSyncOutputDto })
   public async syncSuunto(@UserContext() ctx: UserCtx): Promise<CloudProviderSyncOutputDto> {
     const result = await this.suuntoCloudSyncService.syncActivities(ctx.user.id);
-    const health = result.status === 'running' ? null : await this.suuntoHealthSyncService.sync(ctx.user.id);
+    const health =
+      result.status === 'running' || result.cancelled ? null : await this.suuntoHealthSyncService.sync(ctx.user.id);
     const status =
       result.status === 'running' || health?.status === 'running'
         ? 'running'
@@ -47,6 +80,7 @@ export class CloudProviderSyncController {
       provider: result.provider,
       job_id: result.jobId,
       status,
+      cancelled: result.cancelled || health?.cancelled,
       activities_imported: result.activitiesImported,
       activities_skipped: result.activitiesSkipped,
       activities_updated: 0,
@@ -75,6 +109,7 @@ export class CloudProviderSyncController {
       provider: result.provider,
       job_id: result.jobId,
       status: result.status,
+      cancelled: result.cancelled,
       activities_imported: result.activitiesImported,
       activities_skipped: result.activitiesSkipped,
       activities_failed: result.activitiesFailed,

@@ -1770,6 +1770,17 @@ export default {
     syncAlreadyRunningMessage: 'Ya hay otra sincronización activa. No se ha iniciado un proceso duplicado.',
     syncAlreadyRunningRetryMessage:
       'Hay una sincronización activa. Podrás volver a intentarlo en aproximadamente {{minutes}} min.',
+    cancelActiveSyncs: 'Cancelar sincronizaciones ({{count}})',
+    cancelActiveSyncsButton: 'Cancelar ({{count}})',
+    cancelActiveSyncsHint: 'Solicitar una parada segura de todas las sincronizaciones cloud activas',
+    cancelActiveSyncsTitle: '¿Cancelar las sincronizaciones activas?',
+    cancelActiveSyncsMessage:
+      'Las sincronizaciones cloud terminarán el elemento que están procesando y después se detendrán. Los datos ya guardados se conservarán.',
+    cancelActiveSyncsConfirm: 'Cancelar sincronizaciones',
+    cancelActiveSyncsPending: 'Deteniendo sincronizaciones…',
+    cancelActiveSyncsError: 'No se pudo solicitar la cancelación. Inténtalo de nuevo.',
+    syncCancelledTitle: 'Sincronización detenida de forma segura',
+    syncCancelledMessage: 'Se terminó el elemento que ya estaba en curso y no se iniciaron más.',
     syncActivitiesSummary:
       'Importadas: {{imported}} · Omitidas: {{skipped}} · Reparadas: {{repaired}} · Fallidas: {{failed}}',
     healthDataConsentTitle: 'Consentimiento de datos de salud',

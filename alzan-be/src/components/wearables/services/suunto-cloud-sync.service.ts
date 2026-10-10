@@ -18,6 +18,7 @@ import { CanonicalActivityWriterService } from './canonical-activity-writer.serv
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
+import { WEARABLE_SYNC_CANCEL_REQUESTED } from './wearable-import-lifecycle.service';
 import {
   SuuntoWorkoutPaginationStrategy,
   UnverifiedSinglePageWorkoutPaginationStrategy,
@@ -35,6 +36,7 @@ export interface SuuntoSyncResult {
   provider: 'suunto';
   jobId: string;
   status: 'running' | 'success' | 'partial';
+  cancelled?: boolean;
   retryAfterAt?: string | null;
   activitiesImported: number;
   activitiesSkipped: number;
@@ -47,7 +49,7 @@ export interface SuuntoSyncResult {
 }
 
 type WorkoutImportOutcome = {
-  kind: 'failed' | 'imported' | 'repaired' | 'skipped';
+  kind: 'cancelled' | 'failed' | 'imported' | 'repaired' | 'skipped';
   errorCode?: string;
 };
 
@@ -85,7 +87,6 @@ export class SuuntoCloudSyncService {
   ) {}
 
   public async syncActivities(userId: string): Promise<SuuntoSyncResult> {
-    const token = await this.getUsableToken(userId);
     const job = await this.importLifecycleService.claimSyncJob({
       userId,
       provider: 'suunto',
@@ -96,6 +97,13 @@ export class SuuntoCloudSyncService {
     const stopLeaseHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
     const phaseDurationsMs: Record<string, number> = {};
     try {
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        return await this.finishCancelledSync(job.jobId, job.leaseToken, phaseDurationsMs);
+      }
+      const token = await this.getUsableToken(userId);
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        return await this.finishCancelledSync(job.jobId, job.leaseToken, phaseDurationsMs);
+      }
       const fetchStartedAt = Date.now();
       const workoutFetch = await this.fetchWorkoutSummaries(token.accessToken, userId);
       const workouts = workoutFetch.workouts;
@@ -109,28 +117,32 @@ export class SuuntoCloudSyncService {
           return timeB - timeA;
         });
       const importStartedAt = Date.now();
-      const outcomes = await this.mapWithConcurrency(keyedWorkouts, WORKOUT_IMPORT_CONCURRENCY, async entry =>
-        this.processWorkout({
+      const outcomes = await this.mapWithConcurrency(keyedWorkouts, WORKOUT_IMPORT_CONCURRENCY, async entry => {
+        if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId))
+          return { kind: 'cancelled' as const };
+        return this.processWorkout({
           userId,
           accessToken: token.accessToken,
           workoutKey: entry.workoutKey,
           summary: entry.workout,
           jobId: job.jobId,
           phaseDurationsMs,
-        }),
-      );
+        });
+      });
       phaseDurationsMs.importWorkouts = Date.now() - importStartedAt;
+      const cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId);
       const activitiesImported = this.countOutcomes(outcomes, 'imported');
       const activitiesSkipped = this.countOutcomes(outcomes, 'skipped');
       const activitiesRepaired = this.countOutcomes(outcomes, 'repaired');
       const activitiesFailed = this.countOutcomes(outcomes, 'failed');
       const errorsByCode = this.countErrors(outcomes);
+      if (cancelled) errorsByCode[WEARABLE_SYNC_CANCEL_REQUESTED] = 1;
       if (!workoutFetch.isPaginationVerified) errorsByCode.SUUNTO_PAGINATION_UNVERIFIED = 1;
       const activitiesReconciled = activitiesImported + activitiesRepaired;
       phaseDurationsMs.reconcile = 0;
       const lastSuccessAt = new Date().toISOString();
-      const status = activitiesFailed > 0 || !workoutFetch.isPaginationVerified ? 'partial' : 'success';
-      await this.markConnectionResult(userId, lastSuccessAt, status, errorsByCode);
+      const status = cancelled || activitiesFailed > 0 || !workoutFetch.isPaginationVerified ? 'partial' : 'success';
+      if (!cancelled) await this.markConnectionResult(userId, lastSuccessAt, status, errorsByCode);
       await this.syncStateService.saveState({
         userId,
         provider: 'suunto',
@@ -139,7 +151,7 @@ export class SuuntoCloudSyncService {
         syncDomain: 'activities',
         cursorToken: null,
         anchorToken: null,
-        lastRecordAt: workoutFetch.isPaginationVerified ? lastSuccessAt : null,
+        lastRecordAt: !cancelled && workoutFetch.isPaginationVerified ? lastSuccessAt : null,
         status,
         metadata: {
           jobId: job.jobId,
@@ -165,12 +177,13 @@ export class SuuntoCloudSyncService {
           activitiesFailed,
           activitiesReconciled,
         },
-        lastError: activitiesFailed > 0 ? 'SUUNTO_SYNC_PARTIAL' : null,
+        lastError: cancelled ? WEARABLE_SYNC_CANCEL_REQUESTED : activitiesFailed > 0 ? 'SUUNTO_SYNC_PARTIAL' : null,
       });
       return {
         provider: 'suunto',
         jobId: job.jobId,
         status,
+        cancelled,
         activitiesImported,
         activitiesSkipped,
         activitiesRepaired,
@@ -207,6 +220,34 @@ export class SuuntoCloudSyncService {
       activitiesReconciled: 0,
       errorsByCode: {},
       phaseDurationsMs: {},
+      lastSuccessAt: null,
+    };
+  }
+
+  private async finishCancelledSync(
+    jobId: string,
+    leaseToken: string,
+    phaseDurationsMs: Record<string, number>,
+  ): Promise<SuuntoSyncResult> {
+    await this.importLifecycleService.finishSyncJob({
+      jobId,
+      leaseToken,
+      status: 'partial',
+      counters: { activitiesImported: 0, activitiesSkipped: 0, activitiesRepaired: 0, activitiesFailed: 0 },
+      lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+    });
+    return {
+      provider: 'suunto',
+      jobId,
+      status: 'partial',
+      cancelled: true,
+      activitiesImported: 0,
+      activitiesSkipped: 0,
+      activitiesRepaired: 0,
+      activitiesFailed: 0,
+      activitiesReconciled: 0,
+      errorsByCode: { [WEARABLE_SYNC_CANCEL_REQUESTED]: 1 },
+      phaseDurationsMs,
       lastSuccessAt: null,
     };
   }

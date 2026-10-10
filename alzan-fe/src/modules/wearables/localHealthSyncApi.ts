@@ -2,6 +2,8 @@ import { CONFIG } from '../../constants/environment';
 import { supabase } from '../../lib/supabaseClient';
 import {
   CloudProviderSyncResult,
+  ActiveCloudSyncsResult,
+  CancelCloudSyncsResult,
   CorosCapability,
   CorosDisconnectResult,
   LocalHealthSyncRequest,
@@ -83,6 +85,10 @@ const requestJson = async <T>(path: string, options: { method?: string; body?: J
 };
 
 export const wearablesLocalHealthApi = {
+  listActiveCloudSyncs: () => requestJson<ActiveCloudSyncsResult>('/wearables/cloud/active'),
+
+  cancelActiveCloudSyncs: () => requestJson<CancelCloudSyncsResult>('/wearables/cloud/cancel', { method: 'POST' }),
+
   listHealthConnectOrigins: () => requestJson<ProviderOrigin[]>('/wearables/health-connect/origins'),
 
   upsertHealthConnectOrigins: (origins: ProviderOriginInput[]) =>

@@ -110,6 +110,7 @@ export function useCorosConnection() {
     mutationFn: () => wearablesLocalHealthApi.syncCoros(),
     onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['activeCloudSyncs', user?.id] });
       if (result.status === 'running') {
         Alert.alert(t('settings.syncAlreadyRunningTitle'), t('settings.syncAlreadyRunningMessage'));
         return;
@@ -117,6 +118,10 @@ export function useCorosConnection() {
       invalidateTrainingCalendar(queryClient);
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+      if (result.cancelled) {
+        Alert.alert(t('settings.syncCancelledTitle'), t('settings.syncCancelledMessage'));
+        return;
+      }
       Alert.alert(
         result.status === 'partial' ? t('settings.syncPartialTitle') : t('settings.syncCompleteTitle'),
         [

@@ -1749,6 +1749,17 @@ const en = {
     syncAlreadyRunningTitle: 'Sync already running',
     syncAlreadyRunningMessage: 'Another activity sync is still in progress. No duplicate sync was started.',
     syncAlreadyRunningRetryMessage: 'A sync is still active. You can try again in approximately {{minutes}} min.',
+    cancelActiveSyncs: 'Cancel syncs ({{count}})',
+    cancelActiveSyncsButton: 'Cancel ({{count}})',
+    cancelActiveSyncsHint: 'Request a safe stop for all active cloud syncs',
+    cancelActiveSyncsTitle: 'Cancel active syncs?',
+    cancelActiveSyncsMessage:
+      'Active cloud syncs will finish the item they are processing, then stop. Data already saved will remain available.',
+    cancelActiveSyncsConfirm: 'Cancel syncs',
+    cancelActiveSyncsPending: 'Stopping syncs…',
+    cancelActiveSyncsError: 'Could not request sync cancellation. Please try again.',
+    syncCancelledTitle: 'Sync stopped safely',
+    syncCancelledMessage: 'The item already in progress was completed. No further items were started.',
     syncActivitiesSummary:
       'Imported: {{imported}} · Skipped: {{skipped}} · Repaired: {{repaired}} · Failed: {{failed}}',
     healthDataConsentTitle: 'Health data consent',

@@ -35,8 +35,14 @@ export function usePolarConnection() {
 
   const syncMutation = useMutation({
     mutationFn: async () => wearablesLocalHealthApi.syncPolarActivities(),
-    onSuccess: () => {
+    onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['activeCloudSyncs', user?.id] });
+      if (result.status === 'running') {
+        Alert.alert(t('settings.syncAlreadyRunningTitle'), t('settings.syncAlreadyRunningMessage'));
+      } else if (result.cancelled) {
+        Alert.alert(t('settings.syncCancelledTitle'), t('settings.syncCancelledMessage'));
+      }
     },
     onError: (error: Error) => {
       Alert.alert(t('common.error'), error.message);

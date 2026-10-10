@@ -13,6 +13,7 @@ import { CanonicalProvenance } from '../domain/wearable.types';
 import { CanonicalActivityWriterService } from './canonical-activity-writer.service';
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
+import { WearableImportLifecycleService, WEARABLE_SYNC_CANCEL_REQUESTED } from './wearable-import-lifecycle.service';
 
 type JsonRecord = Record<string, unknown>;
 type ProviderTokenRow = {
@@ -24,8 +25,12 @@ type ProviderTokenRow = {
 
 export interface PolarSyncResult {
   provider: 'polar';
+  jobId: string;
+  status: 'running' | 'success' | 'partial';
+  retryAfterAt?: string | null;
+  cancelled: boolean;
   activitiesImported: number;
-  lastSuccessAt: string;
+  lastSuccessAt: string | null;
 }
 
 @Injectable()
@@ -39,18 +44,46 @@ export class PolarAccessLinkService {
     private readonly rawPayloadService: RawPayloadService,
     private readonly syncStateService: IntegrationSyncStateService,
     private readonly activityWriterService: CanonicalActivityWriterService,
+    private readonly importLifecycleService: WearableImportLifecycleService,
   ) {}
 
   public async syncActivities(userId: string): Promise<PolarSyncResult> {
-    const token = await this.getUsableToken(userId);
+    const job = await this.importLifecycleService.claimSyncJob({
+      userId,
+      provider: 'polar',
+      syncDomain: 'activities',
+      leaseSeconds: 1800,
+    });
+    if (job.action === 'active') {
+      return {
+        provider: 'polar',
+        jobId: job.jobId,
+        status: 'running',
+        cancelled: false,
+        retryAfterAt: job.retryAfterAt,
+        activitiesImported: 0,
+        lastSuccessAt: null,
+      };
+    }
+    const stopHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
     try {
+      const token = await this.getUsableToken(userId);
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        return this.finishCancelled(job.jobId, job.leaseToken, 0);
+      }
       const summaries = await this.fetchExerciseSummaries(token.accessToken);
       let activitiesImported = 0;
       for (const summary of summaries) {
+        if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+          return this.finishCancelled(job.jobId, job.leaseToken, activitiesImported);
+        }
         const detail = await this.fetchExerciseDetail(token.accessToken, summary);
         if (!detail) continue;
         await this.importExercise(userId, detail);
         activitiesImported += 1;
+      }
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        return this.finishCancelled(job.jobId, job.leaseToken, activitiesImported);
       }
       const lastSuccessAt = new Date().toISOString();
       await this.markConnectionSuccess(userId, lastSuccessAt);
@@ -65,11 +98,66 @@ export class PolarAccessLinkService {
         lastRecordAt: lastSuccessAt,
         status: 'success',
       });
-      return { provider: 'polar', activitiesImported, lastSuccessAt };
+      await this.importLifecycleService.finishSyncJob({
+        jobId: job.jobId,
+        leaseToken: job.leaseToken,
+        status: 'success',
+        counters: { activitiesImported },
+        lastError: null,
+      });
+      return {
+        provider: 'polar',
+        jobId: job.jobId,
+        status: 'success',
+        cancelled: false,
+        activitiesImported,
+        lastSuccessAt,
+      };
     } catch (error: unknown) {
+      await this.importLifecycleService
+        .finishSyncJob({
+          jobId: job.jobId,
+          leaseToken: job.leaseToken,
+          status: 'error',
+          counters: {},
+          lastError: this.getErrorMessage(error),
+        })
+        .catch(() => undefined);
       await this.markConnectionError(userId, this.getErrorMessage(error));
       throw error;
+    } finally {
+      stopHeartbeat();
     }
+  }
+
+  private startLeaseHeartbeat(jobId: string, leaseToken: string): () => void {
+    const timer = setInterval(() => {
+      void this.importLifecycleService.renewSyncJob(jobId, leaseToken).catch(() => undefined);
+    }, 60_000);
+    timer.unref();
+    return () => clearInterval(timer);
+  }
+
+  private async finishCancelled(
+    jobId: string,
+    leaseToken: string,
+    activitiesImported: number,
+  ): Promise<PolarSyncResult> {
+    await this.importLifecycleService.finishSyncJob({
+      jobId,
+      leaseToken,
+      status: 'partial',
+      counters: { activitiesImported },
+      lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+    });
+    return {
+      provider: 'polar',
+      jobId,
+      status: 'partial',
+      cancelled: true,
+      activitiesImported,
+      lastSuccessAt: null,
+    };
   }
 
   private async importExercise(userId: string, exercise: JsonRecord): Promise<void> {

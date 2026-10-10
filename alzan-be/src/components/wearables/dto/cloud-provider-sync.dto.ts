@@ -1,4 +1,5 @@
 import { Expose } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CloudProviderSyncOutputDto {
   @Expose()
@@ -9,6 +10,10 @@ export class CloudProviderSyncOutputDto {
 
   @Expose()
   status?: string;
+
+  @ApiPropertyOptional()
+  @Expose()
+  cancelled?: boolean;
 
   @Expose()
   retry_after_at?: string | null;
@@ -72,4 +77,42 @@ export class CloudProviderSyncOutputDto {
 
   @Expose()
   health_last_synced_at?: string | null;
+}
+
+export class ActiveCloudSyncDto {
+  @ApiProperty()
+  @Expose()
+  id!: string;
+
+  @ApiProperty()
+  @Expose()
+  provider!: string;
+
+  @ApiProperty()
+  @Expose()
+  sync_domain!: string;
+
+  @ApiProperty()
+  @Expose()
+  started_at!: string;
+
+  @ApiProperty()
+  @Expose()
+  updated_at!: string;
+
+  @ApiProperty()
+  @Expose()
+  cancellation_requested!: boolean;
+}
+
+export class ActiveCloudSyncsOutputDto {
+  @ApiProperty({ type: [ActiveCloudSyncDto] })
+  @Expose()
+  jobs!: ActiveCloudSyncDto[];
+}
+
+export class CancelCloudSyncsOutputDto {
+  @ApiProperty()
+  @Expose()
+  requested_count!: number;
 }

@@ -121,6 +121,7 @@ async function assertHealthSyncUsesIndependentDomainAndMapsPayloads(): Promise<v
           claims.push(input);
           return { action: 'claimed', jobId: 'job', leaseToken: 'lease' };
         },
+        isSyncCancellationRequested: async () => false,
         finishSyncJob: async () => undefined,
       } as never,
     );
@@ -172,6 +173,7 @@ async function assertHealthFailureIsPartial(): Promise<void> {
       } as never,
       {
         claimSyncJob: async () => ({ action: 'claimed', jobId: 'job', leaseToken: 'lease' }),
+        isSyncCancellationRequested: async () => false,
         finishSyncJob: async () => undefined,
       } as never,
     );
@@ -465,6 +467,7 @@ async function assertHealthWriteFailurePreservesCursor(): Promise<void> {
       } as never,
       {
         claimSyncJob: async () => ({ action: 'acquired', jobId: 'job', leaseToken: 'lease' }),
+        isSyncCancellationRequested: async () => false,
         finishSyncJob: async ({ status }: { status: string }) => {
           finishedStatus = status;
         },

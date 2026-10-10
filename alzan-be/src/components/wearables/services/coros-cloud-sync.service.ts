@@ -35,6 +35,7 @@ import { buildCorosCanonicalActivity } from './coros-activity.utils';
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
+import { WEARABLE_SYNC_CANCEL_REQUESTED } from './wearable-import-lifecycle.service';
 
 type JsonRecord = Record<string, unknown>;
 type CorosToken = {
@@ -49,6 +50,7 @@ export interface CorosSyncResult {
   provider: 'coros';
   jobId: string;
   status: 'running' | 'success' | 'partial';
+  cancelled?: boolean;
   activitiesImported: number;
   activitiesSkipped: number;
   activitiesFailed: number;
@@ -61,7 +63,7 @@ export interface CorosSyncResult {
 
 export interface CorosWorkoutPushSyncResult {
   jobId: string;
-  status: 'failed' | 'imported' | 'running' | 'skipped';
+  status: 'cancelled' | 'failed' | 'imported' | 'running' | 'skipped';
   fitPending?: boolean;
 }
 
@@ -98,7 +100,6 @@ export class CorosCloudSyncService {
     if (!this.corosOAuthService.isUserAllowed(userId)) {
       throw new ForbiddenException('COROS integration is not enabled for this user');
     }
-    const token = await this.getUsableToken(userId);
     const job = await this.importLifecycleService.claimSyncJob({
       userId,
       provider: 'coros',
@@ -109,18 +110,41 @@ export class CorosCloudSyncService {
 
     const stopHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
     try {
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        await this.importLifecycleService.finishSyncJob({
+          jobId: job.jobId,
+          leaseToken: job.leaseToken,
+          status: 'partial',
+          counters: {},
+          lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+        });
+        return this.cancelledResult(job.jobId);
+      }
+      const token = await this.getUsableToken(userId);
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        await this.importLifecycleService.finishSyncJob({
+          jobId: job.jobId,
+          leaseToken: job.leaseToken,
+          status: 'partial',
+          counters: {},
+          lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+        });
+        return this.cancelledResult(job.jobId);
+      }
       const now = new Date();
       // Revisit the available summaries so old failed or pending FIT imports are
       // retried. The durable activity claim skips already completed imports.
       const windows = buildCorosDateWindows(corosHistoryStart(now), now);
-      const workouts = await this.fetchWorkouts(token, windows);
+      const workouts = await this.fetchWorkouts(token, windows, job.jobId);
       let activitiesImported = 0;
       let activitiesSkipped = 0;
       let activitiesFailed = 0;
       let fitPending = 0;
       const errorsByCode: Record<string, number> = {};
+      let cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId);
 
       for (const summary of this.uniqueWorkouts(workouts)) {
+        if (cancelled || (cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId))) break;
         const outcome = await this.importWorkout(userId, token, summary, job.jobId);
         if (outcome.status === 'imported') activitiesImported += 1;
         else if (outcome.status === 'skipped') activitiesSkipped += 1;
@@ -130,21 +154,28 @@ export class CorosCloudSyncService {
           errorsByCode[errorCode] = (errorsByCode[errorCode] ?? 0) + 1;
         }
         if (outcome.fitPending) fitPending += 1;
+        cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId);
       }
 
       const hasHealthConsent = await this.hasHealthConsent(userId);
       let healthDaysImported = 0;
-      if (hasHealthConsent) {
-        const dailyRecords = await this.fetchDailyHealth(token, windows);
+      if (hasHealthConsent && !cancelled) {
+        const dailyRecords = await this.fetchDailyHealth(token, windows, job.jobId);
         for (const record of this.uniqueDailyRecords(dailyRecords)) {
+          if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+            cancelled = true;
+            break;
+          }
           await this.importDailyHealth(userId, record);
           healthDaysImported += 1;
         }
       }
 
-      const status = activitiesFailed > 0 || fitPending > 0 ? 'partial' : 'success';
-      const lastSuccessAt = new Date().toISOString();
-      await this.markConnectionResult(userId, lastSuccessAt, status, errorsByCode);
+      cancelled = cancelled || (await this.importLifecycleService.isSyncCancellationRequested(job.jobId));
+      if (cancelled) errorsByCode[WEARABLE_SYNC_CANCEL_REQUESTED] = 1;
+      const status = cancelled || activitiesFailed > 0 || fitPending > 0 ? 'partial' : 'success';
+      const lastSuccessAt = cancelled ? null : new Date().toISOString();
+      if (lastSuccessAt) await this.markConnectionResult(userId, lastSuccessAt, status, errorsByCode);
       await this.syncStateService.saveState({
         userId,
         provider: 'coros',
@@ -171,12 +202,13 @@ export class CorosCloudSyncService {
         leaseToken: job.leaseToken,
         status,
         counters: { activitiesImported, activitiesSkipped, activitiesFailed, healthDaysImported, fitPending },
-        lastError: activitiesFailed > 0 ? 'COROS_SYNC_PARTIAL' : null,
+        lastError: cancelled ? WEARABLE_SYNC_CANCEL_REQUESTED : activitiesFailed > 0 ? 'COROS_SYNC_PARTIAL' : null,
       });
       return {
         provider: 'coros',
         jobId: job.jobId,
         status,
+        cancelled,
         activitiesImported,
         activitiesSkipped,
         activitiesFailed,
@@ -199,7 +231,6 @@ export class CorosCloudSyncService {
     if (!this.corosOAuthService.isUserAllowed(userId)) {
       throw new ForbiddenException('COROS integration is not enabled for this user');
     }
-    const token = await this.getUsableToken(userId);
     const job = await this.importLifecycleService.claimSyncJob({
       userId,
       provider: 'coros',
@@ -210,23 +241,49 @@ export class CorosCloudSyncService {
 
     const stopHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
     try {
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        await this.importLifecycleService.finishSyncJob({
+          jobId: job.jobId,
+          leaseToken: job.leaseToken,
+          status: 'partial',
+          counters: { activitiesImported: 0, activitiesSkipped: 0, activitiesFailed: 0 },
+          lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+        });
+        return { jobId: job.jobId, status: 'cancelled' };
+      }
+      const token = await this.getUsableToken(userId);
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
+        await this.importLifecycleService.finishSyncJob({
+          jobId: job.jobId,
+          leaseToken: job.leaseToken,
+          status: 'partial',
+          counters: { activitiesImported: 0, activitiesSkipped: 0, activitiesFailed: 0 },
+          lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+        });
+        return { jobId: job.jobId, status: 'cancelled' };
+      }
       const result = await this.importWorkout(userId, token, summary, job.jobId);
-      const status = result.status;
+      const cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId);
+      const status = cancelled ? 'partial' : result.status === 'failed' ? 'partial' : 'success';
       await this.importLifecycleService.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
-        status: status === 'failed' ? 'partial' : 'success',
+        status,
         counters: {
-          activitiesImported: status === 'imported' ? 1 : 0,
-          activitiesSkipped: status === 'skipped' ? 1 : 0,
-          activitiesFailed: status === 'failed' ? 1 : 0,
+          activitiesImported: result.status === 'imported' ? 1 : 0,
+          activitiesSkipped: result.status === 'skipped' ? 1 : 0,
+          activitiesFailed: result.status === 'failed' ? 1 : 0,
         },
-        lastError: status === 'failed' ? 'COROS_ACTIVITY_IMPORT_FAILED' : null,
+        lastError: cancelled
+          ? WEARABLE_SYNC_CANCEL_REQUESTED
+          : result.status === 'failed'
+            ? 'COROS_ACTIVITY_IMPORT_FAILED'
+            : null,
       });
-      if (status !== 'failed') {
+      if (result.status !== 'failed' && !cancelled) {
         await this.markConnectionResult(userId, new Date().toISOString(), 'success', {});
       }
-      return { jobId: job.jobId, status, fitPending: result.fitPending };
+      return { jobId: job.jobId, status: cancelled ? 'cancelled' : result.status, fitPending: result.fitPending };
     } catch (error: unknown) {
       await this.finishFailedJob(job.jobId, job.leaseToken, error);
       throw error;
@@ -246,6 +303,23 @@ export class CorosCloudSyncService {
       healthDaysImported: 0,
       healthConsentRequired: false,
       errorsByCode: {},
+      fitPending: 0,
+      lastSuccessAt: null,
+    };
+  }
+
+  private cancelledResult(jobId: string): CorosSyncResult {
+    return {
+      provider: 'coros',
+      jobId,
+      status: 'partial',
+      cancelled: true,
+      activitiesImported: 0,
+      activitiesSkipped: 0,
+      activitiesFailed: 0,
+      healthDaysImported: 0,
+      healthConsentRequired: false,
+      errorsByCode: { [WEARABLE_SYNC_CANCEL_REQUESTED]: 1 },
       fitPending: 0,
       lastSuccessAt: null,
     };
@@ -386,20 +460,24 @@ export class CorosCloudSyncService {
   private async fetchWorkouts(
     token: CorosToken,
     windows: Array<{ startDate: string; endDate: string }>,
+    jobId: string,
   ): Promise<JsonRecord[]> {
-    const pages = await Promise.all(windows.map(window => this.fetchWorkoutWindow(token, window)));
+    const pages = await Promise.all(windows.map(window => this.fetchWorkoutWindow(token, window, jobId)));
     return pages.flat();
   }
 
   private async fetchWorkoutWindow(
     token: CorosToken,
     window: { startDate: string; endDate: string },
+    jobId: string,
   ): Promise<JsonRecord[]> {
     const records: JsonRecord[] = [];
+    if (await this.importLifecycleService.isSyncCancellationRequested(jobId)) return records;
     let response = await this.getCoros('/v2/coros/sport/list', token, window);
     let requestedPage: number | null = null;
     const seenPages = new Set<number>();
     for (let iteration = 0; iteration < 100; iteration += 1) {
+      if (await this.importLifecycleService.isSyncCancellationRequested(jobId)) return records;
       const page = extractCorosWorkoutPage(response);
       records.push(...page.records);
       if (page.nextPage == null) return records;
@@ -419,20 +497,24 @@ export class CorosCloudSyncService {
   private async fetchDailyHealth(
     token: CorosToken,
     windows: Array<{ startDate: string; endDate: string }>,
+    jobId: string,
   ): Promise<JsonRecord[]> {
-    const pages = await Promise.all(windows.map(window => this.fetchDailyWindow(token, window)));
+    const pages = await Promise.all(windows.map(window => this.fetchDailyWindow(token, window, jobId)));
     return pages.flat();
   }
 
   private async fetchDailyWindow(
     token: CorosToken,
     window: { startDate: string; endDate: string },
+    jobId: string,
   ): Promise<JsonRecord[]> {
     const records: JsonRecord[] = [];
+    if (await this.importLifecycleService.isSyncCancellationRequested(jobId)) return records;
     let response = await this.getCoros('/coros/daily/query', token, window);
     let requestedPage: number | null = null;
     const seenPages = new Set<number>();
     for (let iteration = 0; iteration < 100; iteration += 1) {
+      if (await this.importLifecycleService.isSyncCancellationRequested(jobId)) return records;
       const page = extractCorosDailyPage(response);
       records.push(...page.records);
       if (page.nextPage == null) return records;

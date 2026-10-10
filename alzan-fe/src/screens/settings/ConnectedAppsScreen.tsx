@@ -10,11 +10,12 @@ import {
   Modal,
   SafeAreaView,
 } from 'react-native';
-import { ArrowLeft, Info } from 'lucide-react-native';
+import { ArrowLeft, CircleStop, Info } from 'lucide-react-native';
 import { colors, spacing, typography, borderRadius, shadows } from '../../theme';
 import { useSettingsStyles } from '../../hooks/useSettingsStyles';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
+import { useIsFocused } from '@react-navigation/native';
 import { useStravaConnection } from '../../hooks/useStravaConnection';
 import { useAppleHealthConnection } from '../../hooks/useAppleHealthConnection';
 import { useHealthConnectConnection } from '../../hooks/useHealthConnectConnection';
@@ -24,6 +25,8 @@ import { useCorosConnection } from '../../hooks/useCorosConnection';
 import { useTabBarLayout } from '../../navigation/tabBarLayout';
 import { getCorosConnectionInfo } from './corosConnectionInfo.helper';
 import { getConnectedAppsContentBottomPadding } from './connectedAppsLayout.helper';
+import { Alert } from '../../components/common/Alert';
+import { useActiveCloudSyncs } from '../../modules/wearables';
 
 type PermissionFlow = {
   serviceName: string;
@@ -35,12 +38,14 @@ export const ConnectedAppsScreen = () => {
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors } = useSettingsStyles();
   const { topFromScreenBottom } = useTabBarLayout();
+  const isFocused = useIsFocused();
   const strava = useStravaConnection();
   const appleHealth = useAppleHealthConnection();
   const healthConnect = useHealthConnectConnection();
   const polar = usePolarConnection();
   const suunto = useSuuntoConnection();
   const coros = useCorosConnection();
+  const activeCloudSyncs = useActiveCloudSyncs(isFocused, polar.isSyncing || suunto.isSyncing || coros.isSyncing);
   const [permissionFlow, setPermissionFlow] = useState<PermissionFlow | null>(null);
   const [corosInfoVisible, setCorosInfoVisible] = useState(false);
   const corosConnectionInfo = getCorosConnectionInfo();
@@ -69,6 +74,21 @@ export const ConnectedAppsScreen = () => {
     setPermissionFlow(null);
     flow?.onContinue();
   }, [permissionFlow]);
+
+  const confirmCancelCloudSyncs = useCallback(() => {
+    Alert.alert(t('settings.cancelActiveSyncsTitle'), t('settings.cancelActiveSyncsMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('settings.cancelActiveSyncsConfirm'),
+        style: 'destructive',
+        onPress: () => {
+          void activeCloudSyncs.cancel().catch(() => {
+            Alert.alert(t('common.error'), t('settings.cancelActiveSyncsError'));
+          });
+        },
+      },
+    ]);
+  }, [activeCloudSyncs.cancel, t]);
 
   const openOAuthFlow = useCallback(
     (serviceName: string, onContinue: () => void) => {
@@ -241,9 +261,32 @@ export const ConnectedAppsScreen = () => {
           { paddingBottom: getConnectedAppsContentBottomPadding(topFromScreenBottom, spacing.l) },
         ]}
       >
-        <Text style={[styles.description, { color: themeColors.textSecondary }]}>
-          {t('settings.syncAppsDescription')}
-        </Text>
+        <View style={styles.descriptionRow}>
+          <Text style={[styles.description, styles.descriptionText, { color: themeColors.textSecondary }]}>
+            {t('settings.syncAppsDescription')}
+          </Text>
+          {activeCloudSyncs.hasActiveSyncs && (
+            <TouchableOpacity
+              style={[styles.cancelSyncButton, { borderColor: colors.danger }]}
+              onPress={confirmCancelCloudSyncs}
+              disabled={activeCloudSyncs.isCancelling || activeCloudSyncs.allCancellationRequested}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.cancelActiveSyncs', { count: activeCloudSyncs.jobs.length })}
+              accessibilityHint={t('settings.cancelActiveSyncsHint')}
+            >
+              {activeCloudSyncs.isCancelling ? (
+                <ActivityIndicator size="small" color={colors.danger} />
+              ) : (
+                <CircleStop size={17} color={colors.danger} />
+              )}
+              <Text style={[styles.cancelSyncText, { color: colors.danger }]}>
+                {activeCloudSyncs.isCancelling || activeCloudSyncs.allCancellationRequested
+                  ? t('settings.cancelActiveSyncsPending')
+                  : t('settings.cancelActiveSyncsButton', { count: activeCloudSyncs.jobs.length })}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         <AppCard
           name="Strava"
@@ -518,6 +561,32 @@ const styles = StyleSheet.create({
   description: {
     ...typography.body,
     marginBottom: spacing.m,
+  },
+  descriptionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.s,
+  },
+  descriptionText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cancelSyncButton: {
+    minHeight: 44,
+    maxWidth: '48%',
+    paddingHorizontal: spacing.s,
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  cancelSyncText: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '600',
   },
   card: {
     borderRadius: borderRadius.m,

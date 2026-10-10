@@ -178,6 +178,7 @@ async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
         leaseToken: 'lease-1',
         leaseExpiresAt: '2026-06-15T10:05:00.000Z',
       }),
+      isSyncCancellationRequested: async () => false,
       claimActivity: async (input: { sourceRecordId: string }) =>
         input.sourceRecordId === 'existing-workout'
           ? { action: 'skip', importId: 'import-existing', sessionId: 'session-existing' }

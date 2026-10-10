@@ -553,6 +553,42 @@
         "tags": ["Wearables"]
       }
     },
+    "/wearables/cloud/active": {
+      "get": {
+        "operationId": "listActiveSyncs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ActiveCloudSyncsOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
+    "/wearables/cloud/cancel": {
+      "post": {
+        "operationId": "cancelActiveSyncs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CancelCloudSyncsOutputDto" } }
+            }
+          },
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CancelCloudSyncsOutputDto" } }
+            }
+          }
+        },
+        "tags": ["Wearables"]
+      }
+    },
     "/activity-sessions/{id}/template-association": {
       "post": {
         "operationId": "associateTemplate",
@@ -1107,6 +1143,7 @@
           "provider": { "type": "string" },
           "job_id": { "type": "string" },
           "status": { "type": "string" },
+          "cancelled": { "type": "boolean" },
           "retry_after_at": { "type": "string", "nullable": true },
           "activities_imported": { "type": "number" },
           "activities_skipped": { "type": "number" },
@@ -1130,6 +1167,28 @@
           "health_last_synced_at": { "type": "string", "nullable": true }
         },
         "required": ["provider", "activities_imported", "last_success_at"]
+      },
+      "ActiveCloudSyncDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "provider": { "type": "string" },
+          "sync_domain": { "type": "string" },
+          "started_at": { "type": "string" },
+          "updated_at": { "type": "string" },
+          "cancellation_requested": { "type": "boolean" }
+        },
+        "required": ["id", "provider", "sync_domain", "started_at", "updated_at", "cancellation_requested"]
+      },
+      "ActiveCloudSyncsOutputDto": {
+        "type": "object",
+        "properties": { "jobs": { "type": "array", "items": { "$ref": "#/components/schemas/ActiveCloudSyncDto" } } },
+        "required": ["jobs"]
+      },
+      "CancelCloudSyncsOutputDto": {
+        "type": "object",
+        "properties": { "requested_count": { "type": "number" } },
+        "required": ["requested_count"]
       },
       "TemplateAssociationInputDto": {
         "type": "object",

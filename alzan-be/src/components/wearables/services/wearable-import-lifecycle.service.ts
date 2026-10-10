@@ -36,7 +36,19 @@ export interface WearableSyncJobClaim {
   retryAfterAt: string | null;
 }
 
-const STALE_SUUNTO_SYNC_HEARTBEAT_MS = 5 * 60 * 1000;
+export interface ActiveWearableSyncJob {
+  id: string;
+  provider: WearableProvider;
+  syncDomain: SyncDomain;
+  startedAt: string;
+  updatedAt: string;
+  cancellationRequested: boolean;
+}
+
+export const WEARABLE_SYNC_CANCEL_REQUESTED = 'WEARABLE_SYNC_CANCEL_REQUESTED';
+const STALE_SYNC_WORKER_EXIT_MS = 5 * 60 * 1000;
+
+const STALE_SYNC_HEARTBEAT_MS = 5 * 60 * 1000;
 
 export interface FinishWearableSyncJobInput {
   jobId: string;
@@ -85,7 +97,9 @@ export class WearableImportLifecycleService {
   }
 
   public async claimSyncJob(input: WearableSyncJobClaimInput): Promise<WearableSyncJobClaim> {
-    if (input.provider === 'suunto') await this.reclaimStaleSuuntoSyncJob(input);
+    if (input.provider === 'suunto' || input.provider === 'coros' || input.provider === 'polar') {
+      await this.reclaimStaleSyncJob(input);
+    }
     const { data, error } = await this.supabaseAdminService.client.rpc('claim_wearable_sync_job', {
       p_user_id: input.userId,
       p_provider: input.provider,
@@ -105,9 +119,7 @@ export class WearableImportLifecycleService {
     const heartbeatAt = activeJob?.updated_at ? Date.parse(activeJob.updated_at) : Number.NaN;
     return {
       ...claim,
-      retryAfterAt: Number.isFinite(heartbeatAt)
-        ? new Date(heartbeatAt + STALE_SUUNTO_SYNC_HEARTBEAT_MS).toISOString()
-        : null,
+      retryAfterAt: Number.isFinite(heartbeatAt) ? new Date(heartbeatAt + STALE_SYNC_HEARTBEAT_MS).toISOString() : null,
     };
   }
 
@@ -120,6 +132,46 @@ export class WearableImportLifecycleService {
       p_last_error: input.lastError ?? undefined,
     });
     if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_FINISH_FAILED');
+  }
+
+  public async listActiveSyncJobs(userId: string): Promise<ActiveWearableSyncJob[]> {
+    await this.closeSyncJobsWithExpiredHeartbeats(userId);
+    const { data, error } = await this.supabaseAdminService.client
+      .from('wearable_sync_jobs')
+      .select('id, provider, sync_domain, started_at, updated_at, last_error')
+      .eq('user_id', userId)
+      .eq('status', 'running')
+      .order('started_at', { ascending: false });
+    if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOBS_READ_FAILED');
+    return (data ?? []).map(job => ({
+      id: job.id,
+      provider: job.provider,
+      syncDomain: job.sync_domain as SyncDomain,
+      startedAt: job.started_at,
+      updatedAt: job.updated_at,
+      cancellationRequested: job.last_error === WEARABLE_SYNC_CANCEL_REQUESTED,
+    }));
+  }
+
+  public async requestActiveSyncCancellation(userId: string): Promise<number> {
+    const { data, error } = await this.supabaseAdminService.client
+      .from('wearable_sync_jobs')
+      .update({ last_error: WEARABLE_SYNC_CANCEL_REQUESTED, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('status', 'running')
+      .select('id');
+    if (error) throw new InternalServerErrorException('WEARABLE_SYNC_CANCELLATION_REQUEST_FAILED');
+    return data?.length ?? 0;
+  }
+
+  public async isSyncCancellationRequested(jobId: string): Promise<boolean> {
+    const { data, error } = await this.supabaseAdminService.client
+      .from('wearable_sync_jobs')
+      .select('status, last_error')
+      .eq('id', jobId)
+      .maybeSingle();
+    if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_READ_FAILED');
+    return !data || data.status !== 'running' || data.last_error === WEARABLE_SYNC_CANCEL_REQUESTED;
   }
 
   public async renewSyncJob(jobId: string, leaseToken: string, leaseSeconds = 1800): Promise<void> {
@@ -169,7 +221,7 @@ export class WearableImportLifecycleService {
     };
   }
 
-  private async reclaimStaleSuuntoSyncJob(input: WearableSyncJobClaimInput): Promise<void> {
+  private async reclaimStaleSyncJob(input: WearableSyncJobClaimInput): Promise<void> {
     const now = Date.now();
     const { error } = await this.supabaseAdminService.client
       .from('wearable_sync_jobs')
@@ -180,12 +232,43 @@ export class WearableImportLifecycleService {
         updated_at: new Date(now).toISOString(),
       })
       .eq('user_id', input.userId)
-      .eq('provider', 'suunto')
+      .eq('provider', input.provider)
       .eq('sync_domain', input.syncDomain)
       .eq('status', 'running')
-      .lt('updated_at', new Date(now - STALE_SUUNTO_SYNC_HEARTBEAT_MS).toISOString())
+      .lt('updated_at', new Date(now - STALE_SYNC_HEARTBEAT_MS).toISOString())
       .gt('lease_expires_at', new Date(now).toISOString());
     if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_RECLAIM_FAILED');
+  }
+
+  private async closeSyncJobsWithExpiredHeartbeats(userId: string): Promise<void> {
+    const now = Date.now();
+    const staleBefore = new Date(now - STALE_SYNC_WORKER_EXIT_MS).toISOString();
+    const completedAt = new Date(now).toISOString();
+    for (const provider of ['suunto', 'coros', 'polar'] as const) {
+      const { data: staleJobs, error: staleJobsError } = await this.supabaseAdminService.client
+        .from('wearable_sync_jobs')
+        .select('id, last_error')
+        .eq('user_id', userId)
+        .eq('provider', provider)
+        .eq('status', 'running')
+        .lt('updated_at', staleBefore);
+      if (staleJobsError) throw new InternalServerErrorException('WEARABLE_SYNC_JOBS_READ_FAILED');
+
+      for (const job of staleJobs ?? []) {
+        const lastError =
+          job.last_error === WEARABLE_SYNC_CANCEL_REQUESTED
+            ? 'WEARABLE_SYNC_CANCELLED_AFTER_WORKER_EXIT'
+            : 'WEARABLE_SYNC_JOB_HEARTBEAT_EXPIRED';
+        const { error } = await this.supabaseAdminService.client
+          .from('wearable_sync_jobs')
+          .update({ status: 'error', last_error: lastError, completed_at: completedAt, updated_at: completedAt })
+          .eq('id', job.id)
+          .eq('user_id', userId)
+          .eq('status', 'running')
+          .lt('updated_at', staleBefore);
+        if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_RECLAIM_FAILED');
+      }
+    }
   }
 
   private requireRecord(value: Json, errorCode: string): JsonRecord {

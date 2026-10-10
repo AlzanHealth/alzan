@@ -110,7 +110,10 @@ async function assertSyncRetriesPendingWithoutDuplicates(): Promise<void> {
   let claimed = false;
   let complete = false;
   let active = false;
+  let cancelRequested = false;
   let writes = 0;
+  let finishedWith: string | null = null;
+  let workoutFetchCalls = 0;
   const service = new CorosCloudSyncService(
     {} as ConfigService,
     {} as SupabaseAdminService,
@@ -130,7 +133,10 @@ async function assertSyncRetriesPendingWithoutDuplicates(): Promise<void> {
         claimed = true;
         return { action: complete ? 'skip' : 'claimed', importId: 'import-id' };
       },
-      finishSyncJob: async () => undefined,
+      finishSyncJob: async (input: { lastError: string | null }) => {
+        finishedWith = input.lastError;
+      },
+      isSyncCancellationRequested: async () => cancelRequested,
     } as unknown as WearableImportLifecycleService,
     { isUserAllowed: (userId: string) => userId === 'user-1' } as unknown as CorosOAuthService,
   );
@@ -153,6 +159,7 @@ async function assertSyncRetriesPendingWithoutDuplicates(): Promise<void> {
     throw new Error('COROS_FIT_URL_MISSING');
   };
   internals.fetchWorkouts = async (_token, windows) => {
+    workoutFetchCalls += 1;
     assert.ok(windows.length >= 3, 'revisit old pending imports, not just a three-day overlap');
     const summary = {
       labelId: '418173315956375553',
@@ -179,6 +186,13 @@ async function assertSyncRetriesPendingWithoutDuplicates(): Promise<void> {
   active = true;
   assert.equal((await service.sync('user-1')).status, 'running');
   assert.equal(writes, 2);
+  active = false;
+  cancelRequested = true;
+  const cancelled = await service.sync('user-1');
+  assert.equal(cancelled.cancelled, true);
+  assert.equal(cancelled.status, 'partial');
+  assert.equal(finishedWith, 'WEARABLE_SYNC_CANCEL_REQUESTED');
+  assert.equal(workoutFetchCalls, 3, 'a cancellation already requested must stop before fetching more data');
 }
 
 async function run(): Promise<void> {

@@ -87,6 +87,7 @@ export type CloudProviderSyncResult = {
   provider: WearableProviderKey;
   job_id?: string;
   status?: 'running' | 'success' | 'partial';
+  cancelled?: boolean;
   retry_after_at?: string | null;
   activities_imported: number;
   activities_skipped?: number;
@@ -109,6 +110,18 @@ export type CloudProviderSyncResult = {
   backfill_next_date?: string | null;
   fit_pending?: number;
 };
+
+export type ActiveCloudSync = {
+  id: string;
+  provider: WearableProviderKey;
+  sync_domain: string;
+  started_at: string;
+  updated_at: string;
+  cancellation_requested: boolean;
+};
+
+export type ActiveCloudSyncsResult = { jobs: ActiveCloudSync[] };
+export type CancelCloudSyncsResult = { requested_count: number };
 
 export type CorosCapability = {
   enabled: boolean;
