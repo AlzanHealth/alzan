@@ -77,6 +77,7 @@ const COROS_TOKEN_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 const CANONICAL_ACTIVITY_VERSION = 9;
 const COROS_REQUEST_RETRIES = 3;
 const COROS_RETRY_BASE_DELAY_MS = 250;
+const COROS_RETRY_CANCELLATION_POLL_MS = 1_000;
 const MAX_FIT_BYTES = 25 * 1024 * 1024;
 const COROS_HEALTH_CONSENT_VERSION = 'health_integrations_v2_2026_08_22';
 
@@ -109,6 +110,11 @@ export class CorosCloudSyncService {
     if (job.action === 'active') return this.activeResult(job.jobId);
 
     const stopHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
+    let activitiesImported = 0;
+    let activitiesSkipped = 0;
+    let activitiesFailed = 0;
+    let healthDaysImported = 0;
+    let fitPending = 0;
     try {
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
         await this.importLifecycleService.finishSyncJob({
@@ -120,7 +126,7 @@ export class CorosCloudSyncService {
         });
         return this.cancelledResult(job.jobId);
       }
-      const token = await this.getUsableToken(userId);
+      const token = await this.getUsableToken(userId, job.jobId);
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
         await this.importLifecycleService.finishSyncJob({
           jobId: job.jobId,
@@ -136,10 +142,6 @@ export class CorosCloudSyncService {
       // retried. The durable activity claim skips already completed imports.
       const windows = buildCorosDateWindows(corosHistoryStart(now), now);
       const workouts = await this.fetchWorkouts(token, windows, job.jobId);
-      let activitiesImported = 0;
-      let activitiesSkipped = 0;
-      let activitiesFailed = 0;
-      let fitPending = 0;
       const errorsByCode: Record<string, number> = {};
       let cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId);
 
@@ -158,7 +160,6 @@ export class CorosCloudSyncService {
       }
 
       const hasHealthConsent = await this.hasHealthConsent(userId);
-      let healthDaysImported = 0;
       if (hasHealthConsent && !cancelled) {
         const dailyRecords = await this.fetchDailyHealth(token, windows, job.jobId);
         for (const record of this.uniqueDailyRecords(dailyRecords)) {
@@ -219,11 +220,28 @@ export class CorosCloudSyncService {
         lastSuccessAt,
       };
     } catch (error: unknown) {
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId).catch(() => false)) {
+        await this.importLifecycleService.finishSyncJob({
+          jobId: job.jobId,
+          leaseToken: job.leaseToken,
+          status: 'partial',
+          counters: { activitiesImported, activitiesSkipped, activitiesFailed, healthDaysImported, fitPending },
+          lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+        });
+        return this.cancelledResult(job.jobId, {
+          activitiesImported,
+          activitiesSkipped,
+          activitiesFailed,
+          healthDaysImported,
+          fitPending,
+        });
+      }
       await this.finishFailedJob(job.jobId, job.leaseToken, error);
       await this.markConnectionError(userId, this.errorMessage(error));
       throw error;
     } finally {
       stopHeartbeat();
+      this.importLifecycleService.releaseSyncJob?.(job.jobId);
     }
   }
 
@@ -240,6 +258,9 @@ export class CorosCloudSyncService {
     if (job.action === 'active') return { jobId: job.jobId, status: 'running' };
 
     const stopHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
+    let activitiesImported = 0;
+    let activitiesSkipped = 0;
+    let activitiesFailed = 0;
     try {
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
         await this.importLifecycleService.finishSyncJob({
@@ -251,7 +272,7 @@ export class CorosCloudSyncService {
         });
         return { jobId: job.jobId, status: 'cancelled' };
       }
-      const token = await this.getUsableToken(userId);
+      const token = await this.getUsableToken(userId, job.jobId);
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
         await this.importLifecycleService.finishSyncJob({
           jobId: job.jobId,
@@ -263,6 +284,9 @@ export class CorosCloudSyncService {
         return { jobId: job.jobId, status: 'cancelled' };
       }
       const result = await this.importWorkout(userId, token, summary, job.jobId);
+      activitiesImported = result.status === 'imported' ? 1 : 0;
+      activitiesSkipped = result.status === 'skipped' ? 1 : 0;
+      activitiesFailed = result.status === 'failed' ? 1 : 0;
       const cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId);
       const status = cancelled ? 'partial' : result.status === 'failed' ? 'partial' : 'success';
       await this.importLifecycleService.finishSyncJob({
@@ -270,9 +294,9 @@ export class CorosCloudSyncService {
         leaseToken: job.leaseToken,
         status,
         counters: {
-          activitiesImported: result.status === 'imported' ? 1 : 0,
-          activitiesSkipped: result.status === 'skipped' ? 1 : 0,
-          activitiesFailed: result.status === 'failed' ? 1 : 0,
+          activitiesImported,
+          activitiesSkipped,
+          activitiesFailed,
         },
         lastError: cancelled
           ? WEARABLE_SYNC_CANCEL_REQUESTED
@@ -285,10 +309,21 @@ export class CorosCloudSyncService {
       }
       return { jobId: job.jobId, status: cancelled ? 'cancelled' : result.status, fitPending: result.fitPending };
     } catch (error: unknown) {
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId).catch(() => false)) {
+        await this.importLifecycleService.finishSyncJob({
+          jobId: job.jobId,
+          leaseToken: job.leaseToken,
+          status: 'partial',
+          counters: { activitiesImported, activitiesSkipped, activitiesFailed },
+          lastError: WEARABLE_SYNC_CANCEL_REQUESTED,
+        });
+        return { jobId: job.jobId, status: 'cancelled' };
+      }
       await this.finishFailedJob(job.jobId, job.leaseToken, error);
       throw error;
     } finally {
       stopHeartbeat();
+      this.importLifecycleService.releaseSyncJob?.(job.jobId);
     }
   }
 
@@ -308,19 +343,28 @@ export class CorosCloudSyncService {
     };
   }
 
-  private cancelledResult(jobId: string): CorosSyncResult {
+  private cancelledResult(
+    jobId: string,
+    counters: {
+      activitiesImported?: number;
+      activitiesSkipped?: number;
+      activitiesFailed?: number;
+      healthDaysImported?: number;
+      fitPending?: number;
+    } = {},
+  ): CorosSyncResult {
     return {
       provider: 'coros',
       jobId,
       status: 'partial',
       cancelled: true,
-      activitiesImported: 0,
-      activitiesSkipped: 0,
-      activitiesFailed: 0,
-      healthDaysImported: 0,
+      activitiesImported: counters.activitiesImported ?? 0,
+      activitiesSkipped: counters.activitiesSkipped ?? 0,
+      activitiesFailed: counters.activitiesFailed ?? 0,
+      healthDaysImported: counters.healthDaysImported ?? 0,
       healthConsentRequired: false,
       errorsByCode: { [WEARABLE_SYNC_CANCEL_REQUESTED]: 1 },
-      fitPending: 0,
+      fitPending: counters.fitPending ?? 0,
       lastSuccessAt: null,
     };
   }
@@ -359,8 +403,9 @@ export class CorosCloudSyncService {
       let fitFiles: Uint8Array[] = [];
       let fitPendingReason: string | null = null;
       try {
-        fitFiles = await this.fetchWorkoutFits(token, summary, labelId);
+        fitFiles = await this.fetchWorkoutFits(token, summary, labelId, jobId);
       } catch (error: unknown) {
+        if (await this.importLifecycleService.isSyncCancellationRequested(jobId).catch(() => false)) throw error;
         fitPendingReason = this.errorMessage(error);
         this.logger.warn({ provider: 'coros', labelId, errorCode: fitPendingReason }, 'COROS FIT enrichment pending');
       }
@@ -473,7 +518,7 @@ export class CorosCloudSyncService {
   ): Promise<JsonRecord[]> {
     const records: JsonRecord[] = [];
     if (await this.importLifecycleService.isSyncCancellationRequested(jobId)) return records;
-    let response = await this.getCoros('/v2/coros/sport/list', token, window);
+    let response = await this.getCoros('/v2/coros/sport/list', token, window, jobId);
     let requestedPage: number | null = null;
     const seenPages = new Set<number>();
     for (let iteration = 0; iteration < 100; iteration += 1) {
@@ -486,7 +531,7 @@ export class CorosCloudSyncService {
       }
       seenPages.add(page.nextPage);
       requestedPage = page.nextPage;
-      response = await this.getCoros('/v2/coros/sport/list', token, window, {
+      response = await this.getCoros('/v2/coros/sport/list', token, window, jobId, {
         pageNo: requestedPage,
         pageSize: 100,
       });
@@ -510,7 +555,7 @@ export class CorosCloudSyncService {
   ): Promise<JsonRecord[]> {
     const records: JsonRecord[] = [];
     if (await this.importLifecycleService.isSyncCancellationRequested(jobId)) return records;
-    let response = await this.getCoros('/coros/daily/query', token, window);
+    let response = await this.getCoros('/coros/daily/query', token, window, jobId);
     let requestedPage: number | null = null;
     const seenPages = new Set<number>();
     for (let iteration = 0; iteration < 100; iteration += 1) {
@@ -523,7 +568,7 @@ export class CorosCloudSyncService {
       }
       seenPages.add(page.nextPage);
       requestedPage = page.nextPage;
-      response = await this.getCoros('/coros/daily/query', token, window, {
+      response = await this.getCoros('/coros/daily/query', token, window, jobId, {
         pageNo: requestedPage,
         pageSize: 100,
       });
@@ -535,19 +580,23 @@ export class CorosCloudSyncService {
     path: string,
     token: CorosToken,
     window: { startDate: string; endDate: string },
+    jobId: string,
     extraParams: Record<string, string | number> = {},
   ): Promise<unknown> {
     try {
-      const response = await this.executeRequest(() =>
-        axios.get(`${this.apiBaseUrl}${path}`, {
-          params: { token: token.accessToken, openId: token.openId, ...window, ...extraParams },
-          headers: { Accept: 'application/json', token: token.accessToken },
-          // Axios also transforms rejected responses. Preserve HTTP errors for retry/status handling.
-          transformResponse: [
-            (data: string, _headers, status) => (status != null && status >= 400 ? data : parseCorosJson(data)),
-          ],
-          timeout: 15_000,
-        }),
+      const response = await this.executeRequest(
+        signal =>
+          axios.get(`${this.apiBaseUrl}${path}`, {
+            params: { token: token.accessToken, openId: token.openId, ...window, ...extraParams },
+            headers: { Accept: 'application/json', token: token.accessToken },
+            // Axios also transforms rejected responses. Preserve HTTP errors for retry/status handling.
+            transformResponse: [
+              (data: string, _headers, status) => (status != null && status >= 400 ? data : parseCorosJson(data)),
+            ],
+            timeout: 15_000,
+            signal,
+          }),
+        jobId,
       );
       assertCorosApiSuccess(response.data);
       return response.data;
@@ -556,58 +605,69 @@ export class CorosCloudSyncService {
     }
   }
 
-  private async fetchWorkoutFits(token: CorosToken, summary: JsonRecord, labelId: string): Promise<Uint8Array[]> {
+  private async fetchWorkoutFits(
+    token: CorosToken,
+    summary: JsonRecord,
+    labelId: string,
+    jobId: string,
+  ): Promise<Uint8Array[]> {
     try {
       let fitUrls = extractCorosFitUrls(summary);
       if (fitUrls.length === 0) {
-        const detailResponse = await this.executeRequest(() =>
-          axios.get<unknown>(`${this.apiBaseUrl}/v2/coros/sport/detail/fit`, {
-            params: {
-              mode: summary.mode,
-              subMode: summary.subMode,
-              labelId,
-              openId: token.openId,
-              token: token.accessToken,
-            },
-            headers: { Accept: 'application/json', token: token.accessToken },
-            transformResponse: [
-              (data: string, _headers, status) => (status != null && status >= 400 ? data : parseCorosJson(data)),
-            ],
-            timeout: 15_000,
-          }),
+        const detailResponse = await this.executeRequest(
+          signal =>
+            axios.get<unknown>(`${this.apiBaseUrl}/v2/coros/sport/detail/fit`, {
+              params: {
+                mode: summary.mode,
+                subMode: summary.subMode,
+                labelId,
+                openId: token.openId,
+                token: token.accessToken,
+              },
+              headers: { Accept: 'application/json', token: token.accessToken },
+              transformResponse: [
+                (data: string, _headers, status) => (status != null && status >= 400 ? data : parseCorosJson(data)),
+              ],
+              timeout: 15_000,
+              signal,
+            }),
+          jobId,
         );
         fitUrls = extractCorosFitUrls(detailResponse.data);
       }
       if (fitUrls.length === 0) throw new Error('COROS_FIT_URL_MISSING');
-      return Promise.all(fitUrls.map(fitUrl => this.downloadFit(fitUrl)));
+      return Promise.all(fitUrls.map(fitUrl => this.downloadFit(fitUrl, jobId)));
     } catch (error: unknown) {
       if (error instanceof Error && error.message.startsWith('COROS_FIT_')) throw error;
       throw this.toHttpException(error);
     }
   }
 
-  private async downloadFit(fitUrl: string): Promise<Uint8Array> {
+  private async downloadFit(fitUrl: string, jobId: string): Promise<Uint8Array> {
     const url = validateCorosFitUrl(fitUrl, this.fitAllowedHosts);
-    const response = await this.executeRequest(() =>
-      axios.get<ArrayBuffer>(url.toString(), {
-        responseType: 'arraybuffer',
-        timeout: 15_000,
-        maxRedirects: 0,
-        maxContentLength: MAX_FIT_BYTES,
-        maxBodyLength: MAX_FIT_BYTES,
-      }),
+    const response = await this.executeRequest(
+      signal =>
+        axios.get<ArrayBuffer>(url.toString(), {
+          responseType: 'arraybuffer',
+          timeout: 15_000,
+          maxRedirects: 0,
+          maxContentLength: MAX_FIT_BYTES,
+          maxBodyLength: MAX_FIT_BYTES,
+          signal,
+        }),
+      jobId,
     );
     const bytes = Uint8Array.from(new Uint8Array(response.data));
     assertCorosFitBytes(bytes, MAX_FIT_BYTES);
     return bytes;
   }
 
-  private async getUsableToken(userId: string): Promise<CorosToken> {
+  private async getUsableToken(userId: string, jobId?: string): Promise<CorosToken> {
     const token = await this.readToken(userId);
     if (!token.expiresAt || Date.parse(token.expiresAt) > Date.now() + 5 * 60_000) return token;
     const existingRefresh = this.refreshes.get(userId);
     if (existingRefresh) return existingRefresh;
-    const refresh = this.refreshToken(userId, token).finally(() => this.refreshes.delete(userId));
+    const refresh = this.refreshToken(userId, token, jobId).finally(() => this.refreshes.delete(userId));
     this.refreshes.set(userId, refresh);
     return refresh;
   }
@@ -640,22 +700,28 @@ export class CorosCloudSyncService {
     };
   }
 
-  private async refreshToken(userId: string, token: CorosToken): Promise<CorosToken> {
+  private async refreshToken(userId: string, token: CorosToken, jobId?: string): Promise<CorosToken> {
     if (!token.refreshToken) throw new UnauthorizedException('COROS_REFRESH_TOKEN_MISSING');
     const clientId = this.configService.get<string>('COROS_CLIENT_ID');
     const clientSecret = this.configService.get<string>('COROS_CLIENT_SECRET');
     if (!clientId || !clientSecret) throw new InternalServerErrorException('COROS_CLIENT_CREDENTIALS_MISSING');
-    const response = await this.executeRequest(() =>
-      axios.post<unknown>(
-        `${this.apiBaseUrl}/oauth2/refresh-token`,
-        new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          refresh_token: token.refreshToken as string,
-          grant_type: 'refresh_token',
-        }).toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10_000 },
-      ),
+    const response = await this.executeRequest(
+      signal =>
+        axios.post<unknown>(
+          `${this.apiBaseUrl}/oauth2/refresh-token`,
+          new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: token.refreshToken as string,
+            grant_type: 'refresh_token',
+          }).toString(),
+          {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 10_000,
+            signal,
+          },
+        ),
+      jobId,
     );
     const responsePayload =
       this.isRecord(response.data) && this.isRecord(response.data.data) ? response.data.data : response.data;
@@ -720,18 +786,48 @@ export class CorosCloudSyncService {
     return [...byDay.values()];
   }
 
-  private async executeRequest<T>(request: () => Promise<T>): Promise<T> {
+  private async executeRequest<T>(request: (signal?: AbortSignal) => Promise<T>, jobId?: string): Promise<T> {
     let lastError: unknown;
+    const signal = jobId ? this.importLifecycleService.getSyncJobSignal?.(jobId) : undefined;
     for (let attempt = 0; attempt <= COROS_REQUEST_RETRIES; attempt += 1) {
+      if (signal?.aborted || (jobId && (await this.importLifecycleService.isSyncCancellationRequested(jobId)))) {
+        throw new Error(WEARABLE_SYNC_CANCEL_REQUESTED);
+      }
       try {
-        return await request();
+        return await request(signal);
       } catch (error: unknown) {
         lastError = error;
+        if (signal?.aborted || (jobId && (await this.importLifecycleService.isSyncCancellationRequested(jobId)))) {
+          throw error;
+        }
         if (attempt === COROS_REQUEST_RETRIES || !this.shouldRetry(error)) throw error;
-        await new Promise(resolve => setTimeout(resolve, this.retryDelayMs(error, attempt)));
+        await this.sleepForRetry(this.retryDelayMs(error, attempt), jobId, signal);
       }
     }
     throw lastError;
+  }
+
+  private async sleepForRetry(milliseconds: number, jobId?: string, signal?: AbortSignal): Promise<void> {
+    const deadline = Date.now() + milliseconds;
+    while (Date.now() < deadline) {
+      if (signal?.aborted || (jobId && (await this.importLifecycleService.isSyncCancellationRequested(jobId)))) {
+        throw new Error(WEARABLE_SYNC_CANCEL_REQUESTED);
+      }
+      const waitMs = Math.min(deadline - Date.now(), COROS_RETRY_CANCELLATION_POLL_MS);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          signal?.removeEventListener('abort', handleAbort);
+          resolve();
+        }, waitMs);
+        const handleAbort = (): void => {
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', handleAbort);
+          reject(new Error(WEARABLE_SYNC_CANCEL_REQUESTED));
+        };
+        signal?.addEventListener('abort', handleAbort, { once: true });
+        if (signal?.aborted) handleAbort();
+      });
+    }
   }
 
   private shouldRetry(error: unknown): boolean {

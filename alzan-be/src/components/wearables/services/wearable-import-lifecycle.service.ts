@@ -1,4 +1,10 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  OnModuleDestroy,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Json } from '../../../types/database.types';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { SyncDomain, WearableProvider } from '../domain/wearable.types';
@@ -50,6 +56,12 @@ const STALE_SYNC_WORKER_EXIT_MS = 5 * 60 * 1000;
 
 const STALE_SYNC_HEARTBEAT_MS = 5 * 60 * 1000;
 
+interface ActiveSyncRuntime {
+  controller: AbortController;
+  completed: Promise<void>;
+  markCompleted: () => void;
+}
+
 export interface FinishWearableSyncJobInput {
   jobId: string;
   leaseToken: string;
@@ -61,7 +73,13 @@ export interface FinishWearableSyncJobInput {
 type JsonRecord = Record<string, Json | undefined>;
 
 @Injectable()
-export class WearableImportLifecycleService {
+export class WearableImportLifecycleService implements OnModuleDestroy {
+  private readonly logger = new Logger(WearableImportLifecycleService.name);
+  private readonly activeSyncRuntimes = new Map<string, ActiveSyncRuntime>();
+  private readonly idleWaiters = new Set<() => void>();
+  private pendingClaims = 0;
+  private shuttingDown = false;
+
   constructor(private readonly supabaseAdminService: SupabaseAdminService) {}
 
   public async claimActivity(input: WearableImportClaimInput): Promise<WearableImportClaim> {
@@ -97,30 +115,65 @@ export class WearableImportLifecycleService {
   }
 
   public async claimSyncJob(input: WearableSyncJobClaimInput): Promise<WearableSyncJobClaim> {
-    if (input.provider === 'suunto' || input.provider === 'coros' || input.provider === 'polar') {
-      await this.reclaimStaleSyncJob(input);
-    }
-    const { data, error } = await this.supabaseAdminService.client.rpc('claim_wearable_sync_job', {
-      p_user_id: input.userId,
-      p_provider: input.provider,
-      p_sync_domain: input.syncDomain,
-      p_lease_seconds: input.leaseSeconds ?? 300,
-    });
-    if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_CLAIM_FAILED');
-    const claim = this.parseSyncJobClaim(data);
-    if (claim.action !== 'active') return claim;
+    if (this.shuttingDown) throw new ServiceUnavailableException('WEARABLE_SYNC_BACKEND_SHUTTING_DOWN');
+    this.pendingClaims += 1;
+    try {
+      if (input.provider === 'suunto' || input.provider === 'coros' || input.provider === 'polar') {
+        await this.reclaimStaleSyncJob(input);
+      }
+      const { data, error } = await this.supabaseAdminService.client.rpc('claim_wearable_sync_job', {
+        p_user_id: input.userId,
+        p_provider: input.provider,
+        p_sync_domain: input.syncDomain,
+        p_lease_seconds: input.leaseSeconds ?? 300,
+      });
+      if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_CLAIM_FAILED');
+      const claim = this.parseSyncJobClaim(data);
+      if (claim.action !== 'active') {
+        this.trackActiveSyncJob(claim.jobId);
+        return claim;
+      }
 
-    const { data: activeJob, error: activeJobError } = await this.supabaseAdminService.client
-      .from('wearable_sync_jobs')
-      .select('updated_at')
-      .eq('id', claim.jobId)
-      .maybeSingle();
-    if (activeJobError) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_READ_FAILED');
-    const heartbeatAt = activeJob?.updated_at ? Date.parse(activeJob.updated_at) : Number.NaN;
-    return {
-      ...claim,
-      retryAfterAt: Number.isFinite(heartbeatAt) ? new Date(heartbeatAt + STALE_SYNC_HEARTBEAT_MS).toISOString() : null,
-    };
+      const { data: activeJob, error: activeJobError } = await this.supabaseAdminService.client
+        .from('wearable_sync_jobs')
+        .select('updated_at')
+        .eq('id', claim.jobId)
+        .maybeSingle();
+      if (activeJobError) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_READ_FAILED');
+      const heartbeatAt = activeJob?.updated_at ? Date.parse(activeJob.updated_at) : Number.NaN;
+      return {
+        ...claim,
+        retryAfterAt: Number.isFinite(heartbeatAt)
+          ? new Date(heartbeatAt + STALE_SYNC_HEARTBEAT_MS).toISOString()
+          : null,
+      };
+    } finally {
+      this.pendingClaims -= 1;
+      this.resolveIdleWaiters();
+    }
+  }
+
+  public getSyncJobSignal(jobId: string): AbortSignal | undefined {
+    return this.activeSyncRuntimes.get(jobId)?.controller.signal;
+  }
+
+  public releaseSyncJob(jobId: string): void {
+    const runtime = this.activeSyncRuntimes.get(jobId);
+    if (!runtime) return;
+    this.activeSyncRuntimes.delete(jobId);
+    runtime.markCompleted();
+    this.resolveIdleWaiters();
+  }
+
+  public async onModuleDestroy(): Promise<void> {
+    this.shuttingDown = true;
+    await this.waitForPendingClaims();
+    const activeJobs = [...this.activeSyncRuntimes.entries()];
+    if (activeJobs.length === 0) return;
+
+    for (const [, runtime] of activeJobs) runtime.controller.abort();
+    await Promise.all(activeJobs.map(([jobId]) => this.requestShutdownCancellation(jobId)));
+    await Promise.all(activeJobs.map(([, runtime]) => runtime.completed));
   }
 
   public async finishSyncJob(input: FinishWearableSyncJobInput): Promise<void> {
@@ -161,10 +214,12 @@ export class WearableImportLifecycleService {
       .eq('status', 'running')
       .select('id');
     if (error) throw new InternalServerErrorException('WEARABLE_SYNC_CANCELLATION_REQUEST_FAILED');
+    for (const job of data ?? []) this.activeSyncRuntimes.get(job.id)?.controller.abort();
     return data?.length ?? 0;
   }
 
   public async isSyncCancellationRequested(jobId: string): Promise<boolean> {
+    if (this.activeSyncRuntimes.get(jobId)?.controller.signal.aborted) return true;
     const { data, error } = await this.supabaseAdminService.client
       .from('wearable_sync_jobs')
       .select('status, last_error')
@@ -195,6 +250,39 @@ export class WearableImportLifecycleService {
       throw new InternalServerErrorException('WEARABLE_ACTIVITY_IMPORT_CLAIM_INVALID');
     }
     return { action, importId, sessionId: typeof sessionId === 'string' ? sessionId : null };
+  }
+
+  private trackActiveSyncJob(jobId: string): void {
+    let markCompleted: () => void = () => undefined;
+    const completed = new Promise<void>(resolve => {
+      markCompleted = resolve;
+    });
+    const runtime: ActiveSyncRuntime = { controller: new AbortController(), completed, markCompleted };
+    this.activeSyncRuntimes.set(jobId, runtime);
+    if (this.shuttingDown) runtime.controller.abort();
+  }
+
+  private async requestShutdownCancellation(jobId: string): Promise<void> {
+    const now = new Date().toISOString();
+    const { error } = await this.supabaseAdminService.client
+      .from('wearable_sync_jobs')
+      .update({ last_error: WEARABLE_SYNC_CANCEL_REQUESTED, updated_at: now })
+      .eq('id', jobId)
+      .eq('status', 'running');
+    if (error) {
+      this.logger.error(`Failed to persist shutdown cancellation for wearable sync job ${jobId}`, error.message);
+    }
+  }
+
+  private async waitForPendingClaims(): Promise<void> {
+    if (this.pendingClaims === 0) return;
+    await new Promise<void>(resolve => this.idleWaiters.add(resolve));
+  }
+
+  private resolveIdleWaiters(): void {
+    if (this.pendingClaims > 0) return;
+    for (const resolve of this.idleWaiters) resolve();
+    this.idleWaiters.clear();
   }
 
   private parseSyncJobClaim(value: Json): WearableSyncJobClaim {

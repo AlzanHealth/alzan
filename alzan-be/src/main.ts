@@ -16,6 +16,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
   });
+  app.enableShutdownHooks();
 
   app.useLogger(app.get(PinoLogger));
 

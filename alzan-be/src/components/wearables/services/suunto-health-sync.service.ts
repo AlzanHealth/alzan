@@ -76,7 +76,7 @@ export class SuuntoHealthSyncService {
       if (job.action === 'active') return this.outcome('running', undefined, job.retryAfterAt);
       stopLeaseHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
       if (await this.lifecycle.isSyncCancellationRequested(job.jobId)) return this.finishCancelled(job, 0, 0, 0, 0);
-      const accessToken = await this.suunto.getHealthAccessToken(userId);
+      const accessToken = await this.suunto.getHealthAccessToken(userId, job.jobId);
       const now = Date.now();
       const previousCursor = await this.states.getCursor({
         userId,
@@ -256,6 +256,12 @@ export class SuuntoHealthSyncService {
       };
     } catch (error: unknown) {
       const errorCode = this.errorCode(error);
+      if (
+        job?.action === 'acquired' &&
+        (await this.lifecycle.isSyncCancellationRequested(job.jobId).catch(() => false))
+      ) {
+        return this.finishCancelled(job, 0, 0, 0, 0);
+      }
       await this.states
         .markFailed(
           {
@@ -282,6 +288,7 @@ export class SuuntoHealthSyncService {
       return this.outcome('partial', errorCode);
     } finally {
       stopLeaseHeartbeat?.();
+      if (job?.action === 'acquired') this.lifecycle.releaseSyncJob?.(job.jobId);
     }
   }
 
@@ -308,10 +315,26 @@ export class SuuntoHealthSyncService {
       if (await this.lifecycle.isSyncCancellationRequested(jobId)) break;
       const end = Math.min(start + MAX_API_WINDOW_DAYS * MS_PER_DAY, to);
       const params = { from: start, to: end };
+      const signal = this.lifecycle.getSyncJobSignal?.(jobId);
       const [activity, sleep, recovery] = await Promise.all([
-        axios.get<unknown>('https://cloudapi.suunto.com/247samples/activity', { headers, params, timeout: 30_000 }),
-        axios.get<unknown>('https://cloudapi.suunto.com/247samples/sleep', { headers, params, timeout: 30_000 }),
-        axios.get<unknown>('https://cloudapi.suunto.com/247samples/recovery', { headers, params, timeout: 30_000 }),
+        axios.get<unknown>('https://cloudapi.suunto.com/247samples/activity', {
+          headers,
+          params,
+          timeout: 30_000,
+          signal,
+        }),
+        axios.get<unknown>('https://cloudapi.suunto.com/247samples/sleep', {
+          headers,
+          params,
+          timeout: 30_000,
+          signal,
+        }),
+        axios.get<unknown>('https://cloudapi.suunto.com/247samples/recovery', {
+          headers,
+          params,
+          timeout: 30_000,
+          signal,
+        }),
       ]);
       result.activity.push(...this.records(activity.data));
       result.sleep.push(...this.records(sleep.data));

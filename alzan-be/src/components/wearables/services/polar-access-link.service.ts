@@ -23,6 +23,8 @@ type ProviderTokenRow = {
   expiresAt: string | null;
 };
 
+const POLAR_REQUEST_TIMEOUT_MS = 30_000;
+
 export interface PolarSyncResult {
   provider: 'polar';
   jobId: string;
@@ -66,18 +68,18 @@ export class PolarAccessLinkService {
       };
     }
     const stopHeartbeat = this.startLeaseHeartbeat(job.jobId, job.leaseToken);
+    let activitiesImported = 0;
     try {
-      const token = await this.getUsableToken(userId);
+      const token = await this.getUsableToken(userId, job.jobId);
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
         return this.finishCancelled(job.jobId, job.leaseToken, 0);
       }
-      const summaries = await this.fetchExerciseSummaries(token.accessToken);
-      let activitiesImported = 0;
+      const summaries = await this.fetchExerciseSummaries(token.accessToken, job.jobId);
       for (const summary of summaries) {
         if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId)) {
           return this.finishCancelled(job.jobId, job.leaseToken, activitiesImported);
         }
-        const detail = await this.fetchExerciseDetail(token.accessToken, summary);
+        const detail = await this.fetchExerciseDetail(token.accessToken, summary, job.jobId);
         if (!detail) continue;
         await this.importExercise(userId, detail);
         activitiesImported += 1;
@@ -114,6 +116,9 @@ export class PolarAccessLinkService {
         lastSuccessAt,
       };
     } catch (error: unknown) {
+      if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId).catch(() => false)) {
+        return await this.finishCancelled(job.jobId, job.leaseToken, activitiesImported);
+      }
       await this.importLifecycleService
         .finishSyncJob({
           jobId: job.jobId,
@@ -127,6 +132,7 @@ export class PolarAccessLinkService {
       throw error;
     } finally {
       stopHeartbeat();
+      this.importLifecycleService.releaseSyncJob?.(job.jobId);
     }
   }
 
@@ -185,37 +191,51 @@ export class PolarAccessLinkService {
     await this.activityWriterService.upsertActivity({ userId, activity, provenance });
   }
 
-  private async fetchExerciseSummaries(accessToken: string): Promise<JsonRecord[]> {
-    const response = await this.getPolar<JsonRecord | JsonRecord[]>('/v3/exercises', accessToken, {
-      samples: 'true',
-      zones: 'true',
-      route: 'true',
-    });
+  private async fetchExerciseSummaries(accessToken: string, jobId: string): Promise<JsonRecord[]> {
+    const response = await this.getPolar<JsonRecord | JsonRecord[]>(
+      '/v3/exercises',
+      accessToken,
+      {
+        samples: 'true',
+        zones: 'true',
+        route: 'true',
+      },
+      jobId,
+    );
     if (Array.isArray(response)) return response.filter(this.isRecord);
     const exercises = response.exercises ?? response.exercise ?? response.data;
     if (Array.isArray(exercises)) return exercises.filter(this.isRecord);
     return [];
   }
 
-  private async fetchExerciseDetail(accessToken: string, summary: JsonRecord): Promise<JsonRecord | null> {
+  private async fetchExerciseDetail(
+    accessToken: string,
+    summary: JsonRecord,
+    jobId: string,
+  ): Promise<JsonRecord | null> {
     const url = this.readString(summary.url);
     const id = this.readExerciseId(summary);
     if (url) {
-      return this.getPolarUrl<JsonRecord>(url, accessToken, { samples: 'true', zones: 'true', route: 'true' });
+      return this.getPolarUrl<JsonRecord>(url, accessToken, { samples: 'true', zones: 'true', route: 'true' }, jobId);
     }
     if (!id) return summary;
-    return this.getPolar<JsonRecord>(`/v3/exercises/${encodeURIComponent(id)}`, accessToken, {
-      samples: 'true',
-      zones: 'true',
-      route: 'true',
-    });
+    return this.getPolar<JsonRecord>(
+      `/v3/exercises/${encodeURIComponent(id)}`,
+      accessToken,
+      {
+        samples: 'true',
+        zones: 'true',
+        route: 'true',
+      },
+      jobId,
+    );
   }
 
-  private async getUsableToken(userId: string): Promise<ProviderTokenRow> {
+  private async getUsableToken(userId: string, jobId?: string): Promise<ProviderTokenRow> {
     const token = await this.readToken(userId);
     if (!this.isTokenExpired(token.expiresAt)) return token;
     if (!token.refreshToken) throw new UnauthorizedException('POLAR_REFRESH_TOKEN_MISSING');
-    return this.refreshToken(userId, token);
+    return this.refreshToken(userId, token, jobId);
   }
 
   private async readToken(userId: string): Promise<ProviderTokenRow> {
@@ -243,7 +263,7 @@ export class PolarAccessLinkService {
     };
   }
 
-  private async refreshToken(userId: string, token: ProviderTokenRow): Promise<ProviderTokenRow> {
+  private async refreshToken(userId: string, token: ProviderTokenRow, jobId?: string): Promise<ProviderTokenRow> {
     const clientId = this.configService.get<string>('POLAR_CLIENT_ID');
     const clientSecret = this.configService.get<string>('POLAR_CLIENT_SECRET');
     if (!clientId || !clientSecret) throw new InternalServerErrorException('POLAR_CLIENT_CREDENTIALS_MISSING');
@@ -259,6 +279,8 @@ export class PolarAccessLinkService {
           Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
+        timeout: POLAR_REQUEST_TIMEOUT_MS,
+        signal: jobId ? this.importLifecycleService.getSyncJobSignal?.(jobId) : undefined,
       },
     );
     const data = response.data as {
@@ -298,11 +320,21 @@ export class PolarAccessLinkService {
     };
   }
 
-  private async getPolar<T>(path: string, accessToken: string, params?: Record<string, string>): Promise<T> {
-    return this.getPolarUrl<T>(`${this.apiBaseUrl}${path}`, accessToken, params);
+  private async getPolar<T>(
+    path: string,
+    accessToken: string,
+    params?: Record<string, string>,
+    jobId?: string,
+  ): Promise<T> {
+    return this.getPolarUrl<T>(`${this.apiBaseUrl}${path}`, accessToken, params, jobId);
   }
 
-  private async getPolarUrl<T>(url: string, accessToken: string, params?: Record<string, string>): Promise<T> {
+  private async getPolarUrl<T>(
+    url: string,
+    accessToken: string,
+    params?: Record<string, string>,
+    jobId?: string,
+  ): Promise<T> {
     try {
       const response = await axios.get<T>(url, {
         headers: {
@@ -310,6 +342,8 @@ export class PolarAccessLinkService {
           Accept: 'application/json',
         },
         params,
+        timeout: POLAR_REQUEST_TIMEOUT_MS,
+        signal: jobId ? this.importLifecycleService.getSyncJobSignal?.(jobId) : undefined,
       });
       return response.data;
     } catch (error: unknown) {
