@@ -263,32 +263,8 @@ ON CONFLICT (id) DO UPDATE SET
   reps = EXCLUDED.reps,
   rpe = EXCLUDED.rpe;
 
--- Zone totals for workouts in the last week.
-WITH recent_sessions AS (
-  SELECT id, duration_s
-  FROM public.activity_sessions
-  WHERE user_id = '4424c5d6-5751-4038-aa39-bd85895ddb78'
-    AND name LIKE 'Demo cardio evolution:%'
-    AND start_time >= now() - INTERVAL '7 days'
-    AND avg_heart_rate BETWEEN 40 AND 220
-),
-zone_fractions AS (
-  SELECT * FROM (VALUES
-    (1::smallint, 0.10::numeric),
-    (2::smallint, 0.45::numeric),
-    (3::smallint, 0.30::numeric),
-    (4::smallint, 0.12::numeric),
-    (5::smallint, 0.03::numeric)
-  ) AS zones(zone, fraction)
-)
-INSERT INTO public.activity_heart_rate_zones (session_id, zone, duration_s, percentage)
-SELECT
-  recent_sessions.id,
-  zone_fractions.zone,
-  round(recent_sessions.duration_s * zone_fractions.fraction)::integer,
-  (zone_fractions.fraction * 100)::numeric(5,2)
-FROM recent_sessions
-CROSS JOIN zone_fractions;
+-- The demo has no provider-reported zone totals. Keep this table empty for
+-- these sessions so the UI's verified-zone state remains truthful.
 
 -- Sparse but paired samples for the latest long run and ride. They let the UI
 -- test its conservative within-session output/heart-rate stability calculation.
