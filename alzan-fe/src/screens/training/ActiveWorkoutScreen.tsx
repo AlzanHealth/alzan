@@ -21,7 +21,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
 import { GlassCard } from '../../components/GlassCard';
-import { getSetTableMinWidth, TRAINING_CONTROL_SIZE } from './helpers/trainingFormLayout';
+import { getSetTableLayout, TRAINING_CONTROL_SIZE } from './helpers/trainingFormLayout';
 import { spacing, borderRadius, shadows, darkShadows } from '../../theme';
 import { ExerciseWithType, useActiveWorkout } from '../../hooks/useActiveWorkout';
 import { useAuth } from '../../context/AuthContext';
@@ -178,7 +178,8 @@ const buildSupersetLinksFromSessionLinks = (
 };
 
 export const ActiveWorkoutScreen = () => {
-  const { fontScale } = useWindowDimensions();
+  const { width: viewportWidth } = useWindowDimensions();
+  const setTableLayout = getSetTableLayout(viewportWidth);
   const { t } = useTranslation();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
@@ -1394,6 +1395,7 @@ export const ActiveWorkoutScreen = () => {
                         style={[
                           styles.exerciseCard,
                           dynamicStyles.glassCard,
+                          { paddingHorizontal: setTableLayout.cardPaddingHorizontal },
                           isInSuperset && {
                             borderColor: themeColors.primary + 'CC',
                             borderWidth: 1.5,
@@ -1451,15 +1453,15 @@ export const ActiveWorkoutScreen = () => {
                         </View>
                         {!isCollapsed && (
                           <>
-                            <ScrollView
-                              horizontal
-                              contentContainerStyle={styles.setTableScroll}
-                              keyboardShouldPersistTaps="handled"
-                            >
-                              <View style={{ flex: 1, minWidth: getSetTableMinWidth(fontScale) }}>
+                            <View style={styles.setTable}>
+                              <View style={styles.setTableContent}>
                                 <View
                                   style={[
                                     styles.setsHeader,
+                                    {
+                                      gap: setTableLayout.rowGap,
+                                      paddingHorizontal: setTableLayout.rowPaddingHorizontal,
+                                    },
                                     {
                                       borderBottomColor: isInSuperset
                                         ? themeColors.primary + '7A'
@@ -1476,16 +1478,28 @@ export const ActiveWorkoutScreen = () => {
                                   </Text>
                                   {!isTimeBased && (
                                     <>
-                                      <Text style={[styles.colHeader, dynamicStyles.sublabel, { width: 60 }]}>
+                                      <Text
+                                        style={[
+                                          styles.colHeader,
+                                          dynamicStyles.sublabel,
+                                          { width: setTableLayout.recordColumnWidth },
+                                        ]}
+                                      >
                                         {t('training.prColonAllCaps')}
                                       </Text>
-                                      <Text style={[styles.colHeader, dynamicStyles.sublabel, { flex: 1 }]}>
+                                      <Text
+                                        style={[styles.colHeader, dynamicStyles.sublabel, { flex: 1, minWidth: 0 }]}
+                                      >
                                         {preferences.weight_unit}
                                       </Text>
                                     </>
                                   )}
                                   <Text
-                                    style={[styles.colHeader, dynamicStyles.sublabel, { flex: isTimeBased ? 2 : 1 }]}
+                                    style={[
+                                      styles.colHeader,
+                                      dynamicStyles.sublabel,
+                                      { flex: isTimeBased ? 2 : 1, minWidth: 0 },
+                                    ]}
                                   >
                                     {isTimeBased ? t('training.time') : t('training.repsColon')}
                                   </Text>
@@ -1516,6 +1530,10 @@ export const ActiveWorkoutScreen = () => {
                                       key={setNum}
                                       style={[
                                         styles.setRow,
+                                        {
+                                          gap: setTableLayout.rowGap,
+                                          paddingHorizontal: setTableLayout.rowPaddingHorizontal,
+                                        },
                                         isDone && {
                                           backgroundColor: isDark
                                             ? 'rgba(52, 199, 89, 0.15)'
@@ -1573,7 +1591,7 @@ export const ActiveWorkoutScreen = () => {
                                       {!isTimeBased && (
                                         <>
                                           <TouchableOpacity
-                                            style={styles.prevSetButton}
+                                            style={[styles.prevSetButton, { width: setTableLayout.recordColumnWidth }]}
                                             onPress={() => handleApplyPrToSetWeight(key, prData?.weight_kg)}
                                             disabled={!prData}
                                             accessibilityRole="button"
@@ -1584,7 +1602,7 @@ export const ActiveWorkoutScreen = () => {
                                               style={[
                                                 styles.prevSet,
                                                 {
-                                                  fontSize: 11,
+                                                  fontSize: setTableLayout.compact ? 10 : 11,
                                                   color: prData ? themeColors.primary : themeColors.textSecondary,
                                                 },
                                               ]}
@@ -1595,7 +1613,11 @@ export const ActiveWorkoutScreen = () => {
                                           </TouchableOpacity>
 
                                           <TextInput
-                                            style={[styles.input, dynamicStyles.input]}
+                                            style={[
+                                              styles.input,
+                                              dynamicStyles.input,
+                                              setTableLayout.compact && styles.compactInput,
+                                            ]}
                                             {...DECIMAL_INPUT_PROPS}
                                             accessibilityLabel={t('training.setWeightInput', {
                                               number: setNum,
@@ -1615,7 +1637,12 @@ export const ActiveWorkoutScreen = () => {
                                         </>
                                       )}
                                       <TextInput
-                                        style={[styles.input, dynamicStyles.input, isTimeBased && { flex: 2 }]}
+                                        style={[
+                                          styles.input,
+                                          dynamicStyles.input,
+                                          setTableLayout.compact && styles.compactInput,
+                                          isTimeBased && { flex: 2 },
+                                        ]}
                                         {...INTEGER_INPUT_PROPS}
                                         accessibilityLabel={t('training.setRepsInput', {
                                           number: setNum,
@@ -1671,7 +1698,7 @@ export const ActiveWorkoutScreen = () => {
                                   );
                                 })}
                               </View>
-                            </ScrollView>
+                            </View>
                             <TouchableOpacity style={styles.addSetBtn} onPress={() => handleAddSet(exerciseId)}>
                               <Plus size={16} color={themeColors.primary} />
                               <Text style={[styles.addSetText, { color: themeColors.primary }]}>
@@ -2280,8 +2307,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  setTableScroll: {
-    flexGrow: 1,
+  setTable: {
+    width: '100%',
+  },
+  setTableContent: {
+    width: '100%',
   },
   setRow: {
     flexDirection: 'row',
@@ -2358,8 +2388,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   prevSet: {
-    width: 60,
-    flexShrink: 0,
+    width: '100%',
     textAlign: 'center',
   },
   prevSetButton: {
@@ -2378,6 +2407,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     borderWidth: 1,
+  },
+  compactInput: {
+    paddingHorizontal: 0,
+    fontSize: 15,
   },
   checkBtn: {
     width: TRAINING_CONTROL_SIZE,
