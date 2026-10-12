@@ -5,6 +5,7 @@ import { aggregateStepsByDate } from '../services/stepsAggregation';
 import { stepsApi } from '../services/stepsApi';
 import { healthQueryKeys } from './healthQueryKeys';
 import { isManualStepsRangeValid } from '../helpers/stepsRange.helper';
+import { invalidateStepsRelatedQueries } from './stepsQueryInvalidation';
 
 /**
  * Daily step rows for the last `days` days (oldest first). Used by the chart.
@@ -23,7 +24,7 @@ export const useStepsRange = (days = 366) => {
 };
 
 /**
- * Aggregated step total for today (manual value preferred), or null if none.
+ * Highest step total recorded across sources for today, or null if none.
  */
 export const useTodaySteps = () => {
   const { user } = useAuth();
@@ -76,8 +77,7 @@ export const useUpsertManualSteps = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: healthQueryKeys.steps(user?.id) });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateStepsRelatedQueries(queryClient, user?.id);
     },
   });
 };
@@ -103,8 +103,7 @@ export const useUpsertManualStepsRange = () => {
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: healthQueryKeys.steps(user?.id) });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateStepsRelatedQueries(queryClient, user?.id);
     },
   });
 };
