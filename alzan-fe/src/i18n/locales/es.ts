@@ -1403,6 +1403,7 @@ export default {
     averageAllCaps: 'PROMEDIO',
     selectedRecord: 'Registro seleccionado',
     showPeriodAverage: 'Ver promedio del periodo',
+    showPeriodMedian: 'Ver mediana del periodo',
     chartMetric: 'Métrica',
     chartPeriod: 'Periodo',
     periodWeek: '7 días',

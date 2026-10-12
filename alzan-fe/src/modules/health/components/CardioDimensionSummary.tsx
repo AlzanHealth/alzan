@@ -356,6 +356,7 @@ export const CardioDimensionSummary = ({
             }
             summaryDate={t(CARDIO_PERIOD_TRANSLATIONS[period])}
             summaryLabel={t('health.cardioMetricHeartRate')}
+            clearSelectionLabel={t('health.showPeriodMedian')}
             formatSelectedValue={value => `${Math.round(value)} ${t('health.cardioBpm')}`}
             formatSelectedDate={point => point.label ?? point.dateRange}
           />

@@ -13,6 +13,7 @@ type HealthHistoryChartProps = {
   summaryValue: string;
   summaryDate: string;
   summaryLabel?: string;
+  clearSelectionLabel?: string;
   color: string;
   unit?: string;
   range?: ChartRange;
@@ -29,6 +30,7 @@ export const HealthHistoryChart = ({
   summaryValue,
   summaryDate,
   summaryLabel,
+  clearSelectionLabel,
   color,
   unit,
   range = 'M',
@@ -90,7 +92,9 @@ export const HealthHistoryChart = ({
         <Text style={[styles.readoutDate, healthStyles.subtitle]}>{readout.date}</Text>
         {readout.isSelected ? (
           <Pressable onPress={handleClearSelection} accessibilityRole="button" style={styles.clearSelection}>
-            <Text style={[styles.clearSelectionText, { color: colors.primary }]}>{t('health.showPeriodAverage')}</Text>
+            <Text style={[styles.clearSelectionText, { color: colors.primary }]}>
+              {clearSelectionLabel ?? t('health.showPeriodAverage')}
+            </Text>
           </Pressable>
         ) : null}
       </View>

@@ -1384,6 +1384,7 @@ const en = {
     averageAllCaps: 'AVERAGE',
     selectedRecord: 'Selected record',
     showPeriodAverage: 'Show period average',
+    showPeriodMedian: 'Show period median',
     chartMetric: 'Metric',
     chartPeriod: 'Period',
     periodWeek: '7 days',
