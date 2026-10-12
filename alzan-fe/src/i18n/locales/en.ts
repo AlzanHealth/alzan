@@ -962,14 +962,14 @@ const en = {
     suuntoStressSamples: '{{count}} readings',
     suuntoSteps: 'Steps',
     suuntoStepsDescription:
-      'Steps recorded by your watch in the selected period. The chart compares available daily totals.',
+      'Steps from connected devices and manual entries. When a day has multiple values, the highest one is shown.',
     suuntoStepsAbout: 'About steps',
     suuntoStepsWhat:
-      'The total represents steps Suunto recorded for each day. It is a count of movement detected by your watch, not a complete measure of all your physical activity.',
+      'The total is the highest count recorded for each day across your connected devices and manual entries. Different sources are not added because they may count the same steps.',
     suuntoStepsInterpretation:
-      'Compare days when you wore your watch for a similar amount of time. If you were not wearing it, the total may be lower than your actual steps. Steps alone do not show workout intensity or quality.',
+      'Compare days when you wore your devices for a similar amount of time. If you were not wearing them, the total may be lower than your actual steps. Steps alone do not show workout intensity or quality.',
     suuntoStepsMeasurement:
-      'The chart adds up daily totals received from Suunto. Only dates with data appear; Alzan does not estimate steps for days without a record.',
+      'The chart uses the highest value for each date across connected devices and manual entries. It does not add sources that may count the same steps or estimate days without data.',
     suuntoEnergy: 'Energy',
     suuntoEnergyDescription:
       'An estimate of active energy recorded by your watch, shown in kcal. The chart compares available daily totals.',

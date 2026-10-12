@@ -22,6 +22,7 @@ import { GlassCard } from '../../../components/GlassCard';
 import type { ChartDataPoint, ChartDataPointSelect } from '../../../components/stats/SimpleChart';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { healthQueryKeys } from '../hooks/healthQueryKeys';
+import { aggregateStepsByDate } from '../services/stepsAggregation';
 import {
   addSuuntoSamplePage,
   aggregateDailyActivity,
@@ -135,9 +136,8 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
         loadAllSuuntoPages((offset, pageSize) => {
           let request = supabase
             .from('daily_steps')
-            .select('id, date, total_steps, calories_kcal')
+            .select('id, date, total_steps, calories_kcal, source, is_manual, source_package')
             .eq('user_id', user.id)
-            .eq('source', 'suunto')
             .order('date', { ascending: false })
             .range(offset, offset + pageSize - 1);
           if (from) request = request.gte('date', from.slice(0, 10));
@@ -199,16 +199,22 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
     }))
     .sort((left, right) => (left.date?.getTime() ?? 0) - (right.date?.getTime() ?? 0));
   const averageSleepLabel = avgSleep == null ? '—' : `${Math.floor(avgSleep / 60)}h ${Math.round(avgSleep % 60)}m`;
-  const rowsWithSteps = (query.data?.steps ?? []).filter(
-    (row): row is typeof row & { total_steps: number } => row.total_steps != null,
-  );
+  const stepRows = query.data?.steps ?? [];
+  const stepsByDate = aggregateStepsByDate(stepRows);
+  const totalSteps =
+    stepsByDate.size > 0 ? Array.from(stepsByDate.values()).reduce((sum, value) => sum + value, 0) : null;
+  const aggregatedStepRows = Array.from(stepsByDate, ([date, total_steps]) => ({
+    date,
+    total_steps,
+    calories_kcal: null,
+  }));
+  const suuntoActivityRows = stepRows.filter(row => row.source === 'suunto');
   const rowsWithEnergy = (query.data?.steps ?? []).filter(
-    (row): row is typeof row & { calories_kcal: number } => row.calories_kcal != null,
+    (row): row is typeof row & { calories_kcal: number } => row.source === 'suunto' && row.calories_kcal != null,
   );
-  const totalSteps = rowsWithSteps.length ? rowsWithSteps.reduce((sum, row) => sum + row.total_steps, 0) : null;
   const totalEnergy = rowsWithEnergy.length ? rowsWithEnergy.reduce((sum, row) => sum + row.calories_kcal, 0) : null;
-  const stepPoints = aggregateDailyActivity(query.data?.steps ?? [], 'steps');
-  const energyPoints = aggregateDailyActivity(query.data?.steps ?? [], 'energy');
+  const stepPoints = aggregateDailyActivity(aggregatedStepRows, 'steps');
+  const energyPoints = aggregateDailyActivity(suuntoActivityRows, 'energy');
   const periodStressCounts = sampleData?.stressCounts ?? { relaxing: 0, active: 0, passive: 0, stressful: 0 };
   const selectedStressCounts =
     selectedStressDate === undefined

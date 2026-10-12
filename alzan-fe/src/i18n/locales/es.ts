@@ -972,14 +972,14 @@ export default {
     suuntoStressSamples: '{{count}} lecturas',
     suuntoSteps: 'Pasos',
     suuntoStepsDescription:
-      'Pasos registrados por el reloj durante el periodo seleccionado. La gráfica compara los totales diarios disponibles.',
+      'Pasos de los dispositivos conectados y de los registros manuales. Si hay varios valores para un día, se muestra el mayor.',
     suuntoStepsAbout: 'Acerca de los pasos',
     suuntoStepsWhat:
-      'El total representa los pasos que Suunto registró para cada día. Es un recuento de movimiento detectado por el reloj, no una medida completa de toda tu actividad física.',
+      'El total representa el mayor recuento registrado para cada día entre tus dispositivos conectados y los datos manuales. No se suman distintas fuentes porque pueden contar los mismos pasos.',
     suuntoStepsInterpretation:
-      'Compara días en los que llevaste el reloj durante un tiempo parecido. Si no lo llevabas, el total puede quedarse corto. Los pasos no indican por sí solos la intensidad del ejercicio ni la calidad del entrenamiento.',
+      'Compara días en los que llevaste tus dispositivos durante un tiempo parecido. Si no los llevabas, el total puede quedarse corto. Los pasos no indican por sí solos la intensidad del ejercicio ni la calidad del entrenamiento.',
     suuntoStepsMeasurement:
-      'La gráfica suma los totales diarios recibidos de Suunto. Solo aparecen fechas con datos; Alzan no estima los pasos de los días sin registro.',
+      'La gráfica usa el valor más alto de cada fecha entre dispositivos conectados y registros manuales. No suma fuentes que podrían contar los mismos pasos ni estima días sin datos.',
     suuntoEnergy: 'Energía',
     suuntoEnergyDescription:
       'Estimación de la energía activa registrada por el reloj, expresada en kcal. La gráfica compara los totales diarios disponibles.',

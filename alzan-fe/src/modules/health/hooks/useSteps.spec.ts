@@ -20,7 +20,7 @@ function row(input: {
   };
 }
 
-function assertManualStepsOverrideProviderRows(): void {
+function assertHighestStepsValueWinsIncludingManualRows(): void {
   const aggregated = aggregateStepsByDate([
     row({
       date: '2026-06-24',
@@ -33,7 +33,14 @@ function assertManualStepsOverrideProviderRows(): void {
     row({ date: '2026-06-24', id: 'manual', isManual: true, source: 'manual', totalSteps: 7000 }),
   ]);
 
-  assert.equal(aggregated.get('2026-06-24'), 7000);
+  assert.equal(aggregated.get('2026-06-24'), 9200);
+
+  const manualHigherThanProviders = aggregateStepsByDate([
+    row({ date: '2026-06-24', id: 'provider', source: 'garmin', totalSteps: 9200 }),
+    row({ date: '2026-06-24', id: 'manual', isManual: true, source: 'manual', totalSteps: 9500 }),
+  ]);
+
+  assert.equal(manualHigherThanProviders.get('2026-06-24'), 9500);
 }
 
 function assertHighestProviderValueWinsWhenNoManualRowExists(): void {
@@ -79,6 +86,6 @@ function assertProviderRowsAreNotSummedForTheSameDay(): void {
   );
 }
 
-assertManualStepsOverrideProviderRows();
+assertHighestStepsValueWinsIncludingManualRows();
 assertHighestProviderValueWinsWhenNoManualRowExists();
 assertProviderRowsAreNotSummedForTheSameDay();
