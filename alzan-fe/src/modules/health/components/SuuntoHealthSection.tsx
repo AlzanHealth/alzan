@@ -1,4 +1,5 @@
 import React from 'react';
+import { format } from 'date-fns';
 import {
   Activity,
   Heart,
@@ -35,6 +36,7 @@ import { getSuuntoHealthEducation, suuntoEducationTopicTitles } from '../helpers
 import { HealthHistoryChart } from './HealthHistoryChart';
 import {
   getSuuntoChartRange,
+  getSuuntoDailyPeriodStart,
   getSuuntoPeriodStart,
   loadAllSuuntoPages,
   SUUNTO_DETAIL_PERIODS,
@@ -77,6 +79,8 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   const [selectedStressDate, setSelectedStressDate] = React.useState<number>();
   const selectedPeriod = activeDetail ? detailPeriod : period;
   const from = getSuuntoPeriodStart(selectedPeriod);
+  const dailyFrom = getSuuntoDailyPeriodStart(selectedPeriod);
+  const today = format(new Date(), 'yyyy-MM-dd');
   const bucketSize = selectedPeriod === 'D' ? 30 * 60_000 : selectedPeriod === 'W' ? 2 * 60 * 60_000 : 24 * 60 * 60_000;
   React.useEffect(() => {
     if (sleepDetailsRequest > 0) {
@@ -92,7 +96,7 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
   };
 
   const query = useQuery({
-    queryKey: [...healthQueryKeys.all(user?.id), 'suunto-24-7', selectedPeriod],
+    queryKey: [...healthQueryKeys.all(user?.id), 'suunto-24-7', selectedPeriod, today],
     enabled: !!user,
     queryFn: async () => {
       if (!user) return { samples: createSuuntoSampleAggregate(), sleeps: [], steps: [], syncState: null };
@@ -138,9 +142,11 @@ export const SuuntoHealthSection = ({ sleepDetailsRequest }: Props) => {
             .from('daily_steps')
             .select('id, date, total_steps, calories_kcal, source, is_manual, source_package')
             .eq('user_id', user.id)
+            .lte('date', today)
             .order('date', { ascending: false })
+            .order('id', { ascending: false })
             .range(offset, offset + pageSize - 1);
-          if (from) request = request.gte('date', from.slice(0, 10));
+          if (dailyFrom) request = request.gte('date', dailyFrom);
           return request;
         });
       const [samples, sleeps, steps, syncState] = await Promise.all([

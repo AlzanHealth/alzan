@@ -105,7 +105,7 @@ export const StepsChart = React.forwardRef<StepsChartHandle>((_, ref) => {
           label: numDays <= 7 ? format(day, 'EEE', { locale }).replace('.', '').toLowerCase() : format(day, 'd'),
           fullLabel: format(day, 'd MMM yyyy', { locale }),
           value,
-          hasData: value > 0,
+          hasData: byDate.has(format(day, 'yyyy-MM-dd')),
           isMonthly: false,
         });
       }

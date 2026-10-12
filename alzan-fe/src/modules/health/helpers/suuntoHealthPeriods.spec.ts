@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   getSuuntoChartRange,
+  getSuuntoDailyPeriodStart,
   getSuuntoPeriodStart,
   loadAllSuuntoPages,
   SUUNTO_DETAIL_PERIODS,
@@ -49,6 +50,11 @@ async function loadsRowsBeyondTheFormerFiftyThousandRowLimit(): Promise<void> {
 }
 
 void exposesRequestedDetailPeriodsAndUsesRollingRanges();
+const localMidnight = new Date(2026, 9, 12, 0, 15);
+assert.equal(getSuuntoDailyPeriodStart('D', localMidnight), '2026-10-12');
+assert.equal(getSuuntoDailyPeriodStart('W', localMidnight), '2026-10-06');
+assert.equal(getSuuntoDailyPeriodStart('M', localMidnight), '2026-09-13');
+assert.equal(getSuuntoDailyPeriodStart('ALL', localMidnight), null);
 void loadsEveryPageIncludingTheFinalPartialPage();
 void propagatesPageErrors();
 void loadsRowsBeyondTheFormerFiftyThousandRowLimit();

@@ -92,7 +92,7 @@ export const useUpsertManualStepsRange = () => {
     mutationFn: async (params: { rows: ManualStepsRangeRow[] }) => {
       if (!user?.id) throw new Error('No authenticated user');
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      await Promise.all(
+      const results = await Promise.allSettled(
         params.rows.map(row =>
           stepsApi.upsertManual({
             date: format(row.date, 'yyyy-MM-dd'),
@@ -101,8 +101,10 @@ export const useUpsertManualStepsRange = () => {
           }),
         ),
       );
+      const failedSave = results.find(result => result.status === 'rejected');
+      if (failedSave?.status === 'rejected') throw failedSave.reason;
     },
-    onSuccess: () => {
+    onSettled: () => {
       invalidateStepsRelatedQueries(queryClient, user?.id);
     },
   });

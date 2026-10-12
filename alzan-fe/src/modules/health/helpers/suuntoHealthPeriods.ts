@@ -1,3 +1,5 @@
+import { format, subDays } from 'date-fns';
+
 export const SUUNTO_DETAIL_PERIODS = ['D', 'W', 'M', '3M', '6M', 'ALL'] as const;
 
 export type SuuntoDetailPeriod = (typeof SUUNTO_DETAIL_PERIODS)[number];
@@ -17,6 +19,9 @@ export const getSuuntoPeriodStart = (period: SuuntoHealthPeriod, referenceDate =
   if (period === 'ALL') return null;
   return new Date(referenceDate.getTime() - periodDays[period] * 86_400_000).toISOString();
 };
+
+export const getSuuntoDailyPeriodStart = (period: SuuntoHealthPeriod, referenceDate = new Date()): string | null =>
+  period === 'ALL' ? null : format(subDays(referenceDate, periodDays[period] - 1), 'yyyy-MM-dd');
 
 export const getSuuntoChartRange = (period: SuuntoDetailPeriod): SuuntoChartRange => {
   if (period === 'D') return 'D';

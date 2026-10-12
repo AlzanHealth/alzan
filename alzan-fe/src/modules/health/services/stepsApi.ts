@@ -1,25 +1,27 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { DailySteps } from '../../../types/requests.types';
+import { format } from 'date-fns';
+import { loadAllSuuntoPages } from '../helpers/suuntoHealthPeriods';
 
 export type StepsRow = Pick<DailySteps, 'id' | 'date' | 'total_steps' | 'source' | 'is_manual' | 'source_package'>;
 
 export const stepsApi = {
   /**
-   * Fetch daily step rows on/after a given date (yyyy-MM-dd), oldest first.
+   * Fetch all daily step rows from the given date through today, oldest first.
    */
   async getRange(userId: string, fromDate: string): Promise<StepsRow[]> {
-    const { data, error } = await supabase
-      .from('daily_steps')
-      .select('id, date, total_steps, source, is_manual, source_package')
-      .eq('user_id', userId)
-      .gte('date', fromDate)
-      .order('date', { ascending: true });
-
-    if (error) {
-      console.error('[stepsApi.getRange] Error:', error);
-      throw error;
-    }
-    return (data as StepsRow[]) ?? [];
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return loadAllSuuntoPages((offset, pageSize) =>
+      supabase
+        .from('daily_steps')
+        .select('id, date, total_steps, source, is_manual, source_package')
+        .eq('user_id', userId)
+        .gte('date', fromDate)
+        .lte('date', today)
+        .order('date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(offset, offset + pageSize - 1),
+    );
   },
 
   /**
