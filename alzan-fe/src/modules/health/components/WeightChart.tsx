@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { HealthHistoryChart } from './HealthHistoryChart';
+import { getLast30DaysRecords } from './healthHistoryChartPresentation';
 import { colors, typography } from '../../../theme';
 import { WeightLog } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
@@ -11,12 +12,13 @@ interface WeightChartProps {
 
 export const WeightChart: React.FC<WeightChartProps> = ({ data }) => {
   const { t } = useTranslation();
-  if (!data || data.length === 0) {
+  const recentLogs = getLast30DaysRecords(data ?? []);
+  if (recentLogs.length === 0) {
     return null;
   }
 
   // Transform data for SimpleChart (reverse to show chronologically)
-  const chartData = data
+  const chartData = recentLogs
     .slice()
     .reverse()
     .map(log => ({

@@ -8,6 +8,7 @@ import { colors, typography } from '../../../theme';
 import { useMeasurements, useDeleteMeasurement } from '../hooks/useMeasurements';
 import { format } from 'date-fns';
 import { HealthHistoryChart } from '../components/HealthHistoryChart';
+import { getLast30DaysRecords } from '../components/healthHistoryChartPresentation';
 import { BodyMeasurement } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
@@ -42,15 +43,17 @@ export const MeasurementDetail = () => {
     </View>
   );
 
-  const chartData =
-    logs
-      ?.map(l => ({
-        label: new Date(l.measured_at).getDate().toString(),
-        value: l.value_cm,
-        date: new Date(l.measured_at),
-      }))
-      .reverse() || [];
-  const averageCm = logs?.length ? logs.reduce((sum, log) => sum + log.value_cm, 0) / logs.length : null;
+  const recentLogs = getLast30DaysRecords(logs ?? []);
+  const chartData = recentLogs
+    .map(l => ({
+      label: new Date(l.measured_at).getDate().toString(),
+      value: l.value_cm,
+      date: new Date(l.measured_at),
+    }))
+    .reverse();
+  const averageCm = recentLogs.length
+    ? recentLogs.reduce((sum, log) => sum + log.value_cm, 0) / recentLogs.length
+    : null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -73,7 +76,7 @@ export const MeasurementDetail = () => {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
-          logs && logs.length > 0 ? (
+          recentLogs.length > 0 ? (
             <View style={styles.chartContainer}>
               <Text style={styles.chartTitle}>{t('health.progress30Days')}</Text>
               <HealthHistoryChart
@@ -81,9 +84,9 @@ export const MeasurementDetail = () => {
                 height={220}
                 color={colors.secondary}
                 unit={t('health.cm')}
-                range="A"
+                range="M"
                 summaryValue={averageCm === null ? '—' : `${averageCm.toFixed(1)} ${t('health.cm')}`}
-                summaryDate={t('health.history')}
+                summaryDate={t('health.last30Days')}
                 formatSelectedValue={value => `${value.toFixed(1)} ${t('health.cm')}`}
               />
             </View>

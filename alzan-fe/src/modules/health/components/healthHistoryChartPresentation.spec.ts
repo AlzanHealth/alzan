@@ -1,5 +1,23 @@
 import assert from 'node:assert/strict';
-import { getHealthHistoryChartReadout, getSelectedHealthHistoryPoint } from './healthHistoryChartPresentation';
+import {
+  getHealthHistoryChartReadout,
+  getLast30DaysRecords,
+  getSelectedHealthHistoryPoint,
+} from './healthHistoryChartPresentation';
+
+const referenceDate = new Date('2026-10-11T12:00:00.000Z');
+assert.deepEqual(
+  getLast30DaysRecords(
+    [
+      { id: 'recent', measured_at: '2026-10-10T12:00:00.000Z' },
+      { id: 'boundary', measured_at: '2026-09-11T12:00:00.000Z' },
+      { id: 'old', measured_at: '2026-09-11T11:59:59.000Z' },
+      { id: 'future', measured_at: '2026-10-12T12:00:00.000Z' },
+    ],
+    referenceDate,
+  ).map(record => record.id),
+  ['recent', 'boundary'],
+);
 
 const selectedPoint = {
   value: 0,
