@@ -198,7 +198,7 @@ export class CorosCloudSyncService {
           canonicalVersion: CANONICAL_ACTIVITY_VERSION,
         },
       });
-      await this.importLifecycleService.finishSyncJob({
+      const cancelledAtFinish = await this.importLifecycleService.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
         status,
@@ -208,8 +208,8 @@ export class CorosCloudSyncService {
       return {
         provider: 'coros',
         jobId: job.jobId,
-        status,
-        cancelled,
+        status: cancelledAtFinish ? 'partial' : status,
+        cancelled: cancelled || cancelledAtFinish,
         activitiesImported,
         activitiesSkipped,
         activitiesFailed,
@@ -217,7 +217,7 @@ export class CorosCloudSyncService {
         healthConsentRequired: !hasHealthConsent,
         errorsByCode,
         fitPending,
-        lastSuccessAt,
+        lastSuccessAt: cancelled || cancelledAtFinish ? null : lastSuccessAt,
       };
     } catch (error: unknown) {
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId).catch(() => false)) {
@@ -289,7 +289,7 @@ export class CorosCloudSyncService {
       activitiesFailed = result.status === 'failed' ? 1 : 0;
       const cancelled = await this.importLifecycleService.isSyncCancellationRequested(job.jobId);
       const status = cancelled ? 'partial' : result.status === 'failed' ? 'partial' : 'success';
-      await this.importLifecycleService.finishSyncJob({
+      const cancelledAtFinish = await this.importLifecycleService.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
         status,
@@ -304,10 +304,14 @@ export class CorosCloudSyncService {
             ? 'COROS_ACTIVITY_IMPORT_FAILED'
             : null,
       });
-      if (result.status !== 'failed' && !cancelled) {
+      if (result.status !== 'failed' && !cancelled && !cancelledAtFinish) {
         await this.markConnectionResult(userId, new Date().toISOString(), 'success', {});
       }
-      return { jobId: job.jobId, status: cancelled ? 'cancelled' : result.status, fitPending: result.fitPending };
+      return {
+        jobId: job.jobId,
+        status: cancelled || cancelledAtFinish ? 'cancelled' : result.status,
+        fitPending: result.fitPending,
+      };
     } catch (error: unknown) {
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId).catch(() => false)) {
         await this.importLifecycleService.finishSyncJob({

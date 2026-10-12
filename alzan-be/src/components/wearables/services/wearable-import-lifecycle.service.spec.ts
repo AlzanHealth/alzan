@@ -18,6 +18,14 @@ function createQuery(response: QueryResponse, calls: Array<{ method: string; arg
       calls.push({ method: 'eq', args });
       return query;
     },
+    is: (...args: unknown[]) => {
+      calls.push({ method: 'is', args });
+      return query;
+    },
+    or: (...args: unknown[]) => {
+      calls.push({ method: 'or', args });
+      return query;
+    },
     order: (...args: unknown[]) => {
       calls.push({ method: 'order', args });
       return query;
@@ -124,6 +132,37 @@ async function assertCancellationMarkerIsObservedByWorker(): Promise<void> {
   assert(calls.some(call => call.method === 'eq' && call.args[0] === 'id' && call.args[1] === 'job-1'));
 }
 
+async function assertFinishKeepsConcurrentCancellation(): Promise<void> {
+  const calls: Array<{ method: string; args: unknown[] }> = [];
+  let updateCount = 0;
+  const client = {
+    from: () => {
+      updateCount += 1;
+      return createQuery({ data: updateCount === 1 ? [] : [{ id: 'job-1' }], error: null }, calls);
+    },
+  };
+  const service = new WearableImportLifecycleService({ client } as unknown as SupabaseAdminService);
+
+  await service.finishSyncJob({
+    jobId: 'job-1',
+    leaseToken: 'lease-1',
+    status: 'success',
+    counters: {},
+    lastError: null,
+  });
+
+  assert.equal(updateCount, 2, 'a concurrent cancellation must be finished as partial');
+  const updates = calls.filter(call => call.method === 'update');
+  assert.equal((updates[1].args[0] as Record<string, unknown>).status, 'partial');
+  assert.equal((updates[1].args[0] as Record<string, unknown>).last_error, 'WEARABLE_SYNC_CANCEL_REQUESTED');
+  assert(calls.some(call => call.method === 'eq' && call.args[0] === 'lease_token' && call.args[1] === 'lease-1'));
+  assert(
+    calls.some(
+      call => call.method === 'or' && String(call.args[0]).includes('last_error.neq.WEARABLE_SYNC_CANCEL_REQUESTED'),
+    ),
+  );
+}
+
 async function assertExpiredWorkerIsClosedInsteadOfShownAsActive(): Promise<void> {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   let reads = 0;
@@ -165,6 +204,7 @@ async function run(): Promise<void> {
   await assertActiveJobsAreScopedToCurrentUser();
   await assertCancellationOnlyMarksJobsAndDoesNotFinishThem();
   await assertCancellationMarkerIsObservedByWorker();
+  await assertFinishKeepsConcurrentCancellation();
   await assertExpiredWorkerIsClosedInsteadOfShownAsActive();
 }
 

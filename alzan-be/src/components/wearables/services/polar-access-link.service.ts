@@ -100,7 +100,7 @@ export class PolarAccessLinkService {
         lastRecordAt: lastSuccessAt,
         status: 'success',
       });
-      await this.importLifecycleService.finishSyncJob({
+      const cancelledAtFinish = await this.importLifecycleService.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
         status: 'success',
@@ -110,10 +110,10 @@ export class PolarAccessLinkService {
       return {
         provider: 'polar',
         jobId: job.jobId,
-        status: 'success',
-        cancelled: false,
+        status: cancelledAtFinish ? 'partial' : 'success',
+        cancelled: cancelledAtFinish,
         activitiesImported,
-        lastSuccessAt,
+        lastSuccessAt: cancelledAtFinish ? null : lastSuccessAt,
       };
     } catch (error: unknown) {
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId).catch(() => false)) {

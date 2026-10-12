@@ -168,7 +168,7 @@ export class SuuntoCloudSyncService {
           paginationVerified: workoutFetch.isPaginationVerified,
         },
       });
-      await this.importLifecycleService.finishSyncJob({
+      const cancelledAtFinish = await this.importLifecycleService.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
         status,
@@ -184,8 +184,8 @@ export class SuuntoCloudSyncService {
       return {
         provider: 'suunto',
         jobId: job.jobId,
-        status,
-        cancelled,
+        status: cancelledAtFinish ? 'partial' : status,
+        cancelled: cancelled || cancelledAtFinish,
         activitiesImported,
         activitiesSkipped,
         activitiesRepaired,
@@ -193,7 +193,7 @@ export class SuuntoCloudSyncService {
         activitiesReconciled,
         errorsByCode,
         phaseDurationsMs,
-        lastSuccessAt,
+        lastSuccessAt: cancelled || cancelledAtFinish ? null : lastSuccessAt,
       };
     } catch (error: unknown) {
       if (await this.importLifecycleService.isSyncCancellationRequested(job.jobId).catch(() => false)) {

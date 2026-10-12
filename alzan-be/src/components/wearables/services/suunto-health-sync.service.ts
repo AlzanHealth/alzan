@@ -66,6 +66,10 @@ export class SuuntoHealthSyncService {
 
     let job: Awaited<ReturnType<WearableImportLifecycleService['claimSyncJob']>> | null = null;
     let stopLeaseHeartbeat: (() => void) | null = null;
+    let healthSamplesImported = 0;
+    let healthDaysImported = 0;
+    let sleepsImported = 0;
+    let recoveriesImported = 0;
     try {
       job = await this.lifecycle.claimSyncJob({
         userId,
@@ -99,7 +103,7 @@ export class SuuntoHealthSyncService {
 
       // Keep the existing activities domain and importer independent. This phase only writes wellness data.
       const rows = this.buildMetricRows(userId, activity, recoveryRecords);
-      const healthSamplesImported = await this.writer.replaceHealthMetricSamples({
+      healthSamplesImported = await this.writer.replaceHealthMetricSamples({
         userId,
         provider: 'suunto',
         sourceChannel: 'cloud',
@@ -124,9 +128,6 @@ export class SuuntoHealthSyncService {
         string,
         { latest: unknown; steps: number; energyKcal: number; hasSteps: boolean; hasEnergy: boolean }
       >();
-      let healthDaysImported = 0;
-      let sleepsImported = 0;
-      let recoveriesImported = 0;
       for (const record of activity) {
         const mapped = mapSuuntoDailyActivityToCanonical(record);
         const current = dailyByDate.get(mapped.date) ?? {
@@ -239,7 +240,7 @@ export class SuuntoHealthSyncService {
           recoveries: recoveryRecords.length,
         },
       });
-      await this.lifecycle.finishSyncJob({
+      const cancelledAtFinish = await this.lifecycle.finishSyncJob({
         jobId: job.jobId,
         leaseToken: job.leaseToken,
         status: 'success',
@@ -247,12 +248,13 @@ export class SuuntoHealthSyncService {
         lastError: null,
       });
       return {
-        status: 'success',
+        status: cancelledAtFinish ? 'partial' : 'success',
+        cancelled: cancelledAtFinish,
         healthSamplesImported,
         healthDaysImported,
         sleepsImported,
         recoveriesImported,
-        lastSyncedAt,
+        lastSyncedAt: cancelledAtFinish ? null : lastSyncedAt,
       };
     } catch (error: unknown) {
       const errorCode = this.errorCode(error);
@@ -260,7 +262,7 @@ export class SuuntoHealthSyncService {
         job?.action === 'acquired' &&
         (await this.lifecycle.isSyncCancellationRequested(job.jobId).catch(() => false))
       ) {
-        return this.finishCancelled(job, 0, 0, 0, 0);
+        return this.finishCancelled(job, healthSamplesImported, healthDaysImported, sleepsImported, recoveriesImported);
       }
       await this.states
         .markFailed(

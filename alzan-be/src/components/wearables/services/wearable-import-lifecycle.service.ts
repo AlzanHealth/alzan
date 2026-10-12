@@ -176,15 +176,36 @@ export class WearableImportLifecycleService implements OnModuleDestroy {
     await Promise.all(activeJobs.map(([, runtime]) => runtime.completed));
   }
 
-  public async finishSyncJob(input: FinishWearableSyncJobInput): Promise<void> {
-    const { error } = await this.supabaseAdminService.client.rpc('finish_wearable_sync_job', {
-      p_job_id: input.jobId,
-      p_lease_token: input.leaseToken,
-      p_status: input.status,
-      p_counters: input.counters,
-      p_last_error: input.lastError ?? undefined,
-    });
+  public async finishSyncJob(input: FinishWearableSyncJobInput): Promise<boolean> {
+    const completedAt = new Date().toISOString();
+    const fields = {
+      status: input.status,
+      counters: input.counters as Json,
+      last_error: input.lastError,
+      completed_at: completedAt,
+      updated_at: completedAt,
+    };
+    const { data, error } = await this.supabaseAdminService.client
+      .from('wearable_sync_jobs')
+      .update(fields)
+      .eq('id', input.jobId)
+      .eq('lease_token', input.leaseToken)
+      .eq('status', 'running')
+      .or(`last_error.is.null,last_error.neq.${WEARABLE_SYNC_CANCEL_REQUESTED}`)
+      .select('id');
     if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_FINISH_FAILED');
+    if (data?.length) return input.lastError === WEARABLE_SYNC_CANCEL_REQUESTED;
+    const { data: cancelled, error: cancellationError } = await this.supabaseAdminService.client
+      .from('wearable_sync_jobs')
+      .update({ ...fields, status: 'partial', last_error: WEARABLE_SYNC_CANCEL_REQUESTED })
+      .eq('id', input.jobId)
+      .eq('lease_token', input.leaseToken)
+      .eq('status', 'running')
+      .eq('last_error', WEARABLE_SYNC_CANCEL_REQUESTED)
+      .select('id');
+    if (cancellationError || !cancelled?.length)
+      throw new InternalServerErrorException('WEARABLE_SYNC_JOB_FINISH_FAILED');
+    return true;
   }
 
   public async listActiveSyncJobs(userId: string): Promise<ActiveWearableSyncJob[]> {
