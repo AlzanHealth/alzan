@@ -124,16 +124,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * array/object delimiters outside strings and escaped underscores in keys.
  */
 const normalizeAiRenderedJson = (text: string): string => {
-  let normalized = '';
-  let inString = false;
+  const chunks: string[] = [];
   let escaped = false;
   let stringStart = -1;
+  let chunkStart = 0;
 
   for (let index = 0; index < text.length; index += 1) {
-    const character = text[index] ?? '';
-
-    if (inString) {
-      normalized += character;
+    const character = text[index];
+    if (stringStart >= 0) {
       if (escaped) {
         escaped = false;
       } else if (character === '\\') {
@@ -142,34 +140,27 @@ const normalizeAiRenderedJson = (text: string): string => {
         let nextIndex = index + 1;
         while (nextIndex < text.length && /\s/u.test(text[nextIndex] ?? '')) nextIndex += 1;
         if (text[nextIndex] === ':') {
-          const keyStart = stringStart + 1;
-          const keyEnd = normalized.length - 1;
-          const key = normalized.slice(keyStart, keyEnd).replace(/(^|[^\\])\\_/gu, '$1_');
-          normalized = `${normalized.slice(0, keyStart)}${key}"`;
+          chunks.push(text.slice(chunkStart, stringStart + 1));
+          chunks.push(text.slice(stringStart + 1, index).replace(/(^|[^\\])\\_/gu, '$1_'));
+          chunkStart = index;
         }
-        inString = false;
         stringStart = -1;
       }
       continue;
     }
-
     if (character === '"') {
-      stringStart = normalized.length;
-      normalized += character;
-      inString = true;
+      stringStart = index;
       continue;
     }
-
     const nextCharacter = text[index + 1];
     if (character === '\\' && ['[', ']', '{', '}'].includes(nextCharacter ?? '')) {
-      normalized += nextCharacter;
+      chunks.push(text.slice(chunkStart, index));
+      chunkStart = index + 1;
       index += 1;
-      continue;
     }
-    normalized += character;
   }
-
-  return normalized;
+  chunks.push(text.slice(chunkStart));
+  return chunks.join('');
 };
 
 const addMissingMenuRootBrace = (text: string): string => {
@@ -484,25 +475,23 @@ export function parseMenuImportJson(rawText: string): MenuImportParseResult {
   }
 
   let value: unknown;
-  let parsed = false;
-  const normalizedText = normalizeImportJsonText(rawText);
-  const renderedJson = normalizeAiRenderedJson(normalizedText);
-  const candidates = [rawText, normalizedText, renderedJson, addMissingMenuRootBrace(renderedJson)];
-  for (const candidate of new Set(candidates)) {
+  try {
+    value = JSON.parse(rawText);
+  } catch {
+    const normalizedText = normalizeImportJsonText(rawText);
     try {
-      value = JSON.parse(candidate);
-      parsed = true;
-      break;
+      value = JSON.parse(normalizedText);
     } catch {
-      // Continue only through explicit presentation normalizations; the schema
-      // validator below still rejects missing, extra, or invalid data.
+      const renderedJson = normalizeAiRenderedJson(normalizedText);
+      try {
+        value = JSON.parse(addMissingMenuRootBrace(renderedJson));
+      } catch {
+        return {
+          ok: false,
+          errors: [{ code: 'invalid_json', path: '$', message: 'Invalid JSON syntax' }],
+        };
+      }
     }
-  }
-  if (!parsed) {
-    return {
-      ok: false,
-      errors: [{ code: 'invalid_json', path: '$', message: 'Invalid JSON syntax' }],
-    };
   }
 
   const context: ValidationContext = {

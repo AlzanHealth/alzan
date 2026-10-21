@@ -11,6 +11,7 @@ import {
   updateExerciseForUser,
 } from '../services/exerciseCatalogService';
 import { exerciseCatalogQueryKey } from '../helpers/exerciseCatalogMatching';
+import { loadAllPages } from '../helpers/loadAllPages';
 
 export interface ExerciseUsageSummary {
   setCount: number;
@@ -130,14 +131,18 @@ export const useExerciseCatalogUsage = (userId?: string, requestedExerciseIds: s
     queryFn: async () => {
       if (!userId) throw new Error('exercise_catalog_requires_auth');
 
-      const exerciseIds = [...new Set(requestedExerciseIds)].slice(0, 2500);
-      const { data, error } = await supabase.rpc('get_exercise_catalog_usage_summaries', {
-        p_exercise_ids: exerciseIds,
-      });
+      const exerciseIds = [...new Set(requestedExerciseIds)];
+      const rows: ExerciseCatalogUsageSummaryRow[] = [];
+      // Each ID yields at most one summary; stay below PostgREST's row cap.
+      for (let offset = 0; offset < exerciseIds.length; offset += 500) {
+        const { data, error } = await supabase.rpc('get_exercise_catalog_usage_summaries', {
+          p_exercise_ids: exerciseIds.slice(offset, offset + 500),
+        });
+        if (error) throw error;
+        rows.push(...(data ?? []));
+      }
 
-      if (error) throw error;
-
-      return (data ?? []).reduce<Record<string, ExerciseUsageSummary>>((usage, row) => {
+      return rows.reduce<Record<string, ExerciseUsageSummary>>((usage, row) => {
         usage[row.exercise_id] = mapUsageSummary(row);
         return usage;
       }, {});
@@ -150,13 +155,18 @@ export const useExerciseFavorites = (userId?: string) =>
   useQuery({
     queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('exercise_favorites').select('exercise_id').eq('user_id', userId!);
+      const rows = await loadAllPages(async (from, to) => {
+        const { data, error } = await supabase
+          .from('exercise_favorites')
+          .select('exercise_id')
+          .eq('user_id', userId!)
+          .order('exercise_id', { ascending: true })
+          .range(from, to);
+        if (error) throw error;
+        return data ?? [];
+      });
 
-      if (error) {
-        throw error;
-      }
-
-      return new Set((data ?? []).map(row => row.exercise_id));
+      return new Set(rows.map(row => row.exercise_id));
     },
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,

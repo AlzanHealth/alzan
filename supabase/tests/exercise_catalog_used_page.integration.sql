@@ -11,9 +11,12 @@ SELECT equipment_id AS test_equipment_id
 FROM public.exercises
 WHERE equipment_id IS NOT NULL
 LIMIT 1 \gset
+SELECT id AS test_secondary_muscle_id FROM public.muscle_groups
+WHERE id <> :'test_muscle_id' ORDER BY id LIMIT 1 \gset
 SELECT gen_random_uuid() AS test_session_id \gset
 SELECT set_config('test.muscle_id', :'test_muscle_id', true);
 SELECT set_config('test.equipment_id', :'test_equipment_id', true);
+SELECT set_config('test.secondary_muscle_id', :'test_secondary_muscle_id', true);
 
 DO $$
 BEGIN
@@ -63,6 +66,9 @@ SELECT
   'external'
 FROM generate_series(1, 31) AS n;
 
+UPDATE public.exercises SET secondary_muscle_id = :'test_secondary_muscle_id'
+WHERE id = md5('used-page-test-exercise:31')::uuid;
+
 INSERT INTO public.activity_sessions (
   id, user_id, sport_type, sport_subtype, start_time, end_time, duration_s,
   name, source, provider, status, visibility, timezone
@@ -92,12 +98,12 @@ INSERT INTO public.exercise_favorites (user_id, exercise_id)
 VALUES (:'test_user_id', md5('used-page-test-exercise:1')::uuid);
 
 INSERT INTO public.user_exercise_overrides (
-  user_id, exercise_id, base_name_es, base_name_en, primary_muscle_id, load_type
+  user_id, exercise_id, base_name_es, base_name_en, primary_muscle_id, equipment_id, load_type
 )
 VALUES (
   :'test_user_id', md5('used-page-test-exercise:31')::uuid,
   'Used pagination sample con alias', 'Used pagination sample with alias',
-  current_setting('test.muscle_id')::smallint, 'external'
+  current_setting('test.muscle_id')::smallint, current_setting('test.equipment_id')::smallint, 'external'
 );
 
 DO $$
@@ -173,6 +179,50 @@ BEGIN
   FROM public.get_used_exercise_catalog_page(1, 30, '!!!', NULL, NULL, false);
   IF no_match_count <> 0 THEN
     RAISE EXCEPTION 'a punctuation-only query returned every used exercise';
+  END IF;
+END;
+$$;
+
+-- Clearing optional override values must not restore the canonical metadata.
+UPDATE public.user_exercise_overrides
+SET equipment_id = NULL, secondary_muscle_id = NULL
+WHERE user_id = auth.uid() AND exercise_id = md5('used-page-test-exercise:31')::uuid;
+
+DO $$
+DECLARE
+  secondary_code text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.get_used_exercise_catalog_page(1, 30, 'with alias', NULL, NULL, false)
+    WHERE exercise_id = md5('used-page-test-exercise:31')::uuid
+  ) THEN
+    RAISE EXCEPTION 'clearing optional fields removed the personalized used exercise';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.get_used_exercise_catalog_page(
+      1, 30, 'with alias', NULL, current_setting('test.equipment_id')::integer, false
+    ) WHERE exercise_id = md5('used-page-test-exercise:31')::uuid
+  ) THEN
+    RAISE EXCEPTION 'used-page equipment filtering restored cleared canonical equipment';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.search_exercises_ranked(
+      'with alias', 'en', NULL, current_setting('test.equipment_id')::integer, 180
+    ) WHERE id = md5('used-page-test-exercise:31')::uuid
+  ) THEN
+    RAISE EXCEPTION 'ranked-search equipment filtering restored cleared canonical equipment';
+  END IF;
+
+  SELECT code INTO secondary_code FROM public.muscle_groups
+  WHERE id = current_setting('test.secondary_muscle_id')::smallint;
+  IF EXISTS (
+    SELECT 1 FROM public.get_used_exercise_catalog_page(
+      1, 30, 'with alias ' || secondary_code, NULL, NULL, false
+    ) WHERE exercise_id = md5('used-page-test-exercise:31')::uuid
+  ) THEN
+    RAISE EXCEPTION 'used-page search restored a cleared canonical secondary muscle';
   END IF;
 END;
 $$;

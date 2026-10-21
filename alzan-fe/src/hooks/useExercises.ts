@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { canReuseExerciseSearchPage, getExerciseSearchFields } from '../modules/training/helpers/exerciseSearchState';
 import { supabase } from '../lib/supabaseClient';
 import { Exercise } from '../types/requests.types';
 import { ExerciseWithDetails } from '../types/training';
@@ -253,19 +254,23 @@ export const useExercises = (options?: UseExercisesOptions) => {
   const limit = options?.limit;
   const includeArchived = options?.includeArchived ?? false;
 
+  const queryKey = [
+    'exercises',
+    userId,
+    languageCode,
+    exerciseCatalogQueryKey(trimmedSearchQuery),
+    selectedMuscleId,
+    selectedEquipmentId,
+    exerciseIdsKey,
+    ownerUserId ?? 'all-owners',
+    limit ?? 'all',
+    includeArchived,
+  ];
+
   const { data, isLoading, isFetching, error } = useQuery({
-    queryKey: [
-      'exercises',
-      userId,
-      languageCode,
-      exerciseCatalogQueryKey(trimmedSearchQuery),
-      selectedMuscleId,
-      selectedEquipmentId,
-      exerciseIdsKey,
-      ownerUserId ?? 'all-owners',
-      limit ?? 'all',
-      includeArchived,
-    ],
+    queryKey,
+    placeholderData: (previousData, previousQuery) =>
+      canReuseExerciseSearchPage(previousQuery?.queryKey, queryKey) ? previousData : undefined,
     queryFn: async () => {
       if (exerciseIds !== undefined && exerciseIds.length === 0) {
         return { exercises: [], fuzzyCandidates: [], hasMore: false };
@@ -432,7 +437,10 @@ export const useExercises = (options?: UseExercisesOptions) => {
           typeof limit === 'number' && limit > 0 && selectedMuscleId === null && selectedEquipmentId === null;
         rows = await loadAllPages(
           async (from, to) => {
+            // Canonical localized names keep incremental pages stable even when
+            // user overrides rename an exercise. ID resolves duplicate names.
             const { data, error } = await createBaseQuery()
+              .order(languageCode === 'en' ? 'base_name_en' : 'base_name_es', { ascending: true })
               .order('id', { ascending: true })
               .range(from, to)
               .returns<ExerciseLookupRow[]>();
@@ -477,45 +485,10 @@ export const useExercises = (options?: UseExercisesOptions) => {
       }
 
       const filteredAndSorted = exercisesMatchingFilters
-        .filter(exercise =>
-          matchesLoosely(
-            trimmedSearchQuery,
-            exercise.name,
-            exercise.base_name_es,
-            exercise.base_name_en,
-            exercise.description,
-            exercise.description_es,
-            exercise.description_en,
-            exercise.muscle_name,
-            exercise.secondary_muscle_name,
-            exercise.equipment_name,
-          ),
-        )
+        .filter(exercise => matchesLoosely(trimmedSearchQuery, ...getExerciseSearchFields(exercise)))
         .sort((a, b) => {
-          const scoreA = getSearchRelevanceScore(
-            trimmedSearchQuery,
-            a.name,
-            a.base_name_es,
-            a.base_name_en,
-            a.description,
-            a.description_es,
-            a.description_en,
-            a.muscle_name,
-            a.secondary_muscle_name,
-            a.equipment_name,
-          );
-          const scoreB = getSearchRelevanceScore(
-            trimmedSearchQuery,
-            b.name,
-            b.base_name_es,
-            b.base_name_en,
-            b.description,
-            b.description_es,
-            b.description_en,
-            b.muscle_name,
-            b.secondary_muscle_name,
-            b.equipment_name,
-          );
+          const scoreA = getSearchRelevanceScore(trimmedSearchQuery, ...getExerciseSearchFields(a));
+          const scoreB = getSearchRelevanceScore(trimmedSearchQuery, ...getExerciseSearchFields(b));
 
           if (scoreA !== scoreB) {
             return scoreB - scoreA;

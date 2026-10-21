@@ -482,4 +482,14 @@ assertValid(
   }),
 );
 
+// The input cap also applies to malformed documents: many short keys must not
+// make presentation recovery repeatedly copy an ever-growing output prefix.
+for (const openingBrace of ['{', String.raw`\{`]) {
+  const denseInput = `${openingBrace}${Array(80_000).fill('"a":0').join(',')}}`;
+  assert.ok(denseInput.length <= MENU_IMPORT_MAX_TEXT_LENGTH);
+  const startedAt = performance.now();
+  assert.equal(parseMenuImportJson(denseInput).ok, false);
+  assert.ok(performance.now() - startedAt < 1_000, 'dense input must not block parsing for a second');
+}
+
 console.log('menuImportContract: all assertions passed');

@@ -37,6 +37,7 @@ import {
   useToggleExerciseFavorite,
   useUsedExerciseCatalogPage,
 } from '../../modules/training/hooks/useExerciseCatalog';
+import { orderExerciseCatalogItems } from '../../modules/training/helpers/exerciseSearchState';
 import { ExerciseNameAlreadyExistsError } from '../../modules/training/services/exerciseCatalogService';
 
 type CatalogTab = 'catalog' | 'used' | 'mine';
@@ -125,12 +126,7 @@ export const ExerciseCatalogScreen = () => {
       return true;
     });
 
-    return visible.sort((left, right) => {
-      if (tab === 'used') {
-        return (usage[right.id]?.latestAt ?? '').localeCompare(usage[left.id]?.latestAt ?? '');
-      }
-      return left.name.localeCompare(right.name);
-    });
+    return orderExerciseCatalogItems(visible, tab, usage);
   }, [exercises, favoritesOnly, favoriteIds, tab, usage, usedPageData.exerciseIds, user?.id]);
 
   useEffect(() => {
