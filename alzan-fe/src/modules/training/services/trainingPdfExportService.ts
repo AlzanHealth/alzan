@@ -23,6 +23,8 @@ import { getPhaseLabel } from '../../../screens/training/helpers/phase.helper';
 import i18n from '../../../i18n';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import { getTrainingPdfDateRange } from './trainingPdfDateRange';
+import { fetchExerciseUserOverrides } from './exerciseCatalogService';
+import { applyExerciseUserOverride } from '../helpers/exerciseUserOverride';
 
 const loadAssetAsBase64 = async (module: number): Promise<string | null> => {
   try {
@@ -339,7 +341,18 @@ export const generateTrainingPDF = async ({
 
     if (sessionsError) throw new Error(getErrorMessage(sessionsError));
 
-    const sessionRows = sessions ?? [];
+    const rawSessionRows = sessions ?? [];
+    const exerciseOverrides = await fetchExerciseUserOverrides(userId);
+    const exerciseOverridesById = new Map(exerciseOverrides.map(override => [override.exercise_id, override]));
+    const sessionRows = rawSessionRows.map(session => ({
+      ...session,
+      workout_sets: (session.workout_sets ?? []).map(set => ({
+        ...set,
+        exercise: set.exercise
+          ? applyExerciseUserOverride(set.exercise, exerciseOverridesById.get(set.exercise.id))
+          : null,
+      })),
+    }));
 
     const sportTypes = Array.from(new Set(sessionRows.map(session => session.sport_type).filter(Boolean)));
     const { data: catalogOptions } =

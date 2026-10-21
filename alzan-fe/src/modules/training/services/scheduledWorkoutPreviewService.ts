@@ -8,6 +8,8 @@ import {
 import { fetchTemplateWithProgressedSteps } from './enduranceProgressionService';
 import { applyStrengthProgressionsForPlannedDate } from './strengthProgressionService';
 import { sortByOrderIndex } from '../helpers/advancedEnduranceSession.helper';
+import { fetchExerciseUserOverrides } from './exerciseCatalogService';
+import { applyExerciseUserOverride } from '../helpers/exerciseUserOverride';
 
 export type PreviewExercise = {
   id: string;
@@ -31,6 +33,7 @@ export type EndurancePreviewTemplate = EnduranceWorkoutTemplate & {
 export const fetchGymPreviewTemplate = async (
   templateId: string,
   plannedDate: string,
+  userId?: string,
 ): Promise<GymPreviewTemplate | null> => {
   const { data, error } = await supabase
     .from('workout_templates')
@@ -51,9 +54,18 @@ export const fetchGymPreviewTemplate = async (
 
   const template = data as unknown as GymPreviewTemplate;
   const exercises = sortByOrderIndex(template.exercises || []);
+  const exerciseIds = Array.from(new Set(exercises.map(item => item.exercise_id)));
+  const overrides = userId ? await fetchExerciseUserOverrides(userId, exerciseIds) : [];
+  const overridesByExerciseId = new Map(overrides.map(override => [override.exercise_id, override]));
+  const personalizedExercises = exercises.map(item => ({
+    ...item,
+    exercise: item.exercise
+      ? applyExerciseUserOverride(item.exercise, overridesByExerciseId.get(item.exercise.id))
+      : null,
+  }));
   return {
     ...template,
-    exercises: await applyStrengthProgressionsForPlannedDate(templateId, plannedDate, exercises),
+    exercises: await applyStrengthProgressionsForPlannedDate(templateId, plannedDate, personalizedExercises),
   };
 };
 

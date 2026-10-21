@@ -7,6 +7,7 @@ import { GlassCard } from '../../components/GlassCard';
 import { LiquidGlassFooter } from '../../components/common/LiquidGlassFooter';
 import { spacing, typography } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
+import { useAuth } from '../../context/AuthContext';
 import { ActiveGymSessionAlreadyStartedError, useActiveWorkout } from '../../hooks/useActiveWorkout';
 import { Play, Calendar, Infinity as InfinityIcon } from 'lucide-react-native';
 import { supabase } from '../../lib/supabaseClient';
@@ -24,6 +25,8 @@ import {
 } from '../../services/localization';
 import { Exercise, WorkoutTemplate, WorkoutTemplateExercise } from '../../types/requests.types';
 import { applyStrengthProgressionsForPlannedDate } from '../../modules/training/services/strengthProgressionService';
+import { fetchExerciseUserOverrides } from '../../modules/training/services/exerciseCatalogService';
+import { applyExerciseUserOverride } from '../../modules/training/helpers/exerciseUserOverride';
 
 interface TemplateExerciseRow extends WorkoutTemplateExercise {
   exercise:
@@ -53,6 +56,7 @@ interface WorkoutTemplateWithExercises extends WorkoutTemplate {
 
 export const StartWorkoutScreen = () => {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const languageCode = getCurrentAppLocale();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
@@ -81,7 +85,7 @@ export const StartWorkoutScreen = () => {
     return () => {
       fetchRequestId.current += 1;
     };
-  }, [templateId, languageCode, selectedDateKey]);
+  }, [templateId, languageCode, selectedDateKey, user?.id]);
 
   const fetchTemplate = async (): Promise<WorkoutTemplateWithExercises | null> => {
     const requestId = ++fetchRequestId.current;
@@ -104,19 +108,28 @@ export const StartWorkoutScreen = () => {
         .single()
         .returns<WorkoutTemplateWithExercises>();
       if (error) throw error;
+      const exerciseIds = Array.from(new Set((data.exercises ?? []).map(item => item.exercise_id)));
+      const overrides = user?.id ? await fetchExerciseUserOverrides(user.id, exerciseIds) : [];
+      const overridesByExerciseId = new Map(overrides.map(override => [override.exercise_id, override]));
       const localizedTemplate = data
         ? {
             ...data,
-            exercises: (data.exercises || []).map(item => ({
-              ...item,
-              exercise: item.exercise
-                ? {
-                    ...item.exercise,
-                    base_name: getLocalizedExerciseName(item.exercise, languageCode),
-                    description: getLocalizedExerciseDescription(item.exercise, languageCode),
-                  }
-                : null,
-            })),
+            exercises: (data.exercises || []).map(item => {
+              if (!item.exercise) return { ...item, exercise: null };
+
+              const effectiveExercise = applyExerciseUserOverride(
+                item.exercise,
+                overridesByExerciseId.get(item.exercise.id),
+              );
+              return {
+                ...item,
+                exercise: {
+                  ...effectiveExercise,
+                  base_name: getLocalizedExerciseName(effectiveExercise, languageCode),
+                  description: getLocalizedExerciseDescription(effectiveExercise, languageCode),
+                },
+              };
+            }),
           }
         : null;
       if (!localizedTemplate) return null;

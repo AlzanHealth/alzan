@@ -76,11 +76,12 @@ export const ExercisePrValuesScreen = () => {
   const [editingWeightEntryId, setEditingWeightEntryId] = useState<string | null>(null);
   const [editingWeightValue, setEditingWeightValue] = useState('');
 
-  const { data: weightEntriesData, isLoading: weightEntriesLoading } = useExerciseWeightEntries(
-    exerciseId,
-    metric,
-    loadType ?? null,
-  );
+  const {
+    data: weightEntriesData,
+    isLoading: weightEntriesLoading,
+    isError: weightEntriesError,
+    refetch: refetchWeightEntries,
+  } = useExerciseWeightEntries(exerciseId, metric, loadType ?? null);
   const updateWeightEntry = useUpdateExerciseWeightEntry(exerciseId, metric);
   const deleteWeightEntry = useDeleteExerciseWeightEntry(exerciseId, metric);
   const weightEntries = weightEntriesData?.entries ?? [];
@@ -239,6 +240,19 @@ export const ExercisePrValuesScreen = () => {
             {weightEntriesLoading ? (
               <View style={styles.loadingWrap}>
                 <ActivityIndicator size="small" color={themeColors.primary} />
+              </View>
+            ) : weightEntriesError && !weightEntriesData ? (
+              <View style={styles.loadingWrap}>
+                <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
+                  {t('training.prValuesHistoryLoadError')}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => void refetchWeightEntries()}
+                  style={[styles.retryButton, { borderColor: themeColors.border }]}
+                >
+                  <Text style={[styles.retryButtonText, { color: themeColors.primary }]}>{t('nutrition.retry')}</Text>
+                </TouchableOpacity>
               </View>
             ) : weightEntries.length === 0 ? (
               <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
@@ -461,6 +475,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.l,
   },
+  retryButton: {
+    alignItems: 'center',
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: spacing.s,
+    minHeight: 44,
+    paddingHorizontal: spacing.m,
+  },
+  retryButtonText: { fontSize: 13, fontWeight: '600' },
   emptyText: {
     ...typography.body,
     textAlign: 'center',

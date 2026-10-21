@@ -10,6 +10,7 @@ import {
 } from '../services/localization';
 import { Exercise, WorkoutTemplateExercise } from '../types/requests.types';
 import { buildUserEditedTemplateIdentity } from '../modules/training/helpers/templateEditorIdentity.helper';
+import { applyExerciseUserOverride } from '../modules/training/helpers/exerciseUserOverride';
 import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 import {
   getOneOffTrainingPlanDate,
@@ -21,6 +22,7 @@ import {
   buildStrengthProgressionTargetPatch,
   type StrengthProgressionTargets,
 } from '../modules/training/helpers/strengthExerciseReconciliation.helper';
+import { fetchExerciseUserOverrides } from '../modules/training/services/exerciseCatalogService';
 
 export type PopulatedRoutineData = NonNullable<ReturnType<typeof useGymRoutineEditor>['routineData']>;
 export type RoutineDataExercise = PopulatedRoutineData['exercises'][number];
@@ -66,7 +68,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
 
   // Fetch existing routine if ID provided
   const { data: routineData, isLoading } = useQuery({
-    queryKey: ['routine', routineId, languageCode],
+    queryKey: ['routine', routineId, languageCode, user?.id],
     queryFn: async () => {
       if (!routineId) return null;
 
@@ -95,10 +97,18 @@ export const useGymRoutineEditor = (routineId?: string) => {
 
       if (eError) throw eError;
 
+      const routineExerciseIds = Array.from(new Set((exercisesRaw ?? []).map(exercise => exercise.exercise_id)));
+      const overrides =
+        user && routineExerciseIds.length > 0 ? await fetchExerciseUserOverrides(user.id, routineExerciseIds) : [];
+      const overridesByExerciseId = new Map(overrides.map(override => [override.exercise_id, override]));
+
       // Preserve imported rep ranges until the user explicitly edits the single-value reps field.
       const exercises = (exercisesRaw || []).map(te => {
         const repsMin = te.target_reps_min ?? te.target_reps_max ?? 8;
         const repsMax = te.target_reps_max ?? te.target_reps_min ?? 8;
+        const effectiveExercise = te.exercise
+          ? applyExerciseUserOverride(te.exercise, overridesByExerciseId.get(te.exercise.id))
+          : null;
 
         return {
           ...te,
@@ -106,12 +116,12 @@ export const useGymRoutineEditor = (routineId?: string) => {
           target_reps_max: repsMax,
           is_warmup: te.is_warmup ?? false,
           drop_set_mode: te.drop_set_mode ?? 'none',
-          exercise: te.exercise
+          exercise: effectiveExercise
             ? {
-                ...te.exercise,
-                base_name: getLocalizedExerciseName(te.exercise, languageCode),
-                description: getLocalizedExerciseDescription(te.exercise, languageCode),
-                exercise_type_code: te.exercise.exercise_type?.code || null,
+                ...effectiveExercise,
+                base_name: getLocalizedExerciseName(effectiveExercise, languageCode),
+                description: getLocalizedExerciseDescription(effectiveExercise, languageCode),
+                exercise_type_code: effectiveExercise.exercise_type?.code || null,
               }
             : null,
         };

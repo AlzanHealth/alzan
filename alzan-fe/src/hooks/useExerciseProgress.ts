@@ -4,6 +4,7 @@ import { ActivitySession } from '../types/requests.types';
 import { ExerciseLoadType } from '../services/localization';
 import { isStrengthExerciseSession } from '../modules/training/helpers/exerciseSessionFilter';
 import { loadAllPages } from '../modules/training/helpers/loadAllPages';
+import { useAuth } from '../context/AuthContext';
 
 export type ExerciseProgressMetric = 'weight' | 'reps' | 'time';
 type WeightQuality = 'valid' | 'missing' | 'invalid';
@@ -80,7 +81,7 @@ const getSetDurationSeconds = (set: Pick<ExerciseSetRow, 'duration_s' | 'reps'>)
   return Math.max(set.reps, 0);
 };
 
-const loadExerciseSetRows = async (exerciseId: string, ascending: boolean): Promise<ExerciseSetRow[]> =>
+const loadExerciseSetRows = async (exerciseId: string, ascending: boolean, userId: string): Promise<ExerciseSetRow[]> =>
   loadAllPages(async (from, to) => {
     const { data, error } = await supabase
       .from('workout_sets')
@@ -101,6 +102,7 @@ const loadExerciseSetRows = async (exerciseId: string, ascending: boolean): Prom
         `,
       )
       .eq('exercise_id', exerciseId)
+      .eq('user_id', userId)
       .order('created_at', { ascending })
       .order('id', { ascending })
       .range(from, to)
@@ -236,10 +238,13 @@ export const useExerciseProgress = (
   metric: ExerciseProgressMetric = 'weight',
   loadType: ExerciseLoadType | null = null,
 ) => {
+  const { user } = useAuth();
+  const userId = user?.id;
+
   return useQuery({
-    queryKey: ['exercise-progress', exerciseId, metric, loadType],
+    queryKey: ['exercise-progress', exerciseId, metric, loadType, userId],
     queryFn: async (): Promise<ExerciseProgressData> => {
-      if (!exerciseId) {
+      if (!exerciseId || !userId) {
         return {
           points: [],
           diagnostics: {
@@ -251,7 +256,7 @@ export const useExerciseProgress = (
         };
       }
 
-      const data = await loadExerciseSetRows(exerciseId, true);
+      const data = await loadExerciseSetRows(exerciseId, true, userId);
 
       const pointsBySession = new Map<string, ExerciseProgressPoint>();
       let missingWeightCount = 0;
@@ -406,7 +411,7 @@ export const useExerciseProgress = (
         },
       };
     },
-    enabled: !!exerciseId,
+    enabled: !!exerciseId && !!userId,
     staleTime: 1000 * 60 * 5,
   });
 };
@@ -416,14 +421,17 @@ export const useExerciseWeightEntries = (
   metric: ExerciseProgressMetric = 'weight',
   loadType: ExerciseLoadType | null = null,
 ) => {
+  const { user } = useAuth();
+  const userId = user?.id;
+
   return useQuery({
-    queryKey: ['exercise-value-entries', exerciseId, metric, loadType],
+    queryKey: ['exercise-value-entries', exerciseId, metric, loadType, userId],
     queryFn: async (): Promise<ExerciseValueEntriesData> => {
-      if (!exerciseId) {
+      if (!exerciseId || !userId) {
         return { entries: [] };
       }
 
-      const data = await loadExerciseSetRows(exerciseId, false);
+      const data = await loadExerciseSetRows(exerciseId, false, userId);
 
       const entries = (data ?? [])
         .filter(entry => isStrengthExerciseSession(entry.session?.sport_type))
@@ -451,7 +459,7 @@ export const useExerciseWeightEntries = (
 
       return { entries };
     },
-    enabled: !!exerciseId,
+    enabled: !!exerciseId && !!userId,
     staleTime: 1000 * 30,
   });
 };

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { ArrowLeft, Check, ChevronRight, Dumbbell, X } from 'lucide-react-native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { ArrowLeft, Check, ChevronRight, Dumbbell, RotateCcw, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Alert } from '../../components/common/Alert';
@@ -25,26 +25,44 @@ import { useMuscleGroups } from '../../hooks/useMuscleGroups';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { borderRadius, spacing, typography } from '../../theme';
 import { ExerciseWithDetails } from '../../types/training';
-import { TrainingScreenNavigationProp } from '../../types/navigation.types';
-import { ExerciseLoadType, normalizeSearchText } from '../../services/localization';
-import { useExercises } from '../../hooks/useExercises';
-import { useCreateCustomExercise } from '../../modules/training/hooks/useExerciseCatalog';
+import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../types/navigation.types';
+import { ExerciseLoadType } from '../../services/localization';
+import { useExerciseById, useExercises } from '../../hooks/useExercises';
 import {
-  ExerciseNameAlreadyExistsError,
-  normalizeExerciseCatalogName,
-} from '../../modules/training/services/exerciseCatalogService';
+  exerciseCatalogQueryKey,
+  hasMeaningfulExerciseCatalogSearchQuery,
+  rankExerciseCatalogSuggestions,
+} from '../../modules/training/helpers/exerciseCatalogMatching';
+import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../navigation/tabBarLayout';
+import {
+  useCreateCustomExercise,
+  useExactExerciseCatalogMatch,
+  useResetExerciseUserOverride,
+  useUpdateExerciseForUser,
+} from '../../modules/training/hooks/useExerciseCatalog';
+import { ExerciseNameAlreadyExistsError } from '../../modules/training/services/exerciseCatalogService';
 
 type Selector = 'primaryMuscle' | 'secondaryMuscle' | 'equipment' | null;
 
 const LOAD_TYPES: ExerciseLoadType[] = ['external', 'bodyweight', 'assisted', 'mixed'];
+const EMPTY_EXERCISE_IDS: string[] = [];
 
 export const ExerciseCatalogCreateScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
+  const route = useRoute<RouteProp<TrainingStackParamList, 'ExerciseCatalogCreate'>>();
   const { user } = useAuth();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
+  const { topFromScreenBottom, safeAreaBottom } = useTabBarLayout();
   const { muscleGroups, isLoading: isLoadingMuscles } = useMuscleGroups();
   const { equipment, isLoading: isLoadingEquipment } = useEquipment();
+  const exerciseId = route.params?.exerciseId;
+  const isEditMode = !!exerciseId;
+  const {
+    exercise: exerciseToEdit,
+    isLoading: isLoadingExercise,
+    error: loadExerciseError,
+  } = useExerciseById(exerciseId);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [primaryMuscleId, setPrimaryMuscleId] = useState<number | null>(null);
@@ -52,40 +70,72 @@ export const ExerciseCatalogCreateScreen = () => {
   const [equipmentId, setEquipmentId] = useState<number | null>(null);
   const [loadType, setLoadType] = useState<ExerciseLoadType>('external');
   const [selector, setSelector] = useState<Selector>(null);
+  const [debouncedName, setDebouncedName] = useState('');
+  const [initializedExerciseId, setInitializedExerciseId] = useState<string | null>(null);
   const createExercise = useCreateCustomExercise(user?.id);
-  const normalizedName = normalizeExerciseCatalogName(name);
-  const normalizedSearchText = normalizeSearchText(name);
-  const { exercises: searchMatches, isLoading: isSearching } = useExercises({
-    searchQuery: name.trim(),
-    limit: 8,
+  const updateExercise = useUpdateExerciseForUser(user?.id);
+  const resetExerciseOverride = useResetExerciseUserOverride(user?.id);
+  const queryName = exerciseCatalogQueryKey(name);
+  const isNameDebouncing = queryName !== exerciseCatalogQueryKey(debouncedName);
+  const exactMatchQuery = useExactExerciseCatalogMatch(debouncedName, user?.id, exerciseId);
+  const exactMatchId = exactMatchQuery.data ?? null;
+  const { exercise: exactMatchExercise } = useExerciseById(exactMatchId ?? undefined);
+  const {
+    fuzzyCandidates: searchCandidates,
+    isFetching: isSearching,
+    error: searchError,
+  } = useExercises({
+    searchQuery: hasMeaningfulExerciseCatalogSearchQuery(debouncedName) ? debouncedName : '',
+    exerciseIds: hasMeaningfulExerciseCatalogSearchQuery(debouncedName) ? undefined : EMPTY_EXERCISE_IDS,
+    limit: 90,
   });
 
-  const exactMatch = useMemo(
-    () =>
-      searchMatches.find(exercise => {
-        const normalizedSpanishName = normalizeExerciseCatalogName(exercise.base_name_es ?? '');
-        const normalizedEnglishName = normalizeExerciseCatalogName(exercise.base_name_en ?? '');
-        return (
-          normalizedName !== '' &&
-          (normalizedName === normalizedSpanishName || normalizedName === normalizedEnglishName)
-        );
-      }),
-    [normalizedName, searchMatches],
-  );
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedName(name.trim()), 250);
+    return () => clearTimeout(timeout);
+  }, [name]);
 
-  const similarMatches = useMemo(
-    () =>
-      searchMatches
-        .filter(exercise => exercise.id !== exactMatch?.id)
-        .filter(exercise => {
-          const names = [exercise.name, exercise.base_name_es, exercise.base_name_en].filter(
-            (value): value is string => !!value,
-          );
-          return names.some(value => normalizeSearchText(value) !== normalizedSearchText);
-        })
-        .slice(0, 4),
-    [exactMatch?.id, searchMatches],
-  );
+  useEffect(() => {
+    if (!exerciseToEdit || initializedExerciseId === exerciseToEdit.id) return;
+
+    setName(exerciseToEdit.name);
+    setDescription(exerciseToEdit.description ?? '');
+    setPrimaryMuscleId(exerciseToEdit.primary_muscle_id);
+    setSecondaryMuscleId(exerciseToEdit.secondary_muscle_id);
+    setEquipmentId(exerciseToEdit.equipment_id);
+    setLoadType(exerciseToEdit.load_type ?? 'external');
+    setInitializedExerciseId(exerciseToEdit.id);
+  }, [exerciseToEdit, initializedExerciseId]);
+
+  const exactMatch = exactMatchExercise;
+
+  const similarMatches = useMemo(() => {
+    const excludedIds = new Set([exactMatchId, exerciseId].filter((id): id is string => !!id));
+    const suggestions = rankExerciseCatalogSuggestions(
+      debouncedName,
+      searchCandidates.map(exercise => ({
+        id: exercise.id,
+        names: [
+          exercise.name,
+          exercise.base_name_es,
+          exercise.base_name_en,
+          exercise.canonical_name_es,
+          exercise.canonical_name_en,
+        ].filter((value): value is string => !!value),
+      })),
+      { excludeIds: excludedIds, limit: 4 },
+    );
+    const exerciseById = new Map(searchCandidates.map(exercise => [exercise.id, exercise]));
+    return suggestions
+      .map(suggestion => exerciseById.get(suggestion.id))
+      .filter((exercise): exercise is NonNullable<typeof exercise> => !!exercise);
+  }, [debouncedName, exactMatchId, exerciseId, searchCandidates]);
+
+  const isEditableExercise =
+    !!exerciseToEdit &&
+    !exerciseToEdit.archived_at &&
+    ((exerciseToEdit.is_custom && exerciseToEdit.owner_user_id === user?.id) ||
+      (!exerciseToEdit.is_custom && exerciseToEdit.owner_user_id === null));
 
   const selectedPrimaryMuscle = muscleGroups.find(item => item.id === primaryMuscleId);
   const selectedSecondaryMuscle = muscleGroups.find(item => item.id === secondaryMuscleId);
@@ -95,19 +145,35 @@ export const ExerciseCatalogCreateScreen = () => {
     navigation.navigate('ExerciseDetail', { exercise });
   };
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     const trimmedName = name.trim().replace(/\s+/g, ' ');
-    if (!user || trimmedName.length < 2 || primaryMuscleId === null || exactMatch || isSearching) return;
+    if (
+      !user ||
+      trimmedName.length < 2 ||
+      primaryMuscleId === null ||
+      exactMatchId ||
+      exactMatchQuery.isFetching ||
+      exactMatchQuery.isError ||
+      isNameDebouncing ||
+      isSearching
+    )
+      return;
 
     try {
-      await createExercise.mutateAsync({
+      const input = {
         name: trimmedName,
         primaryMuscleId,
         secondaryMuscleId,
         equipmentId,
         loadType,
         description,
-      });
+      };
+
+      if (exerciseId) {
+        await updateExercise.mutateAsync({ exerciseId, input });
+      } else {
+        await createExercise.mutateAsync(input);
+      }
       navigation.goBack();
     } catch (error) {
       const isDuplicate = error instanceof ExerciseNameAlreadyExistsError;
@@ -138,6 +204,39 @@ export const ExerciseCatalogCreateScreen = () => {
   const selectedOptionId =
     selector === 'primaryMuscle' ? primaryMuscleId : selector === 'secondaryMuscle' ? secondaryMuscleId : equipmentId;
   const selectorIsLoading = selector === 'equipment' ? isLoadingEquipment : isLoadingMuscles;
+  const isSaving = createExercise.isPending || updateExercise.isPending;
+  const footerBottomPadding = Math.max(0, topFromScreenBottom - safeAreaBottom) + TAB_BAR_CLEARANCE;
+  const isNameCheckPending = queryName.length >= 2 && (isNameDebouncing || exactMatchQuery.isFetching || isSearching);
+  const isSaveDisabled =
+    !user ||
+    name.trim().length < 2 ||
+    primaryMuscleId === null ||
+    exactMatchId !== null ||
+    exactMatchQuery.isFetching ||
+    exactMatchQuery.isError ||
+    isNameDebouncing ||
+    (queryName.length >= 2 && isSearching) ||
+    isSaving ||
+    (isEditMode && (!isEditableExercise || isLoadingExercise));
+
+  const resetPersonalizedExercise = () => {
+    if (!exerciseId || !exerciseToEdit?.is_personalized) return;
+
+    Alert.alert(t('training.exerciseCatalogResetOverrideTitle'), t('training.exerciseCatalogResetOverrideMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('training.exerciseCatalogResetOverrideAction'),
+        onPress: () => {
+          void resetExerciseOverride
+            .mutateAsync({ exerciseId })
+            .then(() => navigation.goBack())
+            .catch(() => {
+              Alert.alert(t('common.error'), t('training.exerciseCatalogEditError'));
+            });
+        },
+      },
+    ]);
+  };
 
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.screen}>
@@ -152,7 +251,9 @@ export const ExerciseCatalogCreateScreen = () => {
           >
             <ArrowLeft size={23} color={themeColors.textPrimary} />
           </TouchableOpacity>
-          <Text style={[styles.navigationTitle, dynamicStyles.title]}>{t('training.exerciseCatalogNewTitle')}</Text>
+          <Text style={[styles.navigationTitle, dynamicStyles.title]}>
+            {t(isEditMode ? 'training.exerciseCatalogEditTitle' : 'training.exerciseCatalogNewTitle')}
+          </Text>
           <View style={styles.backButton} />
         </View>
 
@@ -166,237 +267,300 @@ export const ExerciseCatalogCreateScreen = () => {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <Text style={[styles.heading, dynamicStyles.title]}>{t('training.exerciseCatalogNewHeading')}</Text>
-            <Text style={[styles.subtitle, dynamicStyles.sublabel]}>{t('training.exerciseCatalogNewSubtitle')}</Text>
-
-            <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogNameLabel')}</Text>
-            <TextInput
-              accessibilityLabel={t('training.exerciseCatalogNameLabel')}
-              autoCapitalize="sentences"
-              autoCorrect={false}
-              maxLength={80}
-              onChangeText={setName}
-              placeholder={t('training.exerciseCatalogNamePlaceholder')}
-              placeholderTextColor={themeColors.textSecondary}
-              returnKeyType="next"
-              style={[styles.textInput, dynamicStyles.input, { color: themeColors.textPrimary }]}
-              value={name}
-            />
-
-            {normalizedName.length >= 2 && (isSearching || exactMatch || similarMatches.length > 0) ? (
-              <View
-                style={[
-                  styles.matchesCard,
-                  {
-                    backgroundColor: exactMatch
-                      ? isDark
-                        ? 'rgba(255,149,0,0.12)'
-                        : '#FFF8E9'
-                      : dynamicStyles.card.backgroundColor,
-                    borderColor: exactMatch ? `${themeColors.warning}65` : themeColors.border,
-                  },
-                ]}
-              >
-                {isSearching ? (
-                  <View style={styles.matchLoading}>
-                    <ActivityIndicator size="small" color={themeColors.primary} />
-                    <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
-                      {t('training.exerciseCatalogChecking')}
-                    </Text>
-                  </View>
-                ) : exactMatch ? (
-                  <>
-                    <Text style={[styles.matchTitle, { color: themeColors.warning }]}>
-                      {t('training.exerciseCatalogDuplicateTitle')}
-                    </Text>
-                    <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
-                      {t('training.exerciseCatalogExactDuplicate')}
-                    </Text>
-                    <TouchableOpacity style={styles.matchRow} onPress={() => openMatch(exactMatch)}>
-                      <View style={styles.matchCopy}>
-                        <Text style={[styles.matchName, dynamicStyles.label]} numberOfLines={2}>
-                          {exactMatch.name}
-                        </Text>
-                        <Text style={[styles.matchMeta, dynamicStyles.sublabel]} numberOfLines={1}>
-                          {[exactMatch.muscle_name, exactMatch.equipment_name].filter(Boolean).join(' · ')}
-                        </Text>
-                      </View>
-                      <Text style={[styles.exactBadge, { color: themeColors.warning }]}>
-                        {t('training.exerciseCatalogExactBadge')}
-                      </Text>
-                      <ChevronRight size={18} color={themeColors.textSecondary} />
-                    </TouchableOpacity>
-                  </>
-                ) : similarMatches.length > 0 ? (
-                  <>
-                    <Text style={[styles.matchTitle, { color: themeColors.warning }]}>
-                      {t('training.exerciseCatalogSimilarTitle')}
-                    </Text>
-                    <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
-                      {t('training.exerciseCatalogSimilarHint')}
-                    </Text>
-                    {similarMatches.map(exercise => (
-                      <TouchableOpacity
-                        key={exercise.id}
-                        accessibilityRole="button"
-                        style={[styles.matchRow, { borderTopColor: themeColors.border }]}
-                        onPress={() => openMatch(exercise)}
-                      >
-                        <View style={styles.matchCopy}>
-                          <Text style={[styles.matchName, dynamicStyles.label]} numberOfLines={2}>
-                            {exercise.name}
-                          </Text>
-                          <Text style={[styles.matchMeta, dynamicStyles.sublabel]} numberOfLines={1}>
-                            {[exercise.muscle_name, exercise.equipment_name].filter(Boolean).join(' · ')}
-                          </Text>
-                        </View>
-                        <Text style={[styles.similarBadge, { color: themeColors.warning }]}>
-                          {t('training.exerciseCatalogSimilarBadge')}
-                        </Text>
-                        <ChevronRight size={18} color={themeColors.textSecondary} />
-                      </TouchableOpacity>
-                    ))}
-                  </>
-                ) : null}
+            {isEditMode && isLoadingExercise ? (
+              <ActivityIndicator style={styles.selectorLoading} color={themeColors.primary} />
+            ) : isEditMode && (!exerciseToEdit || loadExerciseError || !isEditableExercise) ? (
+              <View style={[styles.matchesCard, { backgroundColor: dynamicStyles.card.backgroundColor }]}>
+                <Text style={[styles.matchTitle, dynamicStyles.label]}>
+                  {t('training.exerciseCatalogEditUnavailable')}
+                </Text>
+                <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
+                  {t('training.exerciseCatalogRetryHint')}
+                </Text>
               </View>
-            ) : null}
+            ) : (
+              <>
+                <Text style={[styles.heading, dynamicStyles.title]}>
+                  {t(isEditMode ? 'training.exerciseCatalogEditHeading' : 'training.exerciseCatalogNewHeading')}
+                </Text>
+                <Text style={[styles.subtitle, dynamicStyles.sublabel]}>
+                  {t(isEditMode ? 'training.exerciseCatalogEditSubtitle' : 'training.exerciseCatalogNewSubtitle')}
+                </Text>
 
-            <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogPrimaryMuscle')}</Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => openSelector('primaryMuscle')}
-              style={[styles.selectField, dynamicStyles.input]}
-            >
-              <Text
-                style={[
-                  styles.selectValue,
-                  { color: selectedPrimaryMuscle ? themeColors.textPrimary : themeColors.textSecondary },
-                ]}
-              >
-                {selectedPrimaryMuscle?.name ?? t('training.exerciseCatalogSelectMuscle')}
-              </Text>
-              <ChevronRight size={19} color={themeColors.textSecondary} />
-            </TouchableOpacity>
+                <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogNameLabel')}</Text>
+                <TextInput
+                  accessibilityLabel={t('training.exerciseCatalogNameLabel')}
+                  autoCapitalize="sentences"
+                  autoCorrect={false}
+                  maxLength={80}
+                  onChangeText={setName}
+                  placeholder={t('training.exerciseCatalogNamePlaceholder')}
+                  placeholderTextColor={themeColors.textSecondary}
+                  returnKeyType="next"
+                  style={[styles.textInput, dynamicStyles.input, { color: themeColors.textPrimary }]}
+                  value={name}
+                />
 
-            <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogSecondaryMuscle')}</Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => openSelector('secondaryMuscle')}
-              style={[styles.selectField, dynamicStyles.input]}
-            >
-              <Text
-                style={[
-                  styles.selectValue,
-                  { color: selectedSecondaryMuscle ? themeColors.textPrimary : themeColors.textSecondary },
-                ]}
-              >
-                {selectedSecondaryMuscle?.name ?? t('training.exerciseCatalogOptional')}
-              </Text>
-              <ChevronRight size={19} color={themeColors.textSecondary} />
-            </TouchableOpacity>
-
-            <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogEquipment')}</Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => openSelector('equipment')}
-              style={[styles.selectField, dynamicStyles.input]}
-            >
-              <Text
-                style={[
-                  styles.selectValue,
-                  { color: selectedEquipment ? themeColors.textPrimary : themeColors.textSecondary },
-                ]}
-              >
-                {selectedEquipment?.name ?? t('training.exerciseCatalogOptional')}
-              </Text>
-              <ChevronRight size={19} color={themeColors.textSecondary} />
-            </TouchableOpacity>
-
-            <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogLoadType')}</Text>
-            <View style={styles.loadTypeOptions}>
-              {LOAD_TYPES.map(option => {
-                const selected = loadType === option;
-                return (
-                  <TouchableOpacity
-                    key={option}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    onPress={() => setLoadType(option)}
+                {queryName.length >= 2 &&
+                (isNameCheckPending ||
+                  exactMatchId ||
+                  exactMatchQuery.isError ||
+                  searchError ||
+                  similarMatches.length > 0) ? (
+                  <View
                     style={[
-                      styles.loadTypeOption,
+                      styles.matchesCard,
                       {
-                        backgroundColor: selected ? `${themeColors.primary}14` : dynamicStyles.card.backgroundColor,
-                        borderColor: selected ? themeColors.primary : themeColors.border,
+                        backgroundColor: exactMatchId
+                          ? isDark
+                            ? 'rgba(255,149,0,0.12)'
+                            : '#FFF8E9'
+                          : dynamicStyles.card.backgroundColor,
+                        borderColor: exactMatchId ? `${themeColors.warning}65` : themeColors.border,
                       },
                     ]}
                   >
-                    {selected ? <Check size={15} color={themeColors.primary} /> : null}
-                    <Text
-                      style={[
-                        styles.loadTypeText,
-                        { color: selected ? themeColors.primary : themeColors.textSecondary },
-                      ]}
-                    >
-                      {t(`training.exerciseCatalogLoadType_${option}`)}
+                    {isNameCheckPending ? (
+                      <View style={styles.matchLoading}>
+                        <ActivityIndicator size="small" color={themeColors.primary} />
+                        <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
+                          {t('training.exerciseCatalogChecking')}
+                        </Text>
+                      </View>
+                    ) : exactMatchQuery.isError ? (
+                      <>
+                        <Text style={[styles.matchTitle, { color: themeColors.danger }]}>
+                          {t('training.exerciseCatalogNameCheckFailed')}
+                        </Text>
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          onPress={() => void exactMatchQuery.refetch()}
+                          style={styles.matchRow}
+                        >
+                          <Text style={[styles.matchHelper, { color: themeColors.primary }]}>
+                            {t('nutrition.retry')}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : exactMatchId ? (
+                      <>
+                        <Text style={[styles.matchTitle, { color: themeColors.warning }]}>
+                          {t('training.exerciseCatalogDuplicateTitle')}
+                        </Text>
+                        <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
+                          {t('training.exerciseCatalogExactDuplicate')}
+                        </Text>
+                        {exactMatch ? (
+                          <TouchableOpacity style={styles.matchRow} onPress={() => openMatch(exactMatch)}>
+                            <View style={styles.matchCopy}>
+                              <Text style={[styles.matchName, dynamicStyles.label]} numberOfLines={2}>
+                                {exactMatch.name}
+                              </Text>
+                              <Text style={[styles.matchMeta, dynamicStyles.sublabel]} numberOfLines={1}>
+                                {[exactMatch.muscle_name, exactMatch.equipment_name].filter(Boolean).join(' · ')}
+                              </Text>
+                            </View>
+                            <Text style={[styles.exactBadge, { color: themeColors.warning }]}>
+                              {t('training.exerciseCatalogExactBadge')}
+                            </Text>
+                            <ChevronRight size={18} color={themeColors.textSecondary} />
+                          </TouchableOpacity>
+                        ) : (
+                          <ActivityIndicator size="small" color={themeColors.primary} />
+                        )}
+                      </>
+                    ) : similarMatches.length > 0 ? (
+                      <>
+                        <Text style={[styles.matchTitle, { color: themeColors.warning }]}>
+                          {t('training.exerciseCatalogSimilarTitle')}
+                        </Text>
+                        <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
+                          {t('training.exerciseCatalogSimilarHint')}
+                        </Text>
+                        {similarMatches.map(exercise => (
+                          <TouchableOpacity
+                            key={exercise.id}
+                            accessibilityRole="button"
+                            style={[styles.matchRow, { borderTopColor: themeColors.border }]}
+                            onPress={() => openMatch(exercise)}
+                          >
+                            <View style={styles.matchCopy}>
+                              <Text style={[styles.matchName, dynamicStyles.label]} numberOfLines={2}>
+                                {exercise.name}
+                              </Text>
+                              <Text style={[styles.matchMeta, dynamicStyles.sublabel]} numberOfLines={1}>
+                                {[exercise.muscle_name, exercise.equipment_name].filter(Boolean).join(' · ')}
+                              </Text>
+                            </View>
+                            <Text style={[styles.similarBadge, { color: themeColors.warning }]}>
+                              {t('training.exerciseCatalogSimilarBadge')}
+                            </Text>
+                            <ChevronRight size={18} color={themeColors.textSecondary} />
+                          </TouchableOpacity>
+                        ))}
+                        {searchError ? (
+                          <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
+                            {t('training.exerciseCatalogSimilarSearchFailed')}
+                          </Text>
+                        ) : null}
+                      </>
+                    ) : searchError ? (
+                      <Text style={[styles.matchHelper, dynamicStyles.sublabel]}>
+                        {t('training.exerciseCatalogSimilarSearchFailed')}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                <Text style={[styles.fieldLabel, dynamicStyles.label]}>
+                  {t('training.exerciseCatalogPrimaryMuscle')}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => openSelector('primaryMuscle')}
+                  style={[styles.selectField, dynamicStyles.input]}
+                >
+                  <Text
+                    style={[
+                      styles.selectValue,
+                      { color: selectedPrimaryMuscle ? themeColors.textPrimary : themeColors.textSecondary },
+                    ]}
+                  >
+                    {selectedPrimaryMuscle?.name ?? t('training.exerciseCatalogSelectMuscle')}
+                  </Text>
+                  <ChevronRight size={19} color={themeColors.textSecondary} />
+                </TouchableOpacity>
+
+                <Text style={[styles.fieldLabel, dynamicStyles.label]}>
+                  {t('training.exerciseCatalogSecondaryMuscle')}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => openSelector('secondaryMuscle')}
+                  style={[styles.selectField, dynamicStyles.input]}
+                >
+                  <Text
+                    style={[
+                      styles.selectValue,
+                      { color: selectedSecondaryMuscle ? themeColors.textPrimary : themeColors.textSecondary },
+                    ]}
+                  >
+                    {selectedSecondaryMuscle?.name ?? t('training.exerciseCatalogOptional')}
+                  </Text>
+                  <ChevronRight size={19} color={themeColors.textSecondary} />
+                </TouchableOpacity>
+
+                <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogEquipment')}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  onPress={() => openSelector('equipment')}
+                  style={[styles.selectField, dynamicStyles.input]}
+                >
+                  <Text
+                    style={[
+                      styles.selectValue,
+                      { color: selectedEquipment ? themeColors.textPrimary : themeColors.textSecondary },
+                    ]}
+                  >
+                    {selectedEquipment?.name ?? t('training.exerciseCatalogOptional')}
+                  </Text>
+                  <ChevronRight size={19} color={themeColors.textSecondary} />
+                </TouchableOpacity>
+
+                <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogLoadType')}</Text>
+                <View style={styles.loadTypeOptions}>
+                  {LOAD_TYPES.map(option => {
+                    const selected = loadType === option;
+                    return (
+                      <TouchableOpacity
+                        key={option}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected }}
+                        onPress={() => setLoadType(option)}
+                        style={[
+                          styles.loadTypeOption,
+                          {
+                            backgroundColor: selected ? `${themeColors.primary}14` : dynamicStyles.card.backgroundColor,
+                            borderColor: selected ? themeColors.primary : themeColors.border,
+                          },
+                        ]}
+                      >
+                        {selected ? <Check size={15} color={themeColors.primary} /> : null}
+                        <Text
+                          style={[
+                            styles.loadTypeText,
+                            { color: selected ? themeColors.primary : themeColors.textSecondary },
+                          ]}
+                        >
+                          {t(`training.exerciseCatalogLoadType_${option}`)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogDescription')}</Text>
+                <TextInput
+                  accessibilityLabel={t('training.exerciseCatalogDescription')}
+                  maxLength={500}
+                  multiline
+                  onChangeText={setDescription}
+                  placeholder={t('training.exerciseCatalogDescriptionPlaceholder')}
+                  placeholderTextColor={themeColors.textSecondary}
+                  style={[styles.descriptionInput, dynamicStyles.input, { color: themeColors.textPrimary }]}
+                  textAlignVertical="top"
+                  value={description}
+                />
+
+                <View style={[styles.scopeNote, { backgroundColor: `${themeColors.primary}12` }]}>
+                  <Dumbbell size={18} color={themeColors.primary} />
+                  <View style={styles.scopeNoteCopy}>
+                    <Text style={[styles.scopeNoteTitle, { color: themeColors.primary }]}>
+                      {isEditMode && exerciseToEdit?.owner_user_id === null
+                        ? t('training.exerciseCatalogAlzanBadge')
+                        : t('training.exerciseCatalogMineBadge')}
+                    </Text>
+                    <Text style={[styles.scopeNoteBody, dynamicStyles.sublabel]}>
+                      {t(isEditMode ? 'training.exerciseCatalogEditScopeHint' : 'training.exerciseCatalogMineHint')}
+                    </Text>
+                  </View>
+                </View>
+                {isEditMode && exerciseToEdit?.is_personalized ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: resetExerciseOverride.isPending }}
+                    disabled={resetExerciseOverride.isPending}
+                    onPress={resetPersonalizedExercise}
+                    style={[styles.resetButton, { borderColor: themeColors.border }]}
+                  >
+                    <RotateCcw size={17} color={themeColors.textSecondary} />
+                    <Text style={[styles.resetButtonText, { color: themeColors.textSecondary }]}>
+                      {t('training.exerciseCatalogResetOverrideAction')}
                     </Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={[styles.fieldLabel, dynamicStyles.label]}>{t('training.exerciseCatalogDescription')}</Text>
-            <TextInput
-              accessibilityLabel={t('training.exerciseCatalogDescription')}
-              maxLength={500}
-              multiline
-              onChangeText={setDescription}
-              placeholder={t('training.exerciseCatalogDescriptionPlaceholder')}
-              placeholderTextColor={themeColors.textSecondary}
-              style={[styles.descriptionInput, dynamicStyles.input, { color: themeColors.textPrimary }]}
-              textAlignVertical="top"
-              value={description}
-            />
-
-            <View style={[styles.scopeNote, { backgroundColor: `${themeColors.primary}12` }]}>
-              <Dumbbell size={18} color={themeColors.primary} />
-              <View style={styles.scopeNoteCopy}>
-                <Text style={[styles.scopeNoteTitle, { color: themeColors.primary }]}>
-                  {t('training.exerciseCatalogMineBadge')}
-                </Text>
-                <Text style={[styles.scopeNoteBody, dynamicStyles.sublabel]}>
-                  {t('training.exerciseCatalogMineHint')}
-                </Text>
-              </View>
-            </View>
+                ) : null}
+              </>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
 
-        <View style={[styles.footer, { borderTopColor: themeColors.border }]}>
+        <View style={[styles.footer, { borderTopColor: themeColors.border, paddingBottom: footerBottomPadding }]}>
           <TouchableOpacity
             accessibilityRole="button"
-            disabled={
-              name.trim().length < 2 ||
-              primaryMuscleId === null ||
-              !!exactMatch ||
-              isSearching ||
-              createExercise.isPending
-            }
-            onPress={() => void handleCreate()}
+            disabled={isSaveDisabled}
+            onPress={() => void handleSave()}
             style={[
               styles.saveButton,
               { backgroundColor: themeColors.primary },
-              (name.trim().length < 2 ||
-                primaryMuscleId === null ||
-                !!exactMatch ||
-                isSearching ||
-                createExercise.isPending) &&
-                styles.disabledButton,
+              isSaveDisabled && styles.disabledButton,
             ]}
           >
-            {createExercise.isPending ? (
+            {isSaving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.saveButtonText}>{t('training.exerciseCatalogSaveAction')}</Text>
+              <Text style={styles.saveButtonText}>
+                {t(isEditMode ? 'training.exerciseCatalogUpdateAction' : 'training.exerciseCatalogSaveAction')}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -548,6 +712,18 @@ const styles = StyleSheet.create({
   scopeNoteCopy: { flex: 1 },
   scopeNoteTitle: { fontSize: 13, fontWeight: '700' },
   scopeNoteBody: { ...typography.caption, lineHeight: 17, marginTop: 3 },
+  resetButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginTop: spacing.s,
+    minHeight: 44,
+    paddingHorizontal: spacing.m,
+  },
+  resetButtonText: { fontSize: 13, fontWeight: '600' },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.m, paddingTop: spacing.s },
   saveButton: { alignItems: 'center', borderRadius: borderRadius.m, justifyContent: 'center', minHeight: 52 },
   saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },

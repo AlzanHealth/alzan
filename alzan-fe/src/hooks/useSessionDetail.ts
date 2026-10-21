@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { ActivitySessionSupersetLink, WorkoutSet } from '../types/requests.types';
 import { getCurrentAppLocale, getLocalizedExerciseName } from '../services/localization';
 import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
+import { applyExerciseUserOverride } from '../modules/training/helpers/exerciseUserOverride';
+import { fetchExerciseUserOverrides } from '../modules/training/services/exerciseCatalogService';
 
 export interface ExerciseGroup {
   exercise_id: string;
@@ -21,7 +23,7 @@ export const useSessionDetail = (sessionId?: string) => {
   const languageCode = getCurrentAppLocale();
 
   return useQuery({
-    queryKey: ['sessionDetail', sessionId, languageCode],
+    queryKey: ['sessionDetail', sessionId, languageCode, user?.id],
     queryFn: async () => {
       if (!sessionId) {
         return {
@@ -62,14 +64,21 @@ export const useSessionDetail = (sessionId?: string) => {
 
       console.log('[useSessionDetail] Fetched sets:', sets?.length);
 
+      const exerciseIds = Array.from(new Set((sets ?? []).map(set => set.exercise_id)));
+      const overrides =
+        user?.id && exerciseIds.length > 0 ? await fetchExerciseUserOverrides(user.id, exerciseIds) : [];
+      const overridesByExerciseId = new Map(overrides.map(override => [override.exercise_id, override]));
+
       // Group sets by exercise
       const grouped = (sets || []).reduce(
         (acc, set) => {
           const exerciseId = set.exercise_id;
           if (!acc[exerciseId]) {
-            const exerciseData = set.exercise;
-            const exerciseName = exerciseData
-              ? getLocalizedExerciseName(exerciseData, languageCode)
+            const effectiveExercise = set.exercise
+              ? applyExerciseUserOverride(set.exercise, overridesByExerciseId.get(exerciseId))
+              : null;
+            const exerciseName = effectiveExercise
+              ? getLocalizedExerciseName(effectiveExercise, languageCode)
               : 'Unknown Exercise';
 
             acc[exerciseId] = {
@@ -160,6 +169,7 @@ export const useUpdateWorkoutSet = () => {
       queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
       queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });

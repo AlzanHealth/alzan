@@ -43,6 +43,7 @@ import {
   isCompactPreviewLayout,
 } from './scheduledWorkoutPreviewLayout.helper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '../../../context/AuthContext';
 
 export type ScheduledWorkoutPreviewPlan = {
   id: string;
@@ -98,6 +99,7 @@ export const ScheduledWorkoutPreviewModal = ({
   onPrimaryAction,
 }: ScheduledWorkoutPreviewModalProps) => {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const { colors, isDark } = useTrainingStyles();
   const { units } = useUnitConversion();
   const { getOptionLabel } = useSportCatalog();
@@ -150,10 +152,10 @@ export const ScheduledWorkoutPreviewModal = ({
   );
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['scheduledWorkoutPreview', plan?.type, plan?.templateId, plan?.plannedDate],
+    queryKey: ['scheduledWorkoutPreview', user?.id, plan?.type, plan?.templateId, plan?.plannedDate],
     queryFn: async (): Promise<PreviewData> => {
       if (!plan?.templateId) return null;
-      if (plan.type === 'gym') return fetchGymPreviewTemplate(plan.templateId, plan.plannedDate);
+      if (plan.type === 'gym') return fetchGymPreviewTemplate(plan.templateId, plan.plannedDate, user?.id);
       return fetchEndurancePreviewTemplate(plan.templateId, plan.plannedDate);
     },
     enabled: visible && !!plan?.templateId,

@@ -15,8 +15,10 @@ import {
   getLocalizedExerciseName,
 } from '../services/localization';
 import { getDefaultGymExerciseTargets } from '../modules/training/helpers/gymExerciseDefaults.helper';
+import { applyExerciseUserOverride } from '../modules/training/helpers/exerciseUserOverride';
 import { getStrengthProgressionDate } from '../modules/training/helpers/strengthProgression.helper';
 import { applyStrengthProgressionsForPlannedDate } from '../modules/training/services/strengthProgressionService';
+import { fetchExerciseUserOverrides } from '../modules/training/services/exerciseCatalogService';
 import { format } from 'date-fns';
 import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
 
@@ -268,20 +270,35 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
             .returns<WorkoutTemplateExerciseLookupRow[]>();
           if (templateError) throw templateError;
 
+          const templateExerciseIds = Array.from(new Set((templateExercises ?? []).map(item => item.exercise_id)));
+          const templateOverrides =
+            user?.id && templateExerciseIds.length > 0
+              ? await fetchExerciseUserOverrides(user.id, templateExerciseIds)
+              : [];
+          const templateOverridesByExerciseId = new Map(
+            templateOverrides.map(override => [override.exercise_id, override]),
+          );
+
           // Transform to include exercise_type_code at exercise level
-          exercises = (templateExercises || []).map(te => ({
-            ...te,
-            is_warmup: te.is_warmup ?? false,
-            drop_set_mode: te.drop_set_mode ?? 'none',
-            exercise: te.exercise
-              ? {
-                  ...te.exercise,
-                  base_name: getLocalizedExerciseName(te.exercise, languageCode),
-                  description: getLocalizedExerciseDescription(te.exercise, languageCode),
-                  exercise_type_code: te.exercise.exercise_type?.code || null,
-                }
-              : null,
-          })) as WorkoutTemplateExerciseWithExercise[];
+          exercises = (templateExercises || []).map(te => {
+            const effectiveExercise = te.exercise
+              ? applyExerciseUserOverride(te.exercise, templateOverridesByExerciseId.get(te.exercise.id))
+              : null;
+
+            return {
+              ...te,
+              is_warmup: te.is_warmup ?? false,
+              drop_set_mode: te.drop_set_mode ?? 'none',
+              exercise: effectiveExercise
+                ? {
+                    ...effectiveExercise,
+                    base_name: getLocalizedExerciseName(effectiveExercise, languageCode),
+                    description: getLocalizedExerciseDescription(effectiveExercise, languageCode),
+                    exercise_type_code: effectiveExercise.exercise_type?.code || null,
+                  }
+                : null,
+            };
+          }) as WorkoutTemplateExerciseWithExercise[];
 
           const { data: linkedPlan, error: linkedPlanError } = await supabase
             .from('workout_plans')
@@ -339,10 +356,22 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
           if (adhocError) throw adhocError;
 
           if (adhocExercisesData) {
+            const adhocOverrides =
+              user?.id && adhocExerciseIds.size > 0
+                ? await fetchExerciseUserOverrides(user.id, Array.from(adhocExerciseIds))
+                : [];
+            const adhocOverridesByExerciseId = new Map(
+              adhocOverrides.map(override => [override.exercise_id, override]),
+            );
+
             // Build session exercise entries for adhoc exercises logged directly in this session.
             const sessionAdhocExercises: WorkoutTemplateExerciseWithExercise[] = adhocExercisesData.map(
               (exerciseData, index) => {
                 const defaultTargets = getDefaultGymExerciseTargets(exerciseData.exercise_type?.code);
+                const effectiveExercise = applyExerciseUserOverride(
+                  exerciseData,
+                  adhocOverridesByExerciseId.get(exerciseData.id),
+                );
 
                 return {
                   id: `adhoc-${exerciseData.id}`,
@@ -361,7 +390,9 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
                   is_warmup: false,
                   drop_set_mode: 'none',
                   exercise: {
-                    ...exerciseData,
+                    ...effectiveExercise,
+                    base_name: getLocalizedExerciseName(effectiveExercise, languageCode),
+                    description: getLocalizedExerciseDescription(effectiveExercise, languageCode),
                     exercise_type_code: exerciseData.exercise_type?.code || null,
                   },
                 };

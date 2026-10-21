@@ -4401,6 +4401,87 @@ export type Database = {
           },
         ];
       };
+      user_exercise_overrides: {
+        Row: {
+          base_name_en: string;
+          base_name_es: string;
+          created_at: string;
+          description_en: string | null;
+          description_es: string | null;
+          equipment_id: number | null;
+          exercise_id: string;
+          load_type: Database['public']['Enums']['exercise_load_type'] | null;
+          primary_muscle_id: number;
+          secondary_muscle_id: number | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          base_name_en: string;
+          base_name_es: string;
+          created_at?: string;
+          description_en?: string | null;
+          description_es?: string | null;
+          equipment_id?: number | null;
+          exercise_id: string;
+          load_type?: Database['public']['Enums']['exercise_load_type'] | null;
+          primary_muscle_id: number;
+          secondary_muscle_id?: number | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          base_name_en?: string;
+          base_name_es?: string;
+          created_at?: string;
+          description_en?: string | null;
+          description_es?: string | null;
+          equipment_id?: number | null;
+          exercise_id?: string;
+          load_type?: Database['public']['Enums']['exercise_load_type'] | null;
+          primary_muscle_id?: number;
+          secondary_muscle_id?: number | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'user_exercise_overrides_equipment_fkey';
+            columns: ['equipment_id'];
+            isOneToOne: false;
+            referencedRelation: 'equipment';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'user_exercise_overrides_exercise_id_fkey';
+            columns: ['exercise_id'];
+            isOneToOne: false;
+            referencedRelation: 'exercises';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'user_exercise_overrides_primary_muscle_fkey';
+            columns: ['primary_muscle_id'];
+            isOneToOne: false;
+            referencedRelation: 'muscle_groups';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'user_exercise_overrides_secondary_muscle_fkey';
+            columns: ['secondary_muscle_id'];
+            isOneToOne: false;
+            referencedRelation: 'muscle_groups';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'user_exercise_overrides_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       user_goals: {
         Row: {
           created_at: string;
@@ -5420,6 +5501,14 @@ export type Database = {
         Args: { p_recipe_id: string };
         Returns: string;
       };
+      exercise_catalog_query_matches_candidates: {
+        Args: { p_candidates: string[]; p_query: string };
+        Returns: boolean;
+      };
+      exercise_catalog_search_token_variants: {
+        Args: { p_token: string };
+        Returns: string[];
+      };
       expire_training_templates: {
         Args: { p_local_date: string };
         Returns: number;
@@ -5431,6 +5520,10 @@ export type Database = {
           p_retryable: boolean;
         };
         Returns: undefined;
+      };
+      find_exact_exercise_catalog_match: {
+        Args: { p_exclude_exercise_id?: string; p_name: string };
+        Returns: string;
       };
       finish_wearable_activity_reconciliation: {
         Args: { p_error_code?: string; p_import_id: string };
@@ -5541,6 +5634,17 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      get_exercise_catalog_usage_summaries: {
+        Args: { p_exercise_ids: string[] };
+        Returns: {
+          best_weight_kg: number;
+          exercise_id: string;
+          latest_at: string;
+          latest_reps: number;
+          latest_weight_kg: number;
+          set_count: number;
+        }[];
+      };
       get_home_summary: {
         Args: {
           p_timezone?: string;
@@ -5577,6 +5681,26 @@ export type Database = {
           has_completed: boolean;
           has_planned: boolean;
           planned_count: number;
+        }[];
+      };
+      get_used_exercise_catalog_page: {
+        Args: {
+          p_equipment_id?: number;
+          p_favorites_only?: boolean;
+          p_muscle_id?: number;
+          p_page?: number;
+          p_page_size?: number;
+          p_query?: string;
+        };
+        Returns: {
+          best_weight_kg: number;
+          current_page: number;
+          exercise_id: string;
+          latest_at: string;
+          latest_reps: number;
+          latest_weight_kg: number;
+          set_count: number;
+          total_items: number;
         }[];
       };
       import_ingredients_batch: { Args: { payload: Json }; Returns: number };

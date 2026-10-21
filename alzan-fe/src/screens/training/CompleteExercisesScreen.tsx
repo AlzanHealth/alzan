@@ -20,6 +20,8 @@ import { TrainingScreenNavigationProp, TrainingStackParamList } from '../../type
 import { WorkoutSet } from '../../types/requests.types';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 import { healthQueryKeys } from '../../modules/health/hooks/healthQueryKeys';
+import { fetchExerciseUserOverrides } from '../../modules/training/services/exerciseCatalogService';
+import { applyExerciseUserOverride } from '../../modules/training/helpers/exerciseUserOverride';
 
 interface DraftSet {
   key: string;
@@ -71,7 +73,7 @@ export const CompleteExercisesScreen = () => {
   const exerciseGroups = useMemo(() => sessionDetail?.exerciseGroups ?? [], [sessionDetail]);
 
   const { data: sessionRow } = useQuery({
-    queryKey: ['activitySession', sessionId],
+    queryKey: ['activitySession', user?.id, sessionId],
     queryFn: async () => {
       const { data, error } = await supabase.from('activity_sessions').select('*').eq('id', sessionId).maybeSingle();
       if (error) throw error;
@@ -80,7 +82,7 @@ export const CompleteExercisesScreen = () => {
   });
 
   const { data: templateExercises = [] } = useQuery({
-    queryKey: ['completeExercisesTemplate', sessionRow?.workout_template_id, locale],
+    queryKey: ['completeExercisesTemplate', user?.id, sessionRow?.workout_template_id, locale],
     queryFn: async (): Promise<TemplateExerciseLite[]> => {
       if (!sessionRow?.workout_template_id) return [];
       const { data, error } = await supabase
@@ -89,16 +91,23 @@ export const CompleteExercisesScreen = () => {
         .eq('workout_template_id', sessionRow.workout_template_id)
         .order('order_index');
       if (error) throw error;
+      const exerciseIds = Array.from(new Set((data ?? []).map(row => row.exercise_id)));
+      const overrides = user?.id ? await fetchExerciseUserOverrides(user.id, exerciseIds) : [];
+      const overridesByExerciseId = new Map(overrides.map(override => [override.exercise_id, override]));
       return (data ?? []).map(row => ({
         exerciseId: row.exercise_id,
-        name: row.exercise ? getLocalizedExerciseName(row.exercise) : '',
+        name: row.exercise
+          ? getLocalizedExerciseName(
+              applyExerciseUserOverride(row.exercise, overridesByExerciseId.get(row.exercise_id)),
+            )
+          : '',
         targetSets: row.target_sets,
         targetRepsMin: row.target_reps_min,
         targetRepsMax: row.target_reps_max,
         orderIndex: row.order_index,
       }));
     },
-    enabled: !!sessionRow?.workout_template_id,
+    enabled: !!user?.id && !!sessionRow?.workout_template_id,
   });
 
   // Merge template exercises, already-logged exercises and manually added
@@ -254,6 +263,7 @@ export const CompleteExercisesScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
       queryClient.invalidateQueries({ queryKey: ['activitySession', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       Alert.alert(t('training.completeExercisesTitle'), t('training.completeExercisesSaved'));
       navigation.goBack();

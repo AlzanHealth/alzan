@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabaseClient';
-import { Tables } from '../../../types/database.types';
-import { loadAllPages } from '../helpers/loadAllPages';
+import { Database } from '../../../types/database.types';
 import {
   createCustomExercise,
   CreateCustomExerciseInput,
   deleteCustomExercise,
+  findExactExerciseCatalogMatch,
+  resetExerciseUserOverride,
   restoreCustomExercise,
+  updateExerciseForUser,
 } from '../services/exerciseCatalogService';
+import { exerciseCatalogQueryKey } from '../helpers/exerciseCatalogMatching';
 
 export interface ExerciseUsageSummary {
   setCount: number;
@@ -17,7 +20,17 @@ export interface ExerciseUsageSummary {
   bestWeightKg: number | null;
 }
 
-type WorkoutSetSummary = Pick<Tables<'workout_sets'>, 'exercise_id' | 'weight_kg' | 'reps' | 'created_at'>;
+export interface ExerciseCatalogUsedPage {
+  exerciseIds: string[];
+  usage: Record<string, ExerciseUsageSummary>;
+  totalItems: number;
+  currentPage: number;
+  totalPages: number;
+}
+
+type UsedExerciseCatalogPageRow = Database['public']['Functions']['get_used_exercise_catalog_page']['Returns'][number];
+type ExerciseCatalogUsageSummaryRow =
+  Database['public']['Functions']['get_exercise_catalog_usage_summaries']['Returns'][number];
 
 export interface ExerciseCatalogIndexItem {
   id: string;
@@ -38,118 +51,99 @@ export interface ExerciseCatalogIndexItem {
     code: string;
     equipment_translations: Array<{ name: string; language_code: string | null }> | null;
   } | null;
+  is_personalized?: boolean;
 }
-
-const EXERCISE_CATALOG_INDEX_SELECT = `
-  id,
-  base_name_es,
-  base_name_en,
-  primary_muscle_id,
-  secondary_muscle_id,
-  equipment_id,
-  primary_muscle:muscle_groups!exercises_primary_muscle_id_fkey (
-    code,
-    muscle_group_translations (name, language_code)
-  ),
-  secondary_muscle:muscle_groups!exercises_secondary_muscle_id_fkey (
-    code,
-    muscle_group_translations (name, language_code)
-  ),
-  equipment (
-    code,
-    equipment_translations (name, language_code)
-  )
-`;
 
 const EXERCISE_CATALOG_FAVORITES_KEY = 'exercise-catalog-favorites';
 const EXERCISE_CATALOG_USAGE_KEY = 'exercise-catalog-usage';
 
-const loadExerciseUsage = async (userId: string): Promise<Record<string, ExerciseUsageSummary>> => {
-  const pageSize = 1000;
-  const rows: WorkoutSetSummary[] = [];
-  let rangeStart = 0;
+const mapUsageSummary = (row: UsedExerciseCatalogPageRow | ExerciseCatalogUsageSummaryRow): ExerciseUsageSummary => ({
+  setCount: row.set_count,
+  latestAt: row.latest_at,
+  latestWeightKg: row.latest_weight_kg ?? null,
+  latestReps: row.latest_reps ?? null,
+  bestWeightKg: row.best_weight_kg ?? null,
+});
 
-  while (true) {
-    const { data, error } = await supabase
-      .from('workout_sets')
-      .select('exercise_id, weight_kg, reps, created_at')
-      .eq('user_id', userId)
-      .eq('is_warmup', false)
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: false })
-      .range(rangeStart, rangeStart + pageSize - 1)
-      .returns<WorkoutSetSummary[]>();
-
-    if (error) {
-      throw error;
-    }
-
-    rows.push(...(data ?? []));
-    if (!data || data.length < pageSize) {
-      break;
-    }
-
-    rangeStart += pageSize;
-  }
-
-  const usage: Record<string, ExerciseUsageSummary> = {};
-
-  for (const row of rows) {
-    const summary = usage[row.exercise_id];
-    if (!summary) {
-      usage[row.exercise_id] = {
-        setCount: 1,
-        latestAt: row.created_at,
-        latestWeightKg: row.weight_kg > 0 ? row.weight_kg : null,
-        latestReps: row.reps > 0 ? row.reps : null,
-        bestWeightKg: row.weight_kg > 0 ? row.weight_kg : null,
-      };
-      continue;
-    }
-
-    summary.setCount += 1;
-    if (row.weight_kg > 0 && (summary.bestWeightKg === null || row.weight_kg > summary.bestWeightKg)) {
-      summary.bestWeightKg = row.weight_kg;
-    }
-    if (summary.latestWeightKg === null && row.weight_kg > 0) {
-      summary.latestWeightKg = row.weight_kg;
-    }
-    if (summary.latestReps === null && row.reps > 0) {
-      summary.latestReps = row.reps;
-    }
-  }
-
-  return usage;
-};
-
-export const useExerciseCatalogUsage = (userId?: string) =>
+export const useUsedExerciseCatalogPage = (
+  userId: string | undefined,
+  options: {
+    page: number;
+    pageSize: number;
+    query: string;
+    muscleId: number | null;
+    equipmentId: number | null;
+    favoritesOnly: boolean;
+    enabled?: boolean;
+  },
+) =>
   useQuery({
-    queryKey: [EXERCISE_CATALOG_USAGE_KEY, userId],
-    queryFn: () => loadExerciseUsage(userId!),
-    enabled: !!userId,
+    queryKey: [
+      EXERCISE_CATALOG_USAGE_KEY,
+      userId,
+      'used-page',
+      options.page,
+      options.pageSize,
+      options.query.trim(),
+      options.muscleId,
+      options.equipmentId,
+      options.favoritesOnly,
+    ],
+    queryFn: async (): Promise<ExerciseCatalogUsedPage> => {
+      if (!userId) throw new Error('exercise_catalog_requires_auth');
+
+      const { data, error } = await supabase.rpc('get_used_exercise_catalog_page', {
+        p_page: options.page,
+        p_page_size: options.pageSize,
+        p_query: options.query.trim(),
+        p_muscle_id: options.muscleId ?? undefined,
+        p_equipment_id: options.equipmentId ?? undefined,
+        p_favorites_only: options.favoritesOnly,
+      });
+
+      if (error) throw error;
+
+      const rows: UsedExerciseCatalogPageRow[] = data ?? [];
+      const first = rows[0];
+      const usage: Record<string, ExerciseUsageSummary> = {};
+      rows.forEach(row => {
+        usage[row.exercise_id] = mapUsageSummary(row);
+      });
+      const totalItems = first?.total_items ?? 0;
+      const totalPages = Math.ceil(totalItems / options.pageSize);
+
+      return {
+        exerciseIds: rows.map(row => row.exercise_id),
+        usage,
+        totalItems,
+        currentPage: first?.current_page ?? 1,
+        totalPages,
+      };
+    },
+    enabled: !!userId && options.enabled !== false,
     staleTime: 1000 * 60,
   });
 
-export const useExerciseCatalogIndex = (userId?: string) =>
+export const useExerciseCatalogUsage = (userId?: string, requestedExerciseIds: string[] = []) =>
   useQuery({
-    queryKey: ['exercise-catalog-index', userId],
-    queryFn: () =>
-      loadAllPages(async (from, to) => {
-        const { data, error } = await supabase
-          .from('exercises')
-          .select(EXERCISE_CATALOG_INDEX_SELECT)
-          .order('id', { ascending: true })
-          .range(from, to)
-          .returns<ExerciseCatalogIndexItem[]>();
+    queryKey: [EXERCISE_CATALOG_USAGE_KEY, userId, 'summaries', requestedExerciseIds.join(',')],
+    queryFn: async () => {
+      if (!userId) throw new Error('exercise_catalog_requires_auth');
 
-        if (error) {
-          throw error;
-        }
+      const exerciseIds = [...new Set(requestedExerciseIds)].slice(0, 2500);
+      const { data, error } = await supabase.rpc('get_exercise_catalog_usage_summaries', {
+        p_exercise_ids: exerciseIds,
+      });
 
-        return data ?? [];
-      }),
-    enabled: !!userId,
-    staleTime: 1000 * 60 * 5,
+      if (error) throw error;
+
+      return (data ?? []).reduce<Record<string, ExerciseUsageSummary>>((usage, row) => {
+        usage[row.exercise_id] = mapUsageSummary(row);
+        return usage;
+      }, {});
+    },
+    enabled: !!userId && requestedExerciseIds.length > 0,
+    staleTime: 1000 * 60,
   });
 
 export const useExerciseFavorites = (userId?: string) =>
@@ -186,7 +180,10 @@ export const useToggleExerciseFavorite = (userId?: string) => {
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] }),
+        queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_USAGE_KEY, userId, 'used-page'] }),
+      ]);
     },
   });
 };
@@ -205,7 +202,60 @@ export const useCreateCustomExercise = (userId?: string) => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['exercises'] });
       await queryClient.invalidateQueries({ queryKey: ['exercise-catalog-index'] });
+      await queryClient.invalidateQueries({ queryKey: ['exercise-catalog-exact-match', userId] });
       await queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] });
+    },
+  });
+};
+
+export const useExactExerciseCatalogMatch = (name: string, userId?: string, excludeExerciseId?: string) => {
+  const queryName = name.trim().replace(/\s+/g, ' ');
+
+  return useQuery({
+    queryKey: ['exercise-catalog-exact-match', userId, exerciseCatalogQueryKey(queryName), excludeExerciseId],
+    queryFn: () => findExactExerciseCatalogMatch(name, excludeExerciseId),
+    enabled: !!userId && queryName.length >= 2,
+    staleTime: 1000 * 30,
+    retry: false,
+  });
+};
+
+export const useUpdateExerciseForUser = (userId?: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ exerciseId, input }: { exerciseId: string; input: CreateCustomExerciseInput }) => {
+      if (!userId) throw new Error('exercise_edit_requires_auth');
+      return updateExerciseForUser(userId, exerciseId, input);
+    },
+    onSuccess: async (_data, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['exercises'] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-by-id', userId, variables.exerciseId] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-catalog-index', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-catalog-exact-match', userId] }),
+        queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_USAGE_KEY, userId] }),
+      ]);
+    },
+  });
+};
+
+export const useResetExerciseUserOverride = (userId?: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ exerciseId }: { exerciseId: string }) => {
+      if (!userId) throw new Error('exercise_edit_requires_auth');
+      return resetExerciseUserOverride(userId, exerciseId);
+    },
+    onSuccess: async (_data, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['exercises'] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-by-id', userId, variables.exerciseId] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-catalog-index', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-catalog-exact-match', userId] }),
+        queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_USAGE_KEY, userId] }),
+      ]);
     },
   });
 };
@@ -222,8 +272,12 @@ export const useDeleteCustomExercise = (userId?: string) => {
       return deleteCustomExercise(exerciseId, userId);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['exercises'] });
-      await queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['exercises'] }),
+        queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-catalog-exact-match', userId] }),
+        queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_USAGE_KEY, userId] }),
+      ]);
     },
   });
 };
@@ -240,8 +294,12 @@ export const useRestoreCustomExercise = (userId?: string) => {
       return restoreCustomExercise(exerciseId, userId);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['exercises'] });
-      await queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['exercises'] }),
+        queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-catalog-exact-match', userId] }),
+        queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_USAGE_KEY, userId] }),
+      ]);
     },
   });
 };

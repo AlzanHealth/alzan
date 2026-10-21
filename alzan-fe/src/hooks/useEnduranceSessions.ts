@@ -207,6 +207,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
       queryClient.invalidateQueries({ queryKey: ['sessionDetail'] });
       queryClient.invalidateQueries({ queryKey: ['sessionLaps'] });
       queryClient.invalidateQueries({ queryKey: ['activitySessionSections'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage'] });
     },
   });
 

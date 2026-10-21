@@ -23,6 +23,7 @@ export const useCopyCompletedSession = () => {
         queryClient.invalidateQueries({ queryKey: ['completedSessions'] }),
         queryClient.invalidateQueries({ queryKey: ['dailyPlans'] }),
         queryClient.invalidateQueries({ queryKey: ['activeSessionBanner'] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage', user?.id] }),
       ]);
     },
   });

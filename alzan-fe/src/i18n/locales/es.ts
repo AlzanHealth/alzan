@@ -2394,6 +2394,7 @@ export default {
     exerciseCatalogAll: 'Todos',
     exerciseCatalogFavorites: 'Favoritos',
     exerciseCatalogAlzanBadge: 'Alzan',
+    exerciseCatalogPersonalizedBadge: 'Editado por ti',
     exerciseCatalogMineBadge: 'Mío',
     exerciseCatalogMineHint: 'Aquí aparecen los ejercicios que creas. Solo tú puedes verlos y gestionarlos.',
     exerciseCatalogUsedHint:
@@ -2407,6 +2408,7 @@ export default {
     exerciseCatalogSetCount: '{{count}} series registradas',
     exerciseCatalogNoDetails: 'Sin grupo muscular ni equipamiento asignados',
     exerciseCatalogOpenExercise: 'Abrir los detalles de {{name}}',
+    exerciseCatalogEditAction: 'Editar {{name}}',
     exerciseCatalogAddFavorite: 'Añadir a favoritos',
     exerciseCatalogRemoveFavorite: 'Quitar de favoritos',
     exerciseCatalogFavoriteLabel: 'Favorito',
@@ -2438,6 +2440,20 @@ export default {
     exerciseCatalogNewTitle: 'Nuevo ejercicio',
     exerciseCatalogNewHeading: 'Crear un ejercicio',
     exerciseCatalogNewSubtitle: 'Añade un movimiento a tu catálogo personal de gym.',
+    exerciseCatalogEditTitle: 'Editar ejercicio',
+    exerciseCatalogEditHeading: 'Modificar los datos del ejercicio',
+    exerciseCatalogEditSubtitle: 'El cambio solo se aplica a tu cuenta y conserva el historial de entrenamientos.',
+    exerciseCatalogEditScopeHint:
+      'Los cambios solo modifican cómo ves este ejercicio. La versión de Alzan, los entrenamientos y los pesos de los demás no cambian.',
+    exerciseCatalogEditUnavailable: 'No puedes editar este ejercicio desde esta cuenta.',
+    exerciseCatalogUpdateAction: 'Guardar cambios',
+    exerciseCatalogEditError: 'No se pudo actualizar el ejercicio. Actualiza el catálogo e inténtalo de nuevo.',
+    exerciseCatalogResetOverrideAction: 'Restaurar datos de Alzan',
+    exerciseCatalogResetOverrideTitle: '¿Restaurar el ejercicio de Alzan?',
+    exerciseCatalogResetOverrideMessage:
+      'Se quitarán tus cambios personales. Tus entrenamientos y pesos seguirán guardados.',
+    exerciseCatalogNameCheckFailed: 'No se pudo comprobar si este ejercicio ya existe.',
+    exerciseCatalogSimilarSearchFailed: 'Las sugerencias de ejercicios parecidos no están disponibles ahora.',
     exerciseCatalogNameLabel: 'Nombre del ejercicio',
     exerciseCatalogNamePlaceholder: 'Ej.: Press inclinado con mancuernas',
     exerciseCatalogChecking: 'Buscando en el catálogo…',
@@ -2467,6 +2483,8 @@ export default {
     exerciseCatalogRemoveWeightMessage:
       'La serie y sus repeticiones seguirán en tu historial; solo se quitará el peso.',
     exerciseCatalogWeightCleared: 'Peso eliminado. La serie y sus repeticiones siguen guardadas.',
+    prValuesHistoryLoadError:
+      'No se pudieron cargar los pesos guardados. El historial sigue almacenado; inténtalo de nuevo.',
     replacementCompletedBlocked: 'No se puede sustituir un ejercicio con series completadas.',
     replacementTimerBlocked: 'Termina o cancela el temporizador de este ejercicio antes de sustituirlo.',
     replacementUnavailable: 'El ejercicio ha cambiado. Vuelve a abrir el organizador.',

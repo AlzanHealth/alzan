@@ -3,11 +3,14 @@ import { Exercise } from './requests.types';
 export type ExerciseWithDetails = Exercise & {
   load_type: 'bodyweight' | 'external' | 'assisted' | 'mixed' | null;
   name: string;
+  canonical_name_es?: string;
+  canonical_name_en?: string | null;
   description?: string | null;
   muscle_name?: string;
   secondary_muscle_name?: string;
   equipment_name?: string;
   exercise_type_code?: string | null; // 'Tiempo' for time-based, 'Repeticiones' for reps
+  is_personalized?: boolean;
   primary_muscle?: {
     id: number;
     code: string;

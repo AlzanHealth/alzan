@@ -28,6 +28,8 @@ import { useAuth } from '../../context/AuthContext';
 import { getLocalizedExerciseName } from '../../services/localization';
 import { PREDEFINED_TEMPLATES, PredefinedTemplate } from '../../data/predefinedTemplates';
 import { copyPredefinedTemplateToMyRoutines } from '../../modules/training/services/predefinedTemplateService';
+import { fetchExerciseUserOverrides } from '../../modules/training/services/exerciseCatalogService';
+import { applyExerciseUserOverride } from '../../modules/training/helpers/exerciseUserOverride';
 import { WeekDaySelector } from '../../components/training/WeekDaySelector';
 import { useQueryClient } from '@tanstack/react-query';
 import { WorkoutTemplate } from '../../types/requests.types';
@@ -243,8 +245,12 @@ export const GymRoutinesListScreen = () => {
         .in('id', uniqueIds);
 
       if (data) {
+        const overrides = user?.id ? await fetchExerciseUserOverrides(user.id, uniqueIds) : [];
+        const overridesByExerciseId = new Map(overrides.map(override => [override.exercise_id, override]));
         const nameMap = new Map<string, string>();
-        data.forEach(d => nameMap.set(d.id, getLocalizedExerciseName(d)));
+        data.forEach(d =>
+          nameMap.set(d.id, getLocalizedExerciseName(applyExerciseUserOverride(d, overridesByExerciseId.get(d.id)))),
+        );
         setPreviewExercises(nameMap);
       }
 
