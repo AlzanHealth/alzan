@@ -213,9 +213,11 @@ export const ExerciseCatalogScreen = () => {
   const renderExercise = ({ item }: { item: ExerciseWithDetails }) => {
     const itemUsage: ExerciseUsageSummary | undefined = usage[item.id];
     const isFavorite = favoriteIds.has(item.id);
-    const canDelete = item.is_custom && item.owner_user_id === user?.id && tab === 'mine';
+    const isMine = item.is_custom && item.owner_user_id === user?.id;
+    const isAlzan = !item.is_custom && item.owner_user_id === null;
+    const canDelete = isMine && tab === 'mine';
     const canRestore = canDelete && !!item.archived_at;
-    const showWeightHistory = !!itemUsage && item.load_type !== 'bodyweight';
+    const showWeightHistory = !!itemUsage && (item.load_type !== 'bodyweight' || itemUsage.latestWeightKg !== null);
     const unit = preferences.weight_unit === 'lb' ? 'lb' : 'kg';
     const weightValue = itemUsage?.latestWeightKg;
     const weightLabel =
@@ -239,16 +241,22 @@ export const ExerciseCatalogScreen = () => {
               <Text style={[styles.exerciseName, dynamicStyles.label]} numberOfLines={2}>
                 {item.name}
               </Text>
-              {item.is_custom && item.owner_user_id === user?.id ? (
-                <View style={[styles.privateBadge, { backgroundColor: `${themeColors.primary}12` }]}>
-                  <Text style={[styles.privateBadgeText, { color: themeColors.primary }]}>
-                    {t('training.exerciseCatalogPrivate')}
+              {isMine ? (
+                <View style={[styles.scopeBadge, { backgroundColor: `${themeColors.primary}12` }]}>
+                  <Text style={[styles.scopeBadgeText, { color: themeColors.primary }]}>
+                    {t('training.exerciseCatalogMineBadge')}
+                  </Text>
+                </View>
+              ) : isAlzan ? (
+                <View style={[styles.scopeBadge, { backgroundColor: `${themeColors.textSecondary}18` }]}>
+                  <Text style={[styles.scopeBadgeText, { color: themeColors.textSecondary }]}>
+                    {t('training.exerciseCatalogAlzanBadge')}
                   </Text>
                 </View>
               ) : null}
               {item.archived_at ? (
-                <View style={[styles.privateBadge, { backgroundColor: `${themeColors.textSecondary}18` }]}>
-                  <Text style={[styles.privateBadgeText, { color: themeColors.textSecondary }]}>
+                <View style={[styles.scopeBadge, { backgroundColor: `${themeColors.textSecondary}18` }]}>
+                  <Text style={[styles.scopeBadgeText, { color: themeColors.textSecondary }]}>
                     {t('training.exerciseCatalogArchivedBadge')}
                   </Text>
                 </View>
@@ -285,6 +293,9 @@ export const ExerciseCatalogScreen = () => {
               color={isFavorite ? themeColors.warning : themeColors.textSecondary}
               fill={isFavorite ? themeColors.warning : 'transparent'}
             />
+            <Text style={[styles.iconActionLabel, { color: themeColors.textSecondary }]}>
+              {t('training.exerciseCatalogFavoriteLabel')}
+            </Text>
           </TouchableOpacity>
           {showWeightHistory ? (
             <TouchableOpacity
@@ -295,6 +306,9 @@ export const ExerciseCatalogScreen = () => {
               onPress={() => openWeightHistory(item)}
             >
               <History size={19} color={themeColors.primary} />
+              <Text style={[styles.iconActionLabel, { color: themeColors.primary }]}>
+                {t('training.exerciseCatalogHistoryLabel')}
+              </Text>
             </TouchableOpacity>
           ) : null}
           {canRestore ? (
@@ -308,6 +322,9 @@ export const ExerciseCatalogScreen = () => {
               onPress={() => void restoreArchivedExercise(item)}
             >
               <RotateCcw size={18} color={themeColors.primary} />
+              <Text style={[styles.iconActionLabel, { color: themeColors.primary }]}>
+                {t('training.exerciseCatalogRestoreLabel')}
+              </Text>
             </TouchableOpacity>
           ) : canDelete ? (
             <TouchableOpacity
@@ -318,6 +335,9 @@ export const ExerciseCatalogScreen = () => {
               onPress={() => confirmDelete(item)}
             >
               <Trash2 size={18} color={themeColors.danger} />
+              <Text style={[styles.iconActionLabel, { color: themeColors.danger }]}>
+                {t('training.exerciseCatalogDeleteLabel')}
+              </Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -491,12 +511,12 @@ export const ExerciseCatalogScreen = () => {
       />
 
       {tab === 'mine' ? (
-        <Text style={[styles.privateHint, { color: themeColors.textSecondary }]}>
-          {t('training.exerciseCatalogPrivateHint')}
+        <Text style={[styles.catalogHint, { color: themeColors.textSecondary }]}>
+          {t('training.exerciseCatalogMineHint')}
         </Text>
       ) : null}
       {tab === 'used' ? (
-        <Text style={[styles.privateHint, { color: themeColors.textSecondary }]}>
+        <Text style={[styles.catalogHint, { color: themeColors.textSecondary }]}>
           {t('training.exerciseCatalogUsedHint')}
         </Text>
       ) : null}
@@ -672,7 +692,7 @@ const styles = StyleSheet.create({
   },
   filterChipText: { fontSize: 12, fontWeight: '600' },
   equipmentLabel: { marginBottom: spacing.xs, marginTop: spacing.s },
-  privateHint: { ...typography.caption, marginTop: spacing.s },
+  catalogHint: { ...typography.caption, marginTop: spacing.s },
   resultsLabel: {
     ...typography.caption,
     fontWeight: '700',
@@ -707,12 +727,20 @@ const styles = StyleSheet.create({
   exerciseCopy: { flex: 1, minWidth: 0 },
   exerciseTitleRow: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.xs },
   exerciseName: { flex: 1, fontSize: 14, fontWeight: '600' },
-  privateBadge: { borderRadius: borderRadius.full, paddingHorizontal: 7, paddingVertical: 3 },
-  privateBadgeText: { fontSize: 9, fontWeight: '700' },
+  scopeBadge: { borderRadius: borderRadius.full, paddingHorizontal: 7, paddingVertical: 3 },
+  scopeBadgeText: { fontSize: 9, fontWeight: '700' },
   exerciseMeta: { fontSize: 11, marginTop: 4 },
   exerciseUsage: { fontSize: 10, fontWeight: '600', marginTop: 5 },
   exerciseActions: { alignItems: 'center', flexDirection: 'row', marginLeft: spacing.xs },
-  iconAction: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
+  iconAction: {
+    alignItems: 'center',
+    height: 54,
+    justifyContent: 'center',
+    minWidth: 56,
+    paddingHorizontal: 2,
+    paddingVertical: spacing.xs,
+  },
+  iconActionLabel: { fontSize: 10, fontWeight: '600', lineHeight: 12, textAlign: 'center' },
   centerState: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: spacing.l },
   emptyState: { alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.l, paddingVertical: spacing.xl },
   stateTitle: { ...typography.h4, textAlign: 'center' },

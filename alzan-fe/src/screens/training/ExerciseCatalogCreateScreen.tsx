@@ -357,14 +357,14 @@ export const ExerciseCatalogCreateScreen = () => {
               value={description}
             />
 
-            <View style={[styles.privateNote, { backgroundColor: `${themeColors.primary}12` }]}>
+            <View style={[styles.scopeNote, { backgroundColor: `${themeColors.primary}12` }]}>
               <Dumbbell size={18} color={themeColors.primary} />
-              <View style={styles.privateNoteCopy}>
-                <Text style={[styles.privateNoteTitle, { color: themeColors.primary }]}>
-                  {t('training.exerciseCatalogPrivate')}
+              <View style={styles.scopeNoteCopy}>
+                <Text style={[styles.scopeNoteTitle, { color: themeColors.primary }]}>
+                  {t('training.exerciseCatalogMineBadge')}
                 </Text>
-                <Text style={[styles.privateNoteBody, dynamicStyles.sublabel]}>
-                  {t('training.exerciseCatalogPrivateHint')}
+                <Text style={[styles.scopeNoteBody, dynamicStyles.sublabel]}>
+                  {t('training.exerciseCatalogMineHint')}
                 </Text>
               </View>
             </View>
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   },
   loadTypeText: { fontSize: 11, fontWeight: '600' },
   descriptionInput: { borderRadius: borderRadius.m, borderWidth: 1, fontSize: 14, minHeight: 96, padding: spacing.m },
-  privateNote: {
+  scopeNote: {
     alignItems: 'flex-start',
     borderRadius: borderRadius.m,
     flexDirection: 'row',
@@ -545,9 +545,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.l,
     padding: spacing.m,
   },
-  privateNoteCopy: { flex: 1 },
-  privateNoteTitle: { fontSize: 13, fontWeight: '700' },
-  privateNoteBody: { ...typography.caption, lineHeight: 17, marginTop: 3 },
+  scopeNoteCopy: { flex: 1 },
+  scopeNoteTitle: { fontSize: 13, fontWeight: '700' },
+  scopeNoteBody: { ...typography.caption, lineHeight: 17, marginTop: 3 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.m, paddingTop: spacing.s },
   saveButton: { alignItems: 'center', borderRadius: borderRadius.m, justifyContent: 'center', minHeight: 52 },
   saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
