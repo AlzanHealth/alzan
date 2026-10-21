@@ -95,7 +95,7 @@ export function substituteWorkoutExercise(
 ): ActiveWorkoutDraft {
   const reason = substitutionBlockReason(draft, id, savedExerciseIds, executingId);
   if (reason) throw new Error(reason);
-  if (exercises.some(item => item.exercise_id === replacement.id) || draft.exerciseOrder.includes(replacement.id)) {
+  if (draft.exerciseOrder.includes(replacement.id) && !draft.hiddenExercises.includes(replacement.id)) {
     throw new Error('exerciseAlreadyInSession');
   }
   const source = exercises.find(item => item.exercise_id === id);
@@ -140,9 +140,14 @@ export function substituteWorkoutExercise(
     inputs,
     setModes,
     extraSets,
-    adhocExercises: [...draft.adhocExercises.filter(item => item.exercise_id !== id), nextExercise],
-    hiddenExercises: [...new Set([...draft.hiddenExercises, id])],
-    exerciseOrder: draft.exerciseOrder.map(value => (value === id ? replacement.id : value)),
+    adhocExercises: [
+      ...draft.adhocExercises.filter(item => item.exercise_id !== id && item.exercise_id !== replacement.id),
+      nextExercise,
+    ],
+    hiddenExercises: [...new Set([...draft.hiddenExercises.filter(value => value !== replacement.id), id])],
+    exerciseOrder: draft.exerciseOrder
+      .filter(value => value !== replacement.id)
+      .map(value => (value === id ? replacement.id : value)),
     supersetLinks: draft.supersetLinks.map(link =>
       link
         .split('|')

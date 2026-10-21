@@ -49,24 +49,6 @@ interface ExerciseLookupRow extends Exercise {
   } | null;
 }
 
-type RankedExerciseRow = {
-  id: string;
-  search_rank: number;
-};
-
-type SearchExercisesRankedRpc = {
-  rpc: (
-    fn: 'search_exercises_ranked',
-    args: {
-      p_query: string;
-      p_locale: string;
-      p_muscle_id: number | null;
-      p_equipment_id: number | null;
-      p_limit: number;
-    },
-  ) => Promise<{ data: RankedExerciseRow[] | null; error: { message: string } | null }>;
-};
-
 const EXERCISE_LOOKUP_SELECT = `
   *,
   exercise_type:exercise_types (
@@ -339,15 +321,28 @@ export const useExercises = (options?: UseExercisesOptions) => {
             rows = [...strongRows, ...broadRows];
           }
         } else {
-          const { data: rankedExercises, error: rankedError } = await (
-            supabase as unknown as SearchExercisesRankedRpc
-          ).rpc('search_exercises_ranked', {
-            p_query: trimmedSearchQuery,
-            p_locale: languageCode,
-            p_muscle_id: selectedMuscleId,
-            p_equipment_id: selectedEquipmentId,
-            p_limit: candidateLimit,
-          });
+          const { data: rankedExercises, error: rankedError } = await loadAllPages(
+            async (from, to) => {
+              const { data, error } = await withTimeout(
+                supabase.rpc('search_exercises_ranked_page', {
+                  p_query: trimmedSearchQuery,
+                  p_locale: languageCode,
+                  p_muscle_id: selectedMuscleId ?? undefined,
+                  p_equipment_id: selectedEquipmentId ?? undefined,
+                  p_limit: to - from + 1,
+                  p_offset: from,
+                }),
+                SEARCH_QUERY_TIMEOUT_MS,
+              );
+              if (error) throw error;
+              return data ?? [];
+            },
+            180,
+            candidateLimit,
+          ).then(
+            data => ({ data, error: null }),
+            (error: unknown) => ({ data: null, error }),
+          );
 
           if (!rankedError && rankedExercises) {
             const rankedIds = rankedExercises.map(item => item.id);
@@ -359,19 +354,28 @@ export const useExercises = (options?: UseExercisesOptions) => {
               return { exercises: [], fuzzyCandidates: [], hasMore: false };
             }
 
-            let detailsQuery = supabase.from('exercises').select(EXERCISE_LOOKUP_SELECT).in('id', matchingRankedIds);
+            const details: ExerciseLookupRow[] = [];
+            for (let offset = 0; offset < matchingRankedIds.length; offset += 180) {
+              let detailsQuery = supabase
+                .from('exercises')
+                .select(EXERCISE_LOOKUP_SELECT)
+                .in('id', matchingRankedIds.slice(offset, offset + 180));
 
-            if (!includeArchived) {
-              detailsQuery = detailsQuery.is('archived_at', null);
+              if (!includeArchived) {
+                detailsQuery = detailsQuery.is('archived_at', null);
+              }
+
+              const { data: page, error: detailsError } = await detailsQuery.returns<ExerciseLookupRow[]>();
+              if (detailsError) {
+                console.error('Error fetching ranked exercises:', detailsError);
+                useOverrideSearchFallback = true;
+                break;
+              }
+              details.push(...(page ?? []));
             }
 
-            const { data: details, error: detailsError } = await detailsQuery.returns<ExerciseLookupRow[]>();
-
-            if (detailsError) {
-              console.error('Error fetching ranked exercises:', detailsError);
-              useOverrideSearchFallback = true;
-            } else {
-              const detailsById = new Map((details ?? []).map(item => [item.id, item]));
+            if (!useOverrideSearchFallback) {
+              const detailsById = new Map(details.map(item => [item.id, item]));
               rows = matchingRankedIds
                 .map(id => detailsById.get(id))
                 .filter((item): item is ExerciseLookupRow => !!item);

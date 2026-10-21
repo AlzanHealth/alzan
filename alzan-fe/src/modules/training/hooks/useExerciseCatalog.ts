@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabaseClient';
 import { Database } from '../../../types/database.types';
 import {
@@ -57,6 +57,19 @@ export interface ExerciseCatalogIndexItem {
 
 const EXERCISE_CATALOG_FAVORITES_KEY = 'exercise-catalog-favorites';
 const EXERCISE_CATALOG_USAGE_KEY = 'exercise-catalog-usage';
+
+// These queries embed exercise fields and must refresh when personalization changes.
+const invalidateExerciseConsumers = (queryClient: QueryClient) =>
+  Promise.all(
+    [
+      'sessionDetail',
+      'activeSession',
+      'routine',
+      'completeExercisesTemplate',
+      'scheduledWorkoutPreview',
+      'exercise-alternatives',
+    ].map(key => queryClient.invalidateQueries({ queryKey: [key] })),
+  );
 
 const mapUsageSummary = (row: UsedExerciseCatalogPageRow | ExerciseCatalogUsageSummaryRow): ExerciseUsageSummary => ({
   setCount: row.set_count,
@@ -211,6 +224,7 @@ export const useCreateCustomExercise = (userId?: string) => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      await queryClient.invalidateQueries({ queryKey: ['exercise-alternatives', userId] });
       await queryClient.invalidateQueries({ queryKey: ['exercise-catalog-index'] });
       await queryClient.invalidateQueries({ queryKey: ['exercise-catalog-exact-match', userId] });
       await queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] });
@@ -240,6 +254,7 @@ export const useUpdateExerciseForUser = (userId?: string) => {
     },
     onSuccess: async (_data, variables) => {
       await Promise.all([
+        invalidateExerciseConsumers(queryClient),
         queryClient.invalidateQueries({ queryKey: ['exercises'] }),
         queryClient.invalidateQueries({ queryKey: ['exercise-by-id', userId, variables.exerciseId] }),
         queryClient.invalidateQueries({ queryKey: ['exercise-catalog-index', userId] }),
@@ -260,6 +275,7 @@ export const useResetExerciseUserOverride = (userId?: string) => {
     },
     onSuccess: async (_data, variables) => {
       await Promise.all([
+        invalidateExerciseConsumers(queryClient),
         queryClient.invalidateQueries({ queryKey: ['exercises'] }),
         queryClient.invalidateQueries({ queryKey: ['exercise-by-id', userId, variables.exerciseId] }),
         queryClient.invalidateQueries({ queryKey: ['exercise-catalog-index', userId] }),
@@ -283,6 +299,8 @@ export const useDeleteCustomExercise = (userId?: string) => {
     },
     onSuccess: async () => {
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['exercise-by-id', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-alternatives', userId] }),
         queryClient.invalidateQueries({ queryKey: ['exercises'] }),
         queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] }),
         queryClient.invalidateQueries({ queryKey: ['exercise-catalog-exact-match', userId] }),
@@ -305,6 +323,8 @@ export const useRestoreCustomExercise = (userId?: string) => {
     },
     onSuccess: async () => {
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['exercise-by-id', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['exercise-alternatives', userId] }),
         queryClient.invalidateQueries({ queryKey: ['exercises'] }),
         queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] }),
         queryClient.invalidateQueries({ queryKey: ['exercise-catalog-exact-match', userId] }),

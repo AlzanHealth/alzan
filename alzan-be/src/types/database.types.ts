@@ -5791,6 +5791,20 @@ export type Database = {
           search_rank: number;
         }[];
       };
+      search_exercises_ranked_page: {
+        Args: {
+          p_equipment_id?: number;
+          p_limit?: number;
+          p_locale?: string;
+          p_muscle_id?: number;
+          p_offset?: number;
+          p_query: string;
+        };
+        Returns: {
+          id: string;
+          search_rank: number;
+        }[];
+      };
       search_ingredients_ranked: {
         Args: {
           p_category?: Database['public']['Enums']['ingredients_category'];

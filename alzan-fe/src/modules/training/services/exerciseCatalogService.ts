@@ -124,6 +124,13 @@ export const fetchExerciseUserOverrides = async (
 ): Promise<ExerciseUserOverride[]> => {
   if (!userId) return [];
   if (exerciseIds && exerciseIds.length === 0) return [];
+  if (exerciseIds && exerciseIds.length > 180) {
+    const overrides: ExerciseUserOverride[] = [];
+    for (let offset = 0; offset < exerciseIds.length; offset += 180) {
+      overrides.push(...(await fetchExerciseUserOverrides(userId, exerciseIds.slice(offset, offset + 180))));
+    }
+    return overrides;
+  }
 
   return loadAllPages(async (from, to) => {
     let query = supabase

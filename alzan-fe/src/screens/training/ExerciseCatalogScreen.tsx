@@ -633,117 +633,113 @@ export const ExerciseCatalogScreen = () => {
           <View style={styles.backButton} />
         </View>
 
-        {isInitialLoading ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator size="large" color={themeColors.primary} />
-          </View>
-        ) : hasError ? (
-          <View style={styles.centerState}>
-            <Text style={[styles.stateTitle, dynamicStyles.title]}>{t('training.exerciseCatalogLoadError')}</Text>
-            <Text style={[styles.stateBody, dynamicStyles.sublabel]}>{t('training.exerciseCatalogRetryHint')}</Text>
-            <TouchableOpacity
-              style={[styles.retryButton, { backgroundColor: themeColors.primary }]}
-              onPress={retryCatalog}
-            >
-              <Text style={styles.primaryButtonLabel}>{t('nutrition.retry')}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <FlatList
-            ref={exerciseListRef}
-            style={styles.exerciseList}
-            data={filteredExercises}
-            keyExtractor={item => item.id}
-            renderItem={renderExercise}
-            ListHeaderComponent={listHeader}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                {isFetchingList && tab === 'used' ? (
-                  <ActivityIndicator size="large" color={themeColors.primary} />
-                ) : (
-                  <>
-                    <Dumbbell size={28} color={themeColors.textSecondary} />
-                    <Text style={[styles.stateTitle, dynamicStyles.title]}>
-                      {t('training.exerciseCatalogEmptyTitle')}
-                    </Text>
-                    <Text style={[styles.stateBody, dynamicStyles.sublabel]}>
-                      {favoritesOnly
-                        ? t('training.exerciseCatalogEmptyFavorites')
-                        : tab === 'mine'
-                          ? t('training.exerciseCatalogEmptyMine')
-                          : tab === 'used'
-                            ? t('training.exerciseCatalogEmptyUsed')
-                            : t('training.exerciseCatalogEmptyCatalog')}
-                    </Text>
-                  </>
-                )}
-              </View>
+        <FlatList
+          ref={exerciseListRef}
+          style={styles.exerciseList}
+          data={isInitialLoading || hasError ? [] : filteredExercises}
+          keyExtractor={item => item.id}
+          renderItem={renderExercise}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              {isInitialLoading || (isFetchingList && tab === 'used') ? (
+                <ActivityIndicator size="large" color={themeColors.primary} />
+              ) : hasError ? (
+                <>
+                  <Text style={[styles.stateTitle, dynamicStyles.title]}>{t('training.exerciseCatalogLoadError')}</Text>
+                  <Text style={[styles.stateBody, dynamicStyles.sublabel]}>
+                    {t('training.exerciseCatalogRetryHint')}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.retryButton, { backgroundColor: themeColors.primary }]}
+                    onPress={retryCatalog}
+                  >
+                    <Text style={styles.primaryButtonLabel}>{t('nutrition.retry')}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Dumbbell size={28} color={themeColors.textSecondary} />
+                  <Text style={[styles.stateTitle, dynamicStyles.title]}>
+                    {t('training.exerciseCatalogEmptyTitle')}
+                  </Text>
+                  <Text style={[styles.stateBody, dynamicStyles.sublabel]}>
+                    {favoritesOnly
+                      ? t('training.exerciseCatalogEmptyFavorites')
+                      : tab === 'mine'
+                        ? t('training.exerciseCatalogEmptyMine')
+                        : tab === 'used'
+                          ? t('training.exerciseCatalogEmptyUsed')
+                          : t('training.exerciseCatalogEmptyCatalog')}
+                  </Text>
+                </>
+              )}
+            </View>
+          }
+          onEndReached={() => {
+            if (tab === 'catalog' && hasMore && !isFetchingExercises) {
+              setVisibleLimit(limit => limit + CATALOG_PAGE_SIZE);
             }
-            onEndReached={() => {
-              if (tab === 'catalog' && hasMore && !isFetchingExercises) {
-                setVisibleLimit(limit => limit + CATALOG_PAGE_SIZE);
-              }
-            }}
-            onEndReachedThreshold={0.35}
-            contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            ListFooterComponent={
-              <>
-                {isFetchingList && exercises.length > 0 ? <ActivityIndicator color={themeColors.primary} /> : null}
-                {tab === 'used' && usedPageData.totalPages > 1 ? (
-                  <View style={styles.pagination}>
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: usedPageData.currentPage <= 1 || isFetchingList }}
-                      disabled={usedPageData.currentPage <= 1 || isFetchingList}
-                      onPress={() => {
-                        setUsedPage(usedPageData.currentPage - 1);
-                        exerciseListRef.current?.scrollToOffset({ offset: 0, animated: true });
-                      }}
-                      style={[
-                        styles.pageButton,
-                        { borderColor: themeColors.border, opacity: usedPageData.currentPage <= 1 ? 0.45 : 1 },
-                      ]}
-                    >
-                      <Text style={[styles.pageButtonText, { color: themeColors.textPrimary }]}>
-                        {t('training.exerciseCatalogPagePrevious')}
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={[styles.pageIndicator, { color: themeColors.textSecondary }]}>
-                      {t('training.exerciseCatalogPage', {
-                        current: usedPageData.currentPage,
-                        total: usedPageData.totalPages,
-                      })}
+          }}
+          onEndReachedThreshold={0.35}
+          contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          ListFooterComponent={
+            <>
+              {isFetchingList && exercises.length > 0 ? <ActivityIndicator color={themeColors.primary} /> : null}
+              {tab === 'used' && usedPageData.totalPages > 1 ? (
+                <View style={styles.pagination}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: usedPageData.currentPage <= 1 || isFetchingList }}
+                    disabled={usedPageData.currentPage <= 1 || isFetchingList}
+                    onPress={() => {
+                      setUsedPage(usedPageData.currentPage - 1);
+                      exerciseListRef.current?.scrollToOffset({ offset: 0, animated: true });
+                    }}
+                    style={[
+                      styles.pageButton,
+                      { borderColor: themeColors.border, opacity: usedPageData.currentPage <= 1 ? 0.45 : 1 },
+                    ]}
+                  >
+                    <Text style={[styles.pageButtonText, { color: themeColors.textPrimary }]}>
+                      {t('training.exerciseCatalogPagePrevious')}
                     </Text>
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        disabled: usedPageData.currentPage >= usedPageData.totalPages || isFetchingList,
-                      }}
-                      disabled={usedPageData.currentPage >= usedPageData.totalPages || isFetchingList}
-                      onPress={() => {
-                        setUsedPage(usedPageData.currentPage + 1);
-                        exerciseListRef.current?.scrollToOffset({ offset: 0, animated: true });
-                      }}
-                      style={[
-                        styles.pageButton,
-                        {
-                          borderColor: themeColors.border,
-                          opacity: usedPageData.currentPage >= usedPageData.totalPages ? 0.45 : 1,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.pageButtonText, { color: themeColors.textPrimary }]}>
-                        {t('training.exerciseCatalogPageNext')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : null}
-              </>
-            }
-          />
-        )}
+                  </TouchableOpacity>
+                  <Text style={[styles.pageIndicator, { color: themeColors.textSecondary }]}>
+                    {t('training.exerciseCatalogPage', {
+                      current: usedPageData.currentPage,
+                      total: usedPageData.totalPages,
+                    })}
+                  </Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityState={{
+                      disabled: usedPageData.currentPage >= usedPageData.totalPages || isFetchingList,
+                    }}
+                    disabled={usedPageData.currentPage >= usedPageData.totalPages || isFetchingList}
+                    onPress={() => {
+                      setUsedPage(usedPageData.currentPage + 1);
+                      exerciseListRef.current?.scrollToOffset({ offset: 0, animated: true });
+                    }}
+                    style={[
+                      styles.pageButton,
+                      {
+                        borderColor: themeColors.border,
+                        opacity: usedPageData.currentPage >= usedPageData.totalPages ? 0.45 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.pageButtonText, { color: themeColors.textPrimary }]}>
+                      {t('training.exerciseCatalogPageNext')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </>
+          }
+        />
 
         <TouchableOpacity
           accessibilityRole="button"
@@ -898,7 +894,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   iconActionLabel: { fontSize: 10, fontWeight: '600', lineHeight: 12, textAlign: 'center' },
-  centerState: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: spacing.l },
   emptyState: { alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.l, paddingVertical: spacing.xl },
   stateTitle: { ...typography.h4, textAlign: 'center' },
   stateBody: { ...typography.caption, lineHeight: 18, textAlign: 'center' },

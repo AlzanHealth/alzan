@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   workoutBlocks,
+  effectiveWorkoutExercises,
   moveWorkoutBlock,
   detachWorkoutExercise,
   substituteWorkoutExercise,
@@ -141,4 +142,37 @@ test('replacement and organization survive a fresh local store without changing 
   await fresh.hydrate(original);
   assert.deepEqual(fresh.getSnapshot().draft, changed);
   assert.equal(JSON.stringify(exercises), templateBefore);
+});
+
+test('replacing an exercise and selecting the original again preserves active targets and unique entries', () => {
+  const restored = substituteWorkoutExercise(
+    replaced,
+    effectiveWorkoutExercises(replaced, exercises),
+    'machine',
+    detail('a'),
+    [],
+    null,
+  );
+  assert.deepEqual(restored.exerciseOrder, original.exerciseOrder);
+  assert.deepEqual(restored.hiddenExercises, ['machine']);
+  assert.deepEqual(
+    restored.adhocExercises.map(item => item.exercise_id),
+    ['a'],
+  );
+  const effective = effectiveWorkoutExercises(restored, exercises);
+  assert.equal(effective.filter(item => item.exercise_id === 'a').length, 1);
+  assert.equal(
+    effective.some(item => item.exercise_id === 'machine'),
+    false,
+  );
+  assert.deepEqual(restored.inputs['a-1'], { weight: '', reps: '9' });
+  assert.equal(restored.inputs['machine-1'], undefined);
+  assert.equal(restored.setModes['a-1'], 'warmup');
+  assert.equal(restored.extraSets.a, 1);
+  assert.deepEqual(restored.supersetLinks, ['a|b']);
+  assert.equal(restored.adhocExercises[0].target_reps_min, 8);
+  assert.equal(restored.adhocExercises[0].target_reps_max, 10);
+  assert.equal(restored.adhocExercises[0].target_sets, 3);
+  assert.equal(restored.adhocExercises[0].rest_seconds, 60);
+  assert.equal(restored.adhocExercises[0].target_weight_kg, 0);
 });

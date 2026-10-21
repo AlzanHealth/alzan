@@ -47,7 +47,10 @@ for (const [from, to] of [
   ['Extensión de tríceps', 'Triceps pushdown'],
   ['Elevación de talón', 'Calf raise'],
 ]) {
-  assert.equal(rankExerciseAlternatives(make('a', from), [make('b', to)]).length, 1, `${from} / ${to}`);
+  assert.ok(
+    rankExerciseAlternatives(make('a', from), [make('b', to)])[0]?.reasons.includes('sameMovement'),
+    `${from} / ${to}`,
+  );
 }
 for (const [from, to] of [
   ['Curl de bíceps', 'Curl femoral'],
@@ -70,8 +73,10 @@ assert.equal(
   'horizontalPress',
 );
 assert.equal(
-  rankExerciseAlternatives(make('a', 'Press inclinado con mancuernas'), [make('b', 'Incline barbell press')]).length,
-  1,
+  rankExerciseAlternatives(make('a', 'Press inclinado con mancuernas'), [
+    make('b', 'Incline barbell press'),
+  ])[0]?.reasons.includes('sameMovement'),
+  true,
 );
 assert.ok(
   !rankExerciseAlternatives(source, [make('decline', 'Press de banca declinado')])[0]?.reasons.includes('sameMovement'),

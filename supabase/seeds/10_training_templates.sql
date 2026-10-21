@@ -80,7 +80,9 @@ INSERT INTO public.exercises (
   description_en,
   is_custom,
   owner_user_id,
-  load_type
+  load_type,
+  primary_muscle_id,
+  equipment_id
 )
 VALUES
   (
@@ -92,7 +94,9 @@ VALUES
     'Demo exercise for testing gym templates.',
     true,
     '4424c5d6-5751-4038-aa39-bd85895ddb78',
-    'external'
+    'external',
+    28,
+    281
   ),
   (
     '11000000-0000-0000-0000-000000000002',
@@ -103,7 +107,9 @@ VALUES
     'Demo exercise for testing sets, reps and weight.',
     true,
     '4424c5d6-5751-4038-aa39-bd85895ddb78',
-    'external'
+    'external',
+    55,
+    NULL
   ),
   (
     '11000000-0000-0000-0000-000000000003',
@@ -114,7 +120,9 @@ VALUES
     'Demo push exercise.',
     true,
     '4424c5d6-5751-4038-aa39-bd85895ddb78',
-    'external'
+    'external',
+    1,
+    81
   ),
   (
     '11000000-0000-0000-0000-000000000004',
@@ -125,7 +133,9 @@ VALUES
     'Demo pull exercise.',
     true,
     '4424c5d6-5751-4038-aa39-bd85895ddb78',
-    'external'
+    'external',
+    71,
+    151
   ),
   (
     '11000000-0000-0000-0000-000000000005',
@@ -136,7 +146,9 @@ VALUES
     'Time-based demo exercise with a 60-second target.',
     true,
     '4424c5d6-5751-4038-aa39-bd85895ddb78',
-    'bodyweight'
+    'bodyweight',
+    25,
+    1
   ),
   (
     '11000000-0000-0000-0000-000000000006',
@@ -147,7 +159,9 @@ VALUES
     'Demo heavy push exercise.',
     true,
     '4424c5d6-5751-4038-aa39-bd85895ddb78',
-    'external'
+    'external',
+    1,
+    116
   ),
   (
     '11000000-0000-0000-0000-000000000007',
@@ -158,7 +172,9 @@ VALUES
     'Demo heavy pull exercise.',
     true,
     '4424c5d6-5751-4038-aa39-bd85895ddb78',
-    'external'
+    'external',
+    71,
+    NULL
   );
 
 INSERT INTO public.workout_templates (
