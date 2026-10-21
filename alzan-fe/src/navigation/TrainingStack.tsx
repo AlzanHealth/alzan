@@ -16,6 +16,8 @@ import { WeeklyPlanScreen } from '../screens/training/WeeklyPlanScreen';
 import { ExerciseDetailScreen } from '../screens/training/ExerciseDetailScreen';
 import { ExercisePrValuesScreen } from '../screens/training/ExercisePrValuesScreen';
 import { ExerciseSearchScreen } from '../screens/training/ExerciseSearchScreen';
+import { ExerciseCatalogScreen } from '../screens/training/ExerciseCatalogScreen';
+import { ExerciseCatalogCreateScreen } from '../screens/training/ExerciseCatalogCreateScreen';
 import { SportTemplatesListScreen } from '../screens/training/SportTemplatesListScreen';
 import { ActivityTypeSelectorScreen } from '../screens/training/ActivityTypeSelectorScreen';
 import { TrainingPlanImportScreen } from '../screens/training/TrainingPlanImportScreen';
@@ -32,6 +34,8 @@ export const TrainingStack = () => {
       <Stack.Screen name="GymRoutinesList" component={GymRoutinesListScreen} />
       <Stack.Screen name="GymRoutineEditor" component={GymRoutineEditorScreen} />
       <Stack.Screen name="ExerciseSearch" component={ExerciseSearchScreen} options={{ presentation: 'modal' }} />
+      <Stack.Screen name="ExerciseCatalog" component={ExerciseCatalogScreen} />
+      <Stack.Screen name="ExerciseCatalogCreate" component={ExerciseCatalogCreateScreen} />
       <Stack.Screen name="StartWorkout" component={StartWorkoutScreen} />
       <Stack.Screen
         name="ActiveWorkout"

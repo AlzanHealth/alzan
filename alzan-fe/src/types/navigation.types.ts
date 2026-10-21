@@ -96,6 +96,8 @@ export type TrainingStackParamList = {
     replacementExerciseName?: string;
     excludedExerciseIds?: string[];
   };
+  ExerciseCatalog: undefined;
+  ExerciseCatalogCreate: undefined;
   StartWorkout: { templateId: string; date?: string; planId?: string };
   ActiveWorkout: { sessionId: string };
   FinishWorkout: { sessionId: string };

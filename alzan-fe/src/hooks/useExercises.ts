@@ -150,6 +150,7 @@ interface UseExercisesOptions {
   selectedMuscleId?: number | null;
   selectedEquipmentId?: number | null;
   limit?: number;
+  includeArchived?: boolean;
 }
 
 const mapExerciseLookupRow = (item: ExerciseLookupRow, languageCode: Locale): ExerciseWithDetails => {
@@ -215,9 +216,18 @@ export const useExercises = (options?: UseExercisesOptions) => {
   const selectedMuscleId = options?.selectedMuscleId ?? null;
   const selectedEquipmentId = options?.selectedEquipmentId ?? null;
   const limit = options?.limit;
+  const includeArchived = options?.includeArchived ?? false;
 
   const { data, isLoading, isFetching, error } = useQuery({
-    queryKey: ['exercises', languageCode, normalizedSearchQuery, selectedMuscleId, selectedEquipmentId, limit ?? 'all'],
+    queryKey: [
+      'exercises',
+      languageCode,
+      normalizedSearchQuery,
+      selectedMuscleId,
+      selectedEquipmentId,
+      limit ?? 'all',
+      includeArchived,
+    ],
     queryFn: async () => {
       const createBaseQuery = () => {
         let query = supabase.from('exercises').select(EXERCISE_LOOKUP_SELECT);
@@ -228,6 +238,10 @@ export const useExercises = (options?: UseExercisesOptions) => {
 
         if (selectedEquipmentId !== null) {
           query = query.eq('equipment_id', selectedEquipmentId);
+        }
+
+        if (!includeArchived) {
+          query = query.is('archived_at', null);
         }
 
         return query;
@@ -255,11 +269,13 @@ export const useExercises = (options?: UseExercisesOptions) => {
             return { exercises: [], hasMore: false };
           }
 
-          const { data: details, error: detailsError } = await supabase
-            .from('exercises')
-            .select(EXERCISE_LOOKUP_SELECT)
-            .in('id', rankedIds)
-            .returns<ExerciseLookupRow[]>();
+          let detailsQuery = supabase.from('exercises').select(EXERCISE_LOOKUP_SELECT).in('id', rankedIds);
+
+          if (!includeArchived) {
+            detailsQuery = detailsQuery.is('archived_at', null);
+          }
+
+          const { data: details, error: detailsError } = await detailsQuery.returns<ExerciseLookupRow[]>();
 
           if (detailsError) {
             console.error('Error fetching ranked exercises:', detailsError);

@@ -479,6 +479,7 @@ const invalidateExerciseQueries = async (
     queryClient.invalidateQueries({ queryKey: ['exercise-value-entries', exerciseId, metric] }),
     queryClient.invalidateQueries({ queryKey: ['exercise-progress', exerciseId] }),
     queryClient.invalidateQueries({ queryKey: ['exercise-value-entries', exerciseId] }),
+    queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage'] }),
     queryClient.invalidateQueries({ queryKey: ['exercises-prs'] }),
     queryClient.invalidateQueries({ queryKey: ['sessionDetail'] }),
     queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] }),

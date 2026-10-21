@@ -13,7 +13,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Download, Trash2, Calendar, AlertTriangle, Upload, ArrowDown, ArrowUp } from 'lucide-react-native';
+import { Download, Trash2, Calendar, AlertTriangle, Upload, ArrowDown, ArrowUp, Dumbbell } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { colors, spacing, typography, borderRadius } from '../../theme';
@@ -333,6 +333,22 @@ const TrainingSettingsScreen = () => {
                   </Text>
                 </View>
                 <Heart size={20} color={themeColors.primary} />
+              </TouchableOpacity>
+              <View style={[styles.separator, dynamicStyles.divider]} />
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.toggleRow}
+                onPress={() => navigation.navigate('Training', { screen: 'ExerciseCatalog' })}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.toggleLabel, dynamicStyles.label]}>
+                    {t('training.exerciseCatalogSettingsTitle')}
+                  </Text>
+                  <Text style={[styles.toggleDesc, dynamicStyles.sublabel]}>
+                    {t('training.exerciseCatalogSettingsDescription')}
+                  </Text>
+                </View>
+                <Dumbbell size={20} color={themeColors.primary} />
               </TouchableOpacity>
               <View style={[styles.separator, dynamicStyles.divider]} />
               <ToggleRow

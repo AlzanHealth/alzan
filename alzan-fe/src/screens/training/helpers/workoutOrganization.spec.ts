@@ -20,6 +20,7 @@ const detail = (id: string): ExerciseWithDetails => ({
   created_at: '2026-09-21T00:00:00Z',
   description_en: null,
   description_es: null,
+  archived_at: null,
   difficulty: null,
   equipment_id: null,
   exercise_type_id: null,

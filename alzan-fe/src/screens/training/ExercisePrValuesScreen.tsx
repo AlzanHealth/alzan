@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { getDateFnsLocale } from '../../i18n/dateLocale';
@@ -180,6 +180,29 @@ export const ExercisePrValuesScreen = () => {
     ]);
   };
 
+  const confirmClearWeightEntry = (entry: (typeof weightEntries)[number]) => {
+    if (metric !== 'weight' || entry.isEmptyWeight || entry.weightKg <= 0) return;
+
+    Alert.alert(t('training.exerciseCatalogRemoveWeightTitle'), t('training.exerciseCatalogRemoveWeightMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('training.exerciseCatalogRemoveWeightAction'),
+        onPress: () => {
+          updateWeightEntry.mutate(
+            { setId: entry.id, value: 0 },
+            {
+              onSuccess: () => {
+                if (editingWeightEntryId === entry.id) {
+                  cancelEditWeightEntry();
+                }
+              },
+            },
+          );
+        },
+      },
+    ]);
+  };
+
   return (
     <LinearGradient colors={dynamicStyles.gradientColors} style={{ flex: 1 }}>
       <SafeAreaView style={[styles.container, dynamicStyles.container]} edges={['top', 'bottom']}>
@@ -328,6 +351,8 @@ export const ExercisePrValuesScreen = () => {
                       ) : (
                         <>
                           <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel={t('common.edit')}
                             style={[
                               styles.iconBtn,
                               { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
@@ -347,7 +372,23 @@ export const ExercisePrValuesScreen = () => {
                               <Pencil size={16} color={themeColors.textPrimary} />
                             )}
                           </TouchableOpacity>
+                          {metric === 'weight' && !entry.isEmptyWeight && entry.weightKg > 0 ? (
+                            <TouchableOpacity
+                              accessibilityRole="button"
+                              accessibilityLabel={t('training.exerciseCatalogRemoveWeightAction')}
+                              style={[
+                                styles.iconBtn,
+                                { backgroundColor: isDark ? 'rgba(255,149,0,0.18)' : 'rgba(255,149,0,0.12)' },
+                              ]}
+                              onPress={() => confirmClearWeightEntry(entry)}
+                              disabled={updateWeightEntry.isPending || deleteWeightEntry.isPending}
+                            >
+                              <X size={16} color={themeColors.warning} />
+                            </TouchableOpacity>
+                          ) : null}
                           <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel={t('training.deletePrValueTitle')}
                             style={[
                               styles.iconBtn,
                               {

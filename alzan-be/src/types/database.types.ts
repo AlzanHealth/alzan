@@ -1995,6 +1995,39 @@ export type Database = {
           },
         ];
       };
+      exercise_favorites: {
+        Row: {
+          created_at: string;
+          exercise_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          exercise_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          exercise_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'exercise_favorites_exercise_id_fkey';
+            columns: ['exercise_id'];
+            isOneToOne: false;
+            referencedRelation: 'exercises';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'exercise_favorites_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       exercise_media: {
         Row: {
           exercise_id: string;
@@ -2076,6 +2109,7 @@ export type Database = {
       };
       exercises: {
         Row: {
+          archived_at: string | null;
           base_name_en: string | null;
           base_name_es: string;
           created_at: string;
@@ -2092,6 +2126,7 @@ export type Database = {
           secondary_muscle_id: number | null;
         };
         Insert: {
+          archived_at?: string | null;
           base_name_en?: string | null;
           base_name_es: string;
           created_at?: string;
@@ -2108,6 +2143,7 @@ export type Database = {
           secondary_muscle_id?: number | null;
         };
         Update: {
+          archived_at?: string | null;
           base_name_en?: string | null;
           base_name_es?: string;
           created_at?: string;
@@ -5561,6 +5597,10 @@ export type Database = {
           p_recipe_id: string;
         };
         Returns: undefined;
+      };
+      normalize_exercise_catalog_name: {
+        Args: { p_name: string };
+        Returns: string;
       };
       nutrition_menu_snapshot_token: {
         Args: { p_dates: string[]; p_user_id: string };

@@ -501,6 +501,7 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activeSession', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage'] });
     },
   });
 
@@ -582,6 +583,7 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
       queryClient.invalidateQueries({ queryKey: ['activeSession'] });
       queryClient.invalidateQueries({ queryKey: ['activeSessionBanner'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage'] });
       queryClient.invalidateQueries({ queryKey: ['dailyPlans'] }); // Reset "Resume" to "Start" instantly
     },
   });
@@ -612,6 +614,7 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activeSession', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage'] });
     },
   });
 
@@ -642,6 +645,7 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activeSession', sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage'] });
     },
   });
 
