@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -27,8 +27,10 @@ import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../navigation/tabBarLayou
 import { ExerciseWithDetails } from '../../types/training';
 import { TrainingScreenNavigationProp } from '../../types/navigation.types';
 import { useExercises } from '../../hooks/useExercises';
+import { getCurrentAppLocale, matchesLoosely } from '../../services/localization';
 import {
   ExerciseUsageSummary,
+  useExerciseCatalogIndex,
   useDeleteCustomExercise,
   useExerciseCatalogUsage,
   useExerciseFavorites,
@@ -36,13 +38,14 @@ import {
   useToggleExerciseFavorite,
 } from '../../modules/training/hooks/useExerciseCatalog';
 import { ExerciseNameAlreadyExistsError } from '../../modules/training/services/exerciseCatalogService';
+import { paginateItems } from '../../modules/training/helpers/exerciseCatalogPagination';
 
 type CatalogTab = 'catalog' | 'used' | 'mine';
 
 const CATALOG_PAGE_SIZE = 30;
 
 export const ExerciseCatalogScreen = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -53,12 +56,75 @@ export const ExerciseCatalogScreen = () => {
   const { equipment } = useEquipment();
   const [tab, setTab] = useState<CatalogTab>('catalog');
   const [query, setQuery] = useState('');
+  const [usedPage, setUsedPage] = useState(1);
   const [visibleLimit, setVisibleLimit] = useState(CATALOG_PAGE_SIZE);
   const [selectedMuscleId, setSelectedMuscleId] = useState<number | null>(null);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const exerciseListRef = useRef<FlatList<ExerciseWithDetails> | null>(null);
+  const { data: usage = {}, isLoading: isLoadingUsage, error: usageError } = useExerciseCatalogUsage(user?.id);
+  const {
+    data: exerciseIndex = [],
+    isLoading: isLoadingExerciseIndex,
+    error: exerciseIndexError,
+  } = useExerciseCatalogIndex(tab === 'used' ? user?.id : undefined);
+  const {
+    data: favoriteIds = new Set<string>(),
+    isLoading: isLoadingFavorites,
+    error: favoritesError,
+  } = useExerciseFavorites(user?.id);
   const createButtonBottom = Math.max(0, topFromScreenBottom - safeAreaBottom) + TAB_BAR_CLEARANCE;
   const listBottomPadding = createButtonBottom + 54 + spacing.m;
+
+  const usedExerciseIds = useMemo(() => {
+    if (tab !== 'used') return [];
+
+    const locale = getCurrentAppLocale();
+    const indexById = new Map(exerciseIndex.map(item => [item.id, item] as const));
+    const getTranslation = (translations: Array<{ name: string; language_code: string | null }> | null | undefined) =>
+      translations?.find(translation => translation.language_code === locale)?.name ?? translations?.[0]?.name ?? '';
+
+    return Object.keys(usage)
+      .filter(id => {
+        const exercise = indexById.get(id);
+        if (!exercise) return false;
+        if (favoritesOnly && !favoriteIds.has(id)) return false;
+        if (selectedMuscleId !== null && exercise.primary_muscle_id !== selectedMuscleId) return false;
+        if (selectedEquipmentId !== null && exercise.equipment_id !== selectedEquipmentId) return false;
+        if (query.trim().length < 2) return true;
+
+        return matchesLoosely(
+          query,
+          exercise.base_name_es,
+          exercise.base_name_en,
+          getTranslation(exercise.primary_muscle?.muscle_group_translations),
+          getTranslation(exercise.secondary_muscle?.muscle_group_translations),
+          getTranslation(exercise.equipment?.equipment_translations),
+          exercise.primary_muscle?.code,
+          exercise.secondary_muscle?.code,
+          exercise.equipment?.code,
+        );
+      })
+      .sort(
+        (left, right) =>
+          (usage[right]?.latestAt ?? '').localeCompare(usage[left]?.latestAt ?? '') || left.localeCompare(right),
+      );
+  }, [
+    exerciseIndex,
+    favoritesOnly,
+    favoriteIds,
+    i18n.language,
+    query,
+    selectedEquipmentId,
+    selectedMuscleId,
+    tab,
+    usage,
+  ]);
+
+  const usedPageData = useMemo(
+    () => paginateItems(usedExerciseIds, usedPage, CATALOG_PAGE_SIZE),
+    [usedExerciseIds, usedPage],
+  );
 
   const catalogLimit = tab === 'catalog' ? visibleLimit : undefined;
   const {
@@ -68,25 +134,20 @@ export const ExerciseCatalogScreen = () => {
     isFetching: isFetchingExercises,
     error: exercisesError,
   } = useExercises({
-    searchQuery: query,
+    searchQuery: tab === 'used' ? undefined : query,
     selectedMuscleId,
     selectedEquipmentId,
+    exerciseIds: tab === 'used' ? usedPageData.items : undefined,
     limit: catalogLimit,
     includeArchived: tab === 'used' || tab === 'mine',
   });
-  const { data: usage = {}, isLoading: isLoadingUsage, error: usageError } = useExerciseCatalogUsage(user?.id);
-  const {
-    data: favoriteIds = new Set<string>(),
-    isLoading: isLoadingFavorites,
-    error: favoritesError,
-  } = useExerciseFavorites(user?.id);
   const toggleFavorite = useToggleExerciseFavorite(user?.id);
   const deleteExercise = useDeleteCustomExercise(user?.id);
   const restoreExercise = useRestoreCustomExercise(user?.id);
 
   const filteredExercises = useMemo(() => {
     const visible = exercises.filter(exercise => {
-      if (tab === 'used' && !usage[exercise.id]) return false;
+      if (tab === 'used' && (!usage[exercise.id] || !usedPageData.items.includes(exercise.id))) return false;
       if (tab === 'mine' && (!exercise.is_custom || exercise.owner_user_id !== user?.id)) return false;
       if (favoritesOnly && !favoriteIds.has(exercise.id)) return false;
       return true;
@@ -98,7 +159,7 @@ export const ExerciseCatalogScreen = () => {
       }
       return left.name.localeCompare(right.name);
     });
-  }, [exercises, favoritesOnly, favoriteIds, tab, usage, user?.id]);
+  }, [exercises, favoritesOnly, favoriteIds, tab, usage, usedPageData.items, user?.id]);
 
   const openExercise = (exercise: ExerciseWithDetails) => {
     navigation.navigate('ExerciseDetail', { exercise });
@@ -171,6 +232,7 @@ export const ExerciseCatalogScreen = () => {
         onPress={() => {
           setSelectedMuscleId(selected ? null : item.id);
           setVisibleLimit(CATALOG_PAGE_SIZE);
+          setUsedPage(1);
         }}
         style={[
           styles.filterChip,
@@ -195,6 +257,7 @@ export const ExerciseCatalogScreen = () => {
         onPress={() => {
           setSelectedEquipmentId(selected ? null : item.id);
           setVisibleLimit(CATALOG_PAGE_SIZE);
+          setUsedPage(1);
         }}
         style={[
           styles.filterChip,
@@ -372,6 +435,7 @@ export const ExerciseCatalogScreen = () => {
           onChangeText={value => {
             setQuery(value);
             setVisibleLimit(CATALOG_PAGE_SIZE);
+            setUsedPage(1);
           }}
           autoCapitalize="none"
           autoCorrect={false}
@@ -398,6 +462,7 @@ export const ExerciseCatalogScreen = () => {
               onPress={() => {
                 setTab(tabKey);
                 setVisibleLimit(CATALOG_PAGE_SIZE);
+                setUsedPage(1);
               }}
               style={[styles.tabButton, selected && { backgroundColor: themeColors.cardBackground }]}
             >
@@ -416,7 +481,10 @@ export const ExerciseCatalogScreen = () => {
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityState={{ selected: favoritesOnly }}
-          onPress={() => setFavoritesOnly(value => !value)}
+          onPress={() => {
+            setFavoritesOnly(value => !value);
+            setUsedPage(1);
+          }}
           style={[
             styles.favoriteFilter,
             {
@@ -446,7 +514,10 @@ export const ExerciseCatalogScreen = () => {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityState={{ selected: selectedMuscleId === null }}
-            onPress={() => setSelectedMuscleId(null)}
+            onPress={() => {
+              setSelectedMuscleId(null);
+              setUsedPage(1);
+            }}
             style={[
               styles.filterChip,
               {
@@ -485,7 +556,10 @@ export const ExerciseCatalogScreen = () => {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityState={{ selected: selectedEquipmentId === null }}
-            onPress={() => setSelectedEquipmentId(null)}
+            onPress={() => {
+              setSelectedEquipmentId(null);
+              setUsedPage(1);
+            }}
             style={[
               styles.filterChip,
               {
@@ -521,17 +595,28 @@ export const ExerciseCatalogScreen = () => {
         </Text>
       ) : null}
       <Text style={[styles.resultsLabel, dynamicStyles.sublabel]}>
-        {t('training.exerciseCatalogResults', { count: filteredExercises.length })}
+        {tab === 'used'
+          ? t('training.exerciseCatalogUsedResults', {
+              count: usedPageData.totalItems,
+              start: usedPageData.totalItems === 0 ? 0 : (usedPageData.currentPage - 1) * CATALOG_PAGE_SIZE + 1,
+              end: Math.min(usedPageData.currentPage * CATALOG_PAGE_SIZE, usedPageData.totalItems),
+            })
+          : t('training.exerciseCatalogResults', { count: filteredExercises.length })}
       </Text>
     </View>
   );
 
-  const isInitialLoading = (isLoadingExercises && exercises.length === 0) || isLoadingUsage || isLoadingFavorites;
-  const hasError = exercisesError || usageError || favoritesError;
+  const isInitialLoading =
+    (isLoadingExercises && exercises.length === 0) ||
+    isLoadingUsage ||
+    (tab === 'used' && isLoadingExerciseIndex) ||
+    isLoadingFavorites;
+  const hasError = exercisesError || usageError || favoritesError || (tab === 'used' && exerciseIndexError);
   const retryCatalog = () => {
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: ['exercises'] }),
       queryClient.invalidateQueries({ queryKey: ['exercise-catalog-usage', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['exercise-catalog-index'] }),
       queryClient.invalidateQueries({ queryKey: ['exercise-catalog-favorites', user?.id] }),
     ]);
   };
@@ -570,6 +655,7 @@ export const ExerciseCatalogScreen = () => {
           </View>
         ) : (
           <FlatList
+            ref={exerciseListRef}
             style={styles.exerciseList}
             data={filteredExercises}
             keyExtractor={item => item.id}
@@ -577,17 +663,25 @@ export const ExerciseCatalogScreen = () => {
             ListHeaderComponent={listHeader}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Dumbbell size={28} color={themeColors.textSecondary} />
-                <Text style={[styles.stateTitle, dynamicStyles.title]}>{t('training.exerciseCatalogEmptyTitle')}</Text>
-                <Text style={[styles.stateBody, dynamicStyles.sublabel]}>
-                  {favoritesOnly
-                    ? t('training.exerciseCatalogEmptyFavorites')
-                    : tab === 'mine'
-                      ? t('training.exerciseCatalogEmptyMine')
-                      : tab === 'used'
-                        ? t('training.exerciseCatalogEmptyUsed')
-                        : t('training.exerciseCatalogEmptyCatalog')}
-                </Text>
+                {isFetchingExercises && tab === 'used' ? (
+                  <ActivityIndicator size="large" color={themeColors.primary} />
+                ) : (
+                  <>
+                    <Dumbbell size={28} color={themeColors.textSecondary} />
+                    <Text style={[styles.stateTitle, dynamicStyles.title]}>
+                      {t('training.exerciseCatalogEmptyTitle')}
+                    </Text>
+                    <Text style={[styles.stateBody, dynamicStyles.sublabel]}>
+                      {favoritesOnly
+                        ? t('training.exerciseCatalogEmptyFavorites')
+                        : tab === 'mine'
+                          ? t('training.exerciseCatalogEmptyMine')
+                          : tab === 'used'
+                            ? t('training.exerciseCatalogEmptyUsed')
+                            : t('training.exerciseCatalogEmptyCatalog')}
+                    </Text>
+                  </>
+                )}
               </View>
             }
             onEndReached={() => {
@@ -600,7 +694,58 @@ export const ExerciseCatalogScreen = () => {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={
-              isFetchingExercises && exercises.length > 0 ? <ActivityIndicator color={themeColors.primary} /> : null
+              <>
+                {isFetchingExercises && exercises.length > 0 ? <ActivityIndicator color={themeColors.primary} /> : null}
+                {tab === 'used' && usedPageData.totalPages > 1 ? (
+                  <View style={styles.pagination}>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: usedPageData.currentPage <= 1 || isFetchingExercises }}
+                      disabled={usedPageData.currentPage <= 1 || isFetchingExercises}
+                      onPress={() => {
+                        setUsedPage(usedPageData.currentPage - 1);
+                        exerciseListRef.current?.scrollToOffset({ offset: 0, animated: true });
+                      }}
+                      style={[
+                        styles.pageButton,
+                        { borderColor: themeColors.border, opacity: usedPageData.currentPage <= 1 ? 0.45 : 1 },
+                      ]}
+                    >
+                      <Text style={[styles.pageButtonText, { color: themeColors.textPrimary }]}>
+                        {t('training.exerciseCatalogPagePrevious')}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.pageIndicator, { color: themeColors.textSecondary }]}>
+                      {t('training.exerciseCatalogPage', {
+                        current: usedPageData.currentPage,
+                        total: usedPageData.totalPages,
+                      })}
+                    </Text>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        disabled: usedPageData.currentPage >= usedPageData.totalPages || isFetchingExercises,
+                      }}
+                      disabled={usedPageData.currentPage >= usedPageData.totalPages || isFetchingExercises}
+                      onPress={() => {
+                        setUsedPage(usedPageData.currentPage + 1);
+                        exerciseListRef.current?.scrollToOffset({ offset: 0, animated: true });
+                      }}
+                      style={[
+                        styles.pageButton,
+                        {
+                          borderColor: themeColors.border,
+                          opacity: usedPageData.currentPage >= usedPageData.totalPages ? 0.45 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.pageButtonText, { color: themeColors.textPrimary }]}>
+                        {t('training.exerciseCatalogPageNext')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </>
             }
           />
         )}
@@ -700,6 +845,23 @@ const styles = StyleSheet.create({
     marginTop: spacing.m,
     textTransform: 'uppercase',
   },
+  pagination: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'space-between',
+    marginTop: spacing.m,
+  },
+  pageButton: {
+    alignItems: 'center',
+    borderRadius: borderRadius.m,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: spacing.s,
+  },
+  pageButtonText: { fontSize: 12, fontWeight: '600' },
+  pageIndicator: { flex: 1, fontSize: 13, fontWeight: '600', textAlign: 'center' },
   exerciseCard: {
     alignItems: 'center',
     borderRadius: borderRadius.m,

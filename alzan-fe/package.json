@@ -4,6 +4,7 @@
   "main": "index.ts",
   "scripts": {
     "verify:active-workout": "tsx src/screens/training/helpers/workoutOrganization.spec.ts && tsx src/screens/training/helpers/workoutSetProgress.spec.ts && tsx src/screens/training/helpers/activeWorkoutDraft.spec.ts && tsx src/screens/training/helpers/workoutFinalization.spec.ts",
+    "verify:exercise-history": "tsx src/modules/training/helpers/exerciseSessionFilter.spec.ts && tsx src/modules/training/helpers/loadAllPages.spec.ts && tsx src/modules/training/helpers/exerciseCatalogPagination.spec.ts",
     "verify:nutrition-export": "tsx src/screens/nutrition/nutritionExportRange.spec.ts",
     "verify:kilometer-draft": "tsx src/screens/training/helpers/kilometerDraft.regression.spec.ts",
     "verify:coros": "tsx src/modules/wearables/corosAvailability.spec.ts",

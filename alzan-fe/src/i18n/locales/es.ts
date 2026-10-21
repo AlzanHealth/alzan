@@ -2399,6 +2399,10 @@ export default {
     exerciseCatalogUsedHint:
       'Ejercicios de tus sesiones de gym. Abre Historial para editar o quitar un peso registrado.',
     exerciseCatalogResults: 'Mostrando {{count}} ejercicios',
+    exerciseCatalogPagePrevious: 'Anterior',
+    exerciseCatalogPageNext: 'Siguiente',
+    exerciseCatalogPage: 'Página {{current}} de {{total}}',
+    exerciseCatalogUsedResults: '{{count}} ejercicios · mostrando {{start}}–{{end}}',
     exerciseCatalogLastWeight: 'Último {{weight}} · {{count}} series registradas',
     exerciseCatalogSetCount: '{{count}} series registradas',
     exerciseCatalogNoDetails: 'Sin grupo muscular ni equipamiento asignados',

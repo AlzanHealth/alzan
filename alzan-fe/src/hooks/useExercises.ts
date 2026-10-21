@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { Exercise } from '../types/requests.types';
 import { ExerciseWithDetails } from '../types/training';
+import { loadAllPages } from '../modules/training/helpers/loadAllPages';
 import { Locale } from '../i18n';
 import {
   buildLooseIlikePattern,
@@ -149,6 +150,7 @@ interface UseExercisesOptions {
   searchQuery?: string;
   selectedMuscleId?: number | null;
   selectedEquipmentId?: number | null;
+  exerciseIds?: string[];
   limit?: number;
   includeArchived?: boolean;
 }
@@ -215,6 +217,8 @@ export const useExercises = (options?: UseExercisesOptions) => {
   const shouldSearch = normalizedSearchQuery.length >= 2;
   const selectedMuscleId = options?.selectedMuscleId ?? null;
   const selectedEquipmentId = options?.selectedEquipmentId ?? null;
+  const exerciseIds = options?.exerciseIds;
+  const exerciseIdsKey = exerciseIds?.join(',') ?? 'all';
   const limit = options?.limit;
   const includeArchived = options?.includeArchived ?? false;
 
@@ -225,12 +229,21 @@ export const useExercises = (options?: UseExercisesOptions) => {
       normalizedSearchQuery,
       selectedMuscleId,
       selectedEquipmentId,
+      exerciseIdsKey,
       limit ?? 'all',
       includeArchived,
     ],
     queryFn: async () => {
+      if (exerciseIds !== undefined && exerciseIds.length === 0) {
+        return { exercises: [], hasMore: false };
+      }
+
       const createBaseQuery = () => {
         let query = supabase.from('exercises').select(EXERCISE_LOOKUP_SELECT);
+
+        if (exerciseIds !== undefined) {
+          query = query.in('id', exerciseIds);
+        }
 
         if (selectedMuscleId !== null) {
           query = query.eq('primary_muscle_id', selectedMuscleId);
@@ -265,11 +278,13 @@ export const useExercises = (options?: UseExercisesOptions) => {
 
         if (!rankedError && rankedExercises) {
           const rankedIds = rankedExercises.map(item => item.id);
-          if (rankedIds.length === 0) {
+          const allowedExerciseIds = exerciseIds === undefined ? null : new Set(exerciseIds);
+          const matchingRankedIds = allowedExerciseIds ? rankedIds.filter(id => allowedExerciseIds.has(id)) : rankedIds;
+          if (matchingRankedIds.length === 0) {
             return { exercises: [], hasMore: false };
           }
 
-          let detailsQuery = supabase.from('exercises').select(EXERCISE_LOOKUP_SELECT).in('id', rankedIds);
+          let detailsQuery = supabase.from('exercises').select(EXERCISE_LOOKUP_SELECT).in('id', matchingRankedIds);
 
           if (!includeArchived) {
             detailsQuery = detailsQuery.is('archived_at', null);
@@ -281,7 +296,7 @@ export const useExercises = (options?: UseExercisesOptions) => {
             console.error('Error fetching ranked exercises:', detailsError);
           } else {
             const detailsById = new Map((details ?? []).map(item => [item.id, item]));
-            rows = rankedIds.map(id => detailsById.get(id)).filter((item): item is ExerciseLookupRow => !!item);
+            rows = matchingRankedIds.map(id => detailsById.get(id)).filter((item): item is ExerciseLookupRow => !!item);
           }
         } else if (rankedError) {
           console.error('Exercise ranked search RPC failed:', rankedError);
@@ -330,20 +345,23 @@ export const useExercises = (options?: UseExercisesOptions) => {
           }
         }
       } else {
-        let query = createBaseQuery().order('id', { ascending: true });
+        rows = await loadAllPages(
+          async (from, to) => {
+            const { data, error } = await createBaseQuery()
+              .order('id', { ascending: true })
+              .range(from, to)
+              .returns<ExerciseLookupRow[]>();
 
-        if (typeof limit === 'number' && limit > 0) {
-          query = query.limit(limit);
-        }
+            if (error) {
+              console.error('Error fetching exercises:', error);
+              throw error;
+            }
 
-        const { data, error } = await query.returns<ExerciseLookupRow[]>();
-
-        if (error) {
-          console.error('Error fetching exercises:', error);
-          throw error;
-        }
-
-        rows = data || [];
+            return data ?? [];
+          },
+          1_000,
+          typeof limit === 'number' && limit > 0 ? limit : Number.POSITIVE_INFINITY,
+        );
       }
 
       const mappedExercises = rows.map(item => mapExerciseLookupRow(item, languageCode));

@@ -2368,6 +2368,10 @@ const en = {
     exerciseCatalogUsedHint:
       'Exercises from your logged gym sessions. Open History to edit or remove a recorded weight.',
     exerciseCatalogResults: 'Showing {{count}} exercises',
+    exerciseCatalogPagePrevious: 'Previous',
+    exerciseCatalogPageNext: 'Next',
+    exerciseCatalogPage: 'Page {{current}} of {{total}}',
+    exerciseCatalogUsedResults: '{{count}} exercises · showing {{start}}–{{end}}',
     exerciseCatalogLastWeight: 'Latest {{weight}} · {{count}} sets logged',
     exerciseCatalogSetCount: '{{count}} sets logged',
     exerciseCatalogNoDetails: 'Muscle group or equipment not set',

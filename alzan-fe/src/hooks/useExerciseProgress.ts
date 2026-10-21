@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { ActivitySession } from '../types/requests.types';
 import { ExerciseLoadType } from '../services/localization';
+import { isStrengthExerciseSession } from '../modules/training/helpers/exerciseSessionFilter';
+import { loadAllPages } from '../modules/training/helpers/loadAllPages';
 
 export type ExerciseProgressMetric = 'weight' | 'reps' | 'time';
 type WeightQuality = 'valid' | 'missing' | 'invalid';
@@ -77,6 +79,39 @@ const getSetDurationSeconds = (set: Pick<ExerciseSetRow, 'duration_s' | 'reps'>)
 
   return Math.max(set.reps, 0);
 };
+
+const loadExerciseSetRows = async (exerciseId: string, ascending: boolean): Promise<ExerciseSetRow[]> =>
+  loadAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from('workout_sets')
+      .select(
+        `
+          id,
+          session_id,
+          reps,
+          weight_kg,
+          duration_s,
+          created_at,
+          session:activity_sessions (
+            id,
+            start_time,
+            sport_type,
+            status
+          )
+        `,
+      )
+      .eq('exercise_id', exerciseId)
+      .order('created_at', { ascending })
+      .order('id', { ascending })
+      .range(from, to)
+      .returns<ExerciseSetRow[]>();
+
+    if (error) {
+      throw error;
+    }
+
+    return data ?? [];
+  });
 
 export const normalizeWeightByLoadTypeForProgress = (
   loadType: ExerciseLoadType | null,
@@ -216,31 +251,7 @@ export const useExerciseProgress = (
         };
       }
 
-      const { data, error } = await supabase
-        .from('workout_sets')
-        .select(
-          `
-            id,
-            session_id,
-            reps,
-            weight_kg,
-            duration_s,
-            created_at,
-            session:activity_sessions (
-              id,
-              start_time,
-              sport_type,
-              status
-            )
-          `,
-        )
-        .eq('exercise_id', exerciseId)
-        .order('created_at', { ascending: true })
-        .returns<ExerciseSetRow[]>();
-
-      if (error) {
-        throw error;
-      }
+      const data = await loadExerciseSetRows(exerciseId, true);
 
       const pointsBySession = new Map<string, ExerciseProgressPoint>();
       let missingWeightCount = 0;
@@ -248,7 +259,7 @@ export const useExerciseProgress = (
       let suspiciousWeightZeroCount = 0;
 
       (data ?? []).forEach(set => {
-        if (set.session?.sport_type && set.session.sport_type !== 'strength') {
+        if (!isStrengthExerciseSession(set.session?.sport_type)) {
           return;
         }
 
@@ -412,34 +423,10 @@ export const useExerciseWeightEntries = (
         return { entries: [] };
       }
 
-      const { data, error } = await supabase
-        .from('workout_sets')
-        .select(
-          `
-            id,
-            session_id,
-            reps,
-            weight_kg,
-            duration_s,
-            created_at,
-            session:activity_sessions (
-              id,
-              start_time,
-              sport_type,
-              status
-            )
-          `,
-        )
-        .eq('exercise_id', exerciseId)
-        .order('created_at', { ascending: false })
-        .returns<ExerciseSetRow[]>();
-
-      if (error) {
-        throw error;
-      }
+      const data = await loadExerciseSetRows(exerciseId, false);
 
       const entries = (data ?? [])
-        .filter(entry => !entry.session?.sport_type || entry.session.sport_type === 'strength')
+        .filter(entry => isStrengthExerciseSession(entry.session?.sport_type))
         .map(entry => {
           const durationSeconds = getSetDurationSeconds(entry);
           const normalizedWeight = normalizeWeightByLoadTypeForProgress(loadType, entry.weight_kg);

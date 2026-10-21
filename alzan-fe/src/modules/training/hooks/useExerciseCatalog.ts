@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabaseClient';
 import { Tables } from '../../../types/database.types';
+import { loadAllPages } from '../helpers/loadAllPages';
 import {
   createCustomExercise,
   CreateCustomExerciseInput,
@@ -17,6 +18,48 @@ export interface ExerciseUsageSummary {
 }
 
 type WorkoutSetSummary = Pick<Tables<'workout_sets'>, 'exercise_id' | 'weight_kg' | 'reps' | 'created_at'>;
+
+export interface ExerciseCatalogIndexItem {
+  id: string;
+  base_name_es: string;
+  base_name_en: string;
+  primary_muscle_id: number | null;
+  secondary_muscle_id: number | null;
+  equipment_id: number | null;
+  primary_muscle: {
+    code: string;
+    muscle_group_translations: Array<{ name: string; language_code: string | null }> | null;
+  } | null;
+  secondary_muscle: {
+    code: string;
+    muscle_group_translations: Array<{ name: string; language_code: string | null }> | null;
+  } | null;
+  equipment: {
+    code: string;
+    equipment_translations: Array<{ name: string; language_code: string | null }> | null;
+  } | null;
+}
+
+const EXERCISE_CATALOG_INDEX_SELECT = `
+  id,
+  base_name_es,
+  base_name_en,
+  primary_muscle_id,
+  secondary_muscle_id,
+  equipment_id,
+  primary_muscle:muscle_groups!exercises_primary_muscle_id_fkey (
+    code,
+    muscle_group_translations (name, language_code)
+  ),
+  secondary_muscle:muscle_groups!exercises_secondary_muscle_id_fkey (
+    code,
+    muscle_group_translations (name, language_code)
+  ),
+  equipment (
+    code,
+    equipment_translations (name, language_code)
+  )
+`;
 
 const EXERCISE_CATALOG_FAVORITES_KEY = 'exercise-catalog-favorites';
 const EXERCISE_CATALOG_USAGE_KEY = 'exercise-catalog-usage';
@@ -87,6 +130,28 @@ export const useExerciseCatalogUsage = (userId?: string) =>
     staleTime: 1000 * 60,
   });
 
+export const useExerciseCatalogIndex = (userId?: string) =>
+  useQuery({
+    queryKey: ['exercise-catalog-index', userId],
+    queryFn: () =>
+      loadAllPages(async (from, to) => {
+        const { data, error } = await supabase
+          .from('exercises')
+          .select(EXERCISE_CATALOG_INDEX_SELECT)
+          .order('id', { ascending: true })
+          .range(from, to)
+          .returns<ExerciseCatalogIndexItem[]>();
+
+        if (error) {
+          throw error;
+        }
+
+        return data ?? [];
+      }),
+    enabled: !!userId,
+    staleTime: 1000 * 60 * 5,
+  });
+
 export const useExerciseFavorites = (userId?: string) =>
   useQuery({
     queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId],
@@ -139,6 +204,7 @@ export const useCreateCustomExercise = (userId?: string) => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      await queryClient.invalidateQueries({ queryKey: ['exercise-catalog-index'] });
       await queryClient.invalidateQueries({ queryKey: [EXERCISE_CATALOG_FAVORITES_KEY, userId] });
     },
   });
