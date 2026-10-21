@@ -22,6 +22,8 @@ import { Search, ArrowLeft, Dumbbell, Info, Check } from 'lucide-react-native';
 import { ExerciseWithDetails } from '../../types/training';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useTranslation } from 'react-i18next';
+import { useExerciseAlternatives } from '../../modules/training/hooks/useExerciseAlternatives';
+import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../navigation/tabBarLayout';
 
 export type MuscleGroupOrEquipment = {
   id: number;
@@ -38,6 +40,12 @@ export const ExerciseSearchScreen = () => {
   const route = useRoute<RouteProp<TrainingStackParamList, 'ExerciseSearch'>>();
   const isMultiSelect = route.params?.selectionMode === 'multi';
   const replacementExerciseName = route.params?.replacementExerciseName;
+  const replacementExercise = route.params?.replacementExercise;
+  const [replacementMode, setReplacementMode] = useState<'suggested' | 'all'>(
+    replacementExercise ? 'suggested' : 'all',
+  );
+  const showSuggestions = !!replacementExercise && replacementMode === 'suggested';
+  const { topFromScreenBottom } = useTabBarLayout();
   const excludedExerciseIds = useMemo(
     () => new Set(route.params?.excludedExerciseIds),
     [route.params?.excludedExerciseIds],
@@ -49,12 +57,19 @@ export const ExerciseSearchScreen = () => {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   // Multi-select staging (used when launched from the routine editor).
   const [selectedExercises, setSelectedExercises] = useState<ExerciseWithDetails[]>([]);
+  const excludedIds = useMemo(() => [...excludedExerciseIds], [excludedExerciseIds]);
+  const suggestions = useExerciseAlternatives(replacementExercise, excludedIds, showSuggestions);
+  const reasonsById = useMemo(
+    () => new Map(suggestions.alternatives.map(item => [item.exercise.id, item.reasons])),
+    [suggestions.alternatives],
+  );
 
   const { exercises, isLoading, isFetching, hasMore } = useExercises({
     searchQuery: debouncedSearchQuery,
     selectedMuscleId,
     selectedEquipmentId,
     limit: visibleLimit,
+    exerciseIds: showSuggestions ? [] : undefined,
   });
   const { muscleGroups } = useMuscleGroups();
   const { equipment } = useEquipment();
@@ -70,7 +85,8 @@ export const ExerciseSearchScreen = () => {
   useEffect(() => {
     setVisibleLimit(EXERCISE_PAGE_SIZE);
   }, [debouncedSearchQuery, selectedMuscleId, selectedEquipmentId]);
-  const showInitialLoading = isLoading && exercises.length === 0;
+  const listedExercises = showSuggestions ? suggestions.alternatives.map(item => item.exercise) : exercises;
+  const showInitialLoading = showSuggestions ? suggestions.isLoading : isLoading && exercises.length === 0;
 
   const handleSelectExercise = (exercise: ExerciseWithDetails) => {
     if (excludedExerciseIds.has(exercise.id)) return;
@@ -155,13 +171,34 @@ export const ExerciseSearchScreen = () => {
           <View style={styles.textContainer}>
             <Text style={[styles.exerciseName, dynamicStyles.title]}>{item.name}</Text>
             <View style={styles.metaRow}>
-              {item.muscle_name && <Text style={styles.muscleText}>{item.muscle_name}</Text>}
-              {item.muscle_name && item.equipment_name && <Text style={styles.separatorText}>•</Text>}
-              {item.equipment_name && <Text style={styles.equipmentText}>{item.equipment_name}</Text>}
+              {item.muscle_name && (
+                <Text style={[styles.muscleText, { color: themeColors.textSecondary }]}>{item.muscle_name}</Text>
+              )}
+              {item.muscle_name && item.equipment_name && (
+                <Text style={[styles.separatorText, { color: themeColors.textSecondary }]}>•</Text>
+              )}
+              {item.equipment_name && (
+                <Text style={[styles.equipmentText, { color: themeColors.textSecondary }]}>{item.equipment_name}</Text>
+              )}
             </View>
             {excluded && (
               <Text style={[styles.exclusionText, { color: themeColors.textSecondary }]}>
                 {t('training.exerciseAlreadyInSession')}
+              </Text>
+            )}
+            {showSuggestions && (
+              <Text style={[styles.exclusionText, { color: themeColors.textSecondary }]}>
+                {[
+                  reasonsById.get(item.id)?.includes('sameMovement')
+                    ? t('training.alternativeReasonMovement')
+                    : t('training.alternativeReasonMuscle'),
+                  ...(reasonsById.get(item.id)?.includes('sameEquipment')
+                    ? [t('training.alternativeReasonSameEquipment')]
+                    : []),
+                  ...(reasonsById.get(item.id)?.includes('differentEquipment')
+                    ? [t('training.alternativeReasonEquipment')]
+                    : []),
+                ].join(' · ')}
               </Text>
             )}
           </View>
@@ -265,24 +302,58 @@ export const ExerciseSearchScreen = () => {
             <Text style={[styles.exerciseName, dynamicStyles.title]}>{replacementExerciseName}</Text>
           </View>
         )}
-        <View style={styles.searchContainer}>
-          <View style={[styles.searchBar, dynamicStyles.input, { height: 50, paddingVertical: 0 }]}>
-            <Search size={20} color={themeColors.textSecondary} />
-            <TextInput
-              style={[styles.searchInput, { color: themeColors.textPrimary }]}
-              placeholder={t('nutrition.search')}
-              placeholderTextColor={themeColors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoFocus={false}
-            />
+        {replacementExercise && (
+          <View style={styles.replacementContext}>
+            <View style={styles.alternativeTabs} accessibilityRole="tablist">
+              {(['suggested', 'all'] as const).map(mode => (
+                <TouchableOpacity
+                  key={mode}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: replacementMode === mode }}
+                  onPress={() => setReplacementMode(mode)}
+                  style={[
+                    styles.alternativeTab,
+                    {
+                      borderColor: themeColors.primary,
+                      backgroundColor: replacementMode === mode ? themeColors.primary : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text style={{ color: replacementMode === mode ? '#FFFFFF' : themeColors.primary }}>
+                    {t(mode === 'suggested' ? 'training.alternativesSuggested' : 'training.alternativesSearchAll')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {showSuggestions && (
+              <Text style={[styles.exclusionText, { color: themeColors.textSecondary }]}>
+                {t('training.alternativesHint')}
+              </Text>
+            )}
           </View>
-        </View>
+        )}
+        {!showSuggestions && (
+          <View style={styles.searchContainer}>
+            <View style={[styles.searchBar, dynamicStyles.input, { height: 50, paddingVertical: 0 }]}>
+              <Search size={20} color={themeColors.textSecondary} />
+              <TextInput
+                style={[styles.searchInput, { color: themeColors.textPrimary }]}
+                placeholder={t('nutrition.search')}
+                placeholderTextColor={themeColors.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus={false}
+              />
+            </View>
+          </View>
+        )}
 
-        <View style={styles.filtersBlock}>
-          {renderFilterChips(t('training.allEquipment'), equipment, selectedEquipmentId, setSelectedEquipmentId)}
-          {renderFilterChips(t('training.allMuscles'), muscleGroups, selectedMuscleId, setSelectedMuscleId)}
-        </View>
+        {!showSuggestions && (
+          <View style={styles.filtersBlock}>
+            {renderFilterChips(t('training.allEquipment'), equipment, selectedEquipmentId, setSelectedEquipmentId)}
+            {renderFilterChips(t('training.allMuscles'), muscleGroups, selectedMuscleId, setSelectedMuscleId)}
+          </View>
+        )}
 
         {showInitialLoading ? (
           <View style={styles.loadingContainer}>
@@ -290,14 +361,18 @@ export const ExerciseSearchScreen = () => {
           </View>
         ) : (
           <FlatList
-            data={exercises}
+            key={showSuggestions ? 'alternatives' : 'catalog'}
+            data={listedExercises}
             renderItem={renderItem}
             keyExtractor={item => item.id}
             extraData={selectedExercises}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: topFromScreenBottom + TAB_BAR_CLEARANCE + spacing.m },
+            ]}
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={
-              hasMore ? (
+              !showSuggestions && hasMore ? (
                 <TouchableOpacity
                   style={[styles.loadMoreButton, dynamicStyles.secondaryButton]}
                   onPress={() => setVisibleLimit(previous => previous + EXERCISE_PAGE_SIZE)}
@@ -314,8 +389,21 @@ export const ExerciseSearchScreen = () => {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>
-                  {t('training.noExercisesFound')}
+                  {showSuggestions
+                    ? t(suggestions.error ? 'training.alternativesError' : 'training.alternativesEmpty')
+                    : t('training.noExercisesFound')}
                 </Text>
+                {showSuggestions && !!suggestions.error && (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.loadMoreButton}
+                    onPress={() => {
+                      void suggestions.retry();
+                    }}
+                  >
+                    <Text style={{ color: themeColors.primary }}>{t('nutrition.retry')}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             }
           />
@@ -326,6 +414,19 @@ export const ExerciseSearchScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  alternativeTabs: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.s,
+  },
+  alternativeTab: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,

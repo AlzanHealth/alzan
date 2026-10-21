@@ -2348,6 +2348,17 @@ const en = {
     detachSuperset: 'Separate from superset',
     replaceExercise: 'Replace exercise',
     replacementSearchTitle: 'Replacing',
+    alternativesSuggested: 'Suggested alternatives',
+    alternativesSearchAll: 'Search all',
+    alternativesHint:
+      'Similar movements come first, followed by general options for the same muscle, prioritizing the same equipment. Review the technique and adjust the load.',
+    alternativeReasonMovement: 'Same muscle and similar movement',
+    alternativeReasonMuscle: 'Same muscle · general option',
+    alternativeReasonSameEquipment: 'Same equipment',
+    alternativeReasonEquipment: 'Different equipment',
+    alternativesEmpty:
+      'No other available exercises match this muscle and measurement type. Use Search all to choose manually.',
+    alternativesError: 'Could not load alternatives. Retry or use Search all.',
     exerciseAlreadyInSession: 'This exercise is already in the session.',
     exerciseCatalogSettingsTitle: 'Exercise catalog',
     exerciseCatalogSettingsDescription: 'Browse gym exercises, review your weights and manage your own.',

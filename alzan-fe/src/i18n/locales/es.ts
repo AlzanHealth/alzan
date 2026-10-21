@@ -2379,6 +2379,17 @@ export default {
     detachSuperset: 'Separar de la superserie',
     replaceExercise: 'Sustituir ejercicio',
     replacementSearchTitle: 'Vas a sustituir',
+    alternativesSuggested: 'Alternativas sugeridas',
+    alternativesSearchAll: 'Buscar todos',
+    alternativesHint:
+      'Primero verás movimientos parecidos y después opciones generales del mismo músculo, priorizando el mismo equipamiento. Revisa la técnica y ajusta la carga.',
+    alternativeReasonMovement: 'Mismo músculo y movimiento parecido',
+    alternativeReasonMuscle: 'Mismo músculo · opción general',
+    alternativeReasonSameEquipment: 'Mismo equipamiento',
+    alternativeReasonEquipment: 'Otro equipamiento',
+    alternativesEmpty:
+      'No hay otros ejercicios disponibles con este músculo y tipo de medición. Usa Buscar todos para elegir manualmente.',
+    alternativesError: 'No se pudieron cargar las alternativas. Reintenta o usa Buscar todos.',
     exerciseAlreadyInSession: 'Este ejercicio ya está en la sesión.',
     exerciseCatalogSettingsTitle: 'Catálogo de ejercicios',
     exerciseCatalogSettingsDescription: 'Explora ejercicios de gym, revisa tus pesos y gestiona los tuyos.',

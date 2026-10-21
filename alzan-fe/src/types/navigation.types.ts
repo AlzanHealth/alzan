@@ -94,6 +94,7 @@ export type TrainingStackParamList = {
     routineId?: string;
     selectionMode?: 'single' | 'multi';
     replacementExerciseName?: string;
+    replacementExercise?: ExerciseWithDetails;
     excludedExerciseIds?: string[];
   };
   ExerciseCatalog: undefined;
