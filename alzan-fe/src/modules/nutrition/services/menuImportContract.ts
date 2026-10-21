@@ -118,6 +118,66 @@ const getWeekdayForDate = (date: string): string =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/**
+ * Some external AI clients copy JSON through a LaTeX/Markdown renderer. Undo
+ * only the renderer escapes that are unambiguous in this contract: escaped
+ * array/object delimiters outside strings and escaped underscores in keys.
+ */
+const normalizeAiRenderedJson = (text: string): string => {
+  let normalized = '';
+  let inString = false;
+  let escaped = false;
+  let stringStart = -1;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index] ?? '';
+
+    if (inString) {
+      normalized += character;
+      if (escaped) {
+        escaped = false;
+      } else if (character === '\\') {
+        escaped = true;
+      } else if (character === '"') {
+        let nextIndex = index + 1;
+        while (nextIndex < text.length && /\s/u.test(text[nextIndex] ?? '')) nextIndex += 1;
+        if (text[nextIndex] === ':') {
+          const keyStart = stringStart + 1;
+          const keyEnd = normalized.length - 1;
+          const key = normalized.slice(keyStart, keyEnd).replace(/(^|[^\\])\\_/gu, '$1_');
+          normalized = `${normalized.slice(0, keyStart)}${key}"`;
+        }
+        inString = false;
+        stringStart = -1;
+      }
+      continue;
+    }
+
+    if (character === '"') {
+      stringStart = normalized.length;
+      normalized += character;
+      inString = true;
+      continue;
+    }
+
+    const nextCharacter = text[index + 1];
+    if (character === '\\' && ['[', ']', '{', '}'].includes(nextCharacter ?? '')) {
+      normalized += nextCharacter;
+      index += 1;
+      continue;
+    }
+    normalized += character;
+  }
+
+  return normalized;
+};
+
+const addMissingMenuRootBrace = (text: string): string => {
+  const trimmed = text.trim();
+  if (/^"format"\s*:/u.test(trimmed) && trimmed.endsWith('}')) return `{${trimmed}`;
+  return trimmed;
+};
+
 const addError = (context: ValidationContext, code: MenuImportValidationErrorCode, path: string, message: string) => {
   context.errors.push({ code, path, message });
 };
@@ -424,17 +484,25 @@ export function parseMenuImportJson(rawText: string): MenuImportParseResult {
   }
 
   let value: unknown;
-  try {
-    value = JSON.parse(rawText);
-  } catch {
+  let parsed = false;
+  const normalizedText = normalizeImportJsonText(rawText);
+  const renderedJson = normalizeAiRenderedJson(normalizedText);
+  const candidates = [rawText, normalizedText, renderedJson, addMissingMenuRootBrace(renderedJson)];
+  for (const candidate of new Set(candidates)) {
     try {
-      value = JSON.parse(normalizeImportJsonText(rawText));
+      value = JSON.parse(candidate);
+      parsed = true;
+      break;
     } catch {
-      return {
-        ok: false,
-        errors: [{ code: 'invalid_json', path: '$', message: 'Invalid JSON syntax' }],
-      };
+      // Continue only through explicit presentation normalizations; the schema
+      // validator below still rejects missing, extra, or invalid data.
     }
+  }
+  if (!parsed) {
+    return {
+      ok: false,
+      errors: [{ code: 'invalid_json', path: '$', message: 'Invalid JSON syntax' }],
+    };
   }
 
   const context: ValidationContext = {

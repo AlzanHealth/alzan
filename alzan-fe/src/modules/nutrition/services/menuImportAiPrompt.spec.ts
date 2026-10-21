@@ -27,6 +27,8 @@ assert.ok(prompt.includes('10 comidas por día'));
 assert.ok(prompt.includes('30 ingredientes por comida'));
 assert.ok(prompt.includes('500 nombres únicos'));
 assert.ok(prompt.includes('entre 0.1 y 10000'));
+assert.ok(prompt.includes('La respuesta empieza con { y termina con }'));
+assert.ok(prompt.includes('No uses escapes LaTeX ni Markdown'));
 assert.doesNotMatch(prompt, /[“”‘’]/, 'AI prompt must use ASCII quotes');
 
 console.log('menuImportAiPrompt tests passed');

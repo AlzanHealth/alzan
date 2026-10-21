@@ -7,6 +7,7 @@ import {
 export const MENU_IMPORT_JSON_OUTPUT_RULES = `REGLAS DE SERIALIZACIÓN OBLIGATORIAS
 - Devuelve únicamente un objeto JSON válido, sin markdown, bloques de código, comentarios ni texto adicional.
 - Usa exclusivamente comillas dobles ASCII ("), nunca comillas tipográficas, y no escapes guiones bajos.
+- La respuesta empieza con { y termina con }. Escribe las claves exactamente como "menu_name", "meal_type" y "quantity_g", con guiones bajos normales; escribe los arrays con [ y ]. No uses escapes LaTeX ni Markdown como \\_, \\[ o \\].
 - La raíz solo contiene format, version, menu_name y days.
 - Cada day solo contiene date, weekday y meals.
 - Cada meal solo contiene meal_type, name e ingredients.

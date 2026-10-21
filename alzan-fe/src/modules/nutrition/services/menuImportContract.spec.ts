@@ -91,6 +91,34 @@ if (validResult.ok) {
   assert.equal(validResult.value.days[0]?.weekday, 'lunes');
 }
 
+// Free AI providers sometimes return the JSON as LaTeX-escaped text and omit
+// the opening root brace when copying a property list. This is the output
+// shown in the user report; it must import without changing any values.
+const escapedAiOutput = String.raw`"format": "alzan-menu-plan", "version": 1, "menu\_name": "Postre con frutos rojos y cereales", "days": \[ { "date": "2026-10-20", "weekday": "martes", "meals": \[ { "meal\_type": "unspecified", "name": "Yogur con frutos rojos y cereales crujientes", "ingredients": \[ { "name": "Yogur natural cremoso", "quantity\_g": 100 }, { "name": "Fresa", "quantity\_g": 70 }, { "name": "Frambuesa", "quantity\_g": 35 }, { "name": "Galletas trituradas", "quantity\_g": 35 }, { "name": "Frutos secos", "quantity\_g": 15 } \] } \] } \] }`;
+const escapedAiResult = parseMenuImportJson(escapedAiOutput);
+assert.equal(escapedAiResult.ok, true);
+if (escapedAiResult.ok) {
+  assert.equal(escapedAiResult.value.menu_name, 'Postre con frutos rojos y cereales');
+  assert.equal(escapedAiResult.value.days[0]?.meals[0]?.meal_type, 'unspecified');
+  assert.deepEqual(
+    escapedAiResult.value.days[0]?.meals[0]?.ingredients.map(({ name, quantity_g }) => [name, quantity_g]),
+    [
+      ['Yogur natural cremoso', 100],
+      ['Fresa', 70],
+      ['Frambuesa', 35],
+      ['Galletas trituradas', 35],
+      ['Frutos secos', 15],
+    ],
+  );
+}
+assert.equal(parseMenuImportJson(`\uFEFF\n\`\`\`json\n${escapedAiOutput}\n\`\`\`\n`).ok, true);
+assert.equal(
+  parseMenuImportJson(escapedAiOutput.replace('"quantity\\_g": 100', '"quantity\\_g": "100"')).ok,
+  false,
+  'presentation recovery must not coerce invalid ingredient quantities',
+);
+assert.equal(parseMenuImportJson(`"other": 1, ${JSON.stringify(menu()).slice(1)}`).ok, false);
+
 // Mobile Safari can replace JSON delimiters with typographic quotes. The
 // frontend accepts only this unambiguous presentation change, not structural repairs.
 const mobileJson = JSON.stringify(menu({ days: [day({ weekday: 'lunes' })] })).replace(/"/g, '“');
