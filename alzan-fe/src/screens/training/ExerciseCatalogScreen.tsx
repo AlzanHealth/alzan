@@ -23,6 +23,7 @@ import { useMuscleGroups } from '../../hooks/useMuscleGroups';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { useUserPreferences } from '../../hooks/useUserPreferences';
 import { borderRadius, spacing, typography } from '../../theme';
+import { TAB_BAR_CLEARANCE, useTabBarLayout } from '../../navigation/tabBarLayout';
 import { ExerciseWithDetails } from '../../types/training';
 import { TrainingScreenNavigationProp } from '../../types/navigation.types';
 import { useExercises } from '../../hooks/useExercises';
@@ -47,6 +48,7 @@ export const ExerciseCatalogScreen = () => {
   const { user } = useAuth();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useTrainingStyles();
   const { preferences, toDisplayWeight } = useUserPreferences();
+  const { topFromScreenBottom, safeAreaBottom } = useTabBarLayout();
   const { muscleGroups } = useMuscleGroups();
   const { equipment } = useEquipment();
   const [tab, setTab] = useState<CatalogTab>('catalog');
@@ -55,6 +57,8 @@ export const ExerciseCatalogScreen = () => {
   const [selectedMuscleId, setSelectedMuscleId] = useState<number | null>(null);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<number | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const createButtonBottom = Math.max(0, topFromScreenBottom - safeAreaBottom) + TAB_BAR_CLEARANCE;
+  const listBottomPadding = createButtonBottom + 54 + spacing.m;
 
   const catalogLimit = tab === 'catalog' ? visibleLimit : undefined;
   const {
@@ -546,6 +550,7 @@ export const ExerciseCatalogScreen = () => {
           </View>
         ) : (
           <FlatList
+            style={styles.exerciseList}
             data={filteredExercises}
             keyExtractor={item => item.id}
             renderItem={renderExercise}
@@ -571,7 +576,7 @@ export const ExerciseCatalogScreen = () => {
               }
             }}
             onEndReachedThreshold={0.35}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { paddingBottom: listBottomPadding }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={
@@ -583,7 +588,10 @@ export const ExerciseCatalogScreen = () => {
         <TouchableOpacity
           accessibilityRole="button"
           onPress={() => navigation.navigate('ExerciseCatalogCreate')}
-          style={[styles.createButton, { backgroundColor: themeColors.primary }]}
+          style={[
+            styles.createButton,
+            { backgroundColor: themeColors.primary, bottom: createButtonBottom, left: spacing.m, right: spacing.m },
+          ]}
         >
           <Plus size={20} color="#FFFFFF" />
           <Text style={styles.primaryButtonLabel}>{t('training.exerciseCatalogCreateAction')}</Text>
@@ -605,7 +613,8 @@ const styles = StyleSheet.create({
   },
   navigationTitle: { ...typography.h4, flex: 1, textAlign: 'center' },
   backButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
-  listContent: { paddingBottom: 96, paddingHorizontal: spacing.m },
+  exerciseList: { flex: 1 },
+  listContent: { paddingHorizontal: spacing.m },
   titleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.m },
   headingCopy: { flex: 1, paddingRight: spacing.s },
   heading: { ...typography.h2 },
@@ -722,9 +731,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.s,
     justifyContent: 'center',
-    marginHorizontal: spacing.m,
-    marginTop: spacing.xs,
     minHeight: 54,
+    position: 'absolute',
+    zIndex: 1,
   },
   primaryButtonLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
 });
