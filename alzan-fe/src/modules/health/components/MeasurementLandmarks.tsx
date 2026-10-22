@@ -1,11 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
-import Svg, { Ellipse, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { useTranslation } from 'react-i18next';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { spacing, typography } from '../../../theme';
-import femaleBodySilhouette from '../assets/female-body-silhouette-front.png';
-import maleBodySilhouette from '../assets/male-body-silhouette-front.png';
+import maleRelaxed from '../assets/measurement-male-relaxed.png';
+import maleFlexed from '../assets/measurement-male-flexed.png';
+import femaleRelaxed from '../assets/measurement-female-relaxed.png';
+import femaleFlexed from '../assets/measurement-female-flexed.png';
 import type { MeasurementSelection } from '../helpers/measurementProtocols';
 
 type MeasurementLandmarksProps = {
@@ -13,32 +15,36 @@ type MeasurementLandmarksProps = {
   sex?: 'male' | 'female' | null;
 };
 
-/** Public-domain OpenClipart body template with an overlay for the selected measurement. */
+type Band = { path: string; width: number };
+
+const BODY_VIEWBOX = '0 0 1086 1448';
+
+/** Overlay marks the actual tape path on the supplied Alzan body illustrations. */
 export const MeasurementLandmarks = ({ measurement, sex }: MeasurementLandmarksProps) => {
   const { t } = useTranslation();
   const { colors } = useHealthStyles();
   const isFemale = sex === 'female';
-  const source = isFemale ? femaleBodySilhouette : maleBodySilhouette;
+  const isFlexedArm = measurement.key === 'arm' && measurement.protocol === 'arm_flexed_max';
+  const source = isFemale ? (isFlexedArm ? femaleFlexed : femaleRelaxed) : isFlexedArm ? maleFlexed : maleRelaxed;
 
-  const band = (() => {
+  const band: Band | null = (() => {
     switch (measurement.key) {
       case 'chest':
-        return { y: 150, from: 263, to: 355 };
+        return { path: 'M340 383 Q543 408 746 383', width: 16 };
       case 'waist':
-        return { y: isFemale ? 203 : 180, from: isFemale ? 258 : 267, to: isFemale ? 370 : 358 };
+        return { path: 'M402 615 Q543 635 684 615', width: 16 };
       case 'abdomen':
-        return { y: isFemale ? 226 : 207, from: isFemale ? 258 : 266, to: isFemale ? 370 : 359 };
+        return { path: 'M414 557 Q543 577 672 557', width: 16 };
       case 'hips':
-        return { y: isFemale ? 278 : 257, from: isFemale ? 246 : 258, to: isFemale ? 380 : 369 };
+        return { path: 'M380 711 Q543 737 706 711', width: 16 };
+      case 'thigh':
+        return { path: 'M387 850 Q460 862 533 850', width: 14 };
+      case 'arm':
+        return null;
       default:
         return null;
     }
   })();
-
-  const armMarker = measurement.key === 'arm';
-  const flexedArm = measurement.protocol === 'arm_flexed_max';
-  const thighMarker = measurement.key === 'thigh';
-  const markerColor = measurement.color;
 
   return (
     <View
@@ -52,46 +58,43 @@ export const MeasurementLandmarks = ({ measurement, sex }: MeasurementLandmarksP
           <Svg
             width="100%"
             height="100%"
-            viewBox="0 0 600 600"
+            viewBox={BODY_VIEWBOX}
             preserveAspectRatio="xMidYMid meet"
             style={styles.markerOverlay}
             accessible={false}
           >
             {band && (
-              <Path
-                d={`M${band.from} ${band.y} Q310 ${band.y + 8} ${band.to} ${band.y}`}
-                fill="none"
-                stroke={markerColor}
-                strokeWidth={15}
-                strokeLinecap="round"
-                opacity={0.95}
-              />
+              <>
+                <Path d={band.path} fill="none" stroke="#FFFFFF" strokeWidth={band.width + 10} strokeLinecap="round" />
+                <Path
+                  d={band.path}
+                  fill="none"
+                  stroke={measurement.color}
+                  strokeWidth={band.width}
+                  strokeLinecap="round"
+                />
+              </>
             )}
-            {armMarker && (
-              <Ellipse
-                cx={flexedArm ? 267 : 365}
-                cy={flexedArm ? (isFemale ? 137 : 128) : isFemale ? 175 : 170}
-                rx={flexedArm ? 17 : 13}
-                ry={flexedArm ? 24 : 22}
-                fill={markerColor + '40'}
-                stroke={markerColor}
-                strokeWidth={8}
-              />
-            )}
-            {thighMarker && (
-              <Ellipse
-                cx={286}
-                cy={isFemale ? 380 : 365}
-                rx={17}
-                ry={12}
-                fill={markerColor + '40'}
-                stroke={markerColor}
-                strokeWidth={8}
-              />
+            {measurement.key === 'arm' && (
+              <>
+                <Path
+                  d={isFlexedArm ? 'M320 286 L320 379' : 'M678 425 L740 425'}
+                  fill="none"
+                  stroke="#FFFFFF"
+                  strokeWidth={14}
+                  strokeLinecap="round"
+                />
+                <Path
+                  d={isFlexedArm ? 'M320 286 L320 379' : 'M678 425 L740 425'}
+                  fill="none"
+                  stroke={measurement.color}
+                  strokeWidth={7}
+                  strokeLinecap="round"
+                />
+              </>
             )}
           </Svg>
         </View>
-        <Text style={[styles.measurementName, { color: markerColor }]}>{t(measurement.labelKey)}</Text>
       </View>
     </View>
   );
@@ -101,8 +104,7 @@ const styles = StyleSheet.create({
   container: { marginVertical: spacing.m, alignItems: 'center' },
   title: { ...typography.body, fontWeight: '600', marginBottom: spacing.s },
   figureWrap: { alignItems: 'center', justifyContent: 'center', width: '100%' },
-  figure: { width: 300, height: 300, maxWidth: '100%', alignItems: 'center', justifyContent: 'center' },
+  figure: { width: 280, maxWidth: '100%', aspectRatio: 760 / 1013, alignItems: 'center', justifyContent: 'center' },
   bodyImage: { width: '100%', height: '100%', position: 'absolute' },
   markerOverlay: { position: 'absolute', zIndex: 2 },
-  measurementName: { ...typography.body, fontWeight: '700', textAlign: 'center', marginTop: spacing.xs },
 });
