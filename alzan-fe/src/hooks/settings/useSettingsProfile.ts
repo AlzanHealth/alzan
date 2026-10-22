@@ -1,3 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { bodyCompositionService } from '../../modules/health/services/bodyCompositionService';
+import { healthQueryKeys } from '../../modules/health/hooks/healthQueryKeys';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Alert } from '../../components/common/Alert';
@@ -33,6 +36,7 @@ export interface SettingsProfile {
 
 export const useSettingsProfile = () => {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const [profile, setProfile] = useState<SettingsProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,6 +133,14 @@ export const useSettingsProfile = () => {
       );
       if (prefError) throw prefError;
 
+      if ('height_cm' in updates || 'sex' in updates || 'date_of_birth' in updates) {
+        void bodyCompositionService
+          .refreshSnapshots(user.id)
+          .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user.id) }))
+          .catch(error => console.error('[Profile] Background composition refresh failed', error));
+        void queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user.id) });
+        void queryClient.invalidateQueries({ queryKey: ['userProfile'] });
+      }
       await fetchProfile();
       return true;
     } catch (err: unknown) {

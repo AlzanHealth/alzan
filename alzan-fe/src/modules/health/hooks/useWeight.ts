@@ -69,11 +69,17 @@ export const useAddWeightLog = () => {
             bodyfat_percent: log.bodyfat_percent ?? existingLog.bodyfat_percent,
             muscle_mass_kg: log.muscle_mass_kg ?? existingLog.muscle_mass_kg,
           });
-          await bodyCompositionService.invalidateAndRecalculateFromInput(userId, targetDate.toISOString());
+          void bodyCompositionService
+            .invalidateAndRecalculateFromInput(userId, targetDate.toISOString())
+            .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
+            .catch(error => console.error('[Health] Background composition refresh failed', error));
           return result;
         }
 
-        await bodyCompositionService.invalidateAndRecalculateFromInput(userId, targetDate.toISOString());
+        void bodyCompositionService
+          .invalidateAndRecalculateFromInput(userId, targetDate.toISOString())
+          .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
+          .catch(error => console.error('[Health] Background composition refresh failed', error));
         return existingLog;
       }
 
@@ -86,7 +92,10 @@ export const useAddWeightLog = () => {
       });
 
       // Auto-calculate daily composition without duplicating weight history.
-      await bodyCompositionService.invalidateAndRecalculateFromInput(userId, result.measured_at);
+      void bodyCompositionService
+        .invalidateAndRecalculateFromInput(userId, result.measured_at)
+        .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
+        .catch(error => console.error('[Health] Background composition refresh failed', error));
 
       return result;
     },
@@ -102,7 +111,10 @@ export const useDeleteWeightLog = () => {
   return useMutation({
     mutationFn: async (id: string) => {
       const deleted = await weightApi.deleteLog(id);
-      await bodyCompositionService.invalidateAndRecalculateFromInput(deleted.user_id, deleted.measured_at);
+      void bodyCompositionService
+        .invalidateAndRecalculateFromInput(deleted.user_id, deleted.measured_at)
+        .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
+        .catch(error => console.error('[Health] Background composition refresh failed', error));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });

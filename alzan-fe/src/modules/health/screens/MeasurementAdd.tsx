@@ -19,11 +19,11 @@ import { useAddMeasurement } from '../hooks/useMeasurements';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MeasurementType } from '../../../types/requests.types';
 import { Alert } from '../../../components/common/Alert';
 import { useTranslation } from 'react-i18next';
 import { getLocaleTag } from '../../../i18n/dateLocale';
-import { TranslationKey } from '../../../i18n/locales/en';
+import { MEASUREMENT_SELECTIONS } from '../helpers/measurementProtocols';
+import { MeasurementLandmarks } from '../components/MeasurementLandmarks';
 import { DECIMAL_INPUT_PROPS, parseLocalizedDecimal } from '../../../utils/numericInput';
 
 const isToday = (someDate: Date) => {
@@ -45,46 +45,6 @@ const isYesterday = (someDate: Date) => {
   );
 };
 
-export type MeasurementAddParams = {
-  key: MeasurementType;
-  labelKey: TranslationKey;
-  tipKey: TranslationKey;
-  color: string;
-};
-
-const MEASUREMENT_TYPES: MeasurementAddParams[] = [
-  {
-    key: 'abdomen',
-    labelKey: 'health.abdomen',
-    tipKey: 'health.measureTipAbdomen',
-    color: '#10B981',
-  },
-  {
-    key: 'hips',
-    labelKey: 'health.hips',
-    tipKey: 'health.measureTipHips',
-    color: '#F59E0B',
-  },
-  {
-    key: 'chest',
-    labelKey: 'health.chest',
-    tipKey: 'health.measureTipChest',
-    color: '#3B82F6',
-  },
-  {
-    key: 'arm',
-    labelKey: 'health.arm',
-    tipKey: 'health.measureTipArm',
-    color: '#8B5CF6',
-  },
-  {
-    key: 'thigh',
-    labelKey: 'health.thigh',
-    tipKey: 'health.measureTipThigh',
-    color: '#EC4899',
-  },
-];
-
 export const MeasurementAdd = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<HealthScreenNavigationProp>();
@@ -92,13 +52,22 @@ export const MeasurementAdd = () => {
   const addMutation = useAddMeasurement();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
 
-  const [type, setType] = useState<MeasurementType>(route.params?.defaultType || 'abdomen');
+  const [selectionIndex, setSelectionIndex] = useState(() =>
+    Math.max(
+      0,
+      MEASUREMENT_SELECTIONS.findIndex(
+        m =>
+          m.key === (route.params?.defaultType || 'abdomen') &&
+          (!route.params?.defaultProtocol || m.protocol === route.params.defaultProtocol),
+      ),
+    ),
+  );
   const [value, setValue] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
-  const currentMeasurement = MEASUREMENT_TYPES.find(m => m.key === type);
+  const currentMeasurement = MEASUREMENT_SELECTIONS[selectionIndex];
 
   if (!currentMeasurement) {
     return null;
@@ -113,7 +82,8 @@ export const MeasurementAdd = () => {
 
     addMutation.mutate(
       {
-        measurement_type: type,
+        measurement_type: currentMeasurement.key,
+        measurement_protocol: currentMeasurement.protocol,
         value_cm: val,
         measured_at: date.toISOString(),
       },
@@ -179,24 +149,24 @@ export const MeasurementAdd = () => {
               style={styles.typeScroll}
               contentContainerStyle={styles.typeScrollContent}
             >
-              {MEASUREMENT_TYPES.map(measurement => (
+              {MEASUREMENT_SELECTIONS.map((measurement, index) => (
                 <TouchableOpacity
-                  key={measurement.key}
+                  key={`${measurement.key}:${measurement.protocol}`}
                   style={[
                     styles.typeButton,
                     { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                    type === measurement.key && {
+                    selectionIndex === index && {
                       backgroundColor: measurement.color + '20',
                       borderColor: measurement.color,
                     },
                   ]}
-                  onPress={() => setType(measurement.key)}
+                  onPress={() => setSelectionIndex(index)}
                 >
                   <Text
                     style={[
                       styles.typeText,
                       { color: themeColors.textSecondary },
-                      type === measurement.key && { color: measurement.color, fontWeight: '700' },
+                      selectionIndex === index && { color: measurement.color, fontWeight: '700' },
                     ]}
                   >
                     {String(t(measurement.labelKey))}
@@ -204,6 +174,8 @@ export const MeasurementAdd = () => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            <MeasurementLandmarks />
 
             {/* Value Input */}
             <View style={styles.inputSection}>
@@ -372,6 +344,7 @@ export const MeasurementAdd = () => {
               <TouchableOpacity
                 style={[styles.saveButton, { backgroundColor: currentMeasurement.color }]}
                 onPress={handleSave}
+                disabled={addMutation.isPending}
               >
                 <Text style={styles.saveText}>{t('common.save')}</Text>
               </TouchableOpacity>
@@ -381,7 +354,7 @@ export const MeasurementAdd = () => {
 
         {/* Android DateTimePicker Logic (Popup) */}
         {showDatePicker && Platform.OS === 'android' && (
-          <DateTimePicker value={date} mode="date" display="default" onChange={onDateChange} />
+          <DateTimePicker value={date} mode="date" display="default" maximumDate={new Date()} onChange={onDateChange} />
         )}
       </SafeAreaView>
 

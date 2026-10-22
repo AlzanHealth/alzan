@@ -20,14 +20,27 @@ import { healthQueryKeys } from '../hooks/healthQueryKeys';
 import { parseISO, isValid } from 'date-fns';
 import { SuuntoHealthSection } from '../components/SuuntoHealthSection';
 import { CardioEvolutionCard } from '../components/CardioEvolutionCard';
+import { findCategory, getBodyFatRanges } from '../constants/bodyCompositionRanges';
 import { UnifiedSleepCard } from '../components/UnifiedSleepCard';
 
 export const HealthHome = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const navigation = useNavigation<HealthScreenNavigationProp>();
-  const { latestWeight, weightDelta, avgSleepMinutes, bodyComposition, latestSleep } = useHealthInsights();
+  const { latestWeight, weightDelta, avgSleepMinutes, bodyComposition, latestSleep, profile } = useHealthInsights();
 
+  const category =
+    bodyComposition.bodyFat &&
+    profile.age !== null &&
+    profile.age >= 20 &&
+    (profile.sex === 'male' || profile.sex === 'female')
+      ? findCategory(bodyComposition.bodyFat.percentage, getBodyFatRanges(profile.age, profile.sex === 'female'))
+      : null;
+  const bodyFatLabel = category
+    ? i18n.resolvedLanguage?.startsWith('es')
+      ? category.labelEs
+      : category.label
+    : t('health.noData');
   const { convertWeightToUi } = useUnitConversion();
   const { styles: dynamicStyles, colors: themeColors } = useHealthStyles();
 
@@ -65,6 +78,9 @@ export const HealthHome = () => {
         return t('health.bmiNormal');
       case 'overweight':
         return t('health.bmiOverweight');
+      case 'obese_1':
+      case 'obese_2':
+      case 'obese_3':
       case 'obese':
         return t('health.bmiObesity');
       default:
@@ -189,7 +205,7 @@ export const HealthHome = () => {
                 <View>
                   <Text style={[styles.listItemTitle, dynamicStyles.title]}>{t('health.imc')}</Text>
                   <Text style={[styles.listItemSubtitle, dynamicStyles.subtitle]}>
-                    {bodyComposition.bmi ? getBmiLabel(bodyComposition.bmi.category) : t('health.noData')}
+                    {bodyComposition.bmi?.category ? getBmiLabel(bodyComposition.bmi.category) : t('health.noData')}
                   </Text>
                 </View>
               </View>
@@ -211,9 +227,7 @@ export const HealthHome = () => {
                 <Activity size={24} color={themeColors.secondary} style={{ marginRight: 12 }} />
                 <View>
                   <Text style={[styles.listItemTitle, dynamicStyles.title]}>{t('health.bodyFat')}</Text>
-                  <Text style={[styles.listItemSubtitle, dynamicStyles.subtitle]}>
-                    {bodyComposition.bodyFat?.categoryLabel || '--'}
-                  </Text>
+                  <Text style={[styles.listItemSubtitle, dynamicStyles.subtitle]}>{bodyFatLabel}</Text>
                 </View>
               </View>
               <View style={styles.listItemRight}>

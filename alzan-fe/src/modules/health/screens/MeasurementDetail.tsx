@@ -4,22 +4,29 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { HealthScreenNavigationProp, HealthStackParamList } from '../../../types/navigation.types';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, Trash2 } from 'lucide-react-native';
-import { colors, typography } from '../../../theme';
+import { colors as defaultColors, typography } from '../../../theme';
 import { useMeasurements, useDeleteMeasurement } from '../hooks/useMeasurements';
 import { format } from 'date-fns';
 import { HealthHistoryChart } from '../components/HealthHistoryChart';
 import { getLast30DaysRecords } from '../components/healthHistoryChartPresentation';
 import { BodyMeasurement } from '../../../types/requests.types';
 import { useTranslation } from 'react-i18next';
+import { getMeasurementLabelKey, matchesMeasurementSeries } from '../helpers/measurementProtocols';
+import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 
 export const MeasurementDetail = () => {
   const { t } = useTranslation();
+  const { colors } = useHealthStyles();
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const route = useRoute<RouteProp<HealthStackParamList, 'MeasurementDetail'>>();
-  const { type, label } = route.params;
+  const type = route.params.type ?? route.params.measurementType ?? route.params.defaultType ?? 'abdomen';
+  const protocol = route.params.protocol ?? (type === 'abdomen' ? 'abdomen_navel' : null);
+  const label =
+    route.params.label ?? String(t(getMeasurementLabelKey({ measurement_type: type, measurement_protocol: protocol })));
 
-  const { data: logs } = useMeasurements(type);
+  const { data: allLogs } = useMeasurements(type);
+  const logs = allLogs?.filter(log => matchesMeasurementSeries(log, type, protocol));
   const deleteMutation = useDeleteMeasurement();
 
   const handleDelete = (id: string) => {
@@ -27,13 +34,13 @@ export const MeasurementDetail = () => {
   };
 
   const renderItem = ({ item }: { item: BodyMeasurement }) => (
-    <View style={styles.logItem}>
+    <View style={[styles.logItem, { borderBottomColor: colors.border }]}>
       <View>
-        <Text style={styles.logValue}>
+        <Text style={[styles.logValue, { color: colors.textPrimary }]}>
           {item.value_cm}
           {t('health.cm')}
         </Text>
-        <Text style={styles.logDate}>
+        <Text style={[styles.logDate, { color: colors.textSecondary }]}>
           {format(new Date(item.measured_at), 'd MMM yyyy, HH:mm', { locale: getDateFnsLocale() })}
         </Text>
       </View>
@@ -56,14 +63,14 @@ export const MeasurementDetail = () => {
     : null;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>{t('common.back')}</Text>
+          <Text style={[styles.backButtonText, { color: colors.primary }]}>{t('common.back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{label}</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>{label}</Text>
         <TouchableOpacity
-          onPress={() => navigation.navigate('MeasurementAdd', { defaultType: type })}
+          onPress={() => navigation.navigate('MeasurementAdd', { defaultType: type, defaultProtocol: protocol })}
           style={styles.addButton}
         >
           <Plus size={24} color={colors.primary} />
@@ -77,8 +84,8 @@ export const MeasurementDetail = () => {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           recentLogs.length > 0 ? (
-            <View style={styles.chartContainer}>
-              <Text style={styles.chartTitle}>{t('health.progress30Days')}</Text>
+            <View style={[styles.chartContainer, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>{t('health.progress30Days')}</Text>
               <HealthHistoryChart
                 data={chartData}
                 height={220}
@@ -100,7 +107,7 @@ export const MeasurementDetail = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: defaultColors.background,
   },
   header: {
     flexDirection: 'row',
@@ -114,11 +121,11 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     ...typography.body,
-    color: colors.primary,
+    color: defaultColors.primary,
   },
   headerTitle: {
     ...typography.h2,
-    color: colors.textPrimary,
+    color: defaultColors.textPrimary,
   },
   addButton: {
     padding: 8,
@@ -132,22 +139,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: defaultColors.border,
   },
   logValue: {
     ...typography.h3,
     fontWeight: '600',
-    color: colors.textPrimary,
+    color: defaultColors.textPrimary,
   },
   logDate: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: defaultColors.textSecondary,
   },
   deleteButton: {
     padding: 8,
   },
   chartContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: defaultColors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
@@ -155,6 +162,6 @@ const styles = StyleSheet.create({
   chartTitle: {
     ...typography.h3,
     marginBottom: 16,
-    color: colors.textPrimary,
+    color: defaultColors.textPrimary,
   },
 });

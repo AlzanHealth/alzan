@@ -859,6 +859,33 @@ export default {
     timeYesterday: 'Ayer',
   },
   health: {
+    compositionWeightLabel: 'Peso',
+    armRelaxed: 'Brazo · relajado',
+    armFlexed: 'Brazo · flexionado',
+    armUnspecified: 'Brazo · postura no especificada',
+    waistUnspecified: 'Cintura · método no especificado',
+    measureTipWaist:
+      'Busca con los dedos el borde superior de los huesos de la cadera, a ambos lados del cuerpo. Rodea la cintura con la cinta justo por encima, mantenla horizontal y mide después de soltar el aire normalmente, sin apretar ni meter barriga.',
+    measureTipArmRelaxed:
+      'Deja el brazo colgando y relajado. Mide a mitad de camino entre el hombro y el codo, con la cinta horizontal y sin apretar.',
+    measureTipArmFlexed: 'Dobla el codo a 90°, contrae el brazo y mide su parte más ancha sin apretar.',
+    measurementLandmarks: 'Dónde colocar la cinta',
+    waistLandmark: 'Cintura · sobre los huesos de la cadera',
+    abdomenLandmark: 'Abdomen · a la altura del ombligo',
+    hipsLandmark: 'Cadera · parte más ancha',
+    bodyChanges: 'Cambios corporales',
+    bodyChangesExplanation:
+      'Los cambios de peso y perímetros no demuestran ganancia ni pérdida muscular. Los líquidos y la técnica de medición también influyen.',
+    bodyChangesMissing: 'Añade medidas comparables en otra fecha, separadas entre 7 y 90 días.',
+    bodyChangesPeriod: 'Fechas comparadas',
+    bodyChangesMethod:
+      'Cambió el método de estimación. La diferencia entre porcentajes no se interpreta como un cambio físico.',
+    compositionAutomatic: 'Se actualiza automáticamente con datos compatibles de las últimas 72 horas.',
+    compositionMeasuredFat: 'Grasa registrada · {{value}}%',
+    compositionMeasuredMuscle: 'Músculo registrado · {{value}} kg',
+    compositionHistorical: 'Estimación histórica · {{date}}',
+    compositionAgeRequired: 'Las categorías de adultos no están disponibles sin una edad aplicable.',
+
     suuntoTitle: 'Salud Suunto 24/7',
     suuntoSubtitle: 'Frecuencia cardiaca, sueño, recuperación y actividad diaria',
     suuntoPeriod: 'Periodo de la gráfica de salud',
@@ -1349,7 +1376,7 @@ export default {
     logWeight: 'Registrar peso',
     logSleep: 'Registrar sueño',
     hydration: 'Hidratación',
-    waist: 'Cintura',
+    waist: 'Cintura para estimar grasa',
     calf: 'Gemelo',
     neck: 'Cuello',
     shoulders: 'Hombros',
@@ -1433,7 +1460,7 @@ export default {
     abdomenAndHip: 'Abdomen y Cadera',
     forBetterPrecision: 'para mayor precisión.',
     abdomen: 'Abdomen',
-    addMeasurementsPrompt: 'Añade medidas corporales para desbloquear métricas de mayor precisión.',
+    addMeasurementsPrompt: 'Añade medidas tomadas correctamente para habilitar las estimaciones aplicables.',
     methodUpdated: 'Método de cálculo actualizado',
     bmiUnderweight: 'Bajo peso',
     bmiNormal: 'Normal',
@@ -1480,10 +1507,10 @@ export default {
     calcFatFromHip: 'Calcula el porcentaje de grasa usando tu contorno de cadera',
     fatFormulaHip: 'Grasa % = (Cadera / Altura ^ 1.5) - 18',
     baiIndexTitle: 'BAI (Índice de Adiposidad Corporal):',
-    abdomenHeightMethodNote: '(Abdomen y Altura). No utiliza tu peso.',
+    abdomenHeightMethodNote: '(Cintura y altura). No utiliza peso.',
     formulaBasedOnMeasurements: 'Fórmula basada en tus medidas',
     exclusivelyMeasurements: 'exclusivamente en tus medidas',
-    fatFormulaSuffix: '- 20 × (Altura / Abdomen)',
+    fatFormulaSuffix: '- 20 × (Altura / Cintura)',
     rfmTitle: 'RFM (Relative Fat Mass):',
     stored: 'Valor guardado',
     measured: 'Medición directa',
@@ -1510,8 +1537,8 @@ export default {
     dataUsedLabel: 'Datos usados:',
     formulaCunBaeLocalized:
       'CUN-BAE = -44.988 + 0.503 * edad + 10.689 * factor mujer + 3.172 * IMC - 0.026 * IMC^2 + 0.181 * IMC * factor mujer - 0.02 * IMC * edad - 0.005 * IMC^2 * factor mujer + 0.00021 * IMC^2 * edad (factor mujer = {{femaleFactor}} porque tu perfil está configurado como {{sexLabel}})',
-    formulaRfmMaleLocalized: 'RFM = 64 - 20 * (altura / abdomen)',
-    formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (altura / abdomen)',
+    formulaRfmMaleLocalized: 'RFM = 64 - 20 * (altura / cintura)',
+    formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (altura / cintura)',
     formulaBaiLocalized: 'BAI = (cadera / alturaM^1.5) - 18',
     formulaDeurenbergLocalized:
       'Deurenberg = 1.20 * IMC + 0.23 * edad - 10.8 * factor hombre - 5.4 (factor hombre = {{maleFactor}})',
@@ -1530,24 +1557,24 @@ export default {
     measuredCalculationNote:
       'Valor importado o introducido directamente. Trátalo como una estimación de la fuente, no como una fórmula de Alzan.',
     rfmPrecisionNote:
-      'Estimación antropométrica avanzada con abdomen y altura. Su precisión depende de que la medida de abdomen sea reciente y esté bien tomada.',
+      'Estimación con altura y cintura reciente medida justo sobre los huesos de la cadera. No mide la grasa directamente.',
     baiPrecisionNote:
-      'Estimación de confianza media con cadera y altura. Es útil si falta abdomen, pero menos fiable que RFM.',
+      'Estimación de menor confianza con cadera y altura, solo cuando no se pueden calcular RFM ni CUN-BAE.',
     basicBodyFatPrecisionNote: 'Estimación básica con IMC, edad y sexo porque faltan medidas corporales recientes.',
     alGindanPrecisionNote:
       'Estimación muscular antropométrica avanzada. Necesita abdomen y cadera recientes y sigue siendo una estimación, no una prueba clínica.',
     basicMusclePrecisionNote:
       'Estimación muscular básica con peso, altura, edad y sexo porque faltan abdomen y cadera recientes.',
-    bodyFatOptimalPrecisionTitle: 'Precisión óptima para grasa corporal:',
+    bodyFatOptimalPrecisionTitle: 'Estimación con cintura:',
     bodyFatOptimalPrecisionBody:
-      'Mantén tu abdomen actualizado; no necesitas cadera para mejorar este cálculo de grasa corporal.',
+      'Mantén la cintura actualizada y sigue las instrucciones para colocar la cinta. Añadir otras medidas no mejora automáticamente esta fórmula.',
     bodyFatImprovePrecisionBody:
-      'Añade abdomen para activar RFM, el método más preciso disponible en Alzan para grasa corporal.',
-    muscleOptimalPrecisionTitle: 'Precisión óptima para músculo estimado:',
+      'Una cintura medida correctamente permite usar RFM. Alzan selecciona una estimación aplicable con datos recientes.',
+    muscleOptimalPrecisionTitle: 'Estimación muscular antropométrica:',
     muscleOptimalPrecisionBody:
-      'Mantén abdomen y cadera actualizados para conservar la mejor estimación muscular disponible en Alzan.',
+      'El resultado es una estimación a partir de datos recientes, no una medición directa del músculo.',
     muscleImprovePrecisionBody:
-      'Añade abdomen y cadera para activar Al-Gindan, la estimación muscular más precisa disponible en Alzan.',
+      'Abdomen y cadera recientes permiten otra estimación antropométrica, sin demostrar ganancia ni pérdida muscular.',
     trackingMeasurementsNote:
       'Pecho, brazo y muslo sirven para ver cambios de perímetros y progreso visual, pero no se usan en esta estimación.',
     remainderDescription:
@@ -1624,7 +1651,7 @@ export default {
     currentTrend: 'Tendencia actual',
     dataCompared: 'Datos comparados:',
     autoCompCalcDisclaimer:
-      'Los datos de composición corporal se calculan automáticamente al registrar el peso. Se recomienda añadir primero las medidas corporales para un cálculo más exacto.',
+      'La composición se actualiza automáticamente al registrar o cambiar pesos, medidas o datos relevantes del perfil. Puedes introducirlos en cualquier orden.',
     addFirstSleepRecord: 'Toca + para añadir tu primera noche',
     noSleepRecords: 'Sin registros de sueño',
     averageLabel: 'Media',

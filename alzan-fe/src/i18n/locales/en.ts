@@ -850,6 +850,32 @@ const en = {
     privateProfile: 'Private profile',
   },
   health: {
+    compositionWeightLabel: 'Weight',
+    armRelaxed: 'Arm · relaxed',
+    armFlexed: 'Arm · flexed',
+    armUnspecified: 'Arm · posture unspecified',
+    waistUnspecified: 'Waist · method unspecified',
+    measureTipWaist:
+      'Find the top edge of your hipbones with your fingers on both sides. Wrap the tape just above them, keep it horizontal and measure after breathing out normally, without squeezing or pulling your belly in.',
+    measureTipArmRelaxed:
+      'Let your arm hang relaxed. Measure halfway between shoulder and elbow, keeping the tape horizontal without squeezing.',
+    measureTipArmFlexed: 'Bend your elbow to 90°, contract your arm and measure its widest part without squeezing.',
+    measurementLandmarks: 'Tape placement',
+    waistLandmark: 'Waist · above hipbones',
+    abdomenLandmark: 'Abdomen · at navel',
+    hipsLandmark: 'Hips · widest part',
+    bodyChanges: 'Body changes',
+    bodyChangesExplanation:
+      'Changes in weight and measurements do not establish muscle gain or loss. Fluids and measurement technique also affect the result.',
+    bodyChangesMissing: 'Add comparable measurements on another date, between 7 and 90 days apart.',
+    bodyChangesPeriod: 'Compared dates',
+    bodyChangesMethod: 'The estimation method changed. Percentage differences are not interpreted as physical change.',
+    compositionAutomatic: 'Updates automatically with compatible inputs from the last 72 hours.',
+    compositionMeasuredFat: 'Recorded body fat · {{value}}%',
+    compositionMeasuredMuscle: 'Recorded muscle · {{value}} kg',
+    compositionHistorical: 'Historical estimate · {{date}}',
+    compositionAgeRequired: 'Adult categories are unavailable without an applicable age.',
+
     suuntoTitle: 'Suunto 24/7 health',
     suuntoSubtitle: 'Heart rate, sleep, recovery and daily activity',
     suuntoPeriod: 'Health chart period',
@@ -1331,7 +1357,7 @@ const en = {
     logWeight: 'Record weight',
     logSleep: 'Record sleep',
     hydration: 'Hydration',
-    waist: 'Waist',
+    waist: 'Waist for body fat estimation',
     calf: 'Calf',
     neck: 'Neck',
     shoulders: 'Shoulders',
@@ -1414,7 +1440,7 @@ const en = {
     abdomenAndHip: 'Abdomen and Hip',
     forBetterPrecision: 'for better accuracy.',
     abdomen: 'Abdomen',
-    addMeasurementsPrompt: 'Add body measurements to unlock high-precision metrics.',
+    addMeasurementsPrompt: 'Add correctly taken measurements to enable applicable estimates.',
     methodUpdated: 'Calculation method updated',
     bmiUnderweight: 'Underweight',
     bmiNormal: 'Normal',
@@ -1460,10 +1486,10 @@ const en = {
     calcFatFromHip: 'Calculate fat percentage using your hip circumference',
     fatFormulaHip: 'Fat % = (Hip / Height ^ 1.5) - 18',
     baiIndexTitle: 'BAI (Body Adiposity Index):',
-    abdomenHeightMethodNote: '(Abdomen and Height). Does not use your weight.',
+    abdomenHeightMethodNote: '(Waist and height). It does not use weight.',
     formulaBasedOnMeasurements: 'Formula based on your measurements',
     exclusivelyMeasurements: 'exclusively on your measurements',
-    fatFormulaSuffix: '- 20 × (Height / Abdomen)',
+    fatFormulaSuffix: '- 20 × (Height / Waist)',
     rfmTitle: 'RFM (Relative Fat Mass):',
     stored: 'Stored value',
     measured: 'Direct measurement',
@@ -1490,8 +1516,8 @@ const en = {
     dataUsedLabel: 'Data used:',
     formulaCunBaeLocalized:
       'CUN-BAE = -44.988 + 0.503 * age + 10.689 * female factor + 3.172 * BMI - 0.026 * BMI^2 + 0.181 * BMI * female factor - 0.02 * BMI * age - 0.005 * BMI^2 * female factor + 0.00021 * BMI^2 * age (female factor = {{femaleFactor}} because your profile is set to {{sexLabel}})',
-    formulaRfmMaleLocalized: 'RFM = 64 - 20 * (height / abdomen)',
-    formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (height / abdomen)',
+    formulaRfmMaleLocalized: 'RFM = 64 - 20 * (height / waist)',
+    formulaRfmFemaleLocalized: 'RFM = 76 - 20 * (height / waist)',
     formulaBaiLocalized: 'BAI = (hip / heightM^1.5) - 18',
     formulaDeurenbergLocalized:
       'Deurenberg = 1.20 * BMI + 0.23 * age - 10.8 * male factor - 5.4 (male factor = {{maleFactor}})',
@@ -1510,23 +1536,23 @@ const en = {
     measuredCalculationNote:
       'Imported or directly entered value. Treat it as a measurement estimate from the source, not an Alzan formula.',
     rfmPrecisionNote:
-      'Advanced anthropometric estimate using abdomen and height. Accuracy depends on a recent, correctly taken abdomen measurement.',
+      'Anthropometric estimate using height and a recent waist measurement taken just above the hipbones. It does not measure body fat directly.',
     baiPrecisionNote:
-      'Medium-confidence estimate using hip and height. It is useful when abdomen is missing, but less reliable than RFM.',
+      'Lower-confidence estimate using hips and height, used only when RFM and CUN-BAE cannot be calculated.',
     basicBodyFatPrecisionNote: 'Basic estimate using BMI, age, and sex because recent body measurements are missing.',
     alGindanPrecisionNote:
       'Advanced anthropometric muscle estimate. It needs recent abdomen and hip measurements and remains an estimate, not a clinical test.',
     basicMusclePrecisionNote:
       'Basic muscle estimate using weight, height, age, and sex because recent abdomen and hip measurements are missing.',
-    bodyFatOptimalPrecisionTitle: 'Optimal precision for body fat:',
+    bodyFatOptimalPrecisionTitle: 'Waist-based estimate:',
     bodyFatOptimalPrecisionBody:
-      'Keep your abdomen measurement updated; hip is not needed to improve this body fat calculation.',
+      'Keep the waist measurement current and follow the tape placement instructions. More measurements do not automatically improve this formula.',
     bodyFatImprovePrecisionBody:
-      'Add abdomen to activate RFM, the most accurate body fat method currently available in Alzan.',
-    muscleOptimalPrecisionTitle: 'Optimal precision for estimated muscle:',
-    muscleOptimalPrecisionBody: 'Keep abdomen and hip updated to maintain the best muscle estimate available in Alzan.',
+      'A correctly measured waist allows RFM. Alzan selects an applicable estimate using recent inputs.',
+    muscleOptimalPrecisionTitle: 'Anthropometric muscle estimate:',
+    muscleOptimalPrecisionBody: 'The result is an estimate from recent inputs, not a direct measurement of muscle.',
     muscleImprovePrecisionBody:
-      'Add abdomen and hip to activate Al-Gindan, the most precise muscle estimate currently available in Alzan.',
+      'Recent abdomen and hip measurements allow another anthropometric estimate, without establishing muscle gain or loss.',
     trackingMeasurementsNote:
       'Chest, arm, and thigh are useful to follow perimeter changes and visual progress, but they are not used by this estimate.',
     remainderDescription:
@@ -1602,7 +1628,7 @@ const en = {
     currentTrend: 'Current trend',
     dataCompared: 'Data compared:',
     autoCompCalcDisclaimer:
-      'Body composition data is calculated automatically when recording weight. It is recommended to add body measurements first for a more accurate calculation.',
+      'Composition updates automatically when you record or change weights, measurements or relevant profile details. You can enter them in any order.',
     addFirstSleepRecord: 'Tap + to add your first night',
     noSleepRecords: 'No sleep records',
     averageLabel: 'Average',

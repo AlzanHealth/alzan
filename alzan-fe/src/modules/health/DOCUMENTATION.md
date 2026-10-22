@@ -1,5 +1,37 @@
 # Health Module - Technical Documentation
 
+> **Composition update (2026-10-22):** The automatic composition implementation below supersedes the legacy calculation and persistence descriptions elsewhere in this document.
+
+## Automatic composition (2026-10-22)
+
+For engineers maintaining Health: `algorithms/bodyCompositionDailyPlanner.ts` selects valid inputs by measurement time, not insertion order. Each input must be no more than 72 hours old at the evaluated instant; future inputs are excluded. Equal timestamps use stable IDs. Invalid newer measurements do not hide valid older inputs.
+
+`algorithms/bodyComposition.ts` calculates BMI from compatible weight and height and classifies the unrounded value. Inferred adult body fat requires known age of at least 20 and applicable inputs: RFM with explicitly recorded iliac-crest waist, then CUN-BAE, then BAI. Percentage estimates can exist without weight; kilogram estimates require compatible weight. Original measured/imported percentages remain separate. These are population estimates, not individual diagnostic measurements.
+
+`services/bodyCompositionService.ts` recalculates in the background after weight, measurement, import, and relevant profile changes. `hooks/useBodyCompositionLogs.ts` also refreshes on mount, focus, and a 60-second interval. Current-day calculation precedes historical repair. Errors and invalidated snapshots must not expose an old estimate as current.
+
+The additive migration `supabase/migrations/20261022120000_composition_input_revision.sql` adds measurement protocols, per-user revisions, invalidation triggers, and authenticated context/commit RPCs. The commit checks ownership, input revision, evaluated time, and future dates under a revision lock. Direct authenticated snapshot writes are revoked. Raw weights are never populated with inferred composition values. Generated database types are synchronized across FE, BE, and Supabase.
+
+`helpers/measurementProtocols.ts` separates relaxed midpoint and flexed maximum arm measurements in entry, history, graphs, duplicate checks, and PDF export. Legacy unspecified arm protocols are preserved and not silently combined. Waist guidance and `components/MeasurementLandmarks.tsx` distinguish waist, navel, and hips.
+
+`algorithms/bodyChanges.ts` compares coherent snapshots using the most recent comparable point 7–90 days earlier. Only matching measurement protocols are compared. The “Cambios corporales” card reports dated weight/perimeter differences without inferring muscle gain or loss; different fat formulas are not treated as physical changes.
+
+### Verification and deployment
+
+- Feature regression suite: `pnpm --prefix alzan-fe run verify:body-composition`.
+- Local transaction/ownership/revision checks: `supabase/tests/composition_input_revision.sql` (runs inside a rollback transaction).
+- Manual local mobile-width flow: saving waist updates CUN-BAE to RFM automatically; relaxed and flexed arms can be saved on the same day. Disposable test measurements are removed afterwards.
+- The migration has been applied only to local Supabase. Production deployment and a physical iPhone check remain separate verification steps.
+
+### Documentation drift record
+
+| Area | Previous description | Current evidence | Action |
+| --- | --- | --- | --- |
+| Composition selection/persistence | Legacy formula and data-flow sections below | Planner, engine, revision migration and service above | Superseded by this section; retain older module overview for context |
+| Recent branch commits | Exercise catalog/search, menu JSON import and PDF export in the last 20 commits | `git log -20`, ending at `2c9157f` before this uncommitted change | This update documents Health only; no unrelated documentation rewrite |
+
+Cleanup: retain legacy material with this explicit supersession notice until the broader module reference is rewritten. No runtime artifacts or credentials belong in this document.
+
 > **Version**: 2.0.0  
 > **Last Updated**: 2025-12-10  
 > **Module Path**: `src/modules/health/`

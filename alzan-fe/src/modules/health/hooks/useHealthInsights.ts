@@ -1,334 +1,153 @@
-/**
- * @fileoverview Health Insights Hook - Aggregates multiple health data sources
- * @module health/hooks/useHealthInsights
- * @version 3.0.0
- *
- * @description
- * This hook serves as the central aggregator for all health-related data in the Alzan Health app.
- * It combines data from multiple sources (weight, measurements, sleep, heart rate, profile)
- * and calculates derived metrics using adaptive multi-level algorithms.
- *
- * ## Data Sources:
- * - **Weight Logs**: From smart scales or manual input
- * - **Anthropometric Measurements**: All circumferences (abdomen, hip, chest, arm, thigh)
- * - **Sleep Logs**: Duration and quality data
- * - **Resting Heart Rate**: From wearables or manual input
- * - **User Profile**: Height, age, sex for calculations
- *
- * ## Calculated Metrics (Adaptive Algorithms):
- * - BMI with sex-specific categories
- * - Body Fat % (4 levels: Deurenberg → BAI → BAI+WHtR → Full Anthropometry)
- * - Muscle Mass (2 levels: Al-Gindan → CMC)
- * - Lean Mass / Fat Mass in kg
- *
- * @author Alzan Health Development Team
- * @since 1.0.0
- */
-
 import { useWeightLogs } from './useWeight';
 import { useMeasurements } from './useMeasurements';
 import { useSleepSessions } from './useSleep';
 import { useRestingHRLogs } from './useRestingHR';
 import { useUserProfile } from './useUserProfile';
 import { useBodyCompositionLogs } from './useBodyCompositionLogs';
+import { calculateAbdominalHealth } from '../algorithms/abdominalHealth';
+import { buildCompositionDeltas } from '../algorithms/compositionSnapshot';
 import {
-  calculateBodyComposition,
-  hasEnoughDataForBmi,
-  hasEnoughDataForBodyFat,
-  AnthroMeasurements,
-  BodyCompositionResult,
-} from '../algorithms/bodyComposition';
-import {
-  calculateAbdominalHealth,
-  calculateRecompositionTrend,
-  RecompositionSnapshot,
-} from '../algorithms/abdominalHealth';
-import { buildCompositionDeltas, mergePersistedCompositionResult } from '../algorithms/compositionSnapshot';
+  isBodyCompositionMeasurementType,
+  planDailyBodyCompositionRecalculation,
+  type DailyCompositionMeasurementInput,
+} from '../algorithms/bodyCompositionDailyPlanner';
+import { buildBodyChanges } from '../algorithms/bodyChanges';
 
-/** Debug flag - logs will appear in development mode */
-const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
-
-/**
- * Logs debug information if DEBUG is enabled
- */
-const log = (message: string, data?: unknown) => {
-  if (DEBUG) {
-    console.log(`[useHealthInsights] ${message}`, data || '');
-  }
-};
-
-/**
- * Main health insights hook - aggregates all health data and calculations
- * Uses adaptive algorithms that select the most accurate method based on available data
- */
+/** Current read model and persisted snapshots share the same input selector and engine. */
 export const useHealthInsights = () => {
-  log('Hook initialized');
-
-  // =========================================================================
-  // DATA FETCHING - From individual hooks
-  // =========================================================================
-
-  const { data: weightLogs } = useWeightLogs();
-  const { data: measurements } = useMeasurements();
+  const weightsQuery = useWeightLogs(500);
+  const measurementsQuery = useMeasurements(undefined, 1000);
   const { data: sleepSessions } = useSleepSessions();
   const { data: hrLogs } = useRestingHRLogs();
   const { data: profile } = useUserProfile();
-  const { data: bodyCompositionLogs } = useBodyCompositionLogs();
-
-  log('Data loaded', {
-    weightLogsCount: weightLogs?.length || 0,
-    measurementsCount: measurements?.length || 0,
-    sleepLogsCount: sleepSessions?.length || 0,
-    hrLogsCount: hrLogs?.length || 0,
-    bodyCompositionLogsCount: bodyCompositionLogs?.length || 0,
-    hasProfile: !!profile,
-  });
-
-  // =========================================================================
-  // EXTRACT LATEST VALUES
-  // =========================================================================
-
-  /** Most recent weight log entry */
-  const latestWeight = weightLogs?.[0];
-
-  /** Previous weight log for delta calculation (finds first weight on a different calendar day, falls back to previous log) */
-  const previousWeight = (() => {
-    if (!weightLogs || weightLogs.length < 2 || !latestWeight) return undefined;
-    const latestDateStr = new Date(latestWeight.measured_at).toDateString();
-    const diffDayLog = weightLogs.find(
-      (log, index) => index > 0 && new Date(log.measured_at).toDateString() !== latestDateStr,
-    );
-    return diffDayLog || weightLogs[1];
-  })();
-
-  const latestSleep = sleepSessions?.[0];
-  const latestCompositionLog = bodyCompositionLogs?.find(log => log.calculation_status !== 'stale');
-
-  /** Most recent heart rate log */
-  const latestHR = hrLogs?.[0];
-
-  // =========================================================================
-  // WEIGHT DELTA CALCULATION
-  // =========================================================================
-
-  let weightDelta = null;
-  if (latestWeight && previousWeight) {
-    weightDelta = {
-      change: parseFloat((latestWeight.weight_kg - previousWeight.weight_kg).toFixed(1)),
-      previousDate: previousWeight.measured_at,
-    };
-    log('Weight delta calculated', weightDelta);
-  }
-
-  // =========================================================================
-  // ANTHROPOMETRIC MEASUREMENTS
-  // =========================================================================
-
-  /**
-   * Helper to get the latest valid measurement (<= 14 days)
-   * Supports checking multiple type keys (e.g. ['hips', 'hip'])
-   */
-  const getLatest = (type: string | string[]): number | undefined => {
-    if (!measurements || measurements.length === 0) return undefined;
-
-    const types = Array.isArray(type) ? type : [type];
-
-    // 1. Filter by type(s)
-    const matching = measurements.filter(m => types.includes(m.measurement_type));
-
-    // 2. Sort by date descending (newest first)
-    matching.sort((a, b) => {
-      const dateA = a.measured_at ? new Date(a.measured_at).getTime() : 0;
-      const dateB = b.measured_at ? new Date(b.measured_at).getTime() : 0;
-      return dateB - dateA;
-    });
-
-    // 3. Find first one within validity window
-    const valid = matching.find(m => {
-      if (!m.measured_at) return false;
-      const measuredAt = new Date(m.measured_at);
-      const now = new Date();
-      const daysDiff = (now.getTime() - measuredAt.getTime()) / (1000 * 3600 * 24);
-
-      const isValid = daysDiff <= 14;
-      if (!isValid && DEBUG) {
-        console.log(`[useHealthInsights] Ignoring old ${m.measurement_type} (${Math.round(daysDiff)} days old)`);
-      }
-      return isValid;
-    });
-
-    return valid?.value_cm;
-  };
-
-  /**
-   * Collected anthropometric measurements for adaptive algorithms
-   */
-  const anthroMeasurements: AnthroMeasurements = {
-    hips: getLatest('hips'),
-    abdomen: getLatest('abdomen'),
-    chest: getLatest('chest'),
-    arm: getLatest('arm'),
-    thigh: getLatest('thigh'),
-  };
-
-  const getPreviousLatest = (type: string): number | undefined => {
-    if (!measurements || measurements.length === 0) return undefined;
-
-    const matching = measurements
-      .filter(m => m.measurement_type === type && m.measured_at)
-      .sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime());
-
-    if (matching.length < 2) return undefined;
-
-    const latestDate = new Date(matching[0].measured_at).toDateString();
-    return matching.find(m => new Date(m.measured_at).toDateString() !== latestDate)?.value_cm;
-  };
-
-  log('Anthropometric measurements', anthroMeasurements);
-
-  // =========================================================================
-  // AGE CALCULATION
-  // =========================================================================
-
+  const compositionQuery = useBodyCompositionLogs();
+  const bodyCompositionLogs = compositionQuery.data;
+  const weightLogs = weightsQuery.data ?? [];
+  const measurements = measurementsQuery.data ?? [];
+  const serverReference =
+    bodyCompositionLogs?.reduce(
+      (latest, row) => Math.max(latest, new Date(row.composition_calculated_at ?? '').getTime() || 0),
+      0,
+    ) ?? 0;
+  const now = new Date(
+    serverReference && compositionQuery.dataUpdatedAt
+      ? serverReference + Math.max(0, Date.now() - compositionQuery.dataUpdatedAt)
+      : Date.now(),
+  );
+  const latestWeight = weightLogs.find(row => new Date(row.measured_at).getTime() <= now.getTime());
+  const previousWeight = weightLogs.find(
+    row =>
+      row.id !== latestWeight?.id &&
+      new Date(row.measured_at).getTime() <= now.getTime() &&
+      new Date(row.measured_at).toDateString() !== new Date(latestWeight?.measured_at ?? now).toDateString(),
+  );
   let age: number | null = null;
   if (profile?.date_of_birth) {
-    const birth = new Date(profile.date_of_birth);
-    const today = new Date();
-    age = today.getFullYear() - birth.getFullYear();
-
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    const birth = new Date(`${profile.date_of_birth}T12:00:00`);
+    age = now.getFullYear() - birth.getFullYear();
+    if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate()))
       age--;
-    }
-    log('Age calculated', { dateOfBirth: profile.date_of_birth, age });
+    if (!Number.isFinite(age) || age < 0) age = null;
   }
-
-  // =========================================================================
-  // BODY COMPOSITION - USE PERSISTED DAILY RESULT WHEN AVAILABLE
-  // =========================================================================
-  //
-  // Daily composition logs preserve the algorithm, formula, inputs and precision
-  // used for that day. Legacy weight-log values remain a fallback for older data.
-
-  let bodyCompResult: BodyCompositionResult | null = null;
-
-  const effectiveSex = profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : undefined;
-
-  if ((latestCompositionLog?.weight_kg_used || latestWeight?.weight_kg) && profile?.height_cm) {
-    const calculationWeight = latestCompositionLog?.weight_kg_used ?? latestWeight!.weight_kg;
-    // Calculate body composition using the algorithm WITH measurements
-    // This is the fallback for old rows; persisted composition logs override method/formula/inputs.
-    const fallbackResult = calculateBodyComposition({
-      weightKg: calculationWeight,
-      heightCm: profile.height_cm,
-      age,
-      sex: effectiveSex,
-      measurements: anthroMeasurements, // Pass actual measurements!
-      loggedBodyFat: latestWeight?.bodyfat_percent ?? undefined,
-      loggedMuscleMass: latestWeight?.muscle_mass_kg ?? undefined,
-      loggedSource: latestWeight?.source,
-    });
-    bodyCompResult =
-      latestCompositionLog && effectiveSex
-        ? mergePersistedCompositionResult(latestCompositionLog, fallbackResult, effectiveSex)
-        : fallbackResult;
-
-    log('Body composition calculated', {
-      bmi: bodyCompResult.bmi?.value,
-      bodyFatMethod: bodyCompResult.bodyFat?.method,
-      muscleMethod: bodyCompResult.muscle?.method,
-    });
-  }
-
-  // =========================================================================
-  // DATA SUFFICIENCY FLAGS
-  // =========================================================================
-
-  const height_cm = profile?.height_cm ?? undefined;
-  const effectiveWeight = latestCompositionLog?.weight_kg_used ?? latestWeight?.weight_kg;
-  const effectiveBodyFat = latestCompositionLog?.bodyfat_percent ?? latestWeight?.bodyfat_percent;
-  const canCalculateBmi = hasEnoughDataForBmi(effectiveWeight, height_cm);
-  const abdominalHealth = calculateAbdominalHealth({
-    weightKg: effectiveWeight,
-    heightCm: height_cm,
-    sex: effectiveSex,
-    measurements: anthroMeasurements,
-  });
-  const currentRecompositionSnapshot: RecompositionSnapshot = {
-    weightKg: effectiveWeight,
-    abdomen: anthroMeasurements.abdomen,
-    chest: anthroMeasurements.chest,
-    arm: anthroMeasurements.arm,
-    thigh: anthroMeasurements.thigh,
-  };
-  const previousRecompositionSnapshot: RecompositionSnapshot = {
-    weightKg: previousWeight?.weight_kg,
-    abdomen: getPreviousLatest('abdomen'),
-    chest: getPreviousLatest('chest'),
-    arm: getPreviousLatest('arm'),
-    thigh: getPreviousLatest('thigh'),
-  };
-  const recompositionTrend = calculateRecompositionTrend({
-    current: currentRecompositionSnapshot,
-    previous: previousRecompositionSnapshot,
-  });
-
-  const canCalculateBodyFat = hasEnoughDataForBodyFat(
-    effectiveWeight,
-    height_cm,
-    age,
-    profile?.sex,
-    anthroMeasurements.hips,
-    effectiveBodyFat,
+  const selectedMeasurements: DailyCompositionMeasurementInput[] = measurements.flatMap(row =>
+    isBodyCompositionMeasurementType(row.measurement_type)
+      ? [
+          {
+            id: row.id,
+            type: row.measurement_type,
+            valueCm: row.value_cm,
+            measuredAt: row.measured_at,
+            protocol: row.measurement_protocol,
+          },
+        ]
+      : [],
   );
+  const effectiveSex = profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : undefined;
+  const plannerInput = {
+    targetDate: now,
+    now,
+    profile: { heightCm: profile?.height_cm, age, sex: effectiveSex },
+    weights: weightLogs.map(row => ({ id: row.id, weightKg: row.weight_kg, measuredAt: row.measured_at })),
+    measurements: selectedMeasurements,
+  };
+  const plan = planDailyBodyCompositionRecalculation(plannerInput);
+  const result = weightsQuery.error || measurementsQuery.error ? undefined : plan.result;
+  const abdominalHealth = calculateAbdominalHealth({
+    heightCm: profile?.height_cm,
+    weightKg: plan.weightKgUsed,
+    sex: effectiveSex,
+    measurements: plan.measurements,
+  });
+  const currentWeight = weightLogs.find(row => row.id === plan.sourceWeightLogId);
+  const currentDate =
+    plan.selectedMeasurements
+      .map(row => row.measuredAt)
+      .concat(currentWeight ? [currentWeight.measured_at] : [])
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+      .at(-1) ?? null;
+  const currentLogs = (bodyCompositionLogs ?? []).filter(row => row.calculation_status !== 'stale');
+  const emptyDeltas = {
+    bmi: null,
+    bodyFat: null,
+    muscle: null,
+    bodyFatMethodChanged: false,
+    muscleMethodChanged: false,
+  };
+  const storedCurrent = currentLogs[0];
+  const snapshotsMatch =
+    storedCurrent &&
+    storedCurrent.source_weight_log_id === (plan.sourceWeightLogId ?? null) &&
+    storedCurrent.bodyfat_method === (result?.bodyFat?.method ?? null) &&
+    storedCurrent.bodyfat_percent === (result?.bodyFat?.percentage ?? null) &&
+    storedCurrent.muscle_mass_kg === (result?.muscle?.massKg ?? null);
 
-  log('Data sufficiency', { canCalculateBmi, canCalculateBodyFat });
-
-  // =========================================================================
-  // AVERAGES CALCULATION
-  // =========================================================================
-
-  const avgSleep =
-    sleepSessions && sleepSessions.length > 0
-      ? sleepSessions.reduce((acc, curr) => acc + (curr.total_sleep_min || 0), 0) / sleepSessions.length
-      : 0;
-
-  const avgHR =
-    hrLogs && hrLogs.length > 0 ? hrLogs.reduce((acc, curr) => acc + curr.resting_hr_bpm, 0) / hrLogs.length : 0;
-  const compositionDeltas = buildCompositionDeltas(bodyCompositionLogs ?? []);
-
-  log('Averages calculated', { avgSleep, avgHR });
-
-  // =========================================================================
-  // RETURN AGGREGATED DATA
-  // =========================================================================
-
-  const result = {
-    // Raw data
+  return {
     latestWeight,
-    latestSleep,
-    latestHR,
-
-    // Averages
-    avgSleepMinutes: avgSleep,
-    avgHRBpm: avgHR,
-
-    // Profile data
+    latestSleep: sleepSessions?.[0],
+    latestHR: hrLogs?.[0],
     age,
-
-    // Body composition (all calculated metrics from adaptive algorithms)
+    avgSleepMinutes: sleepSessions?.length
+      ? sleepSessions.reduce((sum, row) => sum + (row.total_sleep_min ?? 0), 0) / sleepSessions.length
+      : 0,
+    avgHRBpm: hrLogs?.length ? hrLogs.reduce((sum, row) => sum + row.resting_hr_bpm, 0) / hrLogs.length : 0,
+    weightDelta:
+      latestWeight && previousWeight
+        ? {
+            change: Math.round((latestWeight.weight_kg - previousWeight.weight_kg) * 10) / 10,
+            previousDate: previousWeight.measured_at,
+          }
+        : null,
+    profile: { sex: profile?.sex, heightCm: profile?.height_cm, age },
+    isLoading: weightsQuery.isLoading || measurementsQuery.isLoading,
     bodyComposition: {
-      bmi: bodyCompResult?.bmi || null,
-      bodyFat: bodyCompResult?.bodyFat || null,
-      muscle: bodyCompResult?.muscle || null,
-      leanMassKg: bodyCompResult?.leanMassKg || null,
-      fatMassKg: bodyCompResult?.fatMassKg || null,
-      muscleMassKg: bodyCompResult?.muscleMassKg || null,
-      residualMassKg: bodyCompResult?.residualMassKg || null,
+      bmi: result?.bmi ?? null,
+      bodyFat: result?.bodyFat ?? null,
+      muscle: result?.muscle ?? null,
+      leanMassKg: result?.leanMassKg ?? null,
+      fatMassKg: result?.fatMassKg ?? null,
+      muscleMassKg: result?.muscleMassKg ?? null,
+      residualMassKg: result?.residualMassKg ?? null,
+      measuredBodyFat: currentWeight?.bodyfat_percent ?? null,
+      measuredMuscleMass: currentWeight?.muscle_mass_kg ?? null,
+      sourceDate: currentDate,
+      historicalDate:
+        !result?.bmi &&
+        !result?.bodyFat &&
+        !result?.muscle &&
+        !abdominalHealth.waistToHeight &&
+        !abdominalHealth.waistToHip
+          ? (currentLogs.find(
+              row =>
+                row.bmi !== null ||
+                row.bodyfat_percent !== null ||
+                row.muscle_mass_kg !== null ||
+                row.waist_to_height_ratio !== null ||
+                row.waist_to_hip_ratio !== null,
+            )?.calculated_for_date ?? null)
+          : null,
       abdominalHealth,
-      recompositionTrend,
-      // Data availability info
-      availableData: bodyCompResult?.availableData || {
+      bodyChanges: buildBodyChanges(plannerInput),
+      availableData: result?.availableData ?? {
         hasBasicData: false,
         hasHips: false,
         hasAbdomen: false,
@@ -337,43 +156,14 @@ export const useHealthInsights = () => {
         hasThigh: false,
         hasFullAnthropometry: false,
       },
-      // Legacy compatibility
-      hasEnoughDataForBmi: canCalculateBmi,
-      hasEnoughDataForBodyFat: canCalculateBodyFat,
-      hasEnoughDataForMuscle: !!bodyCompResult?.muscle,
-      // Legacy leanMass structure
-      leanMass: bodyCompResult?.leanMassKg
-        ? {
-            muscleMass: bodyCompResult.muscleMassKg || 0,
-            leanMass: bodyCompResult.leanMassKg,
-            fatMass: bodyCompResult.fatMassKg || 0,
-          }
-        : null,
-      deltas: compositionDeltas,
+      hasEnoughDataForBmi: !!result?.bmi,
+      hasEnoughDataForBodyFat: !!result?.bodyFat,
+      hasEnoughDataForMuscle: !!result?.muscle,
+      leanMass:
+        result?.leanMassKg != null
+          ? { muscleMass: result.muscleMassKg ?? 0, leanMass: result.leanMassKg, fatMass: result.fatMassKg ?? 0 }
+          : null,
+      deltas: currentDate && snapshotsMatch ? buildCompositionDeltas(currentLogs) : emptyDeltas,
     },
-
-    // Weight tracking
-    weightDelta,
-
-    // Profile summary
-    profile: {
-      sex: profile?.sex,
-      heightCm: profile?.height_cm,
-      age,
-    },
-
-    // Loading state
-    isLoading: !weightLogs || !bodyCompositionLogs,
   };
-
-  log('Returning result', {
-    hasBmi: !!result.bodyComposition.bmi,
-    hasBodyFat: !!result.bodyComposition.bodyFat,
-    bodyFatMethod: result.bodyComposition.bodyFat?.method,
-    hasMuscle: !!result.bodyComposition.muscle,
-    muscleMethod: result.bodyComposition.muscle?.method,
-    isLoading: result.isLoading,
-  });
-
-  return result;
 };

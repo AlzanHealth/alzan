@@ -1,39 +1,49 @@
 import { MaleOrFemale, MeasurementType } from '../../../types/requests.types';
-import { AnthroMeasurements, BodyCompositionResult, calculateBodyComposition } from './bodyComposition';
+import {
+  AnthroMeasurements,
+  BodyCompositionResult,
+  calculateBodyComposition,
+  isValidCompositionMeasurement,
+} from './bodyComposition';
 
-export const RECENT_BODY_COMPOSITION_WINDOW_DAYS = 14;
-
-const BODY_COMPOSITION_MEASUREMENT_TYPES = ['abdomen', 'hips', 'chest', 'arm', 'thigh'] as const;
-
+export const RECENT_BODY_COMPOSITION_WINDOW_DAYS = 3;
+export const RECENT_BODY_COMPOSITION_WINDOW_HOURS = 72;
+const WINDOW_MS = RECENT_BODY_COMPOSITION_WINDOW_HOURS * 60 * 60 * 1000;
+const BODY_COMPOSITION_MEASUREMENT_TYPES = ['waist', 'abdomen', 'hips', 'chest', 'arm', 'thigh'] as const;
 export type BodyCompositionMeasurementType = (typeof BODY_COMPOSITION_MEASUREMENT_TYPES)[number];
 
 export interface DailyCompositionWeightLogInput {
   id: string;
+  createdAt?: string | null;
   measuredAt: string;
   weightKg: number;
 }
-
 export interface DailyCompositionMeasurementInput {
+  id?: string;
+  createdAt?: string | null;
   type: BodyCompositionMeasurementType;
   measuredAt: string;
   valueCm: number;
+  protocol?: string | null;
 }
-
 export interface DailyCompositionProfileInput {
   heightCm: number | null | undefined;
   age: number | null | undefined;
   sex: MaleOrFemale | null | undefined;
 }
-
 export interface StoredDailyCompositionInput {
+  bmi?: number | null;
   bodyfatPercent?: number | null;
   bodyfatPrecisionLevel?: number | null;
   muscleMassKg?: number | null;
   musclePrecisionLevel?: number | null;
 }
-
-export type DailyCompositionSkipReason = 'missing_weight' | 'missing_profile' | 'missing_bodyfat' | 'not_improved';
-
+export type DailyCompositionSkipReason =
+  | 'missing_weight'
+  | 'missing_profile'
+  | 'missing_bodyfat'
+  | 'not_improved'
+  | 'future_date';
 export interface DailyCompositionRecalculationPlan {
   shouldCalculate: boolean;
   shouldUpsert: boolean;
@@ -44,95 +54,93 @@ export interface DailyCompositionRecalculationPlan {
   sourceWeightLogId?: string;
   weightKgUsed?: number;
   measurements: AnthroMeasurements;
+  selectedMeasurements: DailyCompositionMeasurementInput[];
+  asOf: string;
   result?: BodyCompositionResult;
 }
-
 export interface DailyCompositionPlannerInput {
   targetDate: Date;
   profile: DailyCompositionProfileInput;
   weights: DailyCompositionWeightLogInput[];
   measurements: DailyCompositionMeasurementInput[];
   storedComposition?: StoredDailyCompositionInput | null;
+  now?: Date;
 }
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const BODY_FAT_DIFF_THRESHOLD = 0.1;
-const MUSCLE_DIFF_THRESHOLD = 0.1;
-
 export const isBodyCompositionMeasurementType = (
   type: MeasurementType | string,
-): type is BodyCompositionMeasurementType =>
-  BODY_COMPOSITION_MEASUREMENT_TYPES.includes(type as BodyCompositionMeasurementType);
-
-const startOfLocalDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-const endOfLocalDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+): type is BodyCompositionMeasurementType => BODY_COMPOSITION_MEASUREMENT_TYPES.some(candidate => candidate === type);
 
 const isSameLocalDay = (left: Date, right: Date): boolean =>
   left.getFullYear() === right.getFullYear() &&
   left.getMonth() === right.getMonth() &&
   left.getDate() === right.getDate();
 
-const isWithinRecentWindow = (candidate: Date, targetDate: Date): boolean => {
-  const targetEnd = endOfLocalDay(targetDate).getTime();
-  const candidateTime = candidate.getTime();
+// Historical snapshots use the last millisecond of their local day; today's snapshot uses now.
+const getAsOf = (target: Date, now: Date): number =>
+  Math.min(new Date(target.getFullYear(), target.getMonth(), target.getDate() + 1).getTime() - 1, now.getTime());
 
-  if (candidateTime >= targetEnd) return false;
-
-  const targetStart = startOfLocalDay(targetDate).getTime();
-  const diffDays = (targetStart - startOfLocalDay(candidate).getTime()) / MS_PER_DAY;
-  return diffDays >= 0 && diffDays < RECENT_BODY_COMPOSITION_WINDOW_DAYS;
+const isWithinWindow = (measuredAt: string, asOf: number): boolean => {
+  const timestamp = new Date(measuredAt).getTime();
+  return Number.isFinite(timestamp) && timestamp <= asOf && asOf - timestamp <= WINDOW_MS;
 };
+const isPositiveFinite = (value: number): boolean => Number.isFinite(value) && value > 0;
 
-const selectSourceWeightLog = (
-  targetDate: Date,
-  weights: DailyCompositionWeightLogInput[],
-): DailyCompositionWeightLogInput | undefined =>
-  weights
-    .filter(weight => weight.weightKg > 0 && isWithinRecentWindow(new Date(weight.measuredAt), targetDate))
-    .sort((a, b) => new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime())[0];
+type TimestampedCompositionInput = DailyCompositionMeasurementInput | DailyCompositionWeightLogInput;
+
+const compareTextDescending = (left: string, right: string): number => (left === right ? 0 : left > right ? -1 : 1);
+const creationTime = (value: string | null | undefined): number => {
+  const timestamp = value ? new Date(value).getTime() : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+};
+const fallbackIdentity = (input: TimestampedCompositionInput): string =>
+  'valueCm' in input ? `${input.protocol ?? ''}|${input.type}|${input.valueCm}` : `${input.weightKg}`;
+
+// Stable across database ordering and array reversal, including timestamp ties.
+const compareInputsNewestFirst = (left: TimestampedCompositionInput, right: TimestampedCompositionInput): number => {
+  const measuredDifference = new Date(right.measuredAt).getTime() - new Date(left.measuredAt).getTime();
+  if (measuredDifference !== 0) return measuredDifference;
+  const leftCreated = creationTime(left.createdAt);
+  const rightCreated = creationTime(right.createdAt);
+  if (leftCreated !== rightCreated) return leftCreated > rightCreated ? -1 : 1;
+  return (
+    compareTextDescending(left.id ?? '', right.id ?? '') ||
+    compareTextDescending(fallbackIdentity(left), fallbackIdentity(right))
+  );
+};
 
 const collectMeasurements = (
-  targetDate: Date,
+  asOf: number,
   measurements: DailyCompositionMeasurementInput[],
-): AnthroMeasurements => {
-  const selected: Partial<Record<BodyCompositionMeasurementType, DailyCompositionMeasurementInput>> = {};
-
-  measurements
-    .filter(
-      measurement =>
-        measurement.valueCm > 0 &&
-        isBodyCompositionMeasurementType(measurement.type) &&
-        isWithinRecentWindow(new Date(measurement.measuredAt), targetDate),
-    )
-    .sort((a, b) => new Date(b.measuredAt).getTime() - new Date(a.measuredAt).getTime())
-    .forEach(measurement => {
-      if (!selected[measurement.type]) {
-        selected[measurement.type] = measurement;
-      }
-    });
-
-  return {
-    abdomen: selected.abdomen?.valueCm,
-    hips: selected.hips?.valueCm,
-    chest: selected.chest?.valueCm,
-    arm: selected.arm?.valueCm,
-    thigh: selected.thigh?.valueCm,
-  };
+): { measurements: AnthroMeasurements; selectedMeasurements: DailyCompositionMeasurementInput[] } => {
+  const collected: AnthroMeasurements = {};
+  const selectedMeasurements: DailyCompositionMeasurementInput[] = [];
+  const sorted = measurements
+    .filter(measurement => isPositiveFinite(measurement.valueCm) && isWithinWindow(measurement.measuredAt, asOf))
+    .sort(compareInputsNewestFirst);
+  for (const measurement of sorted) {
+    const { type, protocol, valueCm } = measurement;
+    if (!isBodyCompositionMeasurementType(type)) continue;
+    if (type === 'waist' && protocol !== 'waist_iliac_crest') continue;
+    const key = type === 'arm' && protocol === 'arm_flexed_max' ? 'armFlexed' : type;
+    if (type === 'arm' && protocol !== 'arm_relaxed_midpoint' && protocol !== 'arm_flexed_max') continue;
+    if (!isValidCompositionMeasurement(key, valueCm)) continue;
+    if (collected[key] === undefined) {
+      collected[key] = valueCm;
+      selectedMeasurements.push(measurement);
+    }
+  }
+  return { measurements: collected, selectedMeasurements };
 };
 
-const shouldReplaceMetric = (
-  newPrecision: number | undefined,
-  existingPrecision: number | null | undefined,
-  newValue: number | null | undefined,
-  existingValue: number | null | undefined,
-  threshold: number,
+const hasMetricChanged = (
+  currentValue: number | null | undefined,
+  currentPrecision: number | null | undefined,
+  previousValue: number | null | undefined,
+  previousPrecision: number | null | undefined,
 ): boolean => {
-  if (!newPrecision || newValue === null || newValue === undefined) return false;
-  if (!existingValue || !existingPrecision) return true;
-  if (newPrecision > existingPrecision) return true;
-  if (newPrecision < existingPrecision) return false;
-  return Math.abs(newValue - existingValue) >= threshold;
+  if (currentValue == null) return previousValue != null;
+  if (previousValue == null) return true;
+  return currentPrecision !== previousPrecision || Math.abs(currentValue - previousValue) >= 0.099999;
 };
 
 export const planDailyBodyCompositionRecalculation = ({
@@ -141,84 +149,68 @@ export const planDailyBodyCompositionRecalculation = ({
   weights,
   measurements,
   storedComposition,
+  now = new Date(),
 }: DailyCompositionPlannerInput): DailyCompositionRecalculationPlan => {
-  const sourceWeight = selectSourceWeightLog(targetDate, weights);
-  const collectedMeasurements = collectMeasurements(targetDate, measurements);
-
-  if (!sourceWeight) {
+  const targetDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (targetDay > today) {
     return {
       shouldCalculate: false,
       shouldUpsert: false,
       shouldUpdateWeightLog: false,
       bodyfatShouldReplace: false,
       muscleShouldReplace: false,
-      reason: 'missing_weight',
-      measurements: collectedMeasurements,
+      reason: 'future_date',
+      asOf: now.toISOString(),
+      measurements: {},
+      selectedMeasurements: [],
     };
   }
-
-  if (!profile.heightCm || !profile.age || !profile.sex) {
-    return {
-      shouldCalculate: false,
-      shouldUpsert: false,
-      shouldUpdateWeightLog: false,
-      bodyfatShouldReplace: false,
-      muscleShouldReplace: false,
-      reason: 'missing_profile',
-      sourceWeightLogId: sourceWeight.id,
-      weightKgUsed: sourceWeight.weightKg,
-      measurements: collectedMeasurements,
-    };
-  }
-
+  const asOf = getAsOf(targetDate, now);
+  const sourceWeight = weights
+    .filter(weight => isPositiveFinite(weight.weightKg) && isWithinWindow(weight.measuredAt, asOf))
+    .sort(compareInputsNewestFirst)[0];
+  const { measurements: collectedMeasurements, selectedMeasurements } = collectMeasurements(asOf, measurements);
   const result = calculateBodyComposition({
-    weightKg: sourceWeight.weightKg,
+    weightKg: sourceWeight?.weightKg,
     heightCm: profile.heightCm,
     age: profile.age,
     sex: profile.sex,
     measurements: collectedMeasurements,
   });
-
-  if (!result.bodyFat) {
-    return {
-      shouldCalculate: true,
-      shouldUpsert: false,
-      shouldUpdateWeightLog: false,
-      bodyfatShouldReplace: false,
-      muscleShouldReplace: false,
-      reason: 'missing_bodyfat',
-      sourceWeightLogId: sourceWeight.id,
-      weightKgUsed: sourceWeight.weightKg,
-      measurements: collectedMeasurements,
-      result,
-    };
-  }
-
-  const bodyfatShouldReplace = shouldReplaceMetric(
-    result.bodyFat.precisionLevel,
-    storedComposition?.bodyfatPrecisionLevel,
-    result.bodyFat.percentage,
+  const bodyfatShouldReplace = hasMetricChanged(
+    result.bodyFat?.percentage,
+    result.bodyFat?.precisionLevel,
     storedComposition?.bodyfatPercent,
-    BODY_FAT_DIFF_THRESHOLD,
+    storedComposition?.bodyfatPrecisionLevel,
   );
-  const muscleShouldReplace = shouldReplaceMetric(
-    result.muscle?.precisionLevel,
-    storedComposition?.musclePrecisionLevel,
+  const muscleShouldReplace = hasMetricChanged(
     result.muscle?.massKg,
+    result.muscle?.precisionLevel,
     storedComposition?.muscleMassKg,
-    MUSCLE_DIFF_THRESHOLD,
+    storedComposition?.musclePrecisionLevel,
   );
-  const shouldUpsert = bodyfatShouldReplace || muscleShouldReplace || !storedComposition;
-
+  const bmiChanged = (result.bmi?.value ?? null) !== (storedComposition?.bmi ?? null);
+  const hasAnyResult = !!(result.bmi || result.bodyFat || result.muscle);
+  // Recompute on every edit, including deletions. Old precision never vetoes a current result or null invalidation.
+  const shouldUpsert =
+    bodyfatShouldReplace || muscleShouldReplace || bmiChanged || (!storedComposition && hasAnyResult);
   return {
+    asOf: new Date(asOf).toISOString(),
+    selectedMeasurements,
     shouldCalculate: true,
     shouldUpsert,
-    shouldUpdateWeightLog: isSameLocalDay(new Date(sourceWeight.measuredAt), targetDate),
+    shouldUpdateWeightLog: !!sourceWeight && isSameLocalDay(new Date(sourceWeight.measuredAt), targetDate),
     bodyfatShouldReplace,
     muscleShouldReplace,
-    reason: shouldUpsert ? undefined : 'not_improved',
-    sourceWeightLogId: sourceWeight.id,
-    weightKgUsed: sourceWeight.weightKg,
+    reason:
+      !result.bodyFat && (profile.age == null || !Number.isFinite(profile.age) || profile.age < 20)
+        ? 'missing_profile'
+        : shouldUpsert
+          ? undefined
+          : 'not_improved',
+    sourceWeightLogId: sourceWeight?.id,
+    weightKgUsed: sourceWeight?.weightKg,
     measurements: collectedMeasurements,
     result,
   };

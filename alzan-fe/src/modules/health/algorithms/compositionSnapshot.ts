@@ -54,6 +54,7 @@ const inputKeys: CompositionInputKey[] = [
   'height',
   'age',
   'sex',
+  'waist',
   'abdomen',
   'hips',
   'chest',
@@ -100,28 +101,28 @@ const round1 = (value: number): number => Number(value.toFixed(1));
 export const mergePersistedCompositionResult = (
   persisted: PersistedComposition,
   fallback: BodyCompositionResult,
-  sex: 'male' | 'female',
+  sex?: 'male' | 'female' | null,
 ): BodyCompositionResult => {
   if (persisted.calculation_status === 'stale') return fallback;
   const persistedBodyFatCategory =
-    persisted.bodyfat_percent === null ? null : getBodyFatCategory(persisted.bodyfat_percent, sex);
+    persisted.bodyfat_percent === null || !sex ? null : getBodyFatCategory(persisted.bodyfat_percent, sex);
   const persistedMuscleCategory =
-    persisted.muscle_percent === null ? null : getMuscleCategory(persisted.muscle_percent, sex);
+    persisted.muscle_percent === null || !sex ? null : getMuscleCategory(persisted.muscle_percent, sex);
   const bodyFatMethod = isBodyFatMethod(persisted.bodyfat_method) ? persisted.bodyfat_method : 'stored';
   const muscleMethod = isMuscleMethod(persisted.muscle_method) ? persisted.muscle_method : 'stored';
   const bodyFat =
-    persisted.bodyfat_percent !== null && persistedBodyFatCategory
+    persisted.bodyfat_percent !== null
       ? {
           percentage: persisted.bodyfat_percent,
-          category: persistedBodyFatCategory.category,
-          categoryLabel: persistedBodyFatCategory.label,
+          category: persistedBodyFatCategory?.category ?? null,
+          categoryLabel: persistedBodyFatCategory?.label ?? '',
           method: bodyFatMethod,
           methodLabel: bodyFatMethodLabels[bodyFatMethod],
           precisionLevel: normalizePrecision(persisted.bodyfat_precision_level),
           formulaUsed: persisted.bodyfat_formula ?? 'Stored value; original calculation method is not persisted.',
           inputsUsed: parseInputs(persisted.bodyfat_inputs),
         }
-      : fallback.bodyFat;
+      : null;
   const muscle =
     persisted.muscle_mass_kg !== null && persisted.muscle_percent !== null && persistedMuscleCategory
       ? {
@@ -135,15 +136,16 @@ export const mergePersistedCompositionResult = (
           formulaUsed: persisted.muscle_formula ?? 'Stored value; original calculation method is not persisted.',
           inputsUsed: parseInputs(persisted.muscle_inputs),
         }
-      : fallback.muscle;
-  const weightKg = persisted.weight_kg_used;
-  const fatMassKg = bodyFat && weightKg !== null ? round1(weightKg * (bodyFat.percentage / 100)) : fallback.fatMassKg;
-  const leanMassKg = fatMassKg !== null && weightKg !== null ? round1(weightKg - fatMassKg) : fallback.leanMassKg;
-  const muscleMassKg = muscle?.massKg ?? fallback.muscleMassKg;
+      : null;
+  const weightKg =
+    persisted.weight_kg_used !== null && Number.isFinite(persisted.weight_kg_used) && persisted.weight_kg_used > 0
+      ? persisted.weight_kg_used
+      : null;
+  const fatMassKg = bodyFat && weightKg !== null ? round1(weightKg * (bodyFat.percentage / 100)) : null;
+  const leanMassKg = fatMassKg !== null && weightKg !== null ? round1(weightKg - fatMassKg) : null;
+  const muscleMassKg = muscle?.massKg ?? null;
   const residualMassKg =
-    leanMassKg !== null && muscleMassKg !== null
-      ? round1(Math.max(0, leanMassKg - muscleMassKg))
-      : fallback.residualMassKg;
+    leanMassKg !== null && muscleMassKg !== null ? round1(Math.max(0, leanMassKg - muscleMassKg)) : null;
 
   return { ...fallback, bodyFat, muscle, fatMassKg, leanMassKg, muscleMassKg, residualMassKg };
 };

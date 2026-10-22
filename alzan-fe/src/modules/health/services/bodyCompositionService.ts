@@ -1,31 +1,22 @@
-/**
- * Body Composition Service
- * Calculates daily body composition results without duplicating weight history.
- */
-
+/** Versioned derived snapshots. Raw/imported weight composition is never modified. */
 import { supabase } from '../../../lib/supabaseClient';
-import { Database, MaleOrFemale, MeasurementType, WeightLogUpdate } from '../../../types/requests.types';
-import { Nullable } from '../../../types/common.types';
-import { BodyCompositionResult, calculateBodyComposition } from '../algorithms/bodyComposition';
-import { PersistedAbdominalHealthResult, calculatePersistedAbdominalHealth } from '../algorithms/abdominalHealth';
+import { Database } from '../../../types/requests.types';
+import { calculatePersistedAbdominalHealth } from '../algorithms/abdominalHealth';
 import {
   DailyCompositionMeasurementInput,
-  DailyCompositionWeightLogInput,
-  RECENT_BODY_COMPOSITION_WINDOW_DAYS,
+  RECENT_BODY_COMPOSITION_WINDOW_HOURS,
   isBodyCompositionMeasurementType,
   planDailyBodyCompositionRecalculation,
 } from '../algorithms/bodyCompositionDailyPlanner';
 
-interface UserProfile {
-  height_cm: number | null;
-  date_of_birth: string | null;
-  sex: Nullable<MaleOrFemale>;
-}
-
-type AllMeasurements = { [key in MeasurementType]?: number };
 export type BodyCompositionLog = Database['public']['Tables']['body_composition_logs']['Row'];
-type BodyCompositionLogInsert = Database['public']['Tables']['body_composition_logs']['Insert'];
-
+type SnapshotInsert = Database['public']['Tables']['body_composition_logs']['Insert'];
+export interface RecalculateDailyCompositionResult {
+  success: boolean;
+  unchanged?: boolean;
+  reason?: string;
+  log?: BodyCompositionLog;
+}
 export interface ManualRecalculateResult {
   success: boolean;
   unchanged?: boolean;
@@ -38,519 +29,278 @@ export interface ManualRecalculateResult {
     | 'user_not_found';
   errorValues?: Record<string, string | number>;
 }
-
-export interface RecalculateDailyCompositionResult {
-  success: boolean;
-  unchanged?: boolean;
-  reason?: string;
-  log?: BodyCompositionLog;
-}
-
-const toLocalDateString = (date: Date): string =>
+const VERSION = 2;
+const historicalRepairUsers = new Set<string>();
+const localDate = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
-const startOfLocalDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-const endOfLocalDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-
-const addDays = (date: Date, days: number): Date =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-
-const hasKeys = (value: Record<string, unknown>): boolean => Object.keys(value).length > 0;
-const BODY_COMPOSITION_CALCULATION_VERSION = 1;
-
-const shouldReplaceRatio = (nextValue: number | null | undefined, currentValue: number | null | undefined): boolean => {
-  if (nextValue == null) return false;
-  if (currentValue == null) return true;
-  return Math.abs(nextValue - currentValue) >= 0.005;
-};
-
-const shouldReplaceAbdominalHealth = (
-  next: PersistedAbdominalHealthResult,
-  existing: BodyCompositionLog | null,
-): boolean =>
-  shouldReplaceRatio(next.waistToHeight?.value, existing?.waist_to_height_ratio) ||
-  shouldReplaceRatio(next.waistToHip?.value, existing?.waist_to_hip_ratio);
-
-const buildCompositionPayload = (
-  userId: string,
-  calculatedForDate: string,
-  sourceWeightLogId: string | null,
-  weightKgUsed: number | null,
-  result: BodyCompositionResult | null,
-  abdominalHealth: PersistedAbdominalHealthResult,
-  existing: BodyCompositionLog | null,
-  bodyfatShouldReplace: boolean,
-  muscleShouldReplace: boolean,
-  abdominalShouldReplace: boolean,
-  inputSnapshot: BodyCompositionLogInsert['input_snapshot'],
-): BodyCompositionLogInsert => {
-  const nextBodyFat = result && (bodyfatShouldReplace || !existing) ? result.bodyFat : null;
-  const nextMuscle = result && (muscleShouldReplace || !existing) ? result.muscle : null;
-  const nextWaistToHeight = abdominalShouldReplace || !existing ? abdominalHealth.waistToHeight : null;
-  const nextWaistToHip = abdominalShouldReplace || !existing ? abdominalHealth.waistToHip : null;
-  const hasCompleteComposition =
-    (result?.bmi?.value ?? existing?.bmi) != null &&
-    (nextBodyFat?.percentage ?? existing?.bodyfat_percent) != null &&
-    (nextMuscle?.massKg ?? existing?.muscle_mass_kg) != null &&
-    (nextMuscle?.percentage ?? existing?.muscle_percent) != null;
-
-  return {
-    user_id: userId,
-    calculated_for_date: calculatedForDate,
-    source_weight_log_id: sourceWeightLogId ?? existing?.source_weight_log_id ?? null,
-    weight_kg_used: weightKgUsed ?? existing?.weight_kg_used ?? null,
-    bmi: result?.bmi?.value ?? existing?.bmi ?? null,
-    bodyfat_percent: nextBodyFat?.percentage ?? existing?.bodyfat_percent ?? null,
-    bodyfat_method: nextBodyFat?.method ?? existing?.bodyfat_method ?? null,
-    bodyfat_precision_level: nextBodyFat?.precisionLevel ?? existing?.bodyfat_precision_level ?? null,
-    bodyfat_formula: nextBodyFat?.formulaUsed ?? existing?.bodyfat_formula ?? null,
-    bodyfat_inputs: (nextBodyFat?.inputsUsed ??
-      existing?.bodyfat_inputs ??
-      []) as BodyCompositionLogInsert['bodyfat_inputs'],
-    muscle_mass_kg: nextMuscle?.massKg ?? existing?.muscle_mass_kg ?? null,
-    muscle_percent: nextMuscle?.percentage ?? existing?.muscle_percent ?? null,
-    muscle_method: nextMuscle?.method ?? existing?.muscle_method ?? null,
-    muscle_precision_level: nextMuscle?.precisionLevel ?? existing?.muscle_precision_level ?? null,
-    muscle_formula: nextMuscle?.formulaUsed ?? existing?.muscle_formula ?? null,
-    muscle_inputs: (nextMuscle?.inputsUsed ??
-      existing?.muscle_inputs ??
-      []) as BodyCompositionLogInsert['muscle_inputs'],
-    waist_to_height_ratio: nextWaistToHeight?.value ?? existing?.waist_to_height_ratio ?? null,
-    waist_to_height_category: nextWaistToHeight?.category ?? existing?.waist_to_height_category ?? null,
-    waist_to_height_formula: nextWaistToHeight?.formula ?? existing?.waist_to_height_formula ?? null,
-    waist_to_height_inputs: (nextWaistToHeight?.inputsUsed ??
-      existing?.waist_to_height_inputs ??
-      []) as BodyCompositionLogInsert['waist_to_height_inputs'],
-    waist_to_hip_ratio: nextWaistToHip?.value ?? existing?.waist_to_hip_ratio ?? null,
-    waist_to_hip_category: nextWaistToHip?.category ?? existing?.waist_to_hip_category ?? null,
-    waist_to_hip_formula: nextWaistToHip?.formula ?? existing?.waist_to_hip_formula ?? null,
-    waist_to_hip_inputs: (nextWaistToHip?.inputsUsed ??
-      existing?.waist_to_hip_inputs ??
-      []) as BodyCompositionLogInsert['waist_to_hip_inputs'],
-    composition_calculated_at: new Date().toISOString(),
-    calculation_version: BODY_COMPOSITION_CALCULATION_VERSION,
-    calculation_status: hasCompleteComposition ? 'complete' : 'partial',
-    input_snapshot: inputSnapshot,
-    updated_at: new Date().toISOString(),
-  };
+const dateInput = (date: Date | string): Date =>
+  typeof date === 'string' ? new Date(date.length === 10 ? `${date}T12:00:00` : date) : date;
+const dateEnd = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+const ageAt = (birth: string | null, date: Date): number | null => {
+  if (!birth) return null;
+  const birthday = new Date(`${birth}T12:00:00`);
+  if (!Number.isFinite(birthday.getTime())) return null;
+  const beforeBirthday =
+    date.getMonth() < birthday.getMonth() ||
+    (date.getMonth() === birthday.getMonth() && date.getDate() < birthday.getDate());
+  return date.getFullYear() - birthday.getFullYear() - Number(beforeBirthday);
 };
 
 export const bodyCompositionService = {
-  /**
-   * Recalculates the best available composition for a calendar day.
-   * It may reuse a recent weight as an input, but never creates a weight log.
-   */
+  async getCalculationContext(userId: string) {
+    const { data, error } = await supabase.rpc('get_body_composition_context');
+    if (error) throw error;
+    const context = data?.[0];
+    if (!context || context.user_id !== userId) throw new Error('SNAPSHOT_OWNER_MISMATCH');
+    return context;
+  },
+  async getInputRevision(userId: string): Promise<number> {
+    return (await this.getCalculationContext(userId)).revision;
+  },
+
   async recalculateBestCompositionForDate(
     userId: string,
-    targetDateInput: Date | string = new Date(),
+    targetDateInput?: Date | string,
   ): Promise<RecalculateDailyCompositionResult> {
-    try {
-      const targetDate = typeof targetDateInput === 'string' ? new Date(targetDateInput) : targetDateInput;
-      const calculatedForDate = toLocalDateString(targetDate);
-      const windowStart = addDays(targetDate, -RECENT_BODY_COMPOSITION_WINDOW_DAYS + 1).toISOString();
-      const windowEnd = endOfLocalDay(targetDate).toISOString();
-
-      const profile = await this.getUserProfile(userId);
-      if (!profile || !profile.height_cm) {
-        return { success: false, reason: 'height_missing' };
+    // Read revision before every input. A concurrent change makes the commit fail,
+    // including imports from another device and profile changes during calculation.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const context = await this.getCalculationContext(userId);
+      const revision = context.revision;
+      const now = new Date(context.server_now);
+      const targetDate = targetDateInput === undefined ? now : dateInput(targetDateInput);
+      if (!Number.isFinite(targetDate.getTime()) || localDate(targetDate) > localDate(now)) {
+        return { success: false, reason: 'future_date' };
       }
-
-      const [{ data: weightRows, error: weightError }, { data: measurementRows, error: measurementError }] =
-        await Promise.all([
-          supabase
-            .from('weight_logs')
-            .select('id, measured_at, weight_kg')
-            .eq('user_id', userId)
-            .gte('measured_at', windowStart)
-            .lt('measured_at', windowEnd)
-            .order('measured_at', { ascending: false }),
-          supabase
-            .from('body_measurements')
-            .select('measurement_type, measured_at, value_cm')
-            .eq('user_id', userId)
-            .gte('measured_at', windowStart)
-            .lt('measured_at', windowEnd)
-            .order('measured_at', { ascending: false }),
-        ]);
-
-      if (weightError) throw weightError;
-      if (measurementError) throw measurementError;
-
-      const { data: existingComposition, error: existingError } = await supabase
-        .from('body_composition_logs')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('calculated_for_date', calculatedForDate)
-        .maybeSingle();
-
-      if (existingError) throw existingError;
-
-      const weights: DailyCompositionWeightLogInput[] = (weightRows ?? []).map(row => ({
-        id: row.id,
-        measuredAt: row.measured_at,
-        weightKg: row.weight_kg,
-      }));
+      const cutoff = new Date(Math.min(dateEnd(targetDate).getTime() - 1, now.getTime()));
+      const windowStart = new Date(cutoff.getTime() - RECENT_BODY_COMPOSITION_WINDOW_HOURS * 3600000).toISOString();
+      const [profile, weightsResult, measurementsResult] = await Promise.all([
+        this.getUserProfile(userId),
+        supabase
+          .from('weight_logs')
+          .select('id, measured_at, weight_kg')
+          .eq('user_id', userId)
+          .gte('measured_at', windowStart)
+          .lte('measured_at', cutoff.toISOString())
+          .order('measured_at', { ascending: false }),
+        supabase
+          .from('body_measurements')
+          .select('id, measurement_type, measured_at, value_cm, measurement_protocol')
+          .eq('user_id', userId)
+          .gte('measured_at', windowStart)
+          .lte('measured_at', cutoff.toISOString())
+          .order('measured_at', { ascending: false }),
+      ]);
+      if (weightsResult.error) throw weightsResult.error;
+      if (measurementsResult.error) throw measurementsResult.error;
       const measurements: DailyCompositionMeasurementInput[] = [];
-      (measurementRows ?? []).forEach(row => {
-        if (isBodyCompositionMeasurementType(row.measurement_type)) {
+      for (const row of measurementsResult.data ?? []) {
+        if (isBodyCompositionMeasurementType(row.measurement_type))
           measurements.push({
+            id: row.id,
             type: row.measurement_type,
             measuredAt: row.measured_at,
             valueCm: row.value_cm,
+            protocol: row.measurement_protocol,
           });
-        }
-      });
-
+      }
+      const sex = profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : null;
       const plan = planDailyBodyCompositionRecalculation({
         targetDate,
-        weights,
+        now,
+        weights: (weightsResult.data ?? []).map(row => ({
+          id: row.id,
+          measuredAt: row.measured_at,
+          weightKg: row.weight_kg,
+        })),
         measurements,
-        profile: {
-          heightCm: profile.height_cm,
-          age: this.calculateAge(profile.date_of_birth),
-          sex: profile.sex,
-        },
-        storedComposition:
-          existingComposition && existingComposition.calculation_status !== 'stale'
-            ? {
-                bodyfatPercent: existingComposition.bodyfat_percent,
-                bodyfatPrecisionLevel: existingComposition.bodyfat_precision_level,
-                muscleMassKg: existingComposition.muscle_mass_kg,
-                musclePrecisionLevel: existingComposition.muscle_precision_level,
-              }
-            : null,
+        profile: { heightCm: profile?.height_cm, age: ageAt(profile?.date_of_birth ?? null, cutoff), sex },
       });
-
-      const abdominalHealth = calculatePersistedAbdominalHealth({
-        heightCm: profile.height_cm,
+      const result = plan.result;
+      const abdominal = calculatePersistedAbdominalHealth({
+        heightCm: profile?.height_cm,
         weightKg: plan.weightKgUsed,
-        sex: profile.sex,
+        sex,
         measurements: plan.measurements,
       });
-      const typedExistingComposition = existingComposition as BodyCompositionLog | null;
-      const abdominalShouldReplace = shouldReplaceAbdominalHealth(abdominalHealth, typedExistingComposition);
-      const shouldUpsert = plan.shouldUpsert || abdominalShouldReplace;
-
-      if (!shouldUpsert) {
-        return { success: plan.reason !== 'missing_weight', unchanged: true, reason: plan.reason };
-      }
-
-      const payload = buildCompositionPayload(
-        userId,
-        calculatedForDate,
-        plan.sourceWeightLogId ?? null,
-        plan.weightKgUsed ?? null,
-        plan.result ?? null,
-        abdominalHealth,
-        typedExistingComposition,
-        plan.bodyfatShouldReplace,
-        plan.muscleShouldReplace,
-        abdominalShouldReplace,
-        {
+      const fat = result?.bodyFat;
+      const muscle = result?.muscle;
+      const heightRatio = abdominal.waistToHeight;
+      const hipRatio = abdominal.waistToHip;
+      const payload: SnapshotInsert = {
+        user_id: userId,
+        calculated_for_date: localDate(targetDate),
+        input_revision: revision,
+        source_weight_log_id: plan.sourceWeightLogId ?? null,
+        weight_kg_used: plan.weightKgUsed ?? null,
+        bmi: result?.bmi?.value ?? null,
+        bodyfat_percent: fat?.percentage ?? null,
+        bodyfat_method: fat?.method ?? null,
+        bodyfat_precision_level: fat?.precisionLevel ?? null,
+        bodyfat_formula: fat?.formulaUsed ?? null,
+        bodyfat_inputs: fat?.inputsUsed ?? [],
+        muscle_mass_kg: muscle?.massKg ?? null,
+        muscle_percent: muscle?.percentage ?? null,
+        muscle_method: muscle?.method ?? null,
+        muscle_precision_level: muscle?.precisionLevel ?? null,
+        muscle_formula: muscle?.formulaUsed ?? null,
+        muscle_inputs: muscle?.inputsUsed ?? [],
+        waist_to_height_ratio: heightRatio?.value ?? null,
+        waist_to_height_category: heightRatio?.category ?? null,
+        waist_to_height_formula: heightRatio?.formula ?? null,
+        waist_to_height_inputs: heightRatio?.inputsUsed ?? [],
+        waist_to_hip_ratio: hipRatio?.value ?? null,
+        waist_to_hip_category: hipRatio?.category ?? null,
+        waist_to_hip_formula: hipRatio?.formula ?? null,
+        waist_to_hip_inputs: hipRatio?.inputsUsed ?? [],
+        calculation_version: VERSION,
+        calculation_status: result?.bmi && fat && muscle ? 'complete' : 'partial',
+        input_snapshot: {
+          inputRevision: revision,
+          asOf: cutoff.toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           sourceWeightLogId: plan.sourceWeightLogId ?? null,
+          weightMeasuredAt: weightsResult.data?.find(row => row.id === plan.sourceWeightLogId)?.measured_at ?? null,
           weightKg: plan.weightKgUsed ?? null,
-          heightCm: profile.height_cm,
-          age: this.calculateAge(profile.date_of_birth),
-          sex: profile.sex,
-          measurements: {
-            abdomen: plan.measurements.abdomen ?? null,
-            hips: plan.measurements.hips ?? null,
-            chest: plan.measurements.chest ?? null,
-            arm: plan.measurements.arm ?? null,
-            thigh: plan.measurements.thigh ?? null,
-          },
+          heightCm: profile?.height_cm ?? null,
+          age: ageAt(profile?.date_of_birth ?? null, cutoff),
+          sex,
+          measurements: plan.selectedMeasurements.map(row => ({
+            id: row.id ?? null,
+            createdAt: row.createdAt ?? null,
+            type: row.type,
+            measuredAt: row.measuredAt,
+            valueCm: row.valueCm,
+            protocol: row.protocol ?? null,
+          })),
         },
-      );
-
-      const { data: upsertedLog, error: upsertError } = await supabase
-        .from('body_composition_logs')
-        .upsert(payload, { onConflict: 'user_id,calculated_for_date' })
-        .select()
-        .single();
-
-      if (upsertError) throw upsertError;
-
-      if (plan.shouldUpdateWeightLog && plan.sourceWeightLogId) {
-        const weightUpdate: WeightLogUpdate = {};
-        if (plan.bodyfatShouldReplace && plan.result?.bodyFat) {
-          weightUpdate.bodyfat_percent = plan.result.bodyFat.percentage;
-        }
-        if (plan.muscleShouldReplace) {
-          weightUpdate.muscle_mass_kg = plan.result?.muscle?.massKg ?? null;
-        }
-
-        if (hasKeys(weightUpdate)) {
-          const { error: updateWeightError } = await supabase
-            .from('weight_logs')
-            .update(weightUpdate)
-            .eq('id', plan.sourceWeightLogId);
-
-          if (updateWeightError) throw updateWeightError;
-        }
-      }
-
-      return { success: true, log: upsertedLog as BodyCompositionLog };
-    } catch (error) {
-      console.error('[BodyComp] Error in recalculateBestCompositionForDate:', error);
-      return { success: false, reason: 'unexpected_error' };
+      };
+      const { data, error } = await supabase.rpc('commit_body_composition_snapshot', {
+        p_expected_revision: revision,
+        p_snapshot: payload,
+      });
+      if (error?.code === '40001') continue;
+      if (error) throw error;
+      return { success: true, log: data?.[0] };
     }
-  },
-
-  /**
-   * Recalculates body composition for a weight log entry.
-   * Kept for callers that only know a weight log changed.
-   */
-  async recalculateForWeight(
-    userId: string,
-    weightLogId: string,
-    _weightKg: number,
-    measuredAt?: string,
-  ): Promise<void> {
-    try {
-      let targetDate = measuredAt ? new Date(measuredAt) : null;
-
-      if (!targetDate) {
-        const { data, error } = await supabase
-          .from('weight_logs')
-          .select('measured_at')
-          .eq('user_id', userId)
-          .eq('id', weightLogId)
-          .maybeSingle();
-
-        if (error) throw error;
-        targetDate = data?.measured_at ? new Date(data.measured_at) : new Date();
-      }
-
-      await this.recalculateBestCompositionForDate(userId, targetDate);
-    } catch (error) {
-      console.error('[BodyComp] Error in recalculateForWeight:', error);
-    }
+    throw new Error('COMPOSITION_INPUTS_CHANGED');
   },
 
   async invalidateAndRecalculateFromInput(userId: string, measuredAt: string): Promise<void> {
-    const inputDate = new Date(measuredAt);
-    const startDate = toLocalDateString(inputDate);
-    const endDate = toLocalDateString(addDays(inputDate, RECENT_BODY_COMPOSITION_WINDOW_DAYS - 1));
-    const { data: affectedRows, error: readError } = await supabase
+    // DB triggers already invalidate old/new dates and erase stale results atomically.
+    const { data, error } = await supabase
       .from('body_composition_logs')
       .select('calculated_for_date')
       .eq('user_id', userId)
-      .gte('calculated_for_date', startDate)
-      .lte('calculated_for_date', endDate)
-      .order('calculated_for_date', { ascending: true });
-    if (readError) throw readError;
-    if (affectedRows?.length) {
-      const { error: staleError } = await supabase
-        .from('body_composition_logs')
-        .update({ calculation_status: 'stale' })
-        .eq('user_id', userId)
-        .gte('calculated_for_date', startDate)
-        .lte('calculated_for_date', endDate);
-      if (staleError) throw staleError;
-    }
-    const datesToRecalculate = new Set([startDate, ...(affectedRows ?? []).map(row => row.calculated_for_date)]);
-    for (const date of datesToRecalculate) {
-      await this.recalculateBestCompositionForDate(userId, `${date}T12:00:00`);
-    }
+      .eq('calculation_status', 'stale');
+    if (error) throw error;
+    const dates = new Set([localDate(new Date(measuredAt)), ...(data ?? []).map(row => row.calculated_for_date)]);
+    for (const date of dates) await this.recalculateBestCompositionForDate(userId, date);
   },
 
-  async repairIncompleteSnapshots(userId: string, dates: string[]): Promise<void> {
-    for (const date of dates) {
-      await this.recalculateBestCompositionForDate(userId, `${date}T12:00:00`);
-    }
-  },
-
-  /**
-   * Recalculates body fat for the latest weight log.
-   */
-  async recalculateLatestWeight(userId: string): Promise<void> {
-    try {
-      const { data: weightLog, error } = await supabase
-        .from('weight_logs')
-        .select('measured_at')
-        .eq('user_id', userId)
-        .order('measured_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!weightLog) return;
-
-      await this.recalculateBestCompositionForDate(userId, new Date(weightLog.measured_at));
-    } catch (error) {
-      console.error('[BodyComp] Error in recalculateLatestWeight:', error);
-    }
-  },
-
-  async getLatestBodyCompositionLog(userId: string): Promise<BodyCompositionLog | null> {
+  async refreshSnapshots(userId: string, limit = 100, onHistoricalRepair?: () => void): Promise<BodyCompositionLog[]> {
+    const context = await this.getCalculationContext(userId);
+    const serverNow = new Date(context.server_now);
     const { data, error } = await supabase
       .from('body_composition_logs')
       .select('*')
       .eq('user_id', userId)
       .order('calculated_for_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
+      .limit(limit);
     if (error) throw error;
-    return data as BodyCompositionLog | null;
-  },
-
-  /**
-   * Get full body composition for display (used by hooks)
-   */
-  async getBodyComposition(userId: string, weightKg: number): Promise<BodyCompositionResult | null> {
-    try {
-      const profile = await this.getUserProfile(userId);
-      if (!profile || !profile.height_cm) return null;
-
-      const measurements = await this.getAllLatestMeasurements(userId);
-      const age = this.calculateAge(profile.date_of_birth);
-      const sex = profile.sex;
-      if (!age || (sex !== 'male' && sex !== 'female')) return null;
-
-      return calculateBodyComposition({
-        weightKg,
-        heightCm: profile.height_cm,
-        age,
-        sex,
-        measurements: {
-          abdomen: measurements.abdomen,
-          hips: measurements.hips,
-          chest: measurements.chest,
-          arm: measurements.arm,
-          thigh: measurements.thigh,
-        },
-      });
-    } catch (error) {
-      console.error('[BodyComp] Error in getBodyComposition:', error);
-      return null;
+    const [weights, measurements] = await Promise.all([
+      supabase
+        .from('weight_logs')
+        .select('measured_at')
+        .eq('user_id', userId)
+        .lte('measured_at', context.server_now)
+        .order('measured_at', { ascending: false })
+        .limit(limit),
+      supabase
+        .from('body_measurements')
+        .select('measured_at')
+        .eq('user_id', userId)
+        .lte('measured_at', context.server_now)
+        .order('measured_at', { ascending: false })
+        .limit(limit),
+    ]);
+    if (weights.error) throw weights.error;
+    if (measurements.error) throw measurements.error;
+    const storedDates = new Set((data ?? []).map(row => row.calculated_for_date));
+    const dates = new Set(
+      (data ?? [])
+        .filter(row => row.calculated_for_date <= localDate(serverNow))
+        .filter(row => row.calculation_status === 'stale' || row.calculation_version !== VERSION)
+        .map(row => row.calculated_for_date),
+    );
+    // Always refresh today on hydration: input expiry and imports may create no snapshot.
+    for (const row of [...weights.data, ...measurements.data]) {
+      const date = localDate(new Date(row.measured_at));
+      if (!storedDates.has(date)) dates.add(date);
     }
+    const today = localDate(serverNow);
+    await this.recalculateBestCompositionForDate(userId, today);
+    dates.delete(today);
+    // Current results are returned promptly; history repairs use bounded batches.
+    if (dates.size && !historicalRepairUsers.has(userId)) {
+      historicalRepairUsers.add(userId);
+      const pendingDates = [...dates].sort().reverse();
+      void (async () => {
+        for (let offset = 0; offset < pendingDates.length; offset += 4) {
+          await Promise.all(
+            pendingDates.slice(offset, offset + 4).map(date => this.recalculateBestCompositionForDate(userId, date)),
+          );
+        }
+        onHistoricalRepair?.();
+      })()
+        .catch(error => console.error('[BodyComp] Historical repair failed', error))
+        .finally(() => historicalRepairUsers.delete(userId));
+    }
+    const { data: fresh, error: freshError } = await supabase
+      .from('body_composition_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .neq('calculation_status', 'stale')
+      .lte('calculated_for_date', localDate(serverNow))
+      .order('calculated_for_date', { ascending: false })
+      .limit(limit);
+    if (freshError) throw freshError;
+    return fresh;
   },
 
-  async getUserProfile(userId: string): Promise<UserProfile | null> {
+  async repairIncompleteSnapshots(userId: string, dates: string[]): Promise<void> {
+    for (const date of dates) await this.recalculateBestCompositionForDate(userId, date);
+  },
+  async recalculateForWeight(userId: string, _id: string, _weightKg: number, measuredAt?: string): Promise<void> {
+    await this.invalidateAndRecalculateFromInput(userId, measuredAt ?? new Date().toISOString());
+  },
+  async recalculateLatestWeight(userId: string): Promise<void> {
+    await this.refreshSnapshots(userId);
+  },
+  async getLatestBodyCompositionLog(userId: string): Promise<BodyCompositionLog | null> {
+    return (await this.refreshSnapshots(userId, 1))[0] ?? null;
+  },
+  async getUserProfile(userId: string) {
     const { data, error } = await supabase
       .from('users')
       .select('height_cm, date_of_birth, sex')
       .eq('id', userId)
       .single();
-
-    if (error) return null;
-    return data as UserProfile;
+    if (error) throw error;
+    return data;
   },
-
-  /**
-   * Get ALL latest measurements for body composition algorithms.
-   */
-  async getAllLatestMeasurements(userId: string): Promise<AllMeasurements> {
-    const relevantTypes: MeasurementType[] = ['abdomen', 'hips', 'chest', 'arm', 'thigh'];
-    const measurements: AllMeasurements = {};
-
-    const now = new Date();
-    const windowStart = addDays(now, -RECENT_BODY_COMPOSITION_WINDOW_DAYS + 1).toISOString();
-
-    const { data, error } = await supabase
-      .from('body_measurements')
-      .select('measurement_type, value_cm, measured_at')
-      .eq('user_id', userId)
-      .in('measurement_type', relevantTypes)
-      .gte('measured_at', windowStart)
-      .lt('measured_at', endOfLocalDay(now).toISOString())
-      .order('measured_at', { ascending: false });
-
-    if (error || !data) return measurements;
-
-    data.forEach(row => {
-      if (!measurements[row.measurement_type]) {
-        measurements[row.measurement_type] = row.value_cm;
-      }
-    });
-
-    return measurements;
-  },
-
   calculateAge(dateOfBirth: string | null): number | null {
-    if (!dateOfBirth) return null;
-    const birth = new Date(dateOfBirth);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
-    return age;
+    return ageAt(dateOfBirth, new Date());
   },
-
-  /**
-   * Count how many composition recalculations were updated today.
-   */
-  async getTodayRecalculationCount(userId: string): Promise<number> {
-    const today = new Date();
-    const startOfDay = startOfLocalDay(today).toISOString();
-    const endOfDay = endOfLocalDay(today).toISOString();
-
-    const { count, error } = await supabase
-      .from('body_composition_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .gte('composition_calculated_at', startOfDay)
-      .lt('composition_calculated_at', endOfDay);
-
-    if (error) {
-      console.error('[BodyComp] Error counting today recalculations:', error);
-      return 0;
-    }
-
-    return count || 0;
-  },
-
-  /**
-   * Manual recalculation with daily limit (max 2 per day).
-   */
   async manualRecalculate(userId: string): Promise<ManualRecalculateResult> {
-    const MAX_DAILY_RECALCULATIONS = 2;
-
     try {
-      const todayCount = await this.getTodayRecalculationCount(userId);
-      if (todayCount >= MAX_DAILY_RECALCULATIONS) {
-        return {
-          success: false,
-          errorCode: 'limit_reached',
-          errorValues: { count: MAX_DAILY_RECALCULATIONS },
-        };
-      }
-
-      const result = await this.recalculateBestCompositionForDate(userId, new Date());
-
-      if (result.reason === 'missing_weight') {
-        return { success: false, errorCode: 'weight_missing' };
-      }
-      if (result.reason === 'height_missing' || result.reason === 'missing_profile') {
-        return { success: false, errorCode: 'height_missing' };
-      }
-      if (result.reason === 'missing_bodyfat') {
-        return { success: false, errorCode: 'insufficient_data' };
-      }
-      if (!result.success) {
-        return { success: false, errorCode: 'unexpected_error' };
-      }
-
-      return { success: true, unchanged: result.unchanged };
-    } catch (error) {
-      console.error('[BodyComp] Error in manualRecalculate:', error);
-      return {
-        success: false,
-        errorCode: 'unexpected_error',
-      };
+      await this.recalculateBestCompositionForDate(userId);
+      return { success: true };
+    } catch {
+      return { success: false, errorCode: 'unexpected_error' };
     }
   },
-
-  /**
-   * Called after measurements are inserted.
-   * It recalculates composition for the target day without creating weight logs.
-   */
-  async checkAndTriggerRecalculateForMeasurements(userId: string, dateStr: string): Promise<void> {
-    const targetDate = new Date(`${dateStr}T12:00:00`);
-    await this.recalculateBestCompositionForDate(userId, targetDate);
+  async checkAndTriggerRecalculateForMeasurements(userId: string, date: string): Promise<void> {
+    await this.invalidateAndRecalculateFromInput(userId, dateInput(date).toISOString());
   },
 };

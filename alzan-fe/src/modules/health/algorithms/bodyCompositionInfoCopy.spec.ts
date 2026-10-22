@@ -75,15 +75,15 @@ test('English formulas keep readable factor notes', () => {
   assert.doesNotMatch(formula, /\bfemale\s*\+/i);
 });
 
-test('body fat tips recommend abdomen unless RFM is already active', () => {
+test('body fat tips explain waist protocol without promising universal precision', () => {
   const basicTip = getBodyFatPrecisionTip('cun_bae', tEs);
   const baiTip = getBodyFatPrecisionTip('bai', tEs);
   const rfmTip = getBodyFatPrecisionTip('rfm', tEs);
 
-  assert.match(basicTip.body, /Añade abdomen/);
-  assert.match(baiTip.body, /Añade abdomen/);
-  assert.match(rfmTip.title, /grasa corporal/);
-  assert.match(rfmTip.body, /no necesitas cadera/i);
+  assert.match(basicTip.body, /cintura medida correctamente/);
+  assert.match(baiTip.body, /cintura medida correctamente/);
+  assert.match(rfmTip.title, /cintura/);
+  assert.match(rfmTip.body, /no mejora automáticamente/i);
 });
 
 test('muscle tips ask for abdomen and hip only until Al-Gindan is active', () => {
@@ -91,8 +91,8 @@ test('muscle tips ask for abdomen and hip only until Al-Gindan is active', () =>
   const alGindanTip = getMusclePrecisionTip('al_gindan', tEs);
 
   assert.match(leeTip.body, /abdomen y cadera/i);
-  assert.match(alGindanTip.title, /músculo estimado/i);
-  assert.match(alGindanTip.body, /abdomen y cadera/i);
+  assert.match(alGindanTip.title, /muscular antropométrica/i);
+  assert.match(alGindanTip.body, /no una medición directa/i);
   assert.doesNotMatch(alGindanTip.body, /pecho.*brazo.*muslo/i);
 });
 

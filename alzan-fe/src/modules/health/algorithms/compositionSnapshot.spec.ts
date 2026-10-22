@@ -11,7 +11,7 @@ const fallback = calculateBodyComposition({
   heightCm: 175,
   age: 25,
   sex: 'male',
-  measurements: { abdomen: 82.8, hips: 92.8 },
+  measurements: { waist: 82.8, abdomen: 82.8, hips: 92.8 },
 });
 
 const partialPersisted = {
@@ -29,13 +29,13 @@ const partialPersisted = {
   weight_kg_used: 73.6,
 };
 
-function assertPartialRowsDoNotMaskCalculatedComposition(): void {
+function assertNullSnapshotsDoNotReviveFallback(): void {
   const actual = mergePersistedCompositionResult(partialPersisted, fallback, 'male');
 
-  assert.equal(actual.bodyFat?.percentage, 21.7);
-  assert.equal(actual.bodyFat?.method, 'rfm');
-  assert.equal(actual.muscle?.percentage, 43.9);
-  assert.equal(actual.muscle?.massKg, 32.3);
+  assert.equal(actual.bodyFat, null);
+  assert.equal(actual.muscle, null);
+  assert.equal(actual.fatMassKg, null);
+  assert.equal(actual.muscleMassKg, null);
 }
 
 function assertPersistedMetricsStillWinIndividually(): void {
@@ -54,7 +54,7 @@ function assertPersistedMetricsStillWinIndividually(): void {
 
   assert.equal(actual.bodyFat?.percentage, 18.4);
   assert.equal(actual.bodyFat?.method, 'measured');
-  assert.equal(actual.muscle?.percentage, 43.9);
+  assert.equal(actual.muscle, null);
 }
 
 function assertStaleSnapshotsNeverOverrideRecalculation(): void {
@@ -125,8 +125,33 @@ function assertPersistedHistoryOwnsCompositionDeltas(): void {
   });
 }
 
-assertPartialRowsDoNotMaskCalculatedComposition();
+assertNullSnapshotsDoNotReviveFallback();
 assertPersistedMetricsStillWinIndividually();
 assertStaleSnapshotsNeverOverrideRecalculation();
 assertDeltasRequireComparableSnapshots();
 assertPersistedHistoryOwnsCompositionDeltas();
+
+const weightless = mergePersistedCompositionResult(
+  {
+    ...partialPersisted,
+    weight_kg_used: null,
+    bodyfat_percent: 24,
+    bodyfat_method: 'rfm',
+    bodyfat_precision_level: 3,
+    bodyfat_inputs: ['height', 'sex', 'waist'],
+  },
+  fallback,
+  'male',
+);
+assert.equal(weightless.bodyFat?.percentage, 24);
+assert.deepEqual(weightless.bodyFat?.inputsUsed, ['height', 'sex', 'waist']);
+assert.equal(weightless.fatMassKg, null);
+assert.equal(weightless.leanMassKg, null);
+assert.equal(weightless.residualMassKg, null);
+const sexless = mergePersistedCompositionResult(
+  { ...partialPersisted, bodyfat_percent: 24, bodyfat_method: 'bai' },
+  fallback,
+);
+assert.equal(sexless.bodyFat?.percentage, 24);
+assert.equal(sexless.bodyFat?.category, null);
+console.log('Composition snapshot authoritative nulls, compatible masses, and deltas passed');

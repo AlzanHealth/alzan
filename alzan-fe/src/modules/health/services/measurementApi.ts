@@ -2,97 +2,68 @@ import { supabase } from '../../../lib/supabaseClient';
 import { BodyMeasurement, BodyMeasurementInsert, MeasurementType } from '../../../types/requests.types';
 
 export const measurementApi = {
-  async getMeasurements(userId: string, type?: MeasurementType | MeasurementType[], limit = 30) {
-    console.log('[measurementApi.getMeasurements] Iniciando - userId:', userId, 'type:', type, 'limit:', limit);
-    try {
-      let query = supabase
-        .from('body_measurements')
-        .select('*')
-        .eq('user_id', userId)
-        .order('measured_at', { ascending: false })
-        .limit(limit);
+  async getMeasurements(
+    userId: string,
+    type?: MeasurementType | MeasurementType[],
+    limit = 30,
+    protocol?: string | null,
+  ) {
+    let query = supabase
+      .from('body_measurements')
+      .select('*')
+      .eq('user_id', userId)
+      .order('measured_at', { ascending: false })
+      .limit(limit);
 
-      if (type) {
-        if (Array.isArray(type)) {
-          query = query.in('measurement_type', type);
-        } else {
-          query = query.eq('measurement_type', type);
-        }
+    if (type) {
+      if (Array.isArray(type)) {
+        query = query.in('measurement_type', type);
+      } else {
+        query = query.eq('measurement_type', type);
       }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('[measurementApi.getMeasurements] Error:', error);
-        throw error;
-      }
-      console.log('[measurementApi.getMeasurements] Éxito - registros:', data?.length);
-      return data as BodyMeasurement[];
-    } catch (err) {
-      console.error('[measurementApi.getMeasurements] Exception:', err);
-      throw err;
     }
+
+    if (protocol !== undefined) {
+      query = protocol === null ? query.is('measurement_protocol', null) : query.eq('measurement_protocol', protocol);
+    }
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+    return data as BodyMeasurement[];
   },
 
   async addMeasurement(measurement: Omit<BodyMeasurementInsert, 'id'>) {
-    console.log(
-      '[measurementApi.addMeasurement] Iniciando - type:',
-      measurement.measurement_type,
-      'value:',
-      measurement.value_cm,
-    );
-    try {
-      const { data, error } = await supabase.from('body_measurements').insert(measurement).select().single();
+    const { data, error } = await supabase.from('body_measurements').insert(measurement).select().single();
 
-      if (error) {
-        console.error('[measurementApi.addMeasurement] Error:', error);
-        throw error;
-      }
-      console.log('[measurementApi.addMeasurement] Éxito - id:', data?.id);
-      return data as BodyMeasurement;
-    } catch (err) {
-      console.error('[measurementApi.addMeasurement] Exception:', err);
-      throw err;
+    if (error) {
+      throw error;
     }
+    return data as BodyMeasurement;
   },
 
   async updateMeasurement(id: string, updates: Partial<BodyMeasurement>) {
-    console.log('[measurementApi.updateMeasurement] Iniciando - id:', id, 'updates:', Object.keys(updates));
-    try {
-      const { data, error } = await supabase.from('body_measurements').update(updates).eq('id', id).select().single();
+    const { data, error } = await supabase.from('body_measurements').update(updates).eq('id', id).select().single();
 
-      if (error) {
-        console.error('[measurementApi.updateMeasurement] Error:', error);
-        throw error;
-      }
-      console.log('[measurementApi.updateMeasurement] Éxito');
-      return data as BodyMeasurement;
-    } catch (err) {
-      console.error('[measurementApi.updateMeasurement] Exception:', err);
-      throw err;
+    if (error) {
+      throw error;
     }
+    return data as BodyMeasurement;
   },
 
   async deleteMeasurement(id: string) {
-    console.log('[measurementApi.deleteMeasurement] Iniciando - id:', id);
-    try {
-      const { data, error } = await supabase
-        .from('body_measurements')
-        .delete()
-        .eq('id', id)
-        .select('user_id, measured_at')
-        .single();
+    const { data, error } = await supabase
+      .from('body_measurements')
+      .delete()
+      .eq('id', id)
+      .select('user_id, measured_at')
+      .single();
 
-      if (error) {
-        console.error('[measurementApi.deleteMeasurement] Error:', error);
-        throw error;
-      }
-      console.log('[measurementApi.deleteMeasurement] Éxito');
-      return data;
-    } catch (err) {
-      console.error('[measurementApi.deleteMeasurement] Exception:', err);
-      throw err;
+    if (error) {
+      throw error;
     }
+    return data;
   },
 
   /**
@@ -102,11 +73,16 @@ export const measurementApi = {
    * @param date Date to check (will compare only the day part)
    * @returns true if exists, false otherwise
    */
-  async checkExistsForDay(userId: string, measurementType: MeasurementType, date: Date): Promise<boolean> {
+  async checkExistsForDay(
+    userId: string,
+    measurementType: MeasurementType,
+    date: Date,
+    protocol?: string | null,
+  ): Promise<boolean> {
     const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString();
     const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).toISOString();
 
-    const { count, error } = await supabase
+    let query = supabase
       .from('body_measurements')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
@@ -114,10 +90,14 @@ export const measurementApi = {
       .gte('measured_at', startOfDay)
       .lt('measured_at', endOfDay);
 
-    if (error) {
-      console.error('[measurementApi.checkExistsForDay] Error:', error);
-      return false;
+    if (measurementType === 'abdomen' && protocol === 'abdomen_navel') {
+      query = query.or('measurement_protocol.eq.abdomen_navel,measurement_protocol.is.null');
+    } else {
+      query = protocol ? query.eq('measurement_protocol', protocol) : query.is('measurement_protocol', null);
     }
+    const { count, error } = await query;
+
+    if (error) throw error;
 
     return (count || 0) > 0;
   },

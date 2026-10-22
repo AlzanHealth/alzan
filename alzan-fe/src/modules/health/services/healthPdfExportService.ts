@@ -1,3 +1,4 @@
+import { getMeasurementLabelKey, measurementSeriesKey } from '../helpers/measurementProtocols';
 import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -9,7 +10,7 @@ import { generateDailyProgressHtml } from '../../nutrition/services/dailyProgres
 import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import i18n from '../../../i18n';
 import { TranslationKey } from '../../../i18n/locales/en';
-import { DistanceUnit, MeasurementType, Row, User, WeightUnit } from '../../../types/requests.types';
+import { DistanceUnit, Row, User, WeightUnit } from '../../../types/requests.types';
 import { convertLengthToUi, convertWeightToUi } from '../../../utils/unitConversionUtils';
 import iconSource from '../../../../assets/icon.png';
 import { buildCompositionDeltas } from '../algorithms/compositionSnapshot';
@@ -72,18 +73,6 @@ const t = (key: TranslationKey, options?: Record<string, string | number>) => St
 const isEnglish = () => i18n.language?.startsWith('en');
 const getPdfDatePattern = () => (isEnglish() ? 'MMMM d, yyyy' : 'd MMMM yyyy');
 const getPdfDateTimePattern = () => (isEnglish() ? 'MMM d, HH:mm' : 'd MMM, HH:mm');
-
-const MEASUREMENT_LABEL_KEYS: Record<MeasurementType, TranslationKey> = {
-  waist: 'health.waist',
-  chest: 'health.chest',
-  hips: 'health.hips',
-  thigh: 'health.thigh',
-  arm: 'health.arm',
-  calf: 'health.calf',
-  neck: 'health.neck',
-  shoulders: 'health.shoulders',
-  abdomen: 'health.abdomen',
-};
 
 const loadAssetAsBase64 = async (module: number): Promise<string | null> => {
   try {
@@ -249,13 +238,11 @@ const renderTable = (headers: string[], rows: string[][], emptyLabel: string): s
   `;
 };
 
-const getLatestMeasurementByType = (
-  measurements: BodyMeasurement[],
-): Partial<Record<MeasurementType, BodyMeasurement>> => {
-  return measurements.reduce<Partial<Record<MeasurementType, BodyMeasurement>>>((acc, measurement) => {
-    const current = acc[measurement.measurement_type];
+const getLatestMeasurementByType = (measurements: BodyMeasurement[]): Record<string, BodyMeasurement> => {
+  return measurements.reduce<Record<string, BodyMeasurement>>((acc, measurement) => {
+    const current = acc[measurementSeriesKey(measurement)];
     if (!current || measurement.measured_at > current.measured_at) {
-      acc[measurement.measurement_type] = measurement;
+      acc[measurementSeriesKey(measurement)] = measurement;
     }
     return acc;
   }, {});
@@ -304,6 +291,7 @@ export const generateHealthPDF = async ({
       supabase
         .from('body_composition_logs')
         .select('*')
+        .neq('calculation_status', 'stale')
         .eq('user_id', user.id)
         .gte('calculated_for_date', startDate)
         .lte('calculated_for_date', endDate)
@@ -577,13 +565,13 @@ export const generateHealthPDF = async ({
 
     const measurementRows = measurements.map(measurement => [
       formatDateTime(measurement.measured_at),
-      t(MEASUREMENT_LABEL_KEYS[measurement.measurement_type]),
+      t(getMeasurementLabelKey(measurement)),
       convertLengthToUi(measurement.value_cm, distanceUnit, 1).label,
     ]);
 
     const latestMeasurements = getLatestMeasurementByType(measurements);
-    const latestMeasurementRows = Object.entries(latestMeasurements).map(([type, measurement]) => [
-      t(MEASUREMENT_LABEL_KEYS[type as MeasurementType]),
+    const latestMeasurementRows = Object.values(latestMeasurements).map(measurement => [
+      t(getMeasurementLabelKey(measurement)),
       convertLengthToUi(measurement.value_cm, distanceUnit, 1).label,
       format(parseISO(measurement.measured_at), datePattern, { locale: dateLocale }),
     ]);
@@ -675,8 +663,7 @@ export const generateHealthPDF = async ({
             lines.push(
               `${t('health.measurements')}: ${bucket.measurements
                 .map(
-                  log =>
-                    `${t(MEASUREMENT_LABEL_KEYS[log.measurement_type])} ${convertLengthToUi(log.value_cm, distanceUnit, 1).label}`,
+                  log => `${t(getMeasurementLabelKey(log))} ${convertLengthToUi(log.value_cm, distanceUnit, 1).label}`,
                 )
                 .join(' · ')}`,
             );

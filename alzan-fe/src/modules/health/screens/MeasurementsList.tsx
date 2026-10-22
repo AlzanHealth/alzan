@@ -8,18 +8,12 @@ import { ChevronRight, Plus } from 'lucide-react-native';
 import { useMeasurements } from '../hooks/useMeasurements';
 import { useHealthStyles } from '../../../hooks/useHealthStyles';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MeasurementType } from '../../../types/requests.types';
+import {
+  MEASUREMENT_SELECTIONS,
+  matchesMeasurementSeries,
+  MeasurementSelection,
+} from '../helpers/measurementProtocols';
 import { useTranslation } from 'react-i18next';
-
-type Measurements = { key: MeasurementType; label: string };
-
-const MEASUREMENT_TYPES: Measurements[] = [
-  { key: 'abdomen', label: 'Abdomen' },
-  { key: 'hips', label: 'Cadera' },
-  { key: 'chest', label: 'Pecho' },
-  { key: 'arm', label: 'Brazo' },
-  { key: 'thigh', label: 'Muslo' },
-];
 
 export const MeasurementsList = () => {
   const { t } = useTranslation();
@@ -27,23 +21,29 @@ export const MeasurementsList = () => {
   const { data: allMeasurements } = useMeasurements();
   const { styles: dynamicStyles, colors: themeColors } = useHealthStyles();
 
-  const getLatestValue = (type: MeasurementType) => {
+  const getLatestValue = (selection: MeasurementSelection) => {
     if (!allMeasurements) return null;
-    const typeMeas = allMeasurements.filter(m => m.measurement_type === type);
+    const typeMeas = allMeasurements.filter(m => matchesMeasurementSeries(m, selection.key, selection.protocol));
     if (typeMeas.length === 0) return null;
     // Sort DESC
     return typeMeas.sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime())[0];
   };
 
-  const renderItem = ({ item }: { item: Measurements }) => {
-    const latest = getLatestValue(item.key);
+  const renderItem = ({ item }: { item: MeasurementSelection }) => {
+    const latest = getLatestValue(item);
     return (
       <TouchableOpacity
         style={[styles.item, dynamicStyles.glassCard]}
-        onPress={() => navigation.navigate('MeasurementDetail', { type: item.key, label: item.label })}
+        onPress={() =>
+          navigation.navigate('MeasurementDetail', {
+            type: item.key,
+            protocol: item.protocol,
+            label: String(t(item.labelKey)),
+          })
+        }
       >
         <View>
-          <Text style={[styles.label, dynamicStyles.title]}>{item.label}</Text>
+          <Text style={[styles.label, dynamicStyles.title]}>{String(t(item.labelKey))}</Text>
           <Text style={[styles.value, dynamicStyles.subtitle]}>{latest ? `${latest.value_cm} cm` : '--'}</Text>
           {latest && (
             <Text style={[styles.date, dynamicStyles.subtitle]}>
@@ -70,9 +70,17 @@ export const MeasurementsList = () => {
         </View>
 
         <FlatList
-          data={MEASUREMENT_TYPES}
+          data={[
+            ...MEASUREMENT_SELECTIONS,
+            ...(allMeasurements?.some(m => m.measurement_type === 'arm' && !m.measurement_protocol)
+              ? [{ ...MEASUREMENT_SELECTIONS[4], protocol: null, labelKey: 'health.armUnspecified' as const }]
+              : []),
+            ...(allMeasurements?.some(m => m.measurement_type === 'waist' && !m.measurement_protocol)
+              ? [{ ...MEASUREMENT_SELECTIONS[0], protocol: null, labelKey: 'health.waistUnspecified' as const }]
+              : []),
+          ]}
           renderItem={renderItem}
-          keyExtractor={item => item.key}
+          keyExtractor={item => `${item.key}:${item.protocol}`}
           contentContainerStyle={styles.content}
         />
       </SafeAreaView>

@@ -176,12 +176,15 @@ export type HealthStackParamList = {
   BodyCompositionDetail: undefined;
   MeasurementsList: undefined;
   MeasurementDetail: {
+    protocol?: string | null;
     measurementType?: MeasurementType;
     type?: MeasurementType;
     label?: string;
     defaultType?: MeasurementType;
   };
-  MeasurementAdd: { measurementType?: string; date?: string; defaultType?: MeasurementType } | undefined;
+  MeasurementAdd:
+    | { measurementType?: string; date?: string; defaultType?: MeasurementType; defaultProtocol?: string | null }
+    | undefined;
   SleepList: undefined;
   SleepAdd: undefined;
   RestingHRList: undefined;

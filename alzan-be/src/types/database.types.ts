@@ -984,6 +984,29 @@ export type Database = {
           },
         ];
       };
+      body_composition_input_revisions: {
+        Row: {
+          revision: number;
+          user_id: string;
+        };
+        Insert: {
+          revision?: number;
+          user_id: string;
+        };
+        Update: {
+          revision?: number;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'body_composition_input_revisions_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       body_composition_logs: {
         Row: {
           bmi: number | null;
@@ -998,6 +1021,7 @@ export type Database = {
           composition_calculated_at: string;
           created_at: string;
           id: string;
+          input_revision: number;
           input_snapshot: Json;
           muscle_formula: string | null;
           muscle_inputs: Json;
@@ -1031,6 +1055,7 @@ export type Database = {
           composition_calculated_at?: string;
           created_at?: string;
           id?: string;
+          input_revision?: number;
           input_snapshot?: Json;
           muscle_formula?: string | null;
           muscle_inputs?: Json;
@@ -1064,6 +1089,7 @@ export type Database = {
           composition_calculated_at?: string;
           created_at?: string;
           id?: string;
+          input_revision?: number;
           input_snapshot?: Json;
           muscle_formula?: string | null;
           muscle_inputs?: Json;
@@ -1105,6 +1131,7 @@ export type Database = {
         Row: {
           id: string;
           measured_at: string;
+          measurement_protocol: string | null;
           measurement_type: Database['public']['Enums']['measurement_type_enum'];
           notes: string | null;
           user_id: string;
@@ -1113,6 +1140,7 @@ export type Database = {
         Insert: {
           id?: string;
           measured_at?: string;
+          measurement_protocol?: string | null;
           measurement_type: Database['public']['Enums']['measurement_type_enum'];
           notes?: string | null;
           user_id: string;
@@ -1121,6 +1149,7 @@ export type Database = {
         Update: {
           id?: string;
           measured_at?: string;
+          measurement_protocol?: string | null;
           measurement_type?: Database['public']['Enums']['measurement_type_enum'];
           notes?: string | null;
           user_id?: string;
@@ -5429,6 +5458,49 @@ export type Database = {
         };
         Returns: Json;
       };
+      commit_body_composition_snapshot: {
+        Args: { p_expected_revision: number; p_snapshot: Json };
+        Returns: {
+          bmi: number | null;
+          bodyfat_formula: string | null;
+          bodyfat_inputs: Json;
+          bodyfat_method: string | null;
+          bodyfat_percent: number | null;
+          bodyfat_precision_level: number | null;
+          calculated_for_date: string;
+          calculation_status: string;
+          calculation_version: number;
+          composition_calculated_at: string;
+          created_at: string;
+          id: string;
+          input_revision: number;
+          input_snapshot: Json;
+          muscle_formula: string | null;
+          muscle_inputs: Json;
+          muscle_mass_kg: number | null;
+          muscle_method: string | null;
+          muscle_percent: number | null;
+          muscle_precision_level: number | null;
+          source_weight_log_id: string | null;
+          updated_at: string;
+          user_id: string;
+          waist_to_height_category: string | null;
+          waist_to_height_formula: string | null;
+          waist_to_height_inputs: Json;
+          waist_to_height_ratio: number | null;
+          waist_to_hip_category: string | null;
+          waist_to_hip_formula: string | null;
+          waist_to_hip_inputs: Json;
+          waist_to_hip_ratio: number | null;
+          weight_kg_used: number | null;
+        }[];
+        SetofOptions: {
+          from: '*';
+          to: 'body_composition_logs';
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       complete_wearable_activity_import: {
         Args: {
           p_canonical_version: number;
@@ -5633,6 +5705,14 @@ export type Database = {
           isOneToOne: false;
           isSetofReturn: true;
         };
+      };
+      get_body_composition_context: {
+        Args: never;
+        Returns: {
+          revision: number;
+          server_now: string;
+          user_id: string;
+        }[];
       };
       get_exercise_catalog_usage_summaries: {
         Args: { p_exercise_ids: string[] };
