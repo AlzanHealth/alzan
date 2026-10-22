@@ -1709,8 +1709,12 @@ const en = {
     saveWeightErrorWithDetails: 'Could not save: {{message}}',
     noChangesTitle: 'No changes',
     noChangesMessage: 'Calculated values are the same as current ones. Nothing was modified.',
-    recalculateSuccessTitle: 'Done!',
-    recalculateSuccessMessage: 'Body composition values were updated with the latest measurements.',
+    recalculateSuccessTitle: 'Composition recalculated',
+    recalculateSuccessMessage:
+      'Body composition was recalculated with your latest data, and the available results were updated.',
+    compositionAlreadyCurrentTitle: 'Already up to date',
+    compositionAlreadyCurrentMessage:
+      'Your composition already uses the latest available data and the most precise method those data support. There is nothing new to recalculate right now.',
     cannotRecalculateTitle: 'Cannot recalculate',
     userNotFound: 'User was not found.',
     recalculateLimitError:

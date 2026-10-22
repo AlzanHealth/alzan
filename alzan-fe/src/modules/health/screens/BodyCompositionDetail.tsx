@@ -33,7 +33,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { HealthScreenNavigationProp } from '../../../types/navigation.types';
@@ -63,6 +63,7 @@ import { useUnitConversion } from '../../../hooks/useUnitConversion';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { CompositionInputKey } from '../algorithms/bodyComposition';
 import { getWaistToHeightRangeConfig, getWaistToHipRangeConfig } from '../algorithms/abdominalHealth';
+import { hasBodyCompositionChanged, hasCalculatedCompositionValues } from '../helpers/bodyCompositionRefresh';
 import {
   BMI_RANGES,
   BMI_BAR_CONFIG,
@@ -90,6 +91,7 @@ import {
 
 /** Type for info modal state - which metric is being explained */
 type InfoType = 'bmi' | 'bodyFat' | 'muscle' | 'remainder' | 'waistToHeight' | 'waistToHip' | 'recomposition' | null;
+type RecalculateNotice = 'current' | 'insufficient' | 'success' | 'error' | null;
 
 // ============================================================================
 // MAIN COMPONENT
@@ -122,22 +124,30 @@ export const BodyCompositionDetail = () => {
 
   /** Currently open info modal (null = closed) */
   const [infoModal, setInfoModal] = useState<InfoType>(null);
+  const [recalculateNotice, setRecalculateNotice] = useState<RecalculateNotice>(null);
 
   const isSpanish = i18n.resolvedLanguage?.startsWith('es') ?? false;
 
   const hasDemographicRanges = age !== null && age >= 20 && (profile?.sex === 'male' || profile?.sex === 'female');
   const isFemale = profile?.sex === 'female';
   const deltas = bodyComposition.deltas;
-  const canRecalculate =
-    bodyComposition.hasEnoughDataForBmi ||
-    bodyComposition.hasEnoughDataForBodyFat ||
-    bodyComposition.hasEnoughDataForMuscle ||
-    Object.values(bodyComposition.availableData).some(Boolean);
-
   const handleRecalculate = async () => {
-    if (!canRecalculate || compositionQuery.isFetching) return;
+    if (compositionQuery.isFetching) return;
+    const previousSnapshots = compositionQuery.data;
     const result = await compositionQuery.refetch();
-    if (result.isError) Alert.alert(t('common.error'), t('health.recalculateUnexpectedError'));
+    if (result.isError) {
+      setRecalculateNotice('error');
+      return;
+    }
+    if (!hasCalculatedCompositionValues(result.data)) {
+      setRecalculateNotice('insufficient');
+      return;
+    }
+    if (!hasBodyCompositionChanged(previousSnapshots, result.data)) {
+      setRecalculateNotice('current');
+      return;
+    }
+    setRecalculateNotice('success');
   };
 
   // =========================================================================
@@ -770,6 +780,64 @@ export const BodyCompositionDetail = () => {
     );
   };
 
+  const RecalculateNoticeModal = () => {
+    if (!recalculateNotice) return null;
+
+    const notice = recalculateNotice;
+    const noticeColor = notice === 'error' ? colors.danger : themeColors.primary;
+    const title =
+      notice === 'current'
+        ? t('health.compositionAlreadyCurrentTitle')
+        : notice === 'insufficient'
+          ? t('health.cannotRecalculateTitle')
+          : notice === 'success'
+            ? t('health.recalculateSuccessTitle')
+            : t('common.error');
+    const message =
+      notice === 'current'
+        ? t('health.compositionAlreadyCurrentMessage')
+        : notice === 'insufficient'
+          ? t('health.recalculateInsufficientData')
+          : notice === 'success'
+            ? t('health.recalculateSuccessMessage')
+            : t('health.recalculateUnexpectedError');
+    const NoticeIcon = notice === 'success' ? TrendingUp : notice === 'error' ? X : Info;
+
+    return (
+      <Modal
+        visible
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRecalculateNotice(null)}
+        statusBarTranslucent
+      >
+        <View style={styles.noticeModalOverlay}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setRecalculateNotice(null)}
+          />
+          <View style={[styles.noticeModalCard, dynamicStyles.modalContent]}>
+            <View style={[styles.noticeIcon, { backgroundColor: noticeColor + '20' }]}>
+              <NoticeIcon size={25} color={noticeColor} />
+            </View>
+            <Text style={[styles.noticeTitle, { color: themeColors.textPrimary }]}>{title}</Text>
+            <Text style={[styles.noticeMessage, { color: themeColors.textSecondary }]}>{message}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => setRecalculateNotice(null)}
+              style={[styles.noticeButton, { backgroundColor: themeColors.primary }]}
+            >
+              <Text style={[styles.noticeButtonText, { color: themeColors.white }]}>{t('common.gotIt')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   // --- METRIC CARD COMPONENT ---
   interface MetricCardProps {
     icon: LucideIcon;
@@ -850,6 +918,7 @@ export const BodyCompositionDetail = () => {
     <LinearGradient colors={dynamicStyles.gradientColors} style={styles.safeArea}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <InfoModal />
+        <RecalculateNoticeModal />
 
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -1230,16 +1299,16 @@ export const BodyCompositionDetail = () => {
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityState={{
-              disabled: !canRecalculate || compositionQuery.isFetching,
+              disabled: compositionQuery.isFetching,
               busy: compositionQuery.isFetching,
             }}
-            disabled={!canRecalculate || compositionQuery.isFetching}
+            disabled={compositionQuery.isFetching}
             onPress={() => void handleRecalculate()}
             style={[
               styles.recalculateButton,
               {
                 borderColor: themeColors.primary,
-                opacity: !canRecalculate || compositionQuery.isFetching ? 0.45 : 1,
+                opacity: compositionQuery.isFetching ? 0.45 : 1,
               },
             ]}
           >
@@ -1448,6 +1517,54 @@ const styles = StyleSheet.create({
   },
   // Modal
 
+  noticeModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.l,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+  },
+  noticeModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'center',
+    padding: spacing.xl,
+    borderRadius: borderRadius.l,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    elevation: 20,
+  },
+  noticeIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.m,
+  },
+  noticeTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  noticeMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginTop: spacing.s,
+  },
+  noticeButton: {
+    width: '100%',
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.m,
+    marginTop: spacing.l,
+  },
+  noticeButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',

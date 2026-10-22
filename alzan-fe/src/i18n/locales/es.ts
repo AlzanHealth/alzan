@@ -1733,8 +1733,12 @@ export default {
     saveWeightErrorWithDetails: 'No se pudo guardar: {{message}}',
     noChangesTitle: 'Sin cambios',
     noChangesMessage: 'Los valores calculados son iguales a los actuales. No se ha modificado nada.',
-    recalculateSuccessTitle: '¡Listo!',
-    recalculateSuccessMessage: 'Se han actualizado los valores de composición corporal con las medidas más recientes.',
+    recalculateSuccessTitle: 'Composición recalculada',
+    recalculateSuccessMessage:
+      'Hemos recalculado la composición corporal con tus datos más recientes y actualizado los resultados disponibles.',
+    compositionAlreadyCurrentTitle: 'Ya está al día',
+    compositionAlreadyCurrentMessage:
+      'La composición ya está calculada con los datos más recientes disponibles y el método más preciso compatible con ellos. No hay nada nuevo que recalcular ahora.',
     cannotRecalculateTitle: 'No se puede recalcular',
     userNotFound: 'No se encontró el usuario.',
     recalculateLimitError:
