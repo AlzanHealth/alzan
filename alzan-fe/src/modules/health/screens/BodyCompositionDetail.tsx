@@ -33,7 +33,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { HealthScreenNavigationProp } from '../../../types/navigation.types';
@@ -47,11 +47,13 @@ import {
   Lightbulb,
   Target,
   Dumbbell,
+  RotateCw,
   LucideIcon,
 } from 'lucide-react-native';
 import { colors, spacing, borderRadius } from '../../../theme';
 
 import { useHealthInsights } from '../hooks/useHealthInsights';
+import { useBodyCompositionLogs } from '../hooks/useBodyCompositionLogs';
 import { useProfile } from '../../../hooks/settings/useProfile';
 import { RangeBar } from '../components/RangeBar';
 import { GlassCard } from '../../../components/GlassCard';
@@ -112,6 +114,7 @@ export const BodyCompositionDetail = () => {
 
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const { bodyComposition, latestWeight, age } = useHealthInsights();
+  const compositionQuery = useBodyCompositionLogs();
   const { topFromScreenBottom } = useTabBarLayout();
   const { profile } = useProfile();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
@@ -125,6 +128,17 @@ export const BodyCompositionDetail = () => {
   const hasDemographicRanges = age !== null && age >= 20 && (profile?.sex === 'male' || profile?.sex === 'female');
   const isFemale = profile?.sex === 'female';
   const deltas = bodyComposition.deltas;
+  const canRecalculate =
+    bodyComposition.hasEnoughDataForBmi ||
+    bodyComposition.hasEnoughDataForBodyFat ||
+    bodyComposition.hasEnoughDataForMuscle ||
+    Object.values(bodyComposition.availableData).some(Boolean);
+
+  const handleRecalculate = async () => {
+    if (!canRecalculate || compositionQuery.isFetching) return;
+    const result = await compositionQuery.refetch();
+    if (result.isError) Alert.alert(t('common.error'), t('health.recalculateUnexpectedError'));
+  };
 
   // =========================================================================
   // DYNAMIC RANGES (Age & Sex Specific)
@@ -1213,6 +1227,27 @@ export const BodyCompositionDetail = () => {
           <Text style={[styles.disclaimer, { color: themeColors.textSecondary }]}>
             {t('health.compositionEstimatesDisclaimer')}
           </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{
+              disabled: !canRecalculate || compositionQuery.isFetching,
+              busy: compositionQuery.isFetching,
+            }}
+            disabled={!canRecalculate || compositionQuery.isFetching}
+            onPress={() => void handleRecalculate()}
+            style={[
+              styles.recalculateButton,
+              {
+                borderColor: themeColors.primary,
+                opacity: !canRecalculate || compositionQuery.isFetching ? 0.45 : 1,
+              },
+            ]}
+          >
+            <RotateCw size={19} color={themeColors.primary} />
+            <Text style={[styles.recalculateText, { color: themeColors.primary }]}>
+              {t('health.recalculateComposition')}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -1394,6 +1429,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.7,
     paddingHorizontal: spacing.l,
+  },
+  recalculateButton: {
+    alignSelf: 'center',
+    minHeight: 48,
+    marginTop: spacing.m,
+    paddingHorizontal: spacing.l,
+    borderWidth: 1,
+    borderRadius: borderRadius.l,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.s,
+  },
+  recalculateText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   // Modal
 

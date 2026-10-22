@@ -1357,7 +1357,7 @@ const en = {
     logWeight: 'Record weight',
     logSleep: 'Record sleep',
     hydration: 'Hydration',
-    waist: 'Waist for body fat estimation',
+    waist: 'Waist',
     calf: 'Calf',
     neck: 'Neck',
     shoulders: 'Shoulders',

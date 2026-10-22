@@ -1376,7 +1376,7 @@ export default {
     logWeight: 'Registrar peso',
     logSleep: 'Registrar sueño',
     hydration: 'Hidratación',
-    waist: 'Cintura para estimar grasa',
+    waist: 'Cintura',
     calf: 'Gemelo',
     neck: 'Cuello',
     shoulders: 'Hombros',

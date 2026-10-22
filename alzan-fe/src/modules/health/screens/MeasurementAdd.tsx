@@ -25,6 +25,7 @@ import { getLocaleTag } from '../../../i18n/dateLocale';
 import { MEASUREMENT_SELECTIONS } from '../helpers/measurementProtocols';
 import { MeasurementLandmarks } from '../components/MeasurementLandmarks';
 import { DECIMAL_INPUT_PROPS, parseLocalizedDecimal } from '../../../utils/numericInput';
+import { useUserProfile } from '../hooks/useUserProfile';
 
 const isToday = (someDate: Date) => {
   const today = new Date();
@@ -50,6 +51,7 @@ export const MeasurementAdd = () => {
   const navigation = useNavigation<HealthScreenNavigationProp>();
   const route = useRoute<RouteProp<HealthStackParamList, 'MeasurementAdd'>>();
   const addMutation = useAddMeasurement();
+  const { data: profile } = useUserProfile();
   const { styles: dynamicStyles, colors: themeColors, isDark } = useHealthStyles();
 
   const [selectionIndex, setSelectionIndex] = useState(() =>
@@ -175,7 +177,7 @@ export const MeasurementAdd = () => {
               ))}
             </ScrollView>
 
-            <MeasurementLandmarks />
+            <MeasurementLandmarks sex={profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : null} />
 
             {/* Value Input */}
             <View style={styles.inputSection}>
