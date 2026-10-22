@@ -177,7 +177,10 @@ export const MeasurementAdd = () => {
               ))}
             </ScrollView>
 
-            <MeasurementLandmarks sex={profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : null} />
+            <MeasurementLandmarks
+              measurement={currentMeasurement}
+              sex={profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : null}
+            />
 
             {/* Value Input */}
             <View style={styles.inputSection}>

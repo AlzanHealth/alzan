@@ -869,7 +869,7 @@ export default {
     measureTipArmRelaxed:
       'Deja el brazo colgando y relajado. Mide a mitad de camino entre el hombro y el codo, con la cinta horizontal y sin apretar.',
     measureTipArmFlexed: 'Dobla el codo a 90°, contrae el brazo y mide su parte más ancha sin apretar.',
-    measurementLandmarks: 'Dónde colocar la cinta',
+    measurementLandmarks: 'Dónde medir',
     waistLandmark: 'Cintura · sobre los huesos de la cadera',
     abdomenLandmark: 'Abdomen · a la altura del ombligo',
     hipsLandmark: 'Cadera · parte más ancha',

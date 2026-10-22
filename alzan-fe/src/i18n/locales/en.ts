@@ -860,7 +860,7 @@ const en = {
     measureTipArmRelaxed:
       'Let your arm hang relaxed. Measure halfway between shoulder and elbow, keeping the tape horizontal without squeezing.',
     measureTipArmFlexed: 'Bend your elbow to 90°, contract your arm and measure its widest part without squeezing.',
-    measurementLandmarks: 'Tape placement',
+    measurementLandmarks: 'Where to measure',
     waistLandmark: 'Waist · above hipbones',
     abdomenLandmark: 'Abdomen · at navel',
     hipsLandmark: 'Hips · widest part',
