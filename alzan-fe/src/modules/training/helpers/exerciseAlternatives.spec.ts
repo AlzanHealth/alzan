@@ -28,9 +28,10 @@ const rows = [
 const result = rankExerciseAlternatives(source, rows, new Set(['in-session']));
 assert.deepEqual(
   result.map(item => item.exerciseId),
-  ['other-equipment', 'same-equipment', 'fly', 'shoulders', 'unknown'],
+  ['same-equipment', 'other-equipment', 'shoulders', 'fly', 'unknown'],
 );
-assert.ok(result[0]?.reasons.includes('differentEquipment'));
+assert.ok(result[0]?.reasons.includes('sameMovement'));
+assert.ok(result[1]?.reasons.includes('differentEquipment'));
 assert.ok(rankExerciseAlternatives(make('unknown-source', 'Mi ejercicio'), rows).length > 0);
 assert.deepEqual(rankExerciseAlternatives({ ...source, primaryMuscleId: null }, rows), []);
 assert.equal(rankExerciseAlternatives(source, rows, new Set(), 1).length, 1);
@@ -95,7 +96,7 @@ const practical = rankExerciseAlternatives(source, [
 ]);
 assert.deepEqual(
   practical.map(item => item.exerciseId),
-  ['basic', 'ball', 'combined', 'rotation', 'unstable'],
+  ['basic', 'rotation', 'unstable', 'ball', 'combined'],
 );
 
 const fallbackSource = make('custom', 'Demo personal');
@@ -112,3 +113,11 @@ assert.deepEqual(rankExerciseAlternatives(source, rows, new Set(rows.map(row => 
 assert.deepEqual(rankExerciseAlternatives({ ...source, archived: true }, rows), []);
 
 console.log('Exercise alternative checks passed');
+
+assert.deepEqual(
+  rankExerciseAlternatives(make('source-row', 'Remo apoyado'), [
+    make('far', 'Remo inclinado'),
+    make('near', 'Remo apoyado en banco'),
+  ]).map(item => item.exerciseId),
+  ['near', 'far'],
+);

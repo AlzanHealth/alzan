@@ -21,7 +21,7 @@ export const useExerciseAlternatives = (
       return fetchExerciseAlternatives(user.id, candidate, excludedIds);
     },
     enabled: enabled && !!user && !!candidate,
-    staleTime: 0,
+    staleTime: 30_000,
     retry: false,
   });
   const ids = useMemo(

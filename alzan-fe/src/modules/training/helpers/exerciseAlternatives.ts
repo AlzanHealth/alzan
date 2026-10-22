@@ -118,6 +118,13 @@ export const rankExerciseAlternatives = (
   const family = getExerciseMovementFamily(source.names);
   if (!source.primaryMuscleId || source.archived) return [];
   const sourceNames = normalizedNames(source);
+  const nameTokens = (names: readonly string[]) =>
+    new Set(
+      names
+        .flatMap(name => normalizeExerciseCatalogName(name).split(' '))
+        .filter(token => token.length > 1 && !['demo', 'de', 'del', 'con', 'la', 'el', 'the', 'with'].includes(token)),
+    );
+  const sourceTokens = nameTokens(source.names);
   const unique = new Map<string, ExerciseAlternative>();
   for (const candidate of candidates) {
     if (
@@ -135,7 +142,10 @@ export const rankExerciseAlternatives = (
       (family !== 'horizontalPress' || pressAngle(sourceNames) === pressAngle(candidateNames)) &&
       !SPECIAL_VARIANTS.some(pattern => pattern.test(candidateNames) && !pattern.test(sourceNames));
     const reasons: AlternativeReason[] = ['sameMuscle'];
-    let score = sameMovement ? 100 : 0;
+    const tokens = nameTokens(candidate.names);
+    const shared = [...tokens].filter(token => sourceTokens.has(token)).length;
+    const union = new Set([...tokens, ...sourceTokens]).size;
+    let score = (sameMovement ? 100 : 0) + (union > 0 ? (20 * shared) / union : 0);
     if (sameMovement) reasons.push('sameMovement');
     if (source.equipmentId !== null && candidate.equipmentId === source.equipmentId) {
       if (!sameMovement) score += 5;

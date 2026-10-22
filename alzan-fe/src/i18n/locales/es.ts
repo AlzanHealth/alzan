@@ -2379,10 +2379,12 @@ export default {
     detachSuperset: 'Separar de la superserie',
     replaceExercise: 'Sustituir ejercicio',
     replacementSearchTitle: 'Vas a sustituir',
+    alternativesFallback:
+      'No hay coincidencias para este músculo. Mostramos el catálogo general para que puedas seguir eligiendo.',
+    alternativesToggle: 'Sugerencias',
     alternativesSuggested: 'Alternativas sugeridas',
     alternativesSearchAll: 'Buscar todos',
-    alternativesHint:
-      'Primero verás movimientos parecidos y después opciones generales del mismo músculo, priorizando el mismo equipamiento. Revisa la técnica y ajusta la carga.',
+    alternativesHint: 'Ordenados por movimiento, parecido del nombre y músculo. Revisa la técnica y ajusta la carga.',
     alternativeReasonMovement: 'Mismo músculo y movimiento parecido',
     alternativeReasonMuscle: 'Mismo músculo · opción general',
     alternativeReasonSameEquipment: 'Mismo equipamiento',

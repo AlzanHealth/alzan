@@ -2348,10 +2348,11 @@ const en = {
     detachSuperset: 'Separate from superset',
     replaceExercise: 'Replace exercise',
     replacementSearchTitle: 'Replacing',
+    alternativesFallback: 'No matches for this muscle. Showing the general catalog so you can keep choosing.',
+    alternativesToggle: 'Suggestions',
     alternativesSuggested: 'Suggested alternatives',
     alternativesSearchAll: 'Search all',
-    alternativesHint:
-      'Similar movements come first, followed by general options for the same muscle, prioritizing the same equipment. Review the technique and adjust the load.',
+    alternativesHint: 'Sorted by movement, name similarity and muscle. Review the technique and adjust the load.',
     alternativeReasonMovement: 'Same muscle and similar movement',
     alternativeReasonMuscle: 'Same muscle · general option',
     alternativeReasonSameEquipment: 'Same equipment',
