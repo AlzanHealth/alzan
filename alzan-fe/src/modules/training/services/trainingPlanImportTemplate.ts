@@ -49,7 +49,7 @@ export const buildTrainingPlanImportTemplate = (referenceDate: Date = new Date()
           "workout_goal": "strength",
           "modality": "gym",
           "exercises": [
-            { "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rest_seconds": 150 }
+            { "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rir_by_set": [3, 2, 2, 2], "rest_seconds": 150 }
           ]
         }
       ]
@@ -76,7 +76,7 @@ SALIDA
 - Cada sesión debe incluir modality y workout_goal. Para running usa modality: outdoor (Exterior), salvo que el documento indique cinta: entonces usa treadmill. Para strength usa modality: gym (Gimnasio), salvo que el documento indique claramente free_weights, machines, calisthenics, core o mobility.
 - Usa únicamente objetivos del catálogo: running: endurance, speed, tempo_threshold, long_run, recovery o test; strength: hypertrophy, strength, muscular_endurance, technique, mobility o recovery. Convierte aliases como easy_run→endurance, intervals→speed y tempo→tempo_threshold sin cambiar el entrenamiento.
 - Running usa running_steps; strength usa exercises. No mezcles ambos.
-- No generes rpe, rir, rir_min ni rir_max en ninguna parte. Si el DOCX contiene RPE o RIR, omítelo: esos campos no deben aparecer en el JSON de importación.
+- No generes rpe, rir, rir_min ni rir_max como campos escalares. Si el DOCX contiene un RIR objetivo por serie, conserva solo ese dato como rir_by_set: una lista con exactamente sets valores, cada uno entero de 0 a 10 o null si el documento no lo especifica. No inventes RIR; si no aparece, omite rir_by_set. Si el DOCX contiene RPE, omítelo.
 - No escribas duration_s, distance_m, target_type, target_min, target_max, progression_key ni children dentro de exercises de strength. Esas propiedades solo pertenecen a running_steps.
 - Fechas YYYY-MM-DD, weekday correcto y rango inclusivo máximo de 45 días.
 - Números JSON, nunca texto con unidades. Usa reps o reps_min + reps_max, nunca ambos.
@@ -102,13 +102,13 @@ GIMNASIO
 - Usa exercise_name de una fila real de exercises_rows. Busca primero coincidencia exacta normalizada; si no existe, elige solo una alternativa más parecida y de alta confianza usando el mismo patrón de movimiento, músculo principal, equipamiento y agarre/posición.
 - Sin alternativa segura, conserva el nombre fuente; frontend lo marcará como pendiente para selección manual. No inventes UUID ni metadatos.
 - Para "A o B"/"polea/máquina", usa la opción que el documento seleccione; si no selecciona ninguna, pide aclaración, no decidas por el usuario. "2+2" son dos filas consecutivas solo cuando el documento identifica dos ejercicios distintos; si es ambiguo, pide aclaración.
-- Cada exercise solo puede usar exercise_id, exercise_name, order_index, is_warmup, sets, reps, reps_min, reps_max, weight_kg y rest_seconds.
+- Cada exercise solo puede usar exercise_id, exercise_name, order_index, is_warmup, sets, reps, reps_min, reps_max, weight_kg, rir_by_set y rest_seconds.
 - Conserva series, repeticiones, pesos, descansos y orden; cambia solo la referencia.
 
 PLANTILLAS Y VALIDACIÓN
 - Reutiliza template_key solo con el mismo deporte, workout_goal, modality y estructura: en running, orden, phase_type, duration_type y jerarquía de children; en strength, mismos ejercicios en el mismo orden e is_warmup.
 - Nunca reutilices template_key si cambia workout_goal (recovery frente a endurance), modality o esa estructura. Ejemplo: easy-recovery-4k-recovery y easy-recovery-4k-endurance son familias distintas aunque tengan los mismos metros.
-- Dentro de cada bloque de 7 días contado desde start_date, una familia debe conservar todos los valores: objetivos de ritmo, distancia, duración, repeticiones, pesos, series y descansos. Si cambian dentro del bloque, usa otra clave. Entre bloques sí pueden progresar esos valores si se conserva la estructura y las claves de progresión; las repeticiones de intervalos pueden progresar, las de fases no interval no.
+- Dentro de cada bloque de 7 días contado desde start_date, una familia debe conservar todos los valores: objetivos de ritmo, distancia, duración, repeticiones, pesos, RIR por serie, series y descansos. Si cambian dentro del bloque, usa otra clave. Entre bloques sí pueden progresar esos valores si se conserva la estructura y las claves de progresión; las repeticiones de intervalos pueden progresar, las de fases no interval no.
 - Si no puedes demostrar que dos sesiones tienen la misma estructura completa, usa template_key distintos; es preferible crear dos plantillas que mezclar estructuras incompatibles.
 - En running, progression_key debe ser estable y único dentro de cada sesión.
 - No copies fechas ni cantidades de la plantilla de ejemplo. start_date y end_date delimitan las sesiones reales; una sola sesión usa su fecha en ambos. No añadas días sin entrenamiento.

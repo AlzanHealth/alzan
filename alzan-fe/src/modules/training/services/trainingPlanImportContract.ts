@@ -37,6 +37,7 @@ export type TrainingPlanStrengthExercise = {
   reps?: number;
   reps_min?: number;
   reps_max?: number;
+  rir_by_set?: Array<number | null>;
   weight_kg?: number;
   rpe?: number;
   rest_seconds?: number;
@@ -145,6 +146,7 @@ const EXERCISE_KEYS = [
   'rir',
   'rir_min',
   'rir_max',
+  'rir_by_set',
   'rest_seconds',
   'notes',
 ];
@@ -384,6 +386,24 @@ const parseExercise = (
   const reps = readInteger(value.reps, `${path}.reps`, errors, 1, 1000);
   const repsMin = readInteger(value.reps_min, `${path}.reps_min`, errors, 1, 1000);
   const repsMax = readInteger(value.reps_max, `${path}.reps_max`, errors, 1, 1000);
+  let rirBySet: Array<number | null> | undefined;
+  if (value.rir_by_set !== undefined) {
+    if (!Array.isArray(value.rir_by_set)) {
+      addError(errors, 'invalid_type', `${path}.rir_by_set`, 'Expected an array with one value per set');
+    } else {
+      if (sets !== undefined && value.rir_by_set.length !== sets) {
+        addError(errors, 'invalid_length', `${path}.rir_by_set`, 'rir_by_set must contain one value per set');
+      }
+      rirBySet = value.rir_by_set.map((rir, index) => {
+        if (rir === null) return null;
+        if (typeof rir !== 'number' || !Number.isInteger(rir) || rir < 0 || rir > 10) {
+          addError(errors, 'invalid_range', `${path}.rir_by_set[${index}]`, 'Expected an integer from 0 to 10 or null');
+          return null;
+        }
+        return rir;
+      });
+    }
+  }
   const restSeconds = readInteger(value.rest_seconds, `${path}.rest_seconds`, errors, 0, 3600);
   if (reps !== undefined && (repsMin !== undefined || repsMax !== undefined)) {
     addError(errors, 'invalid_session_shape', `${path}.reps`, 'Use reps or reps_min/reps_max, not both');
@@ -410,6 +430,7 @@ const parseExercise = (
     ...(reps === undefined ? {} : { reps }),
     ...(repsMin === undefined ? {} : { reps_min: repsMin }),
     ...(repsMax === undefined ? {} : { reps_max: repsMax }),
+    ...(rirBySet === undefined ? {} : { rir_by_set: rirBySet }),
     ...(readNumber(value.weight_kg, `${path}.weight_kg`, errors, 0, 1000) === undefined
       ? {}
       : { weight_kg: value.weight_kg as number }),

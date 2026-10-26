@@ -38,6 +38,11 @@ const strings = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(item => typeof item === 'string');
 const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
 const nullableNumber = (value: unknown) => value === null || finite(value);
+const nullableRirBySet = (value: unknown) =>
+  value === undefined ||
+  value === null ||
+  (Array.isArray(value) &&
+    value.every(item => item === null || (finite(item) && Number.isInteger(item) && item >= 0 && item <= 10)));
 const nullableString = (value: unknown) => value === null || typeof value === 'string';
 const exercise = (value: unknown) => {
   if (!record(value)) return false;
@@ -46,6 +51,7 @@ const exercise = (value: unknown) => {
     typeof value.is_warmup !== 'boolean' ||
     !finite(value.order_index) ||
     !['notes', 'superset_next_exercise_id', 'user_id'].every(key => nullableString(value[key])) ||
+    !nullableRirBySet(value.target_rir_by_set) ||
     !['rest_seconds', 'target_reps_max', 'target_reps_min', 'target_rpe', 'target_sets', 'target_weight_kg'].every(
       key => nullableNumber(value[key]),
     )

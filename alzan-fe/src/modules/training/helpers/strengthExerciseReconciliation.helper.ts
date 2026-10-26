@@ -20,6 +20,7 @@ export type StrengthProgressionTargets = {
   target_reps_max?: number | null;
   target_weight_kg?: number | null;
   target_rpe?: number | null;
+  target_rir_by_set?: Array<number | null> | null;
   rest_seconds?: number | null;
 };
 
@@ -29,6 +30,7 @@ const STRENGTH_TARGET_FIELDS = [
   'target_reps_max',
   'target_weight_kg',
   'target_rpe',
+  'target_rir_by_set',
   'rest_seconds',
 ] as const satisfies ReadonlyArray<keyof StrengthProgressionTargets>;
 
@@ -40,7 +42,12 @@ export const buildStrengthProgressionTargetPatch = (
   STRENGTH_TARGET_FIELDS.forEach(field => {
     const previousValue = previous[field] ?? null;
     const nextValue = next[field] ?? null;
-    if (previousValue !== nextValue) patch[field] = nextValue;
+    const equalArrays =
+      Array.isArray(previousValue) &&
+      Array.isArray(nextValue) &&
+      previousValue.length === nextValue.length &&
+      previousValue.every((value, index) => value === nextValue[index]);
+    if (!equalArrays && previousValue !== nextValue) Object.assign(patch, { [field]: nextValue });
   });
   return patch;
 };

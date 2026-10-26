@@ -71,7 +71,10 @@ import {
 } from './helpers/gymSetMode.helper';
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 
-export type WorkoutTemplateExerciseWithDetails = WorkoutTemplateExercise & { exercise: ExerciseWithType | null };
+export type WorkoutTemplateExerciseWithDetails = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & {
+  target_rir_by_set?: Array<number | null> | null;
+  exercise: ExerciseWithType | null;
+};
 type AutoPlayQueue = {
   exerciseId: string;
   nextSetNumber: number;
@@ -1022,6 +1025,7 @@ export const ActiveWorkoutScreen = () => {
       user_id: user?.id ?? null,
       notes: null,
       target_rpe: null,
+      target_rir_by_set: null,
       superset_next_exercise_id: null,
     };
     updateDraft(prev => addWorkoutExercise(prev, newAdhoc));
@@ -1520,6 +1524,7 @@ export const ActiveWorkoutScreen = () => {
                                   const doneSet = getCompletedSet(exerciseId, setNum);
                                   const key = `${exerciseId}-${setNum}`;
                                   const setMode = setModes[key] || 'normal';
+                                  const targetRir = item.target_rir_by_set?.[setIdx] ?? null;
 
                                   const prData = activeSessionData?.prs?.[exerciseId];
                                   const prevText = prData
@@ -1576,6 +1581,11 @@ export const ActiveWorkoutScreen = () => {
                                           number: setNum,
                                           type: getGymSetModeLabel(setMode, setNum),
                                         })}
+                                        accessibilityHint={
+                                          targetRir !== null && setMode !== 'warmup'
+                                            ? t('training.rirTargetAccessibility', { value: targetRir })
+                                            : undefined
+                                        }
                                         accessibilityState={{ disabled: isDone }}
                                       >
                                         <Text
@@ -1587,6 +1597,18 @@ export const ActiveWorkoutScreen = () => {
                                         >
                                           {getGymSetModeLabel(setMode, setNum)}
                                         </Text>
+                                        {targetRir !== null && setMode !== 'warmup' && (
+                                          <View
+                                            style={[
+                                              styles.rirTargetBadge,
+                                              { backgroundColor: themeColors.primary + '18' },
+                                            ]}
+                                          >
+                                            <Text style={[styles.rirTargetBadgeText, { color: themeColors.primary }]}>
+                                              {t('training.rirTargetCompact', { value: targetRir })}
+                                            </Text>
+                                          </View>
+                                        )}
                                       </TouchableOpacity>
 
                                       {!isTimeBased && (
@@ -2387,6 +2409,20 @@ const styles = StyleSheet.create({
   },
   warmupTextActive: {
     color: '#FFF',
+  },
+  rirTargetBadge: {
+    minWidth: 34,
+    minHeight: 14,
+    paddingHorizontal: 3,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rirTargetBadgeText: {
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   prevSet: {
     width: '100%',

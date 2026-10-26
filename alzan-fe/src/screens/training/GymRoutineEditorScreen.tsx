@@ -422,6 +422,7 @@ export const GymRoutineEditorScreen = () => {
           target_reps_max: defaultTargets.target_reps_max,
           target_weight_kg: null,
           target_rpe: null,
+          target_rir_by_set: null,
           notes: null,
           rest_seconds: 60,
           user_id: user?.id || null,

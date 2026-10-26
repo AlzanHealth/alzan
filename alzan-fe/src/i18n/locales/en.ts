@@ -2594,6 +2594,8 @@ const en = {
     prColonAllCaps: 'PR',
     setNumberIndicator: 'Indicates the set number.',
     setColon: 'Set',
+    rirTargetCompact: 'RIR {{value}}',
+    rirTargetAccessibility: 'Target RIR: {{value}} reps in reserve.',
     tableHelp: 'Table Help',
     deleteExercise: 'Delete exercise',
     deleteSet: 'Delete set',

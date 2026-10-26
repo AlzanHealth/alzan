@@ -23,6 +23,7 @@ const loadStrengthProgressionBundle: StrengthProgressionLoader = async templateI
           target_reps_max,
           target_weight_kg,
           target_rpe,
+          target_rir_by_set,
           rest_seconds
         )
       `,

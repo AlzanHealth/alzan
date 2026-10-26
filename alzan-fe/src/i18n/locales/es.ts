@@ -2634,6 +2634,8 @@ export default {
     prColonAllCaps: 'PR',
     setNumberIndicator: 'Indica el número de la serie.',
     setColon: 'Set',
+    rirTargetCompact: 'RIR {{value}}',
+    rirTargetAccessibility: 'Objetivo de RIR: {{value}} repeticiones en reserva.',
     tableHelp: 'Ayuda de Tabla',
     deleteExercise: 'Eliminar ejercicio',
     deleteSet: 'Eliminar serie',

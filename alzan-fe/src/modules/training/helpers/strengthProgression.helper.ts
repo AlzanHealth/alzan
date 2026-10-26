@@ -8,6 +8,7 @@ export type StrengthProgressionTarget = {
   target_reps_max: number | null;
   target_weight_kg: number | null;
   target_rpe: number | null;
+  target_rir_by_set?: Array<number | null> | null;
   rest_seconds: number | null;
 };
 
@@ -19,6 +20,7 @@ export type StrengthExerciseProgression = {
   target_reps_max: number | null;
   target_weight_kg: number | null;
   target_rpe: number | null;
+  target_rir_by_set?: Array<number | null> | null;
   rest_seconds: number | null;
 };
 
@@ -70,6 +72,7 @@ export const applyStrengthExerciseProgressions = <TExercise extends StrengthProg
       target_reps_max: progression.target_reps_max ?? exercise.target_reps_max,
       target_weight_kg: progression.target_weight_kg ?? exercise.target_weight_kg,
       target_rpe: progression.target_rpe ?? exercise.target_rpe,
+      target_rir_by_set: progression.target_rir_by_set ?? exercise.target_rir_by_set,
       rest_seconds: progression.rest_seconds ?? exercise.rest_seconds,
     };
   });

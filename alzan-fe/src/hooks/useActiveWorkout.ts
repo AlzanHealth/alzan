@@ -380,6 +380,7 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
                   user_id: user?.id || null,
                   notes: null,
                   target_rpe: null,
+                  target_rir_by_set: null,
                   order_index: (exercises.length || 0) + index,
                   target_sets: 3,
                   target_reps_min: defaultTargets.target_reps_min,
