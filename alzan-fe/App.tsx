@@ -13,11 +13,12 @@ import { enableScreens } from 'react-native-screens';
 import { AlzanBackendClientProvider } from './src/context/AlzanBackendClientContext';
 import { AlertProvider } from './src/context/AlertContext';
 import { ProviderOAuthWebCallback } from './src/modules/wearables/ProviderOAuthWebCallback';
+import { shouldRetryQuery } from './src/lib/querySafety';
 
 // Enable screens for better performance
 enableScreens(true);
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: shouldRetryQuery } } });
 
 const shouldRenderProviderOAuthWebCallback = (): boolean => {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return false;

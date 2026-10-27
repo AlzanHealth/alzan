@@ -7,6 +7,9 @@ import { checkAndCopyNewWeek } from '../modules/nutrition/services/dietCopyServi
 import { checkAndPlanNewWeeks } from '../modules/training/services/trainingPlanService';
 import { expireTrainingTemplates } from '../modules/training/services/templateLifecycleService';
 import { NutritionSettingsJson } from '../types/requests.types';
+import { createAuthMaintenanceRunner } from './authMaintenance';
+
+const authMaintenance = createAuthMaintenanceRunner();
 
 interface AuthContextType {
   session: Session | null;
@@ -60,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     // Helper to check and run auto-copy if needed
-    const checkAndRunAutoCopy = async (userId: string) => {
+    const executeAutoCopy = async (userId: string) => {
       let templateCleanupCompleted = false;
       try {
         console.log('┌─────────────────────────────────────────────────┐');
@@ -133,19 +136,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // SAVE PREFS IF NEEDED
         // ----------------------------------------------------
         if (prefsUpdated) {
-          await supabase
+          const { error: saveError } = await supabase
             .from('user_preferences')
             .update({
               nutrition_prefs: newNutritionPrefs,
             })
             .eq('user_id', userId);
+          if (saveError) throw saveError;
 
           console.log('[Auth] 💾 Preferencias (Nutrición/Entreno) actualizadas');
         }
-      } catch (error) {
-        console.error('[Auth] ❌ Error en verificación de auto-copia:', error);
+      } catch {
+        console.error('[Auth] Auto-copy maintenance failed');
       }
     };
+    const checkAndRunAutoCopy = (userId: string) => authMaintenance.run(userId, () => executeAutoCopy(userId));
 
     const fetchSession = async () => {
       console.log('[Auth] Iniciando verificación de sesión...');

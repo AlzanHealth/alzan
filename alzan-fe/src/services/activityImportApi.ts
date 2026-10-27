@@ -43,7 +43,6 @@ export async function postActivityImportForm<TResponse>(
   });
 
   const responseText = await response.text();
-  console.log(`Backend returned status ${response.status}. Body: ${responseText}`);
 
   if (!response.ok) {
     let message = `HTTP_${response.status}`;

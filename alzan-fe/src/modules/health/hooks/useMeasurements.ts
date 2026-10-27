@@ -4,6 +4,7 @@ import { measurementApi } from '../services/measurementApi';
 import { MeasurementType } from '../../../types/requests.types';
 import { bodyCompositionService } from '../services/bodyCompositionService';
 import { healthQueryKeys } from './healthQueryKeys';
+import { reportCompositionRefreshFailure } from '../helpers/compositionRequestGuard';
 
 export const useMeasurements = (type?: MeasurementType, limit = 100, protocol?: string | null) => {
   const { user } = useAuth();
@@ -54,7 +55,7 @@ export const useAddMeasurement = () => {
       void bodyCompositionService
         .invalidateAndRecalculateFromInput(user.id, targetDate.toISOString())
         .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
-        .catch(error => console.error('[Health] Background composition refresh failed', error));
+        .catch(reportCompositionRefreshFailure);
 
       return result;
     },
@@ -73,7 +74,7 @@ export const useDeleteMeasurement = () => {
       void bodyCompositionService
         .invalidateAndRecalculateFromInput(deleted.user_id, deleted.measured_at)
         .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
-        .catch(error => console.error('[Health] Background composition refresh failed', error));
+        .catch(reportCompositionRefreshFailure);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });

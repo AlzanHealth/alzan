@@ -3,6 +3,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { weightApi } from '../services/weightApi';
 import { bodyCompositionService } from '../services/bodyCompositionService';
 import { healthQueryKeys } from './healthQueryKeys';
+import { reportCompositionRefreshFailure } from '../helpers/compositionRequestGuard';
 
 export const useWeightLogs = (limit = 100) => {
   const { user } = useAuth();
@@ -72,14 +73,14 @@ export const useAddWeightLog = () => {
           void bodyCompositionService
             .invalidateAndRecalculateFromInput(userId, targetDate.toISOString())
             .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
-            .catch(error => console.error('[Health] Background composition refresh failed', error));
+            .catch(reportCompositionRefreshFailure);
           return result;
         }
 
         void bodyCompositionService
           .invalidateAndRecalculateFromInput(userId, targetDate.toISOString())
           .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
-          .catch(error => console.error('[Health] Background composition refresh failed', error));
+          .catch(reportCompositionRefreshFailure);
         return existingLog;
       }
 
@@ -95,7 +96,7 @@ export const useAddWeightLog = () => {
       void bodyCompositionService
         .invalidateAndRecalculateFromInput(userId, result.measured_at)
         .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
-        .catch(error => console.error('[Health] Background composition refresh failed', error));
+        .catch(reportCompositionRefreshFailure);
 
       return result;
     },
@@ -114,7 +115,7 @@ export const useDeleteWeightLog = () => {
       void bodyCompositionService
         .invalidateAndRecalculateFromInput(deleted.user_id, deleted.measured_at)
         .then(() => queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) }))
-        .catch(error => console.error('[Health] Background composition refresh failed', error));
+        .catch(reportCompositionRefreshFailure);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });

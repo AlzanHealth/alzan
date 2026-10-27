@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
 import { bodyCompositionService } from '../services/bodyCompositionService';
 import { healthQueryKeys } from './healthQueryKeys';
+import { pollingIntervalAfterError } from '../../../lib/querySafety';
 
 export const useBodyCompositionLogs = (limit = 100) => {
   const { user } = useAuth();
@@ -32,6 +33,6 @@ export const useBodyCompositionLogs = (limit = 100) => {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     // Expiring inputs and provider imports are repaired while the screen is open.
-    refetchInterval: 60_000,
+    refetchInterval: query => pollingIntervalAfterError(query.state.error, 60_000),
   });
 };

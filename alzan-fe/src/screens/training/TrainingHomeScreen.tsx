@@ -11,7 +11,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../../components/GlassCard';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -58,6 +58,7 @@ import { getDailyPlanAction } from './helpers/dailyPlanAction.helper';
 import { invalidateTrainingCalendar } from '../../lib/trainingQueryKeys';
 import { buildTemplateAssociationPayload } from '../../modules/training/helpers/templateAssociation.helper';
 import { healthQueryKeys } from '../../modules/health/hooks/healthQueryKeys';
+import { pollingIntervalAfterError } from '../../lib/querySafety';
 
 interface DailyEntry {
   id: string;
@@ -130,6 +131,7 @@ const getDeviceTimezone = (): string => {
 };
 
 export const TrainingHomeScreen = () => {
+  const isFocused = useIsFocused();
   const { t } = useTranslation();
   const { colors } = useTheme();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
@@ -432,7 +434,7 @@ export const TrainingHomeScreen = () => {
     queryKey: ['activeSessionBanner', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('activity_sessions')
         .select('*')
         .eq('user_id', user.id)
@@ -440,10 +442,11 @@ export const TrainingHomeScreen = () => {
         .order('start_time', { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (error) throw error;
       return data;
     },
     enabled: !!user,
-    refetchInterval: 3000,
+    refetchInterval: query => pollingIntervalAfterError(query.state.error, isFocused ? 3000 : false),
   });
   const activeGymSessionId =
     activeSession &&

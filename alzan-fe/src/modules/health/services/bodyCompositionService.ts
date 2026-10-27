@@ -3,6 +3,11 @@ import { supabase } from '../../../lib/supabaseClient';
 import { Database } from '../../../types/requests.types';
 import { calculatePersistedAbdominalHealth } from '../algorithms/abdominalHealth';
 import {
+  createCompositionRequestGuard,
+  CompositionRefreshPausedError,
+  reportCompositionRefreshFailure,
+} from '../helpers/compositionRequestGuard';
+import {
   DailyCompositionMeasurementInput,
   RECENT_BODY_COMPOSITION_WINDOW_HOURS,
   isBodyCompositionMeasurementType,
@@ -30,7 +35,10 @@ export interface ManualRecalculateResult {
   errorValues?: Record<string, string | number>;
 }
 const VERSION = 4;
+const MAX_HISTORICAL_REPAIRS = 12;
+const calculationGuard = createCompositionRequestGuard<RecalculateDailyCompositionResult>();
 const historicalRepairUsers = new Set<string>();
+const historicalRepairAfter = new Map<string, number>();
 const localDate = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const dateInput = (date: Date | string): Date =>
@@ -47,8 +55,10 @@ const ageAt = (birth: string | null, date: Date): number | null => {
 };
 
 export const bodyCompositionService = {
-  async getCalculationContext(userId: string) {
-    const { data, error } = await supabase.rpc('get_body_composition_context');
+  async getCalculationContext(userId: string, signal?: AbortSignal) {
+    const request = supabase.rpc('get_body_composition_context');
+    if (signal) request.abortSignal(signal);
+    const { data, error } = await request;
     if (error) throw error;
     const context = data?.[0];
     if (!context || context.user_id !== userId) throw new Error('SNAPSHOT_OWNER_MISMATCH');
@@ -62,10 +72,22 @@ export const bodyCompositionService = {
     userId: string,
     targetDateInput?: Date | string,
   ): Promise<RecalculateDailyCompositionResult> {
+    const date = targetDateInput === undefined ? new Date() : dateInput(targetDateInput);
+    if (!Number.isFinite(date.getTime())) return { success: false, reason: 'invalid_date' };
+    return calculationGuard.run(userId, localDate(date), signal =>
+      this.calculateSnapshot(userId, signal, targetDateInput),
+    );
+  },
+
+  async calculateSnapshot(
+    userId: string,
+    signal: AbortSignal,
+    targetDateInput?: Date | string,
+  ): Promise<RecalculateDailyCompositionResult> {
     // Read revision before every input. A concurrent change makes the commit fail,
     // including imports from another device and profile changes during calculation.
     for (let attempt = 0; attempt < 3; attempt++) {
-      const context = await this.getCalculationContext(userId);
+      const context = await this.getCalculationContext(userId, signal);
       const revision = context.revision;
       const now = new Date(context.server_now);
       const targetDate = targetDateInput === undefined ? now : dateInput(targetDateInput);
@@ -75,21 +97,23 @@ export const bodyCompositionService = {
       const cutoff = new Date(Math.min(dateEnd(targetDate).getTime() - 1, now.getTime()));
       const windowStart = new Date(cutoff.getTime() - RECENT_BODY_COMPOSITION_WINDOW_HOURS * 3600000).toISOString();
       const [profile, weightsResult, measurementsResult] = await Promise.all([
-        this.getUserProfile(userId),
+        this.getUserProfile(userId, signal),
         supabase
           .from('weight_logs')
           .select('id, measured_at, weight_kg')
           .eq('user_id', userId)
           .gte('measured_at', windowStart)
           .lte('measured_at', cutoff.toISOString())
-          .order('measured_at', { ascending: false }),
+          .order('measured_at', { ascending: false })
+          .abortSignal(signal),
         supabase
           .from('body_measurements')
           .select('id, measurement_type, measured_at, value_cm, measurement_protocol')
           .eq('user_id', userId)
           .gte('measured_at', windowStart)
           .lte('measured_at', cutoff.toISOString())
-          .order('measured_at', { ascending: false }),
+          .order('measured_at', { ascending: false })
+          .abortSignal(signal),
       ]);
       if (weightsResult.error) throw weightsResult.error;
       if (measurementsResult.error) throw measurementsResult.error;
@@ -175,10 +199,12 @@ export const bodyCompositionService = {
           })),
         },
       };
-      const { data, error } = await supabase.rpc('commit_body_composition_snapshot', {
-        p_expected_revision: revision,
-        p_snapshot: payload,
-      });
+      const { data, error } = await supabase
+        .rpc('commit_body_composition_snapshot', {
+          p_expected_revision: revision,
+          p_snapshot: payload,
+        })
+        .abortSignal(signal);
       if (error?.code === '40001') continue;
       if (error) throw error;
       // A concurrent input change is returned by the RPC as an empty set. Retry
@@ -190,18 +216,26 @@ export const bodyCompositionService = {
   },
 
   async invalidateAndRecalculateFromInput(userId: string, measuredAt: string): Promise<void> {
+    calculationGuard.inputsChanged(userId);
+    calculationGuard.assertAvailable(userId);
     // DB triggers already invalidate old/new dates and erase stale results atomically.
     const { data, error } = await supabase
       .from('body_composition_logs')
       .select('calculated_for_date')
       .eq('user_id', userId)
-      .eq('calculation_status', 'stale');
+      .eq('calculation_status', 'stale')
+      .order('calculated_for_date', { ascending: false })
+      .limit(MAX_HISTORICAL_REPAIRS);
     if (error) throw error;
     const dates = new Set([localDate(new Date(measuredAt)), ...(data ?? []).map(row => row.calculated_for_date)]);
-    for (const date of dates) await this.recalculateBestCompositionForDate(userId, date);
+    for (const date of dates) {
+      const result = await this.recalculateBestCompositionForDate(userId, date);
+      if (!result.success) throw new CompositionRefreshPausedError(Date.now() + 30_000);
+    }
   },
 
   async refreshSnapshots(userId: string, limit = 100, onHistoricalRepair?: () => void): Promise<BodyCompositionLog[]> {
+    calculationGuard.assertAvailable(userId);
     const context = await this.getCalculationContext(userId);
     const serverNow = new Date(context.server_now);
     const { data, error } = await supabase
@@ -242,12 +276,14 @@ export const bodyCompositionService = {
       if (!storedDates.has(date)) dates.add(date);
     }
     const today = localDate(serverNow);
-    await this.recalculateBestCompositionForDate(userId, today);
+    const currentResult = await this.recalculateBestCompositionForDate(userId, today);
+    if (!currentResult.success) throw new CompositionRefreshPausedError(Date.now() + 30_000);
     dates.delete(today);
     // Current results are returned promptly; history repairs use bounded batches.
-    if (dates.size && !historicalRepairUsers.has(userId)) {
+    if (dates.size && !historicalRepairUsers.has(userId) && Date.now() >= (historicalRepairAfter.get(userId) ?? 0)) {
       historicalRepairUsers.add(userId);
-      const pendingDates = [...dates].sort().reverse();
+      historicalRepairAfter.set(userId, Date.now() + 60_000);
+      const pendingDates = [...dates].sort().reverse().slice(0, MAX_HISTORICAL_REPAIRS);
       void (async () => {
         for (let offset = 0; offset < pendingDates.length; offset += 4) {
           const results = await Promise.all(
@@ -257,7 +293,7 @@ export const bodyCompositionService = {
         }
         onHistoricalRepair?.();
       })()
-        .catch(error => console.error('[BodyComp] Historical repair failed', error))
+        .catch(reportCompositionRefreshFailure)
         .finally(() => historicalRepairUsers.delete(userId));
     }
     const { data: fresh, error: freshError } = await supabase
@@ -284,12 +320,10 @@ export const bodyCompositionService = {
   async getLatestBodyCompositionLog(userId: string): Promise<BodyCompositionLog | null> {
     return (await this.refreshSnapshots(userId, 1))[0] ?? null;
   },
-  async getUserProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('users')
-      .select('height_cm, date_of_birth, sex')
-      .eq('id', userId)
-      .single();
+  async getUserProfile(userId: string, signal?: AbortSignal) {
+    const request = supabase.from('users').select('height_cm, date_of_birth, sex').eq('id', userId);
+    if (signal) request.abortSignal(signal);
+    const { data, error } = await request.single();
     if (error) throw error;
     return data;
   },

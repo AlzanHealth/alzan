@@ -5,7 +5,7 @@ import { bodyCompositionService, ManualRecalculateResult } from '../services/bod
 
 /**
  * Hook for manually recalculating body composition
- * Limited to 2 recalculations per day
+ * Shares the service's conflict cooldown and concurrent request protection.
  */
 export const useRecalculateBodyComp = () => {
   const queryClient = useQueryClient();

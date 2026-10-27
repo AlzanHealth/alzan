@@ -18,7 +18,6 @@ class WearablesApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly responseText: string,
   ) {
     super(message);
     this.name = 'WearablesApiError';
@@ -29,9 +28,9 @@ const parseApiErrorMessage = (responseText: string, fallback: string): string =>
   if (!responseText) return fallback;
   try {
     const payload = JSON.parse(responseText) as { message?: unknown };
-    return typeof payload.message === 'string' ? payload.message : responseText;
+    return typeof payload.message === 'string' && payload.message.trim() ? payload.message.slice(0, 256) : fallback;
   } catch {
-    return responseText;
+    return fallback;
   }
 };
 
@@ -77,9 +76,8 @@ const requestJson = async <T>(path: string, options: { method?: string; body?: J
     console.error('[wearablesLocalHealthApi] Request failed', {
       path,
       status: response.status,
-      responseText: text,
     });
-    throw new WearablesApiError(parseApiErrorMessage(text, fallback), response.status, text);
+    throw new WearablesApiError(parseApiErrorMessage(text, fallback), response.status);
   }
   return (text ? JSON.parse(text) : null) as T;
 };

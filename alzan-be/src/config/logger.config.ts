@@ -3,9 +3,10 @@ import { Params } from 'nestjs-pino';
 import { NodeEnvironment } from '../common/enum/config.enum';
 
 export const createLoggerConfig = (): Params => {
+  const isLocal = process.env.NODE_ENV === NodeEnvironment.LOCAL;
   return {
     pinoHttp: {
-      ...(process.env.NODE_ENV === NodeEnvironment.LOCAL
+      ...(isLocal
         ? {
             level: 'debug',
 
@@ -20,17 +21,37 @@ export const createLoggerConfig = (): Params => {
                 translateTime: 'yyyy-mm-dd"T"HH:MM:ss.l',
               },
             },
-            serializers: {
-              req: (req: { method: string; url: string }): string => `${req.method} ${req.url}`,
+          }
+        : createGcpLoggingPinoConfig({}, { level: 'info' })),
+      serializers: {
+        // Whitelist fields: OAuth parameters, cookies, webhook secrets and health
+        // payloads must never enter automatic request logs.
+        req: (req: { id?: string | number; method: string; url: string }) => ({
+          id: req.id,
+          method: req.method,
+          url: req.url?.split(/[?#]/u)[0],
+        }),
+        ...(isLocal
+          ? {
               res: (res: { statusCode: number }) => `${res.statusCode}`,
               err: (err: Error): { message: string; stack?: string } => ({
                 message: err.message,
                 stack: err.stack?.split('\n').slice(0, 3).join('\n'),
               }),
-            },
-          }
-        : createGcpLoggingPinoConfig({}, { level: 'debug' })),
-      redact: ['req.headers.authorization', 'req.headers["x-api-key"]', 'req.query.token'],
+            }
+          : {}),
+      },
+      redact: [
+        'req.headers.authorization',
+        'req.headers["x-api-key"]',
+        'req.headers.cookie',
+        'req.headers.secret',
+        'req.headers.client_secret',
+        'req.headers["client-secret"]',
+        'req.query.token',
+        'req.query.code',
+        'res.headers["set-cookie"]',
+      ],
     },
   };
 };
