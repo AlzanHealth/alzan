@@ -101,7 +101,7 @@ export const ExercisePrValuesScreen = () => {
     }
 
     if (metric === 'reps') {
-      setEditingWeightValue(entry.reps > 0 ? String(entry.reps) : '');
+      setEditingWeightValue(entry.reps != null && entry.reps > 0 ? String(entry.reps) : '');
       return;
     }
 

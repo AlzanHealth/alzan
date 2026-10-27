@@ -2,8 +2,21 @@ import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import type { Locale } from 'date-fns';
 import type { TranslationKey } from '../../../i18n/locales/en';
 import type { DailyProgress } from './dailyProgressPdf';
+import { formatDurationTime } from '../../../utils/unitConversionUtils';
 
 export type ProgressPdfTranslator = (key: TranslationKey) => string;
+
+/** Keep repetition and duration measurements distinct, including duration-only gym sets. */
+export const formatDailyProgressSetMetric = (
+  set: Pick<DailyProgress['sets'][number], 'set_number' | 'reps' | 'duration_s'>,
+  t: ProgressPdfTranslator,
+): string => {
+  const metrics: string[] = [];
+  if (set.reps != null) metrics.push(`${set.reps} ${t('progressPdf.reps')}`);
+  if (set.duration_s != null) metrics.push(`${t('training.time')} ${formatDurationTime(set.duration_s)}`);
+  return `${set.set_number}: ${metrics.length ? metrics.join(' · ') : t('progressPdf.noData')}`;
+};
+
 const escapeHtml = (value: string): string =>
   value
     .replace(/&/g, '&amp;')
@@ -43,9 +56,8 @@ const renderDailyCard = (day: DailyProgress, t: ProgressPdfTranslator, locale: L
     );
     const setDetails = sessionSets.map(set => {
       const load = set.weight_kg === 0 ? t('progressPdf.loadNotRecorded') : numeric(set.weight_kg, 'kg', t);
-      const details = [`${set.set_number}: ${set.reps} ${t('progressPdf.reps')}`, load];
+      const details = [formatDailyProgressSetMetric(set, t), load];
       if (set.distance_m != null) details.push(numeric(set.distance_m / 1000, 'km', t));
-      if (set.duration_s != null) details.push(numeric(set.duration_s / 60, 'min', t));
       return `${set.exercise_name ?? t('progressPdf.unknownExercise')} — ${details.join(' · ')}`;
     });
     return [

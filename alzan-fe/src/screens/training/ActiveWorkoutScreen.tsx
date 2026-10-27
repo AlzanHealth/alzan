@@ -29,7 +29,12 @@ import { useActiveWorkoutDraft } from '../../hooks/useActiveWorkoutDraft';
 import { ActiveWorkoutDraft, emptyActiveWorkoutDraft } from './helpers/activeWorkoutDraft';
 import { WorkoutOrganizer } from './components/WorkoutOrganizer';
 import { workoutSetProgress } from './helpers/workoutSetProgress';
-import { prepareWorkoutSetIds, saveWorkoutSequentially } from './helpers/workoutFinalization';
+import {
+  getWorkoutSetMetricValue,
+  getWorkoutSetMetrics,
+  prepareWorkoutSetIds,
+  saveWorkoutSequentially,
+} from './helpers/workoutFinalization';
 import {
   effectiveWorkoutExercises,
   addWorkoutExercise,
@@ -225,7 +230,15 @@ export const ActiveWorkoutScreen = () => {
     activeSessionData.completedSets.forEach(set => {
       const key = `${set.exercise_id}-${set.set_number}`;
       initial.completedSets.push(key);
-      initial.inputs[key] = { weight: String(toDisplayWeight(set.weight_kg ?? 0)), reps: String(set.reps ?? '') };
+      initial.inputs[key] = {
+        weight: String(toDisplayWeight(set.weight_kg ?? 0)),
+        reps: String(
+          getWorkoutSetMetricValue(
+            set,
+            items.find(item => item.exercise_id === set.exercise_id)?.exercise?.exercise_type_code,
+          ) ?? '',
+        ),
+      };
       initial.setModes[key] = set.is_warmup ? 'warmup' : set.set_type === 'drop_set' ? 'drop_set' : 'normal';
     });
     return initial;
@@ -850,11 +863,15 @@ export const ActiveWorkoutScreen = () => {
                 else if (item?.target_reps_min) reps = item.target_reps_min;
 
                 const weightKg = toDbWeight(weight);
+                const existingSet = activeSessionData?.completedSets.find(
+                  set => set.exercise_id === exerciseId && set.set_number === setNum,
+                );
+                const metrics = getWorkoutSetMetrics(reps, item.exercise?.exercise_type_code, existingSet);
                 const setMode = snapshot.setModes[key] || 'normal';
                 const isWarmup = setMode === 'warmup';
 
                 savedCount++;
-                savedVolume += weightKg * reps;
+                savedVolume += weightKg * (metrics.reps ?? 0);
 
                 pendingSaves.push(() =>
                   logSet.mutateAsync({
@@ -863,7 +880,7 @@ export const ActiveWorkoutScreen = () => {
                     exercise_id: exerciseId!,
                     set_number: setNum,
                     weight_kg: weightKg,
-                    reps: reps,
+                    ...metrics,
                     rest_s: item?.rest_seconds,
                     is_warmup: isWarmup,
                     set_type: getWorkoutSetTypeForGymSetMode(setMode),
@@ -1681,8 +1698,13 @@ export const ActiveWorkoutScreen = () => {
                                         value={
                                           inputs[key]?.reps !== undefined
                                             ? inputs[key].reps
-                                            : isDone && doneSet?.reps
-                                              ? doneSet.reps.toString()
+                                            : isDone && doneSet
+                                              ? String(
+                                                  getWorkoutSetMetricValue(
+                                                    doneSet,
+                                                    item.exercise?.exercise_type_code,
+                                                  ) ?? '',
+                                                )
                                               : isTimeBased
                                                 ? (item.target_reps_min || 0).toString()
                                                 : ''

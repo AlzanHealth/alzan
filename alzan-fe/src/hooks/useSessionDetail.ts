@@ -10,6 +10,7 @@ import { fetchExerciseUserOverrides } from '../modules/training/services/exercis
 export interface ExerciseGroup {
   exercise_id: string;
   exercise_name: string;
+  exercise_type_code?: string | null;
   sets: WorkoutSet[];
 }
 
@@ -42,7 +43,7 @@ export const useSessionDetail = (sessionId?: string) => {
               `
               *,
               exercise:exercises(
-                *
+                *, exercise_type:exercise_types(code)
               )
             `,
             )
@@ -84,6 +85,7 @@ export const useSessionDetail = (sessionId?: string) => {
             acc[exerciseId] = {
               exercise_id: exerciseId,
               exercise_name: exerciseName,
+              exercise_type_code: set.exercise?.exercise_type?.code ?? null,
               sets: [],
             };
           }
@@ -150,11 +152,21 @@ export const useUpdateWorkoutSet = () => {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ setId, reps, weight_kg }: { setId: string; reps: number; weight_kg: number }) => {
+    mutationFn: async ({
+      setId,
+      reps,
+      duration_s,
+      weight_kg,
+    }: {
+      setId: string;
+      reps: number | null;
+      duration_s: number | null;
+      weight_kg: number;
+    }) => {
       console.log(`[useUpdateWorkoutSet] Updating set ${setId} to ${reps} reps @ ${weight_kg}kg`);
       const { data, error } = await supabase
         .from('workout_sets')
-        .update({ reps, weight_kg })
+        .update({ reps, duration_s, weight_kg })
         .eq('id', setId)
         .select()
         .single();

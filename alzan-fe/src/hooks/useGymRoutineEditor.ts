@@ -137,7 +137,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
 
       // Fetch PRs for each exercise
       const exerciseIds = exercises?.map(e => e.exercise_id).filter(Boolean) || [];
-      const prs: Record<string, { weight_kg: number; reps: number }> = {};
+      const prs: Record<string, { weight_kg: number; reps: number | null }> = {};
 
       if (exerciseIds.length > 0) {
         const prPromises = exerciseIds.map(async (exId: string) => {

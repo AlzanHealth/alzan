@@ -1625,8 +1625,8 @@ export const EnduranceSessionFormScreen = () => {
           .eq('session_id', gymSessionData.sessionId);
 
         payload.total_sets = sets?.length || 0;
-        payload.total_reps = sets?.reduce((sum, s) => sum + s.reps, 0) || 0;
-        payload.total_volume_kg = sets?.reduce((sum, s) => sum + s.weight_kg * s.reps, 0) || 0;
+        payload.total_reps = sets?.reduce((sum, s) => sum + (s.reps ?? 0), 0) || 0;
+        payload.total_volume_kg = sets?.reduce((sum, s) => sum + s.weight_kg * (s.reps ?? 0), 0) || 0;
       }
 
       // Add template ID linkage if from template

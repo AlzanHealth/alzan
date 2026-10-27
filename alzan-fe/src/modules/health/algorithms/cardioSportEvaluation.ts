@@ -21,7 +21,7 @@ export type CardioWorkoutSet = {
   session_id: string;
   exercise_id: string;
   weight_kg: number;
-  reps: number;
+  reps: number | null;
   rpe: number | null;
   is_warmup: boolean;
   set_type: string;
@@ -634,7 +634,7 @@ const summarizePeriod = (activities: CardioActivity[], workoutSets: CardioWorkou
   const strengthVolumes = activities
     .map(activity =>
       sessionSetMetric(activity, activity.total_volume_kg, sets =>
-        sets.reduce((sum, set) => sum + set.weight_kg * set.reps, 0),
+        sets.reduce((sum, set) => sum + set.weight_kg * (set.reps ?? 0), 0),
       ),
     )
     .filter(nonNegative);
@@ -644,7 +644,7 @@ const summarizePeriod = (activities: CardioActivity[], workoutSets: CardioWorkou
   const reps = activities
     .map(activity =>
       sessionSetMetric(activity, activity.total_reps, sessionSets =>
-        sessionSets.reduce((sum, set) => sum + set.reps, 0),
+        sessionSets.reduce((sum, set) => sum + (set.reps ?? 0), 0),
       ),
     )
     .filter(nonNegative);
@@ -698,6 +698,7 @@ const getStrengthComparisons = (
       set.is_warmup ||
       /warm.?up/i.test(set.set_type) ||
       !positive(set.weight_kg) ||
+      set.reps == null ||
       !Number.isInteger(set.reps) ||
       set.reps < 1 ||
       set.reps > 20 ||

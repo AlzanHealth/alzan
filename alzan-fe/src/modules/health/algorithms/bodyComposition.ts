@@ -150,7 +150,7 @@ const STORED_FORMULA = 'Stored value; original calculation method is not persist
 // ============================================================================
 // VALIDATION RANGES
 // ============================================================================
-const MEASUREMENT_RANGES = {
+export const COMPOSITION_MEASUREMENT_RANGES = {
   waist: { min: 40, max: 200, label: 'Cintura' },
   hips: { min: 50, max: 200, label: 'Cadera' },
   abdomen: { min: 40, max: 200, label: 'Abdomen' },
@@ -169,7 +169,7 @@ const validateMeasurement = (value: number | undefined, range: { min: number; ma
 
 /** Use the same accepted ranges before selecting the newest measurement and before calculating. */
 export const isValidCompositionMeasurement = (type: keyof AnthroMeasurements, value: number): boolean => {
-  const range = type === 'armFlexed' ? MEASUREMENT_RANGES.arm : MEASUREMENT_RANGES[type];
+  const range = type === 'armFlexed' ? COMPOSITION_MEASUREMENT_RANGES.arm : COMPOSITION_MEASUREMENT_RANGES[type];
   return validateMeasurement(value, range) !== undefined;
 };
 
@@ -373,12 +373,12 @@ export const getMuscleCategory = (
 export const calculateBodyComposition = (input: BodyCompositionInput): BodyCompositionResult => {
   const { weightKg, heightCm, age, sex, measurements = {} } = input;
 
-  const waist = validateMeasurement(measurements.waist, MEASUREMENT_RANGES.waist);
-  const abdomen = validateMeasurement(measurements.abdomen, MEASUREMENT_RANGES.abdomen);
-  const hips = validateMeasurement(measurements.hips, MEASUREMENT_RANGES.hips);
-  const chest = validateMeasurement(measurements.chest, MEASUREMENT_RANGES.chest);
-  const arm = validateMeasurement(measurements.arm, MEASUREMENT_RANGES.arm);
-  const thigh = validateMeasurement(measurements.thigh, MEASUREMENT_RANGES.thigh);
+  const waist = validateMeasurement(measurements.waist, COMPOSITION_MEASUREMENT_RANGES.waist);
+  const abdomen = validateMeasurement(measurements.abdomen, COMPOSITION_MEASUREMENT_RANGES.abdomen);
+  const hips = validateMeasurement(measurements.hips, COMPOSITION_MEASUREMENT_RANGES.hips);
+  const chest = validateMeasurement(measurements.chest, COMPOSITION_MEASUREMENT_RANGES.chest);
+  const arm = validateMeasurement(measurements.arm, COMPOSITION_MEASUREMENT_RANGES.arm);
+  const thigh = validateMeasurement(measurements.thigh, COMPOSITION_MEASUREMENT_RANGES.thigh);
   const hasBmiData = isPositiveFinite(weightKg) && isPositiveFinite(heightCm);
   const hasSex = sex === 'male' || sex === 'female';
   const isAdult = isPositiveFinite(age) && age >= 20;
@@ -589,8 +589,8 @@ export const hasEnoughDataForBodyFat = (
   if (!isPositiveFinite(heightCm) || !isPositiveFinite(age) || age < 16) return false;
   const hasSex = sex === 'male' || sex === 'female';
   return !!(
-    (hasSex && age <= 69 && validateMeasurement(waistCm, MEASUREMENT_RANGES.waist)) ||
+    (hasSex && age <= 69 && validateMeasurement(waistCm, COMPOSITION_MEASUREMENT_RANGES.waist)) ||
     (isPositiveFinite(weightKg) && isPositiveFinite(age) && age <= 80 && hasSex) ||
-    (age >= 20 && validateMeasurement(hipCm, MEASUREMENT_RANGES.hips))
+    (age >= 20 && validateMeasurement(hipCm, COMPOSITION_MEASUREMENT_RANGES.hips))
   );
 };

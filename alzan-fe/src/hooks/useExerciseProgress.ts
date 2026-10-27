@@ -19,7 +19,7 @@ type WeightFlag =
 interface ExerciseSetRow {
   id: string;
   session_id: string;
-  reps: number;
+  reps: number | null;
   weight_kg: number;
   duration_s: number | null;
   created_at: string;
@@ -57,7 +57,7 @@ export interface ExerciseValueEntry {
   id: string;
   sessionId: string;
   date: string;
-  reps: number;
+  reps: number | null;
   weightKg: number;
   normalizedWeightKg: number | null;
   durationSeconds: number;
@@ -78,7 +78,7 @@ const getSetDurationSeconds = (set: Pick<ExerciseSetRow, 'duration_s' | 'reps'>)
     return set.duration_s;
   }
 
-  return Math.max(set.reps, 0);
+  return Math.max(set.reps ?? 0, 0);
 };
 
 const loadExerciseSetRows = async (exerciseId: string, ascending: boolean, userId: string): Promise<ExerciseSetRow[]> =>
@@ -275,10 +275,10 @@ export const useExerciseProgress = (
         const setDate = set.session?.start_time ?? set.created_at;
         const setDurationSeconds = getSetDurationSeconds(set);
         const normalizedWeight = normalizeWeightByLoadTypeForProgress(loadType, set.weight_kg);
-        const normalizedReps = Math.max(set.reps, 0);
+        const normalizedReps = Math.max(set.reps ?? 0, 0);
         const normalizedWeightValue = normalizedWeight.value;
         const estimatedOneRepMaxKg =
-          normalizedWeightValue !== null ? normalizedWeightValue * (1 + normalizedReps / 30) : 0;
+          normalizedWeightValue !== null && normalizedReps > 0 ? normalizedWeightValue * (1 + normalizedReps / 30) : 0;
         const volumeKg = normalizedWeightValue !== null ? normalizedWeightValue * normalizedReps : 0;
         const existing = pointsBySession.get(set.session_id);
         const hasValidWeight = normalizedWeightValue !== null;
@@ -449,7 +449,7 @@ export const useExerciseWeightEntries = (
             normalizedWeightKg: normalizedWeightValue,
             durationSeconds,
             isEmptyWeight: normalizedWeightValue === null,
-            isEmptyReps: entry.reps <= 0,
+            isEmptyReps: entry.reps == null || entry.reps <= 0,
             isEmptyDuration: durationSeconds <= 0,
             weightQuality: normalizedWeight.quality,
             weightFlags: normalizedWeight.flags,
@@ -494,7 +494,7 @@ export const useUpdateExerciseWeightEntry = (exerciseId?: string, metric: Exerci
           ? { weight_kg: normalizedValue }
           : metric === 'reps'
             ? { reps: Math.round(normalizedValue) }
-            : { reps: Math.round(normalizedValue), duration_s: Math.round(normalizedValue) };
+            : { reps: null, duration_s: Math.round(normalizedValue) };
 
       const { data, error } = await supabase
         .from('workout_sets')

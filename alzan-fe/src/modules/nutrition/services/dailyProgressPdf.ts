@@ -4,7 +4,10 @@ import { getDateFnsLocale } from '../../../i18n/dateLocale';
 import i18n from '../../../i18n';
 import type { TranslationKey } from '../../../i18n/locales/en';
 import type { Row } from '../../../types/requests.types';
-import { createDailyProgressHtml as renderDailyProgressHtml } from './dailyProgressPdfView';
+import {
+  createDailyProgressHtml as renderDailyProgressHtml,
+  formatDailyProgressSetMetric,
+} from './dailyProgressPdfView';
 import { isNutritionPdfRecord } from './nutritionPdfRecords';
 
 type ProgressSession = Pick<
@@ -246,9 +249,8 @@ const renderDailyCard = (day: DailyProgress): string => {
     );
     const setDetails = sessionSets.map(set => {
       const load = set.weight_kg === 0 ? t('progressPdf.loadNotRecorded') : numeric(set.weight_kg, 'kg');
-      const details = [`${set.set_number}: ${set.reps} ${t('progressPdf.reps')}`, load];
+      const details = [formatDailyProgressSetMetric(set, t), load];
       if (set.distance_m != null) details.push(numeric(set.distance_m / 1000, 'km'));
-      if (set.duration_s != null) details.push(numeric(set.duration_s / 60, 'min'));
       return `${set.exercise_name ?? t('progressPdf.unknownExercise')} — ${details.join(' · ')}`;
     });
     return [

@@ -83,7 +83,7 @@ type ActiveWorkoutCoreData = {
 
 type ActiveWorkoutSupplementalData = {
   history: Record<string, HistoryItem[]>;
-  prs: Record<string, { weight_kg: number; reps: number }>;
+  prs: Record<string, { weight_kg: number; reps: number | null }>;
 };
 
 export type ActiveWorkoutData = ActiveWorkoutCoreData & ActiveWorkoutSupplementalData;
@@ -441,7 +441,7 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
         } satisfies ActiveWorkoutSupplementalData;
       }
 
-      const prs: Record<string, { weight_kg: number; reps: number }> = {};
+      const prs: Record<string, { weight_kg: number; reps: number | null }> = {};
       const history: Record<string, HistoryItem[]> = {};
 
       const { data: historyData } = await supabase

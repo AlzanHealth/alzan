@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 
 export type ExercisePR = {
   weight_kg: number;
-  reps: number;
+  reps: number | null;
 };
 
 export const useExercisesPRs = (exerciseIds: string[]) => {

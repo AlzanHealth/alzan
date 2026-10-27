@@ -1,7 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../context/AuthContext';
 import { wearablesLocalHealthApi } from '../localHealthSyncApi';
 import { pollingIntervalAfterError } from '../../../lib/querySafety';
+import { CloudSyncRecoveryState, shouldRecoverCloudSyncPolling } from './activeCloudSyncRecovery';
 
 const ACTIVE_SYNC_QUERY_KEY = 'activeCloudSyncs';
 
@@ -19,6 +21,15 @@ export const useActiveCloudSyncs = (isScreenFocused = false, isSyncRequestPendin
         isScreenFocused || isSyncRequestPending || query.state.data?.jobs.length ? 2500 : false,
       ),
   });
+
+  const recoveryState = useRef<CloudSyncRecoveryState | undefined>(undefined);
+  const { isError, refetch } = activeSyncsQuery;
+  useEffect(() => {
+    const current = { userId: user?.id, isScreenFocused, isSyncRequestPending };
+    const recover = shouldRecoverCloudSyncPolling(recoveryState.current, current);
+    recoveryState.current = current;
+    if (recover && isError) void refetch({ cancelRefetch: false });
+  }, [user?.id, isScreenFocused, isSyncRequestPending, isError, refetch]);
 
   const cancelMutation = useMutation({
     mutationFn: wearablesLocalHealthApi.cancelActiveCloudSyncs,

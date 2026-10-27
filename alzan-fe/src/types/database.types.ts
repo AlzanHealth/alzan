@@ -5110,7 +5110,7 @@ export type Database = {
           max_hr_bpm: number | null;
           notes: string | null;
           pause_s: number | null;
-          reps: number;
+          reps: number | null;
           rest_s: number | null;
           rpe: number | null;
           session_id: string;
@@ -5133,7 +5133,7 @@ export type Database = {
           max_hr_bpm?: number | null;
           notes?: string | null;
           pause_s?: number | null;
-          reps: number;
+          reps?: number | null;
           rest_s?: number | null;
           rpe?: number | null;
           session_id: string;
@@ -5156,7 +5156,7 @@ export type Database = {
           max_hr_bpm?: number | null;
           notes?: string | null;
           pause_s?: number | null;
-          reps?: number;
+          reps?: number | null;
           rest_s?: number | null;
           rpe?: number | null;
           session_id?: string;

@@ -61,6 +61,7 @@ const day: DailyProgress = {
 
 const messages: Record<string, string> = {
   'progressPdf.noData': 'No data',
+  'training.time': 'Time',
   'progressPdf.steps': 'steps',
   'progressPdf.reps': 'reps',
   'progressPdf.loadNotRecorded': 'Load not recorded',
@@ -136,3 +137,18 @@ const skippedMealHtml = createDailyProgressHtml(
   enUS,
 );
 assert.doesNotMatch(skippedMealHtml, /544 kcal/);
+
+const timedDay: DailyProgress = {
+  ...day,
+  sets: [
+    { ...day.sets[0], exercise_name: 'Timed plank', reps: null, duration_s: 40 },
+    { ...day.sets[0], exercise_name: 'Repetition row', set_number: 2, reps: 8, duration_s: null, weight_kg: 20 },
+    { ...day.sets[0], exercise_name: 'Missing metric', set_number: 3, reps: null, duration_s: null },
+  ],
+};
+const timedHtml = createDailyProgressHtml([timedDay], translate, enUS);
+assert.match(timedHtml, /Timed plank — 1: Time 0:40 · Load not recorded/);
+assert.match(timedHtml, /Repetition row — 2: 8 reps · 20 kg/);
+assert.match(timedHtml, /Missing metric — 3: No data · Load not recorded/);
+assert.doesNotMatch(timedHtml, /null reps|undefined reps|0\.666666/);
+assert.equal((timedHtml.match(/0:40/g) ?? []).length, 1, 'set duration must appear only once');

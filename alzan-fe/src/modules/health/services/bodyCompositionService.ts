@@ -2,6 +2,12 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { Database } from '../../../types/requests.types';
 import { calculatePersistedAbdominalHealth } from '../algorithms/abdominalHealth';
+import { loadLatestCompositionInputs } from './compositionInputs';
+import {
+  BODY_COMPOSITION_VERSION,
+  needsCompositionRepair,
+  isCurrentCompositionSnapshot,
+} from '../helpers/compositionVersion';
 import {
   createCompositionRequestGuard,
   CompositionRefreshPausedError,
@@ -33,7 +39,7 @@ export interface ManualRecalculateResult {
     | 'user_not_found';
   errorValues?: Record<string, string | number>;
 }
-const VERSION = 4;
+const VERSION = BODY_COMPOSITION_VERSION;
 const MAX_HISTORICAL_REPAIRS = 12;
 const calculationGuard = createCompositionRequestGuard<RecalculateDailyCompositionResult>();
 const historicalRepairUsers = new Set<string>();
@@ -94,29 +100,12 @@ export const bodyCompositionService = {
         return { success: false, reason: 'future_date' };
       }
       const cutoff = new Date(Math.min(dateEnd(targetDate).getTime() - 1, now.getTime()));
-      const [profile, weightsResult, measurementsResult] = await Promise.all([
+      const [profile, inputs] = await Promise.all([
         this.getUserProfile(userId, signal),
-        supabase
-          .from('weight_logs')
-          .select('id, measured_at, weight_kg')
-          .eq('user_id', userId)
-          .lte('measured_at', cutoff.toISOString())
-          .order('measured_at', { ascending: false })
-          .limit(1000)
-          .abortSignal(signal),
-        supabase
-          .from('body_measurements')
-          .select('id, measurement_type, measured_at, value_cm, measurement_protocol')
-          .eq('user_id', userId)
-          .lte('measured_at', cutoff.toISOString())
-          .order('measured_at', { ascending: false })
-          .limit(1000)
-          .abortSignal(signal),
+        loadLatestCompositionInputs(supabase, userId, cutoff.toISOString(), signal),
       ]);
-      if (weightsResult.error) throw weightsResult.error;
-      if (measurementsResult.error) throw measurementsResult.error;
       const measurements: DailyCompositionMeasurementInput[] = [];
-      for (const row of measurementsResult.data ?? []) {
+      for (const row of inputs.measurements) {
         if (isBodyCompositionMeasurementType(row.measurement_type))
           measurements.push({
             id: row.id,
@@ -130,7 +119,7 @@ export const bodyCompositionService = {
       const plan = planDailyBodyCompositionRecalculation({
         targetDate,
         now,
-        weights: (weightsResult.data ?? []).map(row => ({
+        weights: inputs.weights.map(row => ({
           id: row.id,
           measuredAt: row.measured_at,
           weightKg: row.weight_kg,
@@ -182,7 +171,7 @@ export const bodyCompositionService = {
           asOf: cutoff.toISOString(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           sourceWeightLogId: plan.sourceWeightLogId ?? null,
-          weightMeasuredAt: weightsResult.data?.find(row => row.id === plan.sourceWeightLogId)?.measured_at ?? null,
+          weightMeasuredAt: inputs.weights.find(row => row.id === plan.sourceWeightLogId)?.measured_at ?? null,
           weightKg: plan.weightKgUsed ?? null,
           heightCm: profile?.height_cm ?? null,
           age: ageAt(profile?.date_of_birth ?? null, cutoff),
@@ -265,10 +254,10 @@ export const bodyCompositionService = {
     const dates = new Set(
       (data ?? [])
         .filter(row => row.calculated_for_date <= localDate(serverNow))
-        .filter(row => row.calculation_status === 'stale' || row.calculation_version !== VERSION)
+        .filter(needsCompositionRepair)
         .map(row => row.calculated_for_date),
     );
-    // Always refresh today on hydration: input expiry and imports may create no snapshot.
+    // Always refresh today on hydration: imports may create no snapshot.
     for (const row of [...weights.data, ...measurements.data]) {
       const date = localDate(new Date(row.measured_at));
       if (!storedDates.has(date)) dates.add(date);
@@ -299,11 +288,12 @@ export const bodyCompositionService = {
       .select('*')
       .eq('user_id', userId)
       .neq('calculation_status', 'stale')
+      .eq('calculation_version', VERSION)
       .lte('calculated_for_date', localDate(serverNow))
       .order('calculated_for_date', { ascending: false })
       .limit(limit);
     if (freshError) throw freshError;
-    return fresh;
+    return fresh.filter(isCurrentCompositionSnapshot);
   },
 
   async repairIncompleteSnapshots(userId: string, dates: string[]): Promise<void> {

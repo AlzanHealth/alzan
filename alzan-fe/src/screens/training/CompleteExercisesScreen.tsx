@@ -22,6 +22,8 @@ import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInp
 import { healthQueryKeys } from '../../modules/health/hooks/healthQueryKeys';
 import { fetchExerciseUserOverrides } from '../../modules/training/services/exerciseCatalogService';
 import { applyExerciseUserOverride } from '../../modules/training/helpers/exerciseUserOverride';
+import { isTimeBasedGymExerciseType } from '../../modules/training/helpers/gymExerciseDefaults.helper';
+import { getWorkoutSetMetricValue, getWorkoutSetMetrics } from './helpers/workoutFinalization';
 
 interface DraftSet {
   key: string;
@@ -31,6 +33,7 @@ interface DraftSet {
 
 interface TemplateExerciseLite {
   exerciseId: string;
+  exerciseTypeCode: string | null;
   name: string;
   targetSets: number | null;
   targetRepsMin: number | null;
@@ -40,6 +43,7 @@ interface TemplateExerciseLite {
 
 interface ExerciseSection {
   exerciseId: string;
+  exerciseTypeCode: string | null;
   name: string;
   target: TemplateExerciseLite | null;
   existingSets: WorkoutSet[];
@@ -66,7 +70,9 @@ export const CompleteExercisesScreen = () => {
   const locale = getCurrentAppLocale();
 
   const [drafts, setDrafts] = useState<Record<string, DraftSet[]>>({});
-  const [extraExercises, setExtraExercises] = useState<Array<{ id: string; name: string }>>([]);
+  const [extraExercises, setExtraExercises] = useState<
+    Array<{ id: string; name: string; exerciseTypeCode: string | null }>
+  >([]);
   const [saving, setSaving] = useState(false);
 
   const { data: sessionDetail } = useSessionDetail(sessionId);
@@ -87,7 +93,9 @@ export const CompleteExercisesScreen = () => {
       if (!sessionRow?.workout_template_id) return [];
       const { data, error } = await supabase
         .from('workout_template_exercises')
-        .select('exercise_id, target_sets, target_reps_min, target_reps_max, order_index, exercise:exercises(*)')
+        .select(
+          'exercise_id, target_sets, target_reps_min, target_reps_max, order_index, exercise:exercises(*, exercise_type:exercise_types(code))',
+        )
         .eq('workout_template_id', sessionRow.workout_template_id)
         .order('order_index');
       if (error) throw error;
@@ -96,6 +104,7 @@ export const CompleteExercisesScreen = () => {
       const overridesByExerciseId = new Map(overrides.map(override => [override.exercise_id, override]));
       return (data ?? []).map(row => ({
         exerciseId: row.exercise_id,
+        exerciseTypeCode: row.exercise?.exercise_type?.code ?? null,
         name: row.exercise
           ? getLocalizedExerciseName(
               applyExerciseUserOverride(row.exercise, overridesByExerciseId.get(row.exercise_id)),
@@ -118,6 +127,7 @@ export const CompleteExercisesScreen = () => {
       if (!byId.has(templateExercise.exerciseId)) {
         byId.set(templateExercise.exerciseId, {
           exerciseId: templateExercise.exerciseId,
+          exerciseTypeCode: templateExercise.exerciseTypeCode,
           name: templateExercise.name,
           target: templateExercise,
           existingSets: [],
@@ -131,6 +141,7 @@ export const CompleteExercisesScreen = () => {
       } else {
         byId.set(group.exercise_id, {
           exerciseId: group.exercise_id,
+          exerciseTypeCode: group.exercise_type_code ?? null,
           name: group.exercise_name,
           target: null,
           existingSets: group.sets,
@@ -139,7 +150,13 @@ export const CompleteExercisesScreen = () => {
     }
     for (const extra of extraExercises) {
       if (!byId.has(extra.id)) {
-        byId.set(extra.id, { exerciseId: extra.id, name: extra.name, target: null, existingSets: [] });
+        byId.set(extra.id, {
+          exerciseId: extra.id,
+          exerciseTypeCode: extra.exerciseTypeCode,
+          name: extra.name,
+          target: null,
+          existingSets: [],
+        });
       }
     }
     return Array.from(byId.values());
@@ -185,7 +202,10 @@ export const CompleteExercisesScreen = () => {
           setExtraExercises(current =>
             current.some(extra => extra.id === exercise.id)
               ? current
-              : [...current, { id: exercise.id, name: exercise.name }],
+              : [
+                  ...current,
+                  { id: exercise.id, name: exercise.name, exerciseTypeCode: exercise.exercise_type_code ?? null },
+                ],
           );
         }
         addDraft(exercise.id);
@@ -202,7 +222,8 @@ export const CompleteExercisesScreen = () => {
         session_id: string;
         exercise_id: string;
         set_number: number;
-        reps: number;
+        reps: number | null;
+        duration_s: number | null;
         weight_kg: number;
         user_id: string;
         created_at: string;
@@ -223,7 +244,7 @@ export const CompleteExercisesScreen = () => {
             session_id: sessionId,
             exercise_id: section.exerciseId,
             set_number: setNumber,
-            reps,
+            ...getWorkoutSetMetrics(reps, section.exerciseTypeCode),
             weight_kg: weightKg,
             user_id: user.id,
             created_at: new Date().toISOString(),
@@ -279,7 +300,7 @@ export const CompleteExercisesScreen = () => {
       target.targetRepsMin != null && target.targetRepsMax != null && target.targetRepsMin !== target.targetRepsMax
         ? `${target.targetRepsMin}-${target.targetRepsMax}`
         : `${target.targetRepsMax ?? target.targetRepsMin ?? ''}`;
-    return `${target.targetSets ?? '-'} x ${reps || '-'}`;
+    return `${target.targetSets ?? '-'} x ${reps || '-'}${isTimeBasedGymExerciseType(target.exerciseTypeCode) ? ' s' : ''}`;
   };
 
   return (
@@ -325,7 +346,9 @@ export const CompleteExercisesScreen = () => {
                     {set.set_number}
                   </Text>
                   <Text style={[typography.body, { color: themeColors.textPrimary }]}>
-                    {set.reps} x{' '}
+                    {isTimeBasedGymExerciseType(section.exerciseTypeCode)
+                      ? `${getWorkoutSetMetricValue(set, section.exerciseTypeCode) ?? ''} s`
+                      : `${set.reps ?? ''} x`}{' '}
                     {preferences.weight_unit === 'lb'
                       ? `${Math.round((set.weight_kg ?? 0) * 2.20462 * 10) / 10} lb`
                       : `${set.weight_kg ?? 0} kg`}
@@ -341,7 +364,7 @@ export const CompleteExercisesScreen = () => {
                   <TextInput
                     style={[styles.setInput, { color: themeColors.textPrimary, borderColor: themeColors.border }]}
                     {...INTEGER_INPUT_PROPS}
-                    placeholder={t('training.repsColon')}
+                    placeholder={isTimeBasedGymExerciseType(section.exerciseTypeCode) ? 's' : t('training.repsColon')}
                     placeholderTextColor={themeColors.textSecondary}
                     value={draft.reps}
                     onChangeText={value => updateDraft(section.exerciseId, draft.key, 'reps', value)}

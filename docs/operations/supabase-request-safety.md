@@ -15,7 +15,7 @@ The app-level retry/polling guards reduce accidental request loops; they cannot 
 ## Request limits
 
 - `alzan-fe/src/lib/querySafety.ts` permits one retry for a network failure or HTTP 5xx. SQL, business-validation, permission, HTTP 4xx and quota failures are not automatically retried by React Query.
-- Composition, wearable-job and active-session polling pauses after an error. Window focus, remount, reconnection or explicit invalidation can resume the query. Active-session polling also stops when the training screen is not focused.
+- Composition, wearable-job and active-session polling pauses after an error. Window focus, remount, reconnection or explicit invalidation can resume the query. Wearable-job polling also explicitly retries once when the user returns to the connected-apps screen or starts a fresh sync request; another failure stays paused until a new action. Active-session polling also stops when the training screen is not focused.
 - `compositionRequestGuard.ts` shares a calculation between callers for the same user and date. Supabase calls inside a calculation share a 20-second abort signal. After a failed calculation, subsequent calculations for that user pause for 30 seconds, increasing to at most five minutes on repeated failures.
 - A real input edit can clear a revision-conflict cooldown, but cannot bypass an outage cooldown. An older successful request cannot clear a newer failure.
 - Historical background repairs process at most 12 dates per minute, with at most four concurrent calculations. A real input mutation repairs at most 12 stale dates plus the changed date; remaining history can be repaired on later refreshes.
@@ -23,6 +23,12 @@ The app-level retry/polling guards reduce accidental request loops; they cannot 
 - `context/authMaintenance.ts` shares overlapping startup/SIGNED_IN maintenance and permits at most one run per user per minute after completion. This prevents duplicate automatic planning work from repeated auth events; direct planning settings actions keep their existing behavior.
 
 These client guards apply per running application instance. They are not a server rate limit against a modified client or a cross-device spending limit. Supabase authentication, ownership checks, input revisions and RLS remain the server boundaries.
+
+## Latest composition inputs and historical upgrades
+
+`alzan-fe/src/modules/health/services/compositionInputs.ts` retrieves the latest eligible row for each of seven measurement type/protocol combinations plus the latest valid positive weight. Each query filters the owner, evaluation cutoff and accepted values before applying `limit(1)`; timestamp ties use a stable ID order. At most eight input rows are returned, so a long history of chest or other measurements cannot hide an older valid waist. The accepted measurement ranges come from the calculation engine in `bodyComposition.ts`.
+
+`alzan-fe/src/modules/health/helpers/compositionVersion.ts` advances snapshots to version 5. Historical snapshots from the former 72-hour policy enter the existing bounded repair queue and are excluded from displayed results until recalculated. Today's calculation runs first. Raw measured/imported body-fat values remain separate.
 
 ## Database invalidation
 
@@ -46,6 +52,12 @@ Migration `20261027193000_restrict_authenticated_rpc_anonymous_grants.sql` remov
 
 This does not establish that a real credential was previously exposed, and does not remove existing logs or historical ingest usage. The review does not cover every manually constructed log message in the repository.
 
+## Timed strength sets and deployment order
+
+The training JSON contract accepts `duration_s` without repetitions for catalog exercises whose type is time-based. Template targets and weekly progressions keep the duration in their existing target fields; completed sets persist seconds in `workout_sets.duration_s` with `reps = null`. Repetition sets retain repetitions and do not contribute artificial durations. Resuming, editing, adding missing sets and PDF exports handle both metrics; known legacy timed exercises can still read seconds from their former repetitions field.
+
+Migration `20261028120000_allow_timed_workout_sets_without_repetitions.sql` removes the `NOT NULL` requirement on `workout_sets.reps`, preserving existing values. Apply this migration **before deploying the updated frontend**; the previous schema rejects completed timed sets with null repetitions. The database types were regenerated from local Supabase using `pnpm run supabase:types`, not edited by hand. This migration was applied only locally during this review.
+
 ## Verification
 
 Run from the repository root:
@@ -65,12 +77,15 @@ The SQL regression is local-only and rolls back its fixture writes:
 ```sh
 docker exec -i supabase_db_alzan-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/composition_input_revision.sql
 docker exec -i supabase_db_alzan-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/internal_rpc_permissions.sql
+docker exec -i supabase_db_alzan-app psql -U postgres -d postgres -v ON_ERROR_STOP=1 < supabase/tests/timed_workout_sets.integration.sql
 ```
 
 Deploy the frontend, backend and migration through the existing release process. Applying the SQL function alone does not deploy the client guards or backend logger. No paid service or billing configuration is part of this change.
 
 ### Validation and rollout on 2026-10-27
 
-All five SQL migrations in this change were applied locally and to the linked Cloud project with the Supabase CLI. Cloud schema readback verified restricted RPC grants and the invalidation branches; the final measured-composition adjustment was subsequently applied successfully. Local transaction tests cover composition invalidation, ownership/RLS, denied client execution, successful service-role writes and wearable bundles.
+The earlier rollout verified Cloud application of the conflict handling and RPC restrictions, followed by the measured-composition invalidation adjustment. The 2026-10-28 PR review checked the final local schema, including forward invalidation for the latest-input policy. Local transaction tests cover composition invalidation, ownership/RLS, denied client execution and successful service-role writes. This review did not apply migrations or deploy application changes to Cloud.
 
 Format, lint and TypeScript checks passed. Request safety, logger safety, body-composition, active-workout and 13 import-review integration scenarios passed. Manual localhost checks covered login, persisted login after reload, Health, Training calendar loading and the successful unchanged-recalculation modal. No physical iPhone test was performed. Frontend/backend source changes remain on `fix/composition-conflict-log-ingestion` and have not been deployed by this task.
+
+The 2026-10-28 review added regression coverage for more than 1,200 historical measurements, snapshot version upgrades, explicit wearable polling recovery, and real HTML rendering of timed sets. Manual localhost testing imported a two-week timed routine, verified 30/40-second progression targets and optional RIR in the database and active workout, completed the second session, and confirmed that editing 40 to 42 seconds preserved `duration_s` and null repetitions. The disposable QA routine and sessions were removed after validation.

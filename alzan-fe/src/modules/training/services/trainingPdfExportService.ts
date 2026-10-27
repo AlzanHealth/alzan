@@ -467,7 +467,7 @@ export const generateTrainingPDF = async ({
         }
         exerciseMap.get(exerciseName)?.push(set);
 
-        if (set.weight_kg > 0 && set.reps > 0) {
+        if (set.weight_kg > 0 && set.reps != null && set.reps > 0) {
           sessionVolume += set.weight_kg * set.reps;
         }
       });
@@ -787,7 +787,8 @@ export const generateTrainingPDF = async ({
       const primaryMetrics: string[] = [];
       const contextualMetrics: string[] = [];
 
-      if (set.reps > 0) primaryMetrics.push(`${set.reps} ${t('training.repetitions').toLowerCase()}`);
+      if (set.reps != null && set.reps > 0)
+        primaryMetrics.push(`${set.reps} ${t('training.repetitions').toLowerCase()}`);
       if (set.weight_kg > 0) primaryMetrics.push(convertWeightToUi(set.weight_kg, weightUnit, 1).label);
       if (set.distance_m != null && set.distance_m > 0)
         primaryMetrics.push(convertDistanceToUi(set.distance_m, distanceUnit, 2).label);

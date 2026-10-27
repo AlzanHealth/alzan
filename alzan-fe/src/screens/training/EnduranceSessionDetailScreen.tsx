@@ -76,6 +76,8 @@ import { getDefaultCopyTargetDate } from '../../modules/training/helpers/copyCom
 import { DECIMAL_INPUT_PROPS, INTEGER_INPUT_PROPS } from '../../utils/numericInput';
 import { canDeleteActivitySession } from './helpers/trainingDetailActions.helper';
 import { sortByOrderIndex } from '../../modules/training/helpers/advancedEnduranceSession.helper';
+import { isTimeBasedGymExerciseType } from '../../modules/training/helpers/gymExerciseDefaults.helper';
+import { getWorkoutSetMetricValue, getWorkoutSetMetrics } from './helpers/workoutFinalization';
 
 const VOLLEYBALL_SPORT_TYPE = 'volleyball' as ActivitySession['sport_type'];
 const TRAIL_SPORT_TYPE = 'trail' as ActivitySession['sport_type'];
@@ -254,8 +256,10 @@ export const EnduranceSessionDetailScreen = () => {
   const [editingSet, setEditingSet] = useState<{
     id: string;
     set_number: number;
-    reps: number;
+    reps: number | null;
+    duration_s: number | null;
     weight_kg: number;
+    exerciseTypeCode: string | null;
   } | null>(null);
   const [editReps, setEditReps] = useState('');
   const [editWeight, setEditWeight] = useState('');
@@ -2009,7 +2013,11 @@ export const EnduranceSessionDetailScreen = () => {
                         <View style={styles.setHeaderRow}>
                           <Text style={[styles.setHeaderLabel, dynamicStyles.sublabel, { width: 62 }]} />
                           <Text style={[styles.setHeaderLabel, dynamicStyles.sublabel, { flex: 1 }]}>
-                            {t('training.repsColon').toUpperCase()}
+                            {t(
+                              isTimeBasedGymExerciseType(group.exercise_type_code)
+                                ? 'training.time'
+                                : 'training.repsColon',
+                            ).toUpperCase()}
                           </Text>
                           <Text style={[styles.setHeaderLabel, dynamicStyles.sublabel, { flex: 1 }]}>
                             {preferences.weight_unit.toUpperCase()}
@@ -2070,7 +2078,11 @@ export const EnduranceSessionDetailScreen = () => {
                                   </View>
                                 )}
                               </View>
-                              <Text style={[styles.setCellValue, dynamicStyles.title, { flex: 1 }]}>{set.reps}</Text>
+                              <Text style={[styles.setCellValue, dynamicStyles.title, { flex: 1 }]}>
+                                {isTimeBasedGymExerciseType(group.exercise_type_code)
+                                  ? `${getWorkoutSetMetricValue(set, group.exercise_type_code) ?? ''} s`
+                                  : set.reps}
+                              </Text>
                               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
                                 <Text style={[styles.setCellValue, dynamicStyles.title]}>
                                   {toDisplayWeight(set.weight_kg)}
@@ -2085,8 +2097,14 @@ export const EnduranceSessionDetailScreen = () => {
                                 style={styles.editSetButton}
                                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                                 onPress={() => {
-                                  setEditingSet(set);
-                                  setEditReps(String(set.reps));
+                                  setEditingSet({ ...set, exerciseTypeCode: group.exercise_type_code ?? null });
+                                  setEditReps(
+                                    String(
+                                      isTimeBasedGymExerciseType(group.exercise_type_code)
+                                        ? (getWorkoutSetMetricValue(set, group.exercise_type_code) ?? '')
+                                        : (set.reps ?? ''),
+                                    ),
+                                  );
                                   setEditWeight(String(toDisplayWeight(set.weight_kg)));
                                 }}
                               >
@@ -2489,7 +2507,9 @@ export const EnduranceSessionDetailScreen = () => {
                     autoFocus
                   />
                   <Text style={[styles.modalInputUnit, { color: themeColors.textSecondary }]}>
-                    {t('training.repsColon').toLowerCase()}
+                    {isTimeBasedGymExerciseType(editingSet?.exerciseTypeCode)
+                      ? 's'
+                      : t('training.repsColon').toLowerCase()}
                   </Text>
                 </View>
                 <View style={styles.modalInputGroup}>
@@ -2519,7 +2539,11 @@ export const EnduranceSessionDetailScreen = () => {
                   const weight_kg = preferences.weight_unit === 'lb' ? displayWeight / 2.20462 : displayWeight;
                   if (!isNaN(reps) && !isNaN(weight_kg)) {
                     updateSet.mutate(
-                      { setId: editingSet.id, reps, weight_kg },
+                      {
+                        setId: editingSet.id,
+                        ...getWorkoutSetMetrics(reps, editingSet.exerciseTypeCode, editingSet),
+                        weight_kg,
+                      },
                       { onSuccess: () => setEditingSet(null) },
                     );
                   }
