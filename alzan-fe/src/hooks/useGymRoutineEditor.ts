@@ -23,6 +23,8 @@ import {
   type StrengthProgressionTargets,
 } from '../modules/training/helpers/strengthExerciseReconciliation.helper';
 import { fetchExerciseUserOverrides } from '../modules/training/services/exerciseCatalogService';
+import type { Json } from '../types/database.types';
+import { parseTargetRirBySet } from '../modules/training/helpers/targetRirBySet.helper';
 
 export type PopulatedRoutineData = NonNullable<ReturnType<typeof useGymRoutineEditor>['routineData']>;
 export type RoutineDataExercise = PopulatedRoutineData['exercises'][number];
@@ -52,7 +54,8 @@ interface RoutineExerciseLookupRow extends Exercise {
   } | null;
 }
 
-type WorkoutTemplateExerciseLookupRow = WorkoutTemplateExercise & {
+type WorkoutTemplateExerciseLookupRow = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & {
+  target_rir_by_set: Json | null;
   exercise: RoutineExerciseLookupRow | null;
 };
 
@@ -60,6 +63,10 @@ type ExistingRoutineExerciseRow = {
   id: string;
   order_index: number;
 } & StrengthProgressionTargets;
+
+type ExistingRoutineExerciseDatabaseRow = Omit<ExistingRoutineExerciseRow, 'target_rir_by_set'> & {
+  target_rir_by_set: Json | null;
+};
 
 export const useGymRoutineEditor = (routineId?: string) => {
   const { user } = useAuth();
@@ -112,6 +119,7 @@ export const useGymRoutineEditor = (routineId?: string) => {
 
         return {
           ...te,
+          target_rir_by_set: parseTargetRirBySet(te.target_rir_by_set, te.target_sets),
           target_reps_min: repsMin,
           target_reps_max: repsMax,
           is_warmup: te.is_warmup ?? false,
@@ -219,10 +227,13 @@ export const useGymRoutineEditor = (routineId?: string) => {
           )
           .eq('workout_template_id', data.id)
           .order('order_index')
-          .returns<ExistingRoutineExerciseRow[]>();
+          .returns<ExistingRoutineExerciseDatabaseRow[]>();
 
         if (existingError) throw existingError;
-        existingExercises = existingRows ?? [];
+        existingExercises = (existingRows ?? []).map(row => ({
+          ...row,
+          target_rir_by_set: parseTargetRirBySet(row.target_rir_by_set, row.target_sets),
+        }));
       }
 
       const reconciliation = buildStrengthExerciseReconciliationPlan({
@@ -292,13 +303,14 @@ export const useGymRoutineEditor = (routineId?: string) => {
         if (targetUpdates.length > 0) {
           const { data: progressionRows, error: progressionRowsError } = await supabase
             .from('workout_template_exercise_progressions')
-            .select('id, workout_template_exercise_id, target_rir_by_set')
+            .select('id, workout_template_exercise_id, target_sets, target_rir_by_set')
             .eq('workout_template_id', template.id)
             .returns<
               Array<{
                 id: string;
                 workout_template_exercise_id: string;
-                target_rir_by_set: Array<number | null> | null;
+                target_sets: number | null;
+                target_rir_by_set: Json | null;
               }>
             >();
           if (progressionRowsError) throw progressionRowsError;
@@ -312,10 +324,11 @@ export const useGymRoutineEditor = (routineId?: string) => {
                 .filter(row => row.workout_template_exercise_id === update.exerciseId)
                 .map(row => {
                   const rowPatch = { ...progressionPatch };
-                  if (setCountChanged && Array.isArray(row.target_rir_by_set)) {
+                  const previousRirTargets = parseTargetRirBySet(row.target_rir_by_set, row.target_sets);
+                  if (setCountChanged && previousRirTargets) {
                     rowPatch.target_rir_by_set = Array.from(
-                      { length: progressionPatch.target_sets ?? row.target_rir_by_set.length },
-                      (_, index) => row.target_rir_by_set?.[index] ?? null,
+                      { length: progressionPatch.target_sets ?? previousRirTargets.length },
+                      (_, index) => previousRirTargets[index] ?? null,
                     );
                   }
                   return supabase.from('workout_template_exercise_progressions').update(rowPatch).eq('id', row.id);

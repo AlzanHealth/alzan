@@ -584,7 +584,7 @@ const createStrengthTemplate = async (
       });
       const { error: progressionError } = await supabase
         .from('workout_template_exercise_progressions')
-        .insert(progressionRows as never);
+        .insert(progressionRows);
       if (progressionError) {
         logTrainingPlanImportError('strength-progressions:create-failed', progressionError, {
           familyKey: family.familyKey,

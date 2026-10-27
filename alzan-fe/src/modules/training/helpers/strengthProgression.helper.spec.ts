@@ -7,6 +7,7 @@ import {
   type StrengthExerciseProgression,
 } from './strengthProgression.helper';
 import { getProgressionWeekIndex } from './enduranceProgression.helper';
+import { parseTargetRirBySet } from './targetRirBySet.helper';
 
 const baseExercises = [
   {
@@ -147,6 +148,16 @@ assert.deepEqual(
   baseExercises,
   'dates after the recurrence must use the base targets',
 );
+
+assert.deepEqual(parseTargetRirBySet(null, 3), null);
+assert.deepEqual(parseTargetRirBySet([3, null, 1], 3), [3, null, 1]);
+assert.deepEqual(parseTargetRirBySet([0, 10], 2), [0, 10]);
+assert.equal(parseTargetRirBySet([3, 2], 3), null, 'vectors with a different number of sets are rejected');
+assert.equal(parseTargetRirBySet([3, -1], 2), null, 'RIR cannot be negative');
+assert.equal(parseTargetRirBySet([3, 11], 2), null, 'RIR cannot be above ten');
+assert.equal(parseTargetRirBySet([3, 2.5], 2), null, 'RIR targets must be integers');
+assert.equal(parseTargetRirBySet([3, '2'], 2), null, 'string values are rejected');
+assert.equal(parseTargetRirBySet({ values: [3, 2] }, 2), null, 'non-array JSON is rejected');
 
 const verifySafeFallback = async () => {
   let capturedError: unknown;

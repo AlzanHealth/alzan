@@ -27,8 +27,11 @@ import { Exercise, WorkoutTemplate, WorkoutTemplateExercise } from '../../types/
 import { applyStrengthProgressionsForPlannedDate } from '../../modules/training/services/strengthProgressionService';
 import { fetchExerciseUserOverrides } from '../../modules/training/services/exerciseCatalogService';
 import { applyExerciseUserOverride } from '../../modules/training/helpers/exerciseUserOverride';
+import type { Json } from '../../types/database.types';
+import { parseTargetRirBySet, type TargetRirBySet } from '../../modules/training/helpers/targetRirBySet.helper';
 
-interface TemplateExerciseRow extends WorkoutTemplateExercise {
+type TemplateExerciseRow = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & {
+  target_rir_by_set: TargetRirBySet;
   exercise:
     | (Exercise & {
         base_name_es?: string | null;
@@ -37,7 +40,11 @@ interface TemplateExerciseRow extends WorkoutTemplateExercise {
         description_en?: string | null;
       })
     | null;
-}
+};
+
+type DatabaseTemplateExerciseRow = Omit<TemplateExerciseRow, 'target_rir_by_set'> & {
+  target_rir_by_set: Json | null;
+};
 
 interface WorkoutTemplateWithExercises extends WorkoutTemplate {
   exercises: Array<
@@ -52,6 +59,10 @@ interface WorkoutTemplateWithExercises extends WorkoutTemplate {
         | null;
     }
   >;
+}
+
+interface DatabaseWorkoutTemplateWithExercises extends WorkoutTemplate {
+  exercises: DatabaseTemplateExerciseRow[];
 }
 
 export const StartWorkoutScreen = () => {
@@ -106,16 +117,17 @@ export const StartWorkoutScreen = () => {
         )
         .eq('id', templateId)
         .single()
-        .returns<WorkoutTemplateWithExercises>();
+        .returns<DatabaseWorkoutTemplateWithExercises>();
       if (error) throw error;
       const exerciseIds = Array.from(new Set((data.exercises ?? []).map(item => item.exercise_id)));
       const overrides = user?.id ? await fetchExerciseUserOverrides(user.id, exerciseIds) : [];
       const overridesByExerciseId = new Map(overrides.map(override => [override.exercise_id, override]));
-      const localizedTemplate = data
+      const localizedTemplate: WorkoutTemplateWithExercises | null = data
         ? {
             ...data,
             exercises: (data.exercises || []).map(item => {
-              if (!item.exercise) return { ...item, exercise: null };
+              const targetRirBySet = parseTargetRirBySet(item.target_rir_by_set, item.target_sets);
+              if (!item.exercise) return { ...item, target_rir_by_set: targetRirBySet, exercise: null };
 
               const effectiveExercise = applyExerciseUserOverride(
                 item.exercise,
@@ -123,6 +135,7 @@ export const StartWorkoutScreen = () => {
               );
               return {
                 ...item,
+                target_rir_by_set: targetRirBySet,
                 exercise: {
                   ...effectiveExercise,
                   base_name: getLocalizedExerciseName(effectiveExercise, languageCode),

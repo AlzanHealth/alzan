@@ -1,12 +1,22 @@
 import { supabase } from '../../../lib/supabaseClient';
+import type { Json } from '../../../types/database.types';
 import {
   applyStrengthProgressionBundleForDate,
   loadStrengthProgressionsOrBase,
   type StrengthProgressionBundle,
   type StrengthProgressionTarget,
 } from '../helpers/strengthProgression.helper';
+import { parseTargetRirBySet } from '../helpers/targetRirBySet.helper';
 
 type StrengthProgressionLoader = (templateId: string) => Promise<StrengthProgressionBundle>;
+
+type DatabaseStrengthProgressionBundle = Omit<StrengthProgressionBundle, 'progressions'> & {
+  progressions: Array<
+    Omit<StrengthProgressionBundle['progressions'][number], 'target_rir_by_set'> & {
+      target_rir_by_set: Json | null;
+    }
+  >;
+};
 
 const loadStrengthProgressionBundle: StrengthProgressionLoader = async templateId => {
   const { data, error } = await supabase
@@ -29,11 +39,17 @@ const loadStrengthProgressionBundle: StrengthProgressionLoader = async templateI
       `,
     )
     .eq('id', templateId)
-    .returns<StrengthProgressionBundle[]>()
+    .returns<DatabaseStrengthProgressionBundle[]>()
     .single();
 
   if (error) throw error;
-  return data;
+  return {
+    ...data,
+    progressions: data.progressions.map(progression => ({
+      ...progression,
+      target_rir_by_set: parseTargetRirBySet(progression.target_rir_by_set, progression.target_sets),
+    })),
+  };
 };
 
 export const applyStrengthProgressionsForPlannedDate = async <TExercise extends StrengthProgressionTarget>(

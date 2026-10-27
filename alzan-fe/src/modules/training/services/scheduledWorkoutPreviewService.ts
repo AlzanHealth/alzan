@@ -10,6 +10,8 @@ import { applyStrengthProgressionsForPlannedDate } from './strengthProgressionSe
 import { sortByOrderIndex } from '../helpers/advancedEnduranceSession.helper';
 import { fetchExerciseUserOverrides } from './exerciseCatalogService';
 import { applyExerciseUserOverride } from '../helpers/exerciseUserOverride';
+import type { Json } from '../../../types/database.types';
+import { parseTargetRirBySet, type TargetRirBySet } from '../helpers/targetRirBySet.helper';
 
 export type PreviewExercise = {
   id: string;
@@ -18,12 +20,21 @@ export type PreviewExercise = {
   load_type: string | null;
 };
 
-export type PreviewGymExercise = WorkoutTemplateExercise & {
+export type PreviewGymExercise = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & {
+  target_rir_by_set: TargetRirBySet;
   exercise: PreviewExercise | null;
+};
+
+type DatabasePreviewGymExercise = Omit<PreviewGymExercise, 'target_rir_by_set'> & {
+  target_rir_by_set: Json | null;
 };
 
 export type GymPreviewTemplate = WorkoutTemplate & {
   exercises: PreviewGymExercise[];
+};
+
+type DatabaseGymPreviewTemplate = WorkoutTemplate & {
+  exercises: DatabasePreviewGymExercise[];
 };
 
 export type EndurancePreviewTemplate = EnduranceWorkoutTemplate & {
@@ -52,7 +63,14 @@ export const fetchGymPreviewTemplate = async (
   if (error) throw error;
   if (!data) return null;
 
-  const template = data as unknown as GymPreviewTemplate;
+  const databaseTemplate = data as unknown as DatabaseGymPreviewTemplate;
+  const template: GymPreviewTemplate = {
+    ...databaseTemplate,
+    exercises: databaseTemplate.exercises.map(item => ({
+      ...item,
+      target_rir_by_set: parseTargetRirBySet(item.target_rir_by_set, item.target_sets),
+    })),
+  };
   const exercises = sortByOrderIndex(template.exercises || []);
   const exerciseIds = Array.from(new Set(exercises.map(item => item.exercise_id)));
   const overrides = userId ? await fetchExerciseUserOverrides(userId, exerciseIds) : [];

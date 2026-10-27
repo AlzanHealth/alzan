@@ -21,6 +21,8 @@ import { applyStrengthProgressionsForPlannedDate } from '../modules/training/ser
 import { fetchExerciseUserOverrides } from '../modules/training/services/exerciseCatalogService';
 import { format } from 'date-fns';
 import { healthQueryKeys } from '../modules/health/hooks/healthQueryKeys';
+import type { Json } from '../types/database.types';
+import { parseTargetRirBySet, type TargetRirBySet } from '../modules/training/helpers/targetRirBySet.helper';
 
 export type FinishSession = {
   id: string;
@@ -61,10 +63,14 @@ interface ActiveWorkoutExerciseLookupRow {
   } | null;
 }
 
-type WorkoutTemplateExerciseLookupRow = WorkoutTemplateExercise & {
+type WorkoutTemplateExerciseLookupRow = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & {
+  target_rir_by_set: Json | null;
   exercise: ActiveWorkoutExerciseLookupRow | null;
 };
-type WorkoutTemplateExerciseWithExercise = WorkoutTemplateExercise & { exercise: ExerciseWithType };
+type WorkoutTemplateExerciseWithExercise = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & {
+  target_rir_by_set: TargetRirBySet;
+  exercise: ExerciseWithType;
+};
 
 type HistoryItem = Pick<WorkoutSet, 'exercise_id' | 'weight_kg' | 'reps' | 'set_number' | 'session_id' | 'created_at'>;
 
@@ -287,6 +293,7 @@ export const useActiveWorkout = (sessionId?: string, supplementalExerciseIds: st
 
             return {
               ...te,
+              target_rir_by_set: parseTargetRirBySet(te.target_rir_by_set, te.target_sets),
               is_warmup: te.is_warmup ?? false,
               drop_set_mode: te.drop_set_mode ?? 'none',
               exercise: effectiveExercise
