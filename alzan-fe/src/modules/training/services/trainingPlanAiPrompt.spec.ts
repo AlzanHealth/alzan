@@ -65,6 +65,13 @@ assert.ok(prompt.includes('El catálogo completo de 2 ejercicios ya está copiad
 assert.ok(prompt.includes('Pégalo aquí con Ctrl+V o Cmd+V'));
 assert.ok(prompt.includes('Debajo del catálogo, pega o escribe tu entrenamiento'));
 assert.ok(prompt.includes('una fotografía'));
+assert.ok(prompt.includes('rir_by_set: una lista con exactamente sets valores'));
+assert.ok(prompt.includes('No inventes RIR; si no aparece, omite rir_by_set'));
+assert.ok(
+  prompt.includes(
+    'Para ejercicios de fuerza, si la fuente da un rango o dos opciones de repeticiones para un ejercicio, elige el número mayor y escríbelo en reps',
+  ),
+);
 assert.ok(prompt.includes('una única sesión'));
 assert.ok(prompt.includes('2026-09-28'));
 assert.ok(prompt.includes('Si solo hay una sesión y no indica fecha'));

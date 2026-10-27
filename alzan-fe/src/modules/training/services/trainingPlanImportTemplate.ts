@@ -85,7 +85,7 @@ FIDELIDAD
 - Copia exactamente fechas, días, sesiones, orden, objetivos, intervalos, recuperaciones, distancias, duraciones, series, repeticiones, pesos y descansos del DOCX.
 - No inventes ni modifiques entrenamientos.
 - Un día de descanso, paseo o movilidad sin entrenamiento no crea una sesión artificial. Una sesión opcional conserva "Opcional" en name.
-- Para rangos de peso, descanso, distancia o duración usa el límite inferior; para repeticiones usa reps_min y reps_max.
+- Para rangos de peso, descanso, distancia o duración usa el límite inferior. Para ejercicios de fuerza, si la fuente da un rango o dos opciones de repeticiones para un ejercicio, elige el número mayor y escríbelo en reps (por ejemplo, 8–12 → reps: 12); no uses reps_min ni reps_max para ese caso. Si solo indica una cifra, consérvala en reps. No sumes las opciones.
 - Lee todas las páginas y tablas del DOCX: la tabla de calendario fija fechas y nombres; las tablas de rutinas fijan ejercicios. No conviertas una tabla en sesión.
 - Asocia las rutinas de gimnasio del calendario con sus tablas y reutiliza cada una en sus fechas.
 

@@ -4,6 +4,7 @@ import {
   TRAINING_PLAN_IMPORT_MAX_EXERCISES_PER_SESSION,
   TRAINING_PLAN_IMPORT_MAX_STEP_DEPTH,
 } from './trainingPlanImportContract';
+import { toImportedRirBySet } from './trainingPlanImportRir.helper';
 
 const weekdayForDate = (date: string) =>
   ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][
@@ -51,7 +52,74 @@ if (parsed.ok) {
   assert.equal(parsed.value.weeks[1].sessions[1].exercises?.[0].weight_kg, 80);
   assert.equal(parsed.value.weeks[0].sessions[0].modality, 'outdoor');
   assert.equal(parsed.value.weeks[0].sessions[1].modality, 'gym');
+  assert.equal('rir_by_set' in parsed.value.weeks[0].sessions[1].exercises![0], false);
 }
+
+const strengthWithPartialRir = {
+  ...validDocument,
+  weeks: [
+    {
+      week_number: 1,
+      sessions: [
+        runningSession('2026-08-03'),
+        {
+          ...strengthSession('2026-08-04'),
+          exercises: [{ exercise_name: 'Sentadilla', order_index: 0, sets: 4, reps: 6, rir_by_set: [0, null, 1, 10] }],
+        },
+      ],
+    },
+  ],
+};
+const parsedStrengthWithPartialRir = parseTrainingPlanJson(JSON.stringify(strengthWithPartialRir));
+assert.equal(parsedStrengthWithPartialRir.ok, true);
+if (parsedStrengthWithPartialRir.ok) {
+  assert.deepEqual(parsedStrengthWithPartialRir.value.weeks[0].sessions[1].exercises?.[0].rir_by_set, [0, null, 1, 10]);
+}
+assert.equal(
+  parseTrainingPlanJson(
+    JSON.stringify({
+      ...strengthWithPartialRir,
+      weeks: [
+        {
+          ...strengthWithPartialRir.weeks[0],
+          sessions: [
+            strengthWithPartialRir.weeks[0].sessions[0],
+            {
+              ...strengthWithPartialRir.weeks[0].sessions[1],
+              exercises: [{ exercise_name: 'Sentadilla', order_index: 0, sets: 4, reps: 6, rir_by_set: [3, null, 1] }],
+            },
+          ],
+        },
+      ],
+    }),
+  ).ok,
+  false,
+  'RIR arrays must have exactly one value per set',
+);
+assert.equal(
+  parseTrainingPlanJson(
+    JSON.stringify({
+      ...strengthWithPartialRir,
+      weeks: [
+        {
+          ...strengthWithPartialRir.weeks[0],
+          sessions: [
+            strengthWithPartialRir.weeks[0].sessions[0],
+            {
+              ...strengthWithPartialRir.weeks[0].sessions[1],
+              exercises: [{ exercise_name: 'Sentadilla', order_index: 0, sets: 4, reps: 6, rir_by_set: [3, 11, 1, 0] }],
+            },
+          ],
+        },
+      ],
+    }),
+  ).ok,
+  false,
+  'RIR values must be integers between zero and ten',
+);
+
+assert.equal(toImportedRirBySet(undefined), null, 'omitted RIR must inherit the base target in progressions');
+assert.deepEqual(toImportedRirBySet([3, null, 1]), [3, null, 1], 'explicit per-set gaps must be preserved');
 
 const mobileTrainingJson = JSON.stringify(validDocument).replace(/"/g, '“');
 const mobileTrainingResult = parseTrainingPlanJson(`\u00a0${mobileTrainingJson}\u00a0`);

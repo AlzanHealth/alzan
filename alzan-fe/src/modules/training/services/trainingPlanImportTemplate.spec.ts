@@ -15,6 +15,12 @@ assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('aunque tenga otro nombre'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('CSV adjunto'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No generes el campo notes'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No generes rpe, rir, rir_min ni rir_max'));
+assert.ok(
+  TRAINING_PLAN_IMPORT_PROMPT.includes(
+    'Si el DOCX contiene un RIR objetivo por serie, conserva solo ese dato como rir_by_set',
+  ),
+);
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No inventes RIR; si no aparece, omite rir_by_set'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No uses target_type: "rpe"'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No escribas duration_s, distance_m'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Cada exercise solo puede usar'));
@@ -26,6 +32,11 @@ assert.ok(
   TRAINING_PLAN_IMPORT_PROMPT.includes('hypertrophy, strength, muscular_endurance, technique, mobility o recovery'),
 );
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Copia exactamente fechas'));
+assert.ok(
+  TRAINING_PLAN_IMPORT_PROMPT.includes(
+    'Para ejercicios de fuerza, si la fuente da un rango o dos opciones de repeticiones para un ejercicio, elige el número mayor y escríbelo en reps',
+  ),
+);
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('informe de bloqueo'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('exercise_id'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('weekday'));
