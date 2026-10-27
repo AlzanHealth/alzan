@@ -16,6 +16,7 @@ const baseExercises = [
     target_reps_max: 10,
     target_weight_kg: 70,
     target_rpe: 7,
+    target_rir_by_set: [3, 2, 2],
     rest_seconds: 90,
     nested: { preserved: true },
   },
@@ -26,6 +27,7 @@ const baseExercises = [
     target_reps_max: 8,
     target_weight_kg: 40,
     target_rpe: 8,
+    target_rir_by_set: [3, 2, 2, 1],
     rest_seconds: 120,
     nested: { preserved: true },
   },
@@ -50,6 +52,7 @@ const progressions: StrengthExerciseProgression[] = [
     target_reps_max: null,
     target_weight_kg: null,
     target_rpe: null,
+    target_rir_by_set: null,
     rest_seconds: null,
   },
   {
@@ -60,6 +63,7 @@ const progressions: StrengthExerciseProgression[] = [
     target_reps_max: 5,
     target_weight_kg: 85,
     target_rpe: 9,
+    target_rir_by_set: [2, 1, 1, 0, 0],
     rest_seconds: 180,
   },
 ];
@@ -84,8 +88,16 @@ assert.deepEqual(
   },
 );
 assert.deepEqual(weekTwo[0].nested, { preserved: true });
+assert.deepEqual(weekTwo[0].target_rir_by_set, baseExercises[0].target_rir_by_set);
 assert.deepEqual(weekTwo[1], baseExercises[1], 'null progression values must preserve the base targets');
 assert.deepEqual(baseExercises[0].target_sets, 3, 'the base exercise must not be mutated');
+
+const weekThree = applyStrengthExerciseProgressions(baseExercises, progressions, 3);
+assert.deepEqual(
+  weekThree[0].target_rir_by_set,
+  [2, 1, 1, 0, 0],
+  'a progression RIR vector must override the base targets',
+);
 
 const weekOne = applyStrengthExerciseProgressions(baseExercises, progressions, 1);
 assert.deepEqual(weekOne, baseExercises, 'weeks without overrides must keep the base targets');

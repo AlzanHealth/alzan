@@ -5197,7 +5197,7 @@ export type Database = {
           rest_seconds: number | null;
           target_reps_max: number | null;
           target_reps_min: number | null;
-          target_rir_by_set: number[] | null;
+          target_rir_by_set: (number | null)[] | null;
           target_rpe: number | null;
           target_sets: number | null;
           target_weight_kg: number | null;
@@ -5212,7 +5212,7 @@ export type Database = {
           rest_seconds?: number | null;
           target_reps_max?: number | null;
           target_reps_min?: number | null;
-          target_rir_by_set?: number[] | null;
+          target_rir_by_set?: (number | null)[] | null;
           target_rpe?: number | null;
           target_sets?: number | null;
           target_weight_kg?: number | null;
@@ -5227,7 +5227,7 @@ export type Database = {
           rest_seconds?: number | null;
           target_reps_max?: number | null;
           target_reps_min?: number | null;
-          target_rir_by_set?: number[] | null;
+          target_rir_by_set?: (number | null)[] | null;
           target_rpe?: number | null;
           target_sets?: number | null;
           target_weight_kg?: number | null;
@@ -5265,7 +5265,7 @@ export type Database = {
           superset_next_exercise_id: string | null;
           target_reps_max: number | null;
           target_reps_min: number | null;
-          target_rir_by_set: number[] | null;
+          target_rir_by_set: (number | null)[] | null;
           target_rpe: number | null;
           target_sets: number | null;
           target_weight_kg: number | null;
@@ -5283,7 +5283,7 @@ export type Database = {
           superset_next_exercise_id?: string | null;
           target_reps_max?: number | null;
           target_reps_min?: number | null;
-          target_rir_by_set?: number[] | null;
+          target_rir_by_set?: (number | null)[] | null;
           target_rpe?: number | null;
           target_sets?: number | null;
           target_weight_kg?: number | null;
@@ -5301,7 +5301,7 @@ export type Database = {
           superset_next_exercise_id?: string | null;
           target_reps_max?: number | null;
           target_reps_min?: number | null;
-          target_rir_by_set?: number[] | null;
+          target_rir_by_set?: (number | null)[] | null;
           target_rpe?: number | null;
           target_sets?: number | null;
           target_weight_kg?: number | null;
