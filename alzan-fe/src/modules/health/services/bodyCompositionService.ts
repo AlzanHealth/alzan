@@ -181,9 +181,12 @@ export const bodyCompositionService = {
       });
       if (error?.code === '40001') continue;
       if (error) throw error;
+      // A concurrent input change is returned by the RPC as an empty set. Retry
+      // with a fresh revision instead of treating this expected race as success.
+      if (!data?.[0]) continue;
       return { success: true, log: data?.[0] };
     }
-    throw new Error('COMPOSITION_INPUTS_CHANGED');
+    return { success: false, reason: 'inputs_changed' };
   },
 
   async invalidateAndRecalculateFromInput(userId: string, measuredAt: string): Promise<void> {
@@ -247,9 +250,10 @@ export const bodyCompositionService = {
       const pendingDates = [...dates].sort().reverse();
       void (async () => {
         for (let offset = 0; offset < pendingDates.length; offset += 4) {
-          await Promise.all(
+          const results = await Promise.all(
             pendingDates.slice(offset, offset + 4).map(date => this.recalculateBestCompositionForDate(userId, date)),
           );
+          if (results.some(result => !result.success)) return;
         }
         onHistoricalRepair?.();
       })()
@@ -294,7 +298,8 @@ export const bodyCompositionService = {
   },
   async manualRecalculate(userId: string): Promise<ManualRecalculateResult> {
     try {
-      await this.recalculateBestCompositionForDate(userId);
+      const result = await this.recalculateBestCompositionForDate(userId);
+      if (!result.success) return { success: false, errorCode: 'unexpected_error' };
       return { success: true };
     } catch {
       return { success: false, errorCode: 'unexpected_error' };

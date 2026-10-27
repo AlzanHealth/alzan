@@ -26,6 +26,9 @@ export const useBodyCompositionLogs = (limit = 100) => {
       return logs;
     },
     enabled: !!user?.id,
+    // Conflicts are retried inside the calculation service. A second React Query
+    // retry multiplies database calls when the input revision keeps changing.
+    retry: false,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     // Expiring inputs and provider imports are repaired while the screen is open.
