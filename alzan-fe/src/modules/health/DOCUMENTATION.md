@@ -4,7 +4,7 @@
 
 ## Automatic composition (2026-10-22)
 
-For engineers maintaining Health: `algorithms/bodyCompositionDailyPlanner.ts` selects valid inputs by measurement time, not insertion order. Each input must be no more than 72 hours old at the evaluated instant; future inputs are excluded. Equal timestamps use stable IDs. Invalid newer measurements do not hide valid older inputs.
+For engineers maintaining Health: `algorithms/bodyCompositionDailyPlanner.ts` selects the latest valid inputs by measurement time, not insertion order, without expiring them after 72 hours. Inputs later than the evaluation instant are excluded. Equal timestamps use stable IDs. Invalid newer measurements do not hide valid older inputs. Editing or deleting an older input invalidates snapshots from its date forward because it may have been the latest available value for those dates.
 
 `algorithms/bodyComposition.ts` calculates BMI from compatible weight and height and classifies the unrounded value. Inferred adult body fat requires known age of at least 20 and applicable inputs: RFM with explicitly recorded iliac-crest waist, then CUN-BAE, then BAI. Percentage estimates can exist without weight; kilogram estimates require compatible weight. Original measured/imported percentages remain separate. These are population estimates, not individual diagnostic measurements.
 

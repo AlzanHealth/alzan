@@ -25,9 +25,9 @@ assert.equal(partial.shouldUpdateWeightLog, false);
 assert.equal(partial.selectedMeasurements[0]?.protocol, 'waist_iliac_crest');
 assert.equal(partial.asOf, now.toISOString());
 
-for (const offset of [0, 72 * 3600000, 72 * 3600000 + 1, -1]) {
+for (const offset of [0, 72 * 3600000, 14 * 24 * 3600000, 2 * 365 * 24 * 3600000, -1]) {
   const measuredAt = new Date(now.getTime() - offset).toISOString();
-  const eligible = offset >= 0 && offset <= 72 * 3600000;
+  const eligible = offset >= 0;
   const result = plan({ weights: [weight(measuredAt)], measurements: [waist(measuredAt)] });
   assert.equal(!!result.result?.bmi, eligible, `weight exact timestamp ${offset}`);
   assert.equal(!!result.result?.bodyFat, eligible, `waist exact timestamp ${offset}`);
@@ -68,9 +68,9 @@ assert.equal(bmiOnly.result?.bodyFat, null);
 // Historical end-of-day anchor follows local time, including timezone/DST boundaries.
 const historicalTarget = new Date(2026, 6, 1, 12);
 const end = new Date(2026, 6, 2).getTime() - 1;
-for (const offset of [72 * 3600000, 72 * 3600000 + 1, -1]) {
+for (const offset of [72 * 3600000, 14 * 24 * 3600000, -1]) {
   const result = plan({ targetDate: historicalTarget, measurements: [waist(new Date(end - offset).toISOString())] });
-  assert.equal(!!result.result?.bodyFat, offset === 72 * 3600000, `historical boundary ${offset}`);
+  assert.equal(!!result.result?.bodyFat, offset >= 0, `historical measurement age ${offset}`);
 }
 const old = new Date(now.getTime() - 2 * 3600000).toISOString();
 const latest = plan({
@@ -81,7 +81,9 @@ assert.equal(latest.weightKgUsed, 81);
 assert.equal(latest.measurements.waist, 92);
 assert.equal(latest.selectedMeasurements.length, 1);
 assert.equal(latest.shouldUpdateWeightLog, true);
-console.log('Daily planner partial inputs, protocols, 72h boundaries, history, and invalidation regressions passed');
+console.log(
+  'Daily planner partial inputs, protocols, latest available inputs, history, and invalidation regressions passed',
+);
 
 const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 12);
 const future = plan({
@@ -143,4 +145,4 @@ const teenOldWaist = plan({
   weights: [weight(now.toISOString())],
   measurements: [waist(new Date(now.getTime() - 73 * 3600000).toISOString())],
 });
-assert.equal(teenOldWaist.result?.bodyFat?.method, 'deurenberg');
+assert.equal(teenOldWaist.result?.bodyFat?.method, 'rfm_adolescent');

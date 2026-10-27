@@ -870,7 +870,7 @@ const en = {
     bodyChangesMissing: 'Add comparable measurements on another date, between 7 and 90 days apart.',
     bodyChangesPeriod: 'Compared dates',
     bodyChangesMethod: 'The estimation method changed. Percentage differences are not interpreted as physical change.',
-    compositionAutomatic: 'Updates automatically with compatible inputs from the last 72 hours.',
+    compositionAutomatic: 'Updates automatically using the latest valid data available.',
     compositionMeasuredFat: 'Recorded body fat · {{value}}%',
     compositionMeasuredMuscle: 'Recorded muscle · {{value}} kg',
     compositionHistorical: 'Historical estimate · {{date}}',

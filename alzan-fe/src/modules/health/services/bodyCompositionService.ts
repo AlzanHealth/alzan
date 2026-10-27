@@ -9,7 +9,6 @@ import {
 } from '../helpers/compositionRequestGuard';
 import {
   DailyCompositionMeasurementInput,
-  RECENT_BODY_COMPOSITION_WINDOW_HOURS,
   isBodyCompositionMeasurementType,
   planDailyBodyCompositionRecalculation,
 } from '../algorithms/bodyCompositionDailyPlanner';
@@ -95,24 +94,23 @@ export const bodyCompositionService = {
         return { success: false, reason: 'future_date' };
       }
       const cutoff = new Date(Math.min(dateEnd(targetDate).getTime() - 1, now.getTime()));
-      const windowStart = new Date(cutoff.getTime() - RECENT_BODY_COMPOSITION_WINDOW_HOURS * 3600000).toISOString();
       const [profile, weightsResult, measurementsResult] = await Promise.all([
         this.getUserProfile(userId, signal),
         supabase
           .from('weight_logs')
           .select('id, measured_at, weight_kg')
           .eq('user_id', userId)
-          .gte('measured_at', windowStart)
           .lte('measured_at', cutoff.toISOString())
           .order('measured_at', { ascending: false })
+          .limit(1000)
           .abortSignal(signal),
         supabase
           .from('body_measurements')
           .select('id, measurement_type, measured_at, value_cm, measurement_protocol')
           .eq('user_id', userId)
-          .gte('measured_at', windowStart)
           .lte('measured_at', cutoff.toISOString())
           .order('measured_at', { ascending: false })
+          .limit(1000)
           .abortSignal(signal),
       ]);
       if (weightsResult.error) throw weightsResult.error;

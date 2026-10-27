@@ -880,7 +880,7 @@ export default {
     bodyChangesPeriod: 'Fechas comparadas',
     bodyChangesMethod:
       'Cambió el método de estimación. La diferencia entre porcentajes no se interpreta como un cambio físico.',
-    compositionAutomatic: 'Se actualiza automáticamente con datos compatibles de las últimas 72 horas.',
+    compositionAutomatic: 'Se actualiza automáticamente con los datos válidos más recientes disponibles.',
     compositionMeasuredFat: 'Grasa registrada · {{value}}%',
     compositionMeasuredMuscle: 'Músculo registrado · {{value}} kg',
     compositionHistorical: 'Estimación histórica · {{date}}',

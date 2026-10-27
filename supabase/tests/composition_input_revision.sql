@@ -79,6 +79,10 @@ BEGIN
   RAISE EXCEPTION 'foreign owner accepted';
  EXCEPTION WHEN insufficient_privilege THEN NULL;
  END;
+ INSERT INTO public.weight_logs(user_id,weight_kg,measured_at) VALUES(owner_id,74,now()-interval '30 days');
+ IF NOT EXISTS(SELECT 1 FROM public.body_composition_logs WHERE user_id=owner_id AND calculated_for_date=current_date AND calculation_status='stale') THEN
+  RAISE EXCEPTION 'historical input did not invalidate the current snapshot';
+ END IF;
  -- A deletion changes the revision even when no replacement input is available.
  DELETE FROM public.body_measurements WHERE id=measurement_id;
  IF NOT EXISTS(SELECT 1 FROM public.body_composition_logs WHERE user_id=owner_id AND calculated_for_date=current_date AND calculation_status='stale' AND bodyfat_percent IS NULL AND muscle_mass_kg IS NULL) THEN RAISE EXCEPTION 'deleted input did not invalidate snapshot'; END IF;

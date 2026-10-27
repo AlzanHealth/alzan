@@ -6,9 +6,6 @@ import {
   isValidCompositionMeasurement,
 } from './bodyComposition';
 
-export const RECENT_BODY_COMPOSITION_WINDOW_DAYS = 3;
-export const RECENT_BODY_COMPOSITION_WINDOW_HOURS = 72;
-const WINDOW_MS = RECENT_BODY_COMPOSITION_WINDOW_HOURS * 60 * 60 * 1000;
 const BODY_COMPOSITION_MEASUREMENT_TYPES = ['waist', 'abdomen', 'hips', 'chest', 'arm', 'thigh'] as const;
 export type BodyCompositionMeasurementType = (typeof BODY_COMPOSITION_MEASUREMENT_TYPES)[number];
 
@@ -79,9 +76,9 @@ const isSameLocalDay = (left: Date, right: Date): boolean =>
 const getAsOf = (target: Date, now: Date): number =>
   Math.min(new Date(target.getFullYear(), target.getMonth(), target.getDate() + 1).getTime() - 1, now.getTime());
 
-const isWithinWindow = (measuredAt: string, asOf: number): boolean => {
+const isAvailableAt = (measuredAt: string, asOf: number): boolean => {
   const timestamp = new Date(measuredAt).getTime();
-  return Number.isFinite(timestamp) && timestamp <= asOf && asOf - timestamp <= WINDOW_MS;
+  return Number.isFinite(timestamp) && timestamp <= asOf;
 };
 const isPositiveFinite = (value: number): boolean => Number.isFinite(value) && value > 0;
 
@@ -115,7 +112,7 @@ const collectMeasurements = (
   const collected: AnthroMeasurements = {};
   const selectedMeasurements: DailyCompositionMeasurementInput[] = [];
   const sorted = measurements
-    .filter(measurement => isPositiveFinite(measurement.valueCm) && isWithinWindow(measurement.measuredAt, asOf))
+    .filter(measurement => isPositiveFinite(measurement.valueCm) && isAvailableAt(measurement.measuredAt, asOf))
     .sort(compareInputsNewestFirst);
   for (const measurement of sorted) {
     const { type, protocol, valueCm } = measurement;
@@ -168,7 +165,7 @@ export const planDailyBodyCompositionRecalculation = ({
   }
   const asOf = getAsOf(targetDate, now);
   const sourceWeight = weights
-    .filter(weight => isPositiveFinite(weight.weightKg) && isWithinWindow(weight.measuredAt, asOf))
+    .filter(weight => isPositiveFinite(weight.weightKg) && isAvailableAt(weight.measuredAt, asOf))
     .sort(compareInputsNewestFirst)[0];
   const { measurements: collectedMeasurements, selectedMeasurements } = collectMeasurements(asOf, measurements);
   const result = calculateBodyComposition({

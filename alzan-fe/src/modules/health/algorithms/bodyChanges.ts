@@ -36,11 +36,13 @@ export const buildBodyChanges = (input: DailyCompositionPlannerInput): BodyChang
     });
     const changes: BodyChange[] = [];
     if (current.weightKgUsed !== undefined && previous.weightKgUsed !== undefined) {
-      changes.push({
-        key: 'weight',
-        difference: Math.round((current.weightKgUsed - previous.weightKgUsed) * 10) / 10,
-        unit: 'kg',
-      });
+      const difference = Math.round((current.weightKgUsed - previous.weightKgUsed) * 10) / 10;
+      if (difference !== 0)
+        changes.push({
+          key: 'weight',
+          difference,
+          unit: 'kg',
+        });
     }
     const keys = ['waist', 'abdomen', 'hips', 'chest', 'arm', 'armFlexed', 'thigh'] as const;
     for (const key of keys) {
@@ -57,7 +59,8 @@ export const buildBodyChanges = (input: DailyCompositionPlannerInput): BodyChang
       );
       if (!currentSource || !previousSource || (currentSource.protocol ?? null) !== (previousSource.protocol ?? null))
         continue;
-      changes.push({ key, difference: Math.round((latest - earlier) * 10) / 10, unit: 'cm' });
+      const difference = Math.round((latest - earlier) * 10) / 10;
+      if (difference !== 0) changes.push({ key, difference, unit: 'cm' });
     }
     if (changes.length > 0) return { currentDate: current.asOf, previousDate: previous.asOf, changes };
   }

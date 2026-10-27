@@ -31,8 +31,15 @@ assert.equal(
   }),
   null,
 );
-assert.equal(
-  buildBodyChanges({ ...input, targetDate: new Date('2026-11-22T12:00:00Z'), now: new Date('2026-11-22T12:00:00Z') }),
-  null,
+const lastKnownChanges = buildBodyChanges({
+  ...input,
+  targetDate: new Date('2026-11-22T12:00:00Z'),
+  now: new Date('2026-11-22T12:00:00Z'),
+});
+assert.ok(lastKnownChanges);
+assert.deepEqual(
+  lastKnownChanges.changes.map(row => row.key),
+  ['weight', 'abdomen'],
 );
+assert.equal(lastKnownChanges.previousDate, '2026-10-12T10:00:00.000Z');
 console.log('Body change comparison checks passed');
