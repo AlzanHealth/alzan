@@ -24,7 +24,7 @@ const CATALOG_HEADERS = [
   'is_custom',
 ] as const;
 
-const AI_CLIPBOARD_CATALOG_HEADERS = ['exercise_name_es', 'primary_muscle', 'equipment'] as const;
+const AI_CLIPBOARD_CATALOG_HEADERS = ['exercise_name_es', 'exercise_type', 'primary_muscle', 'equipment'] as const;
 
 const normalizeSortValue = (value: string | null): string =>
   (value ?? '')
@@ -72,7 +72,9 @@ export const serializeTrainingExerciseCatalogCsv = (catalog: TrainingExerciseAiC
 
 export const serializeTrainingExerciseAiClipboardCsv = (catalog: TrainingExerciseAiCatalogRow[]): string => {
   const rows = sortTrainingExerciseAiCatalog(catalog).map(exercise =>
-    [exercise.exercise_name_es, exercise.primary_muscle, exercise.equipment].map(escapeCsvCell).join(','),
+    [exercise.exercise_name_es, exercise.exercise_type, exercise.primary_muscle, exercise.equipment]
+      .map(escapeCsvCell)
+      .join(','),
   );
 
   return ['ejercicios.csv', 'exercises_rows', AI_CLIPBOARD_CATALOG_HEADERS.join(','), ...rows].join('\n');
@@ -86,6 +88,7 @@ ADAPTACIÓN PARA ESTA CONVERSACIÓN
 - Puede ser una única sesión escrita, una fotografía o un documento breve; extrae solo lo visible o escrito.
 - Si solo hay una sesión y no indica fecha, usa ${currentDate}. Si hay varias sesiones y falta una fecha, devuelve un informe de bloqueo y no inventes fechas.
 - En una sesión concreta conserva deporte, bloques, ejercicios, series, cargas, descansos e intervalos; no la conviertas en un plan semanal.
+- La columna exercise_type del catálogo indica cómo se mide cada ejercicio: para Tiempo usa duration_s en segundos y omite reps; para reps usa reps o su rango y omite duration_s.
 - No inventes datos que no aparezcan en la entrada.
 - Aplica las reglas de familias y bloques de 7 días anteriores también a esta entrada breve.
 - Para ejercicios de strength, selecciona exactamente exercise_name_es de una fila real de exercises_rows usando el nombre, el músculo principal y el equipamiento.

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   parseTrainingPlanJson,
   type TrainingPlanImportDocument,
@@ -11,6 +12,7 @@ import {
   searchTrainingPlanExerciseCandidates,
   type TrainingPlanImportProgress,
 } from '../modules/training/services/trainingPlanImportService';
+import { getTrainingPlanExerciseMetricValidationErrors } from '../modules/training/services/trainingPlanStrengthTarget.helper';
 import {
   areTrainingPlanExerciseResolutionsReady,
   selectTrainingPlanExerciseCandidate,
@@ -26,6 +28,7 @@ import {
 import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 
 export const useTrainingPlanImport = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { settings } = useTrainingSettings();
   const queryClient = useQueryClient();
@@ -42,8 +45,27 @@ export const useTrainingPlanImport = () => {
   const [importProgress, setImportProgress] = useState<TrainingPlanImportProgress | null>(null);
 
   const parsed = useMemo(() => (rawJson.trim() ? parseTrainingPlanJson(rawJson) : null), [rawJson]);
-  const validationErrors = analysisErrors.length > 0 ? analysisErrors : parsed && !parsed.ok ? parsed.errors : [];
   const document = analyzedDocument;
+  const exerciseMetricErrors = useMemo(
+    () => getTrainingPlanExerciseMetricValidationErrors(document, exerciseResolutions),
+    [document, exerciseResolutions],
+  );
+  const baseValidationErrors = analysisErrors.length > 0 ? analysisErrors : parsed && !parsed.ok ? parsed.errors : [];
+  const validationErrors = [
+    ...baseValidationErrors,
+    ...exerciseMetricErrors.map(error => ({
+      code: 'invalid_session_shape' as const,
+      path: error.path,
+      message: t(
+        error.issue.kind === 'timed_catalog_type_required'
+          ? 'training.trainingPlanTimedCatalogTypeRequired'
+          : error.issue.kind === 'timed_needs_duration'
+            ? 'training.trainingPlanTimedNeedsDuration'
+            : 'training.trainingPlanRepsNeedRepetitions',
+        { exercise: error.issue.exerciseName },
+      ),
+    })),
+  ];
 
   const updateRawJson = useCallback((value: string) => {
     rawJsonRef.current = value;
@@ -116,6 +138,7 @@ export const useTrainingPlanImport = () => {
   const importPlan = useCallback(async () => {
     if (!user || !document || importInFlightRef.current || analyzeInFlightRef.current)
       return { ok: false as const, kind: 'busy' as const };
+    if (exerciseMetricErrors.length > 0) return { ok: false as const, kind: 'invalid-exercise-metric' as const };
     if (!areTrainingPlanExerciseResolutionsReady(exerciseResolutions)) {
       return { ok: false as const, kind: 'unresolved-exercises' as const };
     }
@@ -149,7 +172,7 @@ export const useTrainingPlanImport = () => {
       setIsImporting(false);
       setImportProgress(null);
     }
-  }, [document, exerciseResolutions, queryClient, settings.autoDeleteExpiredTemplates, user]);
+  }, [document, exerciseMetricErrors, exerciseResolutions, queryClient, settings.autoDeleteExpiredTemplates, user]);
 
   const exerciseResolutionReady = areTrainingPlanExerciseResolutionsReady(exerciseResolutions);
 
@@ -162,7 +185,8 @@ export const useTrainingPlanImport = () => {
     analysisProgress,
     isImporting,
     importProgress,
-    canImport: !!document && exerciseResolutionReady && !isAnalyzing && !isImporting,
+    canImport:
+      !!document && exerciseResolutionReady && exerciseMetricErrors.length === 0 && !isAnalyzing && !isImporting,
     exerciseResolutions,
     selectExerciseCandidate,
     searchExerciseCandidates,

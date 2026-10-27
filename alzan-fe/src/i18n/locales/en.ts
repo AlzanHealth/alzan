@@ -2984,6 +2984,11 @@ const en = {
     trainingPlanImportSuccess: '{{templates}} templates and {{plans}} workouts added.',
     trainingPlanImportReused: '{{templates}} existing templates were reused without replacing their changes.',
     trainingPlanImportError: 'Could not import the training plan.',
+    trainingPlanTimedCatalogTypeRequired:
+      'Could not verify the type of “{{exercise}}”. Select a time-based exercise from the catalog to import duration_s.',
+    trainingPlanTimedNeedsDuration:
+      '“{{exercise}}” is time-based. Provide duration_s in seconds instead of repetitions.',
+    trainingPlanRepsNeedRepetitions: '“{{exercise}}” is repetition-based. Provide reps instead of duration_s.',
     trainingPlanValidationError: '{{path}}: {{message}}',
     trainingPlanPreviewMeta: '{{weeks}} {{weekLabel}} · {{sessions}} {{workoutLabel}}',
     trainingPlanWeek: 'week',

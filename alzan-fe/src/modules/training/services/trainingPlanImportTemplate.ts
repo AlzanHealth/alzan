@@ -49,7 +49,8 @@ export const buildTrainingPlanImportTemplate = (referenceDate: Date = new Date()
           "workout_goal": "strength",
           "modality": "gym",
           "exercises": [
-            { "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rir_by_set": [3, 2, 2, 2], "rest_seconds": 150 }
+            { "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rir_by_set": [3, 2, 2, 2], "rest_seconds": 150 },
+            { "exercise_name": "Plancha lateral", "order_index": 1, "sets": 3, "duration_s": 30, "rest_seconds": 45 }
           ]
         }
       ]
@@ -77,7 +78,7 @@ SALIDA
 - Usa únicamente objetivos del catálogo: running: endurance, speed, tempo_threshold, long_run, recovery o test; strength: hypertrophy, strength, muscular_endurance, technique, mobility o recovery. Convierte aliases como easy_run→endurance, intervals→speed y tempo→tempo_threshold sin cambiar el entrenamiento.
 - Running usa running_steps; strength usa exercises. No mezcles ambos.
 - No generes rpe, rir, rir_min ni rir_max como campos escalares. Si el DOCX contiene un RIR objetivo por serie, conserva solo ese dato como rir_by_set: una lista con exactamente sets valores, cada uno entero de 0 a 10 o null si el documento no lo especifica. No inventes RIR; si no aparece, omite rir_by_set. Si el DOCX contiene RPE, omítelo.
-- No escribas duration_s, distance_m, target_type, target_min, target_max, progression_key ni children dentro de exercises de strength. Esas propiedades solo pertenecen a running_steps.
+- En exercises de strength puedes usar duration_s únicamente como objetivo por tiempo de un ejercicio cuyo exercise_type del catálogo sea Tiempo; para los demás ejercicios no uses duration_s. Las propiedades distance_m, target_type, target_min, target_max, progression_key y children son exclusivas de running_steps.
 - Fechas YYYY-MM-DD, weekday correcto y rango inclusivo máximo de 45 días.
 - Números JSON, nunca texto con unidades. Usa reps o reps_min + reps_max, nunca ambos.
 
@@ -102,7 +103,9 @@ GIMNASIO
 - Usa exercise_name de una fila real de exercises_rows. Busca primero coincidencia exacta normalizada; si no existe, elige solo una alternativa más parecida y de alta confianza usando el mismo patrón de movimiento, músculo principal, equipamiento y agarre/posición.
 - Sin alternativa segura, conserva el nombre fuente; frontend lo marcará como pendiente para selección manual. No inventes UUID ni metadatos.
 - Para "A o B"/"polea/máquina", usa la opción que el documento seleccione; si no selecciona ninguna, pide aclaración, no decidas por el usuario. "2+2" son dos filas consecutivas solo cuando el documento identifica dos ejercicios distintos; si es ambiguo, pide aclaración.
-- Cada exercise solo puede usar exercise_id, exercise_name, order_index, is_warmup, sets, reps, reps_min, reps_max, weight_kg, rir_by_set y rest_seconds.
+- Cada exercise solo puede usar exercise_id, exercise_name, order_index, is_warmup, sets, duration_s, reps, reps_min, reps_max, weight_kg, rir_by_set y rest_seconds.
+- Lee exercise_type en la fila elegida del catálogo. Si su valor es Tiempo, escribe el objetivo en duration_s como segundos enteros positivos y omite reps, reps_min y reps_max. Si exercise_type es Repeticiones (o reps), usa reps o reps_min + reps_max y omite duration_s. Nunca incluyas ambos tipos de objetivo en el mismo ejercicio. Si el tipo falta, pregunta o conserva el nombre para que se resuelva manualmente; no adivines el tipo.
+- Si la fuente indica un rango de tiempo para un ejercicio de tipo Tiempo, usa su límite inferior en duration_s (por ejemplo, 25–40 s → duration_s: 25). En ejercicios por repeticiones se mantiene la regla específica de elegir el número mayor.
 - Conserva series, repeticiones, pesos, descansos y orden; cambia solo la referencia.
 
 PLANTILLAS Y VALIDACIÓN

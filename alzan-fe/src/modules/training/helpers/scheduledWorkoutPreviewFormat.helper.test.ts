@@ -42,11 +42,11 @@ assert.equal(
       target_reps_min: 60,
       target_reps_max: 60,
       rest_seconds: 30,
-      exercise: { load_type: 'time' },
+      exercise: { exercise_type_code: 'Tiempo', load_type: 'external' },
     },
     labels,
   ),
-  '3 Sets · 60s time · Rest 0:30',
+  '3 Sets · 60 s · Rest 0:30',
 );
 
 assert.equal(

@@ -96,6 +96,85 @@ assert.equal(
   false,
   'RIR arrays must have exactly one value per set',
 );
+
+const strengthWithTimedExercise = {
+  ...validDocument,
+  weeks: [
+    {
+      week_number: 1,
+      sessions: [
+        runningSession('2026-08-03'),
+        {
+          ...strengthSession('2026-08-04'),
+          exercises: [
+            { exercise_name: 'Plancha lateral', order_index: 0, sets: 3, duration_s: 30, rest_seconds: 45 },
+            { exercise_name: 'Isométrico aductor en rango cómodo', order_index: 1, sets: 2, duration_s: 20 },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const parsedTimedExercise = parseTrainingPlanJson(JSON.stringify(strengthWithTimedExercise));
+assert.equal(parsedTimedExercise.ok, true, 'timed gym exercises must import without a reps field');
+if (parsedTimedExercise.ok) {
+  const importedExercises = parsedTimedExercise.value.weeks[0].sessions[1].exercises;
+  assert.equal(importedExercises?.[0].duration_s, 30);
+  assert.equal(importedExercises?.[1].duration_s, 20);
+  assert.equal('reps' in (importedExercises?.[0] ?? {}), false);
+}
+
+const timedExerciseWithReps = {
+  ...strengthWithTimedExercise,
+  weeks: [
+    {
+      ...strengthWithTimedExercise.weeks[0],
+      sessions: [
+        strengthWithTimedExercise.weeks[0].sessions[1],
+        {
+          ...strengthSession('2026-08-05'),
+          exercises: [{ exercise_name: 'Plancha lateral', order_index: 0, sets: 3, duration_s: 30, reps: 8 }],
+        },
+      ],
+    },
+  ],
+};
+const parsedTimedExerciseWithReps = parseTrainingPlanJson(JSON.stringify(timedExerciseWithReps));
+assert.equal(parsedTimedExerciseWithReps.ok, false, 'an exercise cannot mix time and repetition targets');
+
+const exerciseWithoutMetric = {
+  ...strengthWithTimedExercise,
+  weeks: [
+    {
+      ...strengthWithTimedExercise.weeks[0],
+      sessions: [
+        {
+          ...strengthSession('2026-08-04'),
+          exercises: [{ exercise_name: 'Plancha lateral', order_index: 0, sets: 3 }],
+        },
+      ],
+    },
+  ],
+};
+assert.equal(parseTrainingPlanJson(JSON.stringify(exerciseWithoutMetric)).ok, false);
+
+for (const duration_s of [0, -1, 1.5, 3601]) {
+  const invalidTimedExercise = {
+    ...strengthWithTimedExercise,
+    weeks: [
+      {
+        ...strengthWithTimedExercise.weeks[0],
+        sessions: [
+          {
+            ...strengthSession('2026-08-04'),
+            exercises: [{ exercise_name: 'Plancha lateral', order_index: 0, sets: 3, duration_s }],
+          },
+        ],
+      },
+    ],
+  };
+  assert.equal(parseTrainingPlanJson(JSON.stringify(invalidTimedExercise)).ok, false);
+}
 assert.equal(
   parseTrainingPlanJson(
     JSON.stringify({

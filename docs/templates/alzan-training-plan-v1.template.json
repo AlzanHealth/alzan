@@ -41,7 +41,8 @@
           "template_key": "lower-body",
           "workout_goal": "strength",
           "exercises": [
-            { "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rir_by_set": [3, 2, 2, 2], "rest_seconds": 150 }
+            { "exercise_name": "Sentadilla", "order_index": 0, "sets": 4, "reps": 6, "weight_kg": 80, "rir_by_set": [3, 2, 2, 2], "rest_seconds": 150 },
+            { "exercise_name": "Plancha lateral", "order_index": 1, "sets": 3, "duration_s": 30, "rest_seconds": 45 }
           ]
         }
       ]

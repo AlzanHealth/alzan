@@ -18,6 +18,7 @@ export type PreviewExercise = {
   base_name_es: string | null;
   base_name_en: string | null;
   load_type: string | null;
+  exercise_type_code?: string | null;
 };
 
 export type PreviewGymExercise = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & {
@@ -27,6 +28,7 @@ export type PreviewGymExercise = Omit<WorkoutTemplateExercise, 'target_rir_by_se
 
 type DatabasePreviewGymExercise = Omit<PreviewGymExercise, 'target_rir_by_set'> & {
   target_rir_by_set: Json | null;
+  exercise: (Omit<PreviewExercise, 'exercise_type_code'> & { exercise_type: { code: string } | null }) | null;
 };
 
 export type GymPreviewTemplate = WorkoutTemplate & {
@@ -53,7 +55,7 @@ export const fetchGymPreviewTemplate = async (
         *,
         exercises:workout_template_exercises(
           *,
-          exercise:exercises(id, base_name_es, base_name_en, load_type)
+          exercise:exercises(id, base_name_es, base_name_en, load_type, exercise_type:exercise_types(code))
         )
       `,
     )
@@ -69,6 +71,9 @@ export const fetchGymPreviewTemplate = async (
     exercises: databaseTemplate.exercises.map(item => ({
       ...item,
       target_rir_by_set: parseTargetRirBySet(item.target_rir_by_set, item.target_sets),
+      exercise: item.exercise
+        ? { ...item.exercise, exercise_type_code: item.exercise.exercise_type?.code ?? null }
+        : null,
     })),
   };
   const exercises = sortByOrderIndex(template.exercises || []);

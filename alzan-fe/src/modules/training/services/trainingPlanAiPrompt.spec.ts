@@ -31,25 +31,41 @@ const catalog: TrainingExerciseAiCatalogRow[] = [
     equipment: null,
     is_custom: true,
   },
+  {
+    exercise_id: '3',
+    exercise_name_es: 'Plancha lateral',
+    exercise_name_en: 'Side plank',
+    exercise_type: 'Tiempo',
+    load_type: 'bodyweight',
+    primary_muscle: 'abdominals',
+    secondary_muscle: 'shoulders',
+    equipment: 'bodyweight',
+    is_custom: false,
+  },
 ];
 
 assert.deepEqual(
   sortTrainingExerciseAiCatalog(catalog).map(row => row.exercise_id),
-  ['2', '1'],
+  ['3', '2', '1'],
   'the catalog must have a stable localized-name order',
 );
 
 const csv = serializeTrainingExerciseCatalogCsv(catalog);
 assert.match(csv, /^exercise_id,exercise_name_es,exercise_name_en,/);
+assert.match(csv.split('\n')[0], /exercise_type/);
 assert.match(csv, /"Press, inclinado"/);
 assert.match(csv, /"Incline ""press"""/);
 assert.match(csv, /"legs\nquads"/);
 assert.ok(csv.includes(',true'), 'custom exercises must be represented without owner data');
 
 const clipboardCsv = serializeTrainingExerciseAiClipboardCsv(catalog);
-assert.match(clipboardCsv, /^ejercicios\.csv\nexercises_rows\nexercise_name_es,primary_muscle,equipment\n/);
-assert.ok(clipboardCsv.includes('"Press, inclinado",chest,barbell'));
-assert.ok(clipboardCsv.includes('Sentadilla catálogo privada,"legs\nquads",'));
+assert.match(
+  clipboardCsv,
+  /^ejercicios\.csv\nexercises_rows\nexercise_name_es,exercise_type,primary_muscle,equipment\n/,
+);
+assert.ok(clipboardCsv.includes('"Press, inclinado",reps,chest,barbell'));
+assert.ok(clipboardCsv.includes('Sentadilla catálogo privada,,"legs\nquads",'));
+assert.ok(clipboardCsv.includes('Plancha lateral,Tiempo,abdominals,bodyweight'));
 assert.ok(
   clipboardCsv.indexOf('Press, inclinado') < clipboardCsv.indexOf('Sentadilla catálogo privada'),
   'the clipboard catalog must retain deterministic localized-name sorting',
@@ -61,7 +77,7 @@ assert.ok(!clipboardCsv.includes(catalog[0].exercise_id));
 
 const prompt = buildTrainingPlanAiPrompt(catalog, '2026-09-28');
 assert.ok(prompt.startsWith(TRAINING_PLAN_IMPORT_PROMPT));
-assert.ok(prompt.includes('El catálogo completo de 2 ejercicios ya está copiado'));
+assert.ok(prompt.includes('El catálogo completo de 3 ejercicios ya está copiado'));
 assert.ok(prompt.includes('Pégalo aquí con Ctrl+V o Cmd+V'));
 assert.ok(prompt.includes('Debajo del catálogo, pega o escribe tu entrenamiento'));
 assert.ok(prompt.includes('una fotografía'));
@@ -82,6 +98,9 @@ assert.ok(prompt.includes('Alzan resolverá el UUID al importar el JSON'));
 assert.ok(prompt.includes('tablas del DOCX'));
 assert.ok(prompt.includes('rutinas de gimnasio'));
 assert.ok(prompt.includes('comillas ASCII'));
+assert.ok(prompt.includes('exercise_type'));
+assert.ok(prompt.includes('duration_s'));
+assert.ok(prompt.includes('para Tiempo usa duration_s en segundos y omite reps'));
 assert.ok(prompt.includes('frontend lo marcará como pendiente'));
 assert.ok(prompt.includes('conserva el nombre fuente; el frontend pedirá selección'));
 assert.doesNotMatch(prompt, /[“”‘’]/, 'AI prompt must use ASCII quotes');
@@ -107,7 +126,11 @@ const largeCatalog: TrainingExerciseAiCatalogRow[] = Array.from({ length: 2_012 
   is_custom: false,
 }));
 const largeClipboardCsv = serializeTrainingExerciseAiClipboardCsv(largeCatalog);
-assert.ok(largeClipboardCsv.startsWith('ejercicios.csv\nexercises_rows\nexercise_name_es,primary_muscle,equipment\n'));
+assert.ok(
+  largeClipboardCsv.startsWith(
+    'ejercicios.csv\nexercises_rows\nexercise_name_es,exercise_type,primary_muscle,equipment\n',
+  ),
+);
 assert.equal(largeClipboardCsv.split('\n').length, largeCatalog.length + 3);
 largeCatalog.forEach(exercise => {
   assert.ok(largeClipboardCsv.includes(exercise.exercise_name_es), `${exercise.exercise_name_es} must be serialized`);

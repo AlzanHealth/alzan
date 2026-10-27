@@ -22,7 +22,10 @@ assert.ok(
 );
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No inventes RIR; si no aparece, omite rir_by_set'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No uses target_type: "rpe"'));
-assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('No escribas duration_s, distance_m'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('exercise_type del catálogo sea Tiempo'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('escribe el objetivo en duration_s como segundos enteros positivos'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('omite reps, reps_min y reps_max'));
+assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Nunca incluyas ambos tipos de objetivo'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Cada exercise solo puede usar'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('Cada sesión debe incluir modality'));
 assert.ok(TRAINING_PLAN_IMPORT_PROMPT.includes('modality: outdoor'));
@@ -64,6 +67,7 @@ assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /CATÁLOGO DE EJERCICIO
 assert.doesNotMatch(TRAINING_PLAN_IMPORT_CLIPBOARD_TEXT, /11111111-1111-4111-8111-111111111111/);
 assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"workout_goal": "speed"'));
 assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"modality": "gym"'));
+assert.ok(TRAINING_PLAN_IMPORT_TEMPLATE.includes('"duration_s": 30'));
 
 const datedTemplate = buildTrainingPlanImportTemplate(new Date('2026-07-30T12:00:00+02:00'));
 assert.ok(datedTemplate.includes('"start_date": "2026-08-03"'));

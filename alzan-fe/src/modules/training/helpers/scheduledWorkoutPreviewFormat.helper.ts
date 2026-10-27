@@ -5,6 +5,7 @@ import {
   formatDurationTime,
 } from '../../../utils/unitConversionUtils';
 import { DistanceUnit, DurationType, SportType, TargetType, WeightUnit } from '../../../types/requests.types';
+import { isTimeBasedGymExerciseType } from './gymExerciseDefaults.helper';
 
 export type PreviewLabels = {
   reps: string;
@@ -28,6 +29,7 @@ export type GymExercisePreviewInput = {
   rest_seconds?: number | null;
   exercise?: {
     load_type?: string | null;
+    exercise_type_code?: string | null;
   } | null;
 };
 
@@ -70,12 +72,14 @@ export const formatGymExercisePrescription = (exercise: GymExercisePreviewInput,
   const sets = exercise.target_sets ?? 1;
   const min = exercise.target_reps_min ?? exercise.target_reps_max ?? 0;
   const max = exercise.target_reps_max ?? exercise.target_reps_min ?? min;
-  const isTimeBased = exercise.exercise?.load_type === 'time';
+  const isTimeBased = exercise.exercise?.exercise_type_code
+    ? isTimeBasedGymExerciseType(exercise.exercise.exercise_type_code)
+    : exercise.exercise?.load_type === 'time';
 
   parts.push(`${sets} ${labels.sets}`);
 
   if (isTimeBased) {
-    parts.push(`${min === max ? min : `${min}-${max}`}s ${labels.time.toLowerCase()}`);
+    parts.push(`${min === max ? min : `${min}-${max}`} s`);
   } else {
     parts.push(`${min === max ? min : `${min}-${max}`} ${labels.reps.toLowerCase()}`);
   }

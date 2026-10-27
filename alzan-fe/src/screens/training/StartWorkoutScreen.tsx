@@ -22,6 +22,7 @@ import {
   getCurrentAppLocale,
   getLocalizedExerciseDescription,
   getLocalizedExerciseName,
+  isTimeBasedExerciseType,
 } from '../../services/localization';
 import { Exercise, WorkoutTemplate, WorkoutTemplateExercise } from '../../types/requests.types';
 import { applyStrengthProgressionsForPlannedDate } from '../../modules/training/services/strengthProgressionService';
@@ -44,6 +45,11 @@ type TemplateExerciseRow = Omit<WorkoutTemplateExercise, 'target_rir_by_set'> & 
 
 type DatabaseTemplateExerciseRow = Omit<TemplateExerciseRow, 'target_rir_by_set'> & {
   target_rir_by_set: Json | null;
+  exercise:
+    | (Exercise & {
+        exercise_type: { code: string } | null;
+      })
+    | null;
 };
 
 interface WorkoutTemplateWithExercises extends WorkoutTemplate {
@@ -55,6 +61,7 @@ interface WorkoutTemplateWithExercises extends WorkoutTemplate {
             base_name_en?: string | null;
             description_es?: string | null;
             description_en?: string | null;
+            exercise_type_code?: string | null;
           })
         | null;
     }
@@ -110,7 +117,8 @@ export const StartWorkoutScreen = () => {
             exercises:workout_template_exercises(
               *,
               exercise:exercises(
-                *
+                *,
+                exercise_type:exercise_types(code)
               )
             )
           `,
@@ -138,6 +146,7 @@ export const StartWorkoutScreen = () => {
                 target_rir_by_set: targetRirBySet,
                 exercise: {
                   ...effectiveExercise,
+                  exercise_type_code: item.exercise.exercise_type?.code ?? null,
                   base_name: getLocalizedExerciseName(effectiveExercise, languageCode),
                   description: getLocalizedExerciseDescription(effectiveExercise, languageCode),
                 },
@@ -361,7 +370,9 @@ export const StartWorkoutScreen = () => {
                   </View>
                   <Text style={[styles.exerciseDetails, { color: themeColors.textSecondary }]}>
                     {(item?.target_sets || 3) +
-                      ` ${setsLabel} · ${item?.target_reps_min ?? item?.target_reps_max ?? 8} ${repsLabel}`}
+                      ` ${setsLabel} · ${item?.target_reps_min ?? item?.target_reps_max ?? 8}${
+                        isTimeBasedExerciseType(item.exercise?.exercise_type_code) ? ' s' : ` ${repsLabel}`
+                      }`}
                   </Text>
                   {(isWarmupExercise || isDropSetExercise) && (
                     <View

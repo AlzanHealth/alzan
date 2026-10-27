@@ -34,6 +34,7 @@ export type TrainingPlanStrengthExercise = {
   order_index: number;
   is_warmup?: boolean;
   sets: number;
+  duration_s?: number;
   reps?: number;
   reps_min?: number;
   reps_max?: number;
@@ -138,6 +139,7 @@ const EXERCISE_KEYS = [
   'order_index',
   'is_warmup',
   'sets',
+  'duration_s',
   'reps',
   'reps_min',
   'reps_max',
@@ -383,6 +385,7 @@ const parseExercise = (
     addError(errors, 'missing_field', `${path}.exercise_id`, 'Provide exercise_id or exercise_name');
   const order = readInteger(value.order_index, `${path}.order_index`, errors, 0, 1000);
   const sets = readInteger(value.sets, `${path}.sets`, errors, 1, 100);
+  const durationS = readInteger(value.duration_s, `${path}.duration_s`, errors, 1, 3600);
   const reps = readInteger(value.reps, `${path}.reps`, errors, 1, 1000);
   const repsMin = readInteger(value.reps_min, `${path}.reps_min`, errors, 1, 1000);
   const repsMax = readInteger(value.reps_max, `${path}.reps_max`, errors, 1, 1000);
@@ -408,14 +411,17 @@ const parseExercise = (
   if (reps !== undefined && (repsMin !== undefined || repsMax !== undefined)) {
     addError(errors, 'invalid_session_shape', `${path}.reps`, 'Use reps or reps_min/reps_max, not both');
   }
+  if (durationS !== undefined && (reps !== undefined || repsMin !== undefined || repsMax !== undefined)) {
+    addError(errors, 'invalid_session_shape', `${path}.duration_s`, 'Use duration_s or a repetition target, not both');
+  }
   if ((repsMin === undefined) !== (repsMax === undefined)) {
     addError(errors, 'invalid_session_shape', `${path}.reps_min`, 'Provide both reps_min and reps_max');
   }
   if (repsMin !== undefined && repsMax !== undefined && repsMin > repsMax) {
     addError(errors, 'invalid_range', `${path}.reps_max`, 'reps_max must be greater than or equal to reps_min');
   }
-  if (reps === undefined && repsMin === undefined && repsMax === undefined) {
-    addError(errors, 'missing_field', `${path}.reps`, 'Provide reps or reps_min and reps_max');
+  if (durationS === undefined && reps === undefined && repsMin === undefined && repsMax === undefined) {
+    addError(errors, 'missing_field', `${path}.reps`, 'Provide duration_s, reps, or reps_min and reps_max');
   }
   if (value.is_warmup !== undefined && typeof value.is_warmup !== 'boolean') {
     addError(errors, 'invalid_type', `${path}.is_warmup`, 'Expected a boolean');
@@ -427,6 +433,7 @@ const parseExercise = (
     order_index: order,
     is_warmup: value.is_warmup === true,
     sets,
+    ...(durationS === undefined ? {} : { duration_s: durationS }),
     ...(reps === undefined ? {} : { reps }),
     ...(repsMin === undefined ? {} : { reps_min: repsMin }),
     ...(repsMax === undefined ? {} : { reps_max: repsMax }),

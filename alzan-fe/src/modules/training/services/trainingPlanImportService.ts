@@ -15,6 +15,10 @@ import { buildImportedWorkoutPlans } from './trainingPlanImportCalendar.helper';
 import { toImportedProgressionKey } from './trainingPlanImportProgressionKey';
 import { toImportedRirBySet } from './trainingPlanImportRir.helper';
 import {
+  getTrainingPlanExerciseMetricError,
+  getTrainingPlanStrengthTargetValues,
+} from './trainingPlanStrengthTarget.helper';
+import {
   areTrainingPlanExerciseResolutionsReady,
   getTrainingExerciseResolutionKey,
   resolveTrainingPlanExerciseResolutions as buildTrainingPlanExerciseResolutions,
@@ -48,6 +52,22 @@ const reportImportProgress = (
   percentage: number,
 ): void => {
   options.onProgress?.({ phase, percentage: Math.max(0, Math.min(100, Math.round(percentage))) });
+};
+
+const validateResolvedExerciseMetrics = (
+  exercises: TrainingPlanStrengthExercise[],
+  resolvedExerciseIds: Map<string, string>,
+  catalog: TrainingExerciseCatalogRow[],
+): void => {
+  const catalogById = new Map(catalog.map(exercise => [exercise.id, exercise] as const));
+  for (const exercise of exercises) {
+    const exerciseId = resolvedExerciseIds.get(getTrainingExerciseResolutionKey(exercise));
+    const catalogExercise = exerciseId ? catalogById.get(exerciseId) : undefined;
+    const metricIssue = getTrainingPlanExerciseMetricError(exercise, catalogExercise?.exercise_type);
+    if (metricIssue) {
+      throw new Error(`Invalid target for "${metricIssue.exerciseName}": ${metricIssue.kind}`);
+    }
+  }
 };
 
 const getDateRange = (document: TrainingPlanImportDocument): { start: string; end: string } => {
@@ -217,11 +237,13 @@ const resolveExercises = async (
       }
       resolved.set(resolution.resolutionKey, selected.id);
     });
+    validateResolvedExerciseMetrics(exercises, resolved, catalog);
     logTrainingPlanImport('resolve-exercises:complete', { resolved: resolved.size });
     return resolved;
   }
   try {
     const resolved = resolveTrainingPlanExercisesFromCatalog(exercises, catalog);
+    validateResolvedExerciseMetrics(exercises, resolved, catalog);
     logTrainingPlanImport('resolve-exercises:complete', { resolved: resolved.size });
     return resolved;
   } catch (error) {
@@ -504,14 +526,14 @@ const createStrengthTemplate = async (
         });
         throw error;
       }
+      const targets = getTrainingPlanStrengthTargetValues(exercise, 8);
       return {
         workout_template_id: template.id,
         exercise_id: exerciseId,
         order_index: exercise.order_index,
         is_warmup: exercise.is_warmup ?? false,
         target_sets: exercise.sets,
-        target_reps_min: exercise.reps_min ?? exercise.reps ?? 8,
-        target_reps_max: exercise.reps_max ?? exercise.reps ?? 8,
+        ...targets,
         target_weight_kg: exercise.weight_kg ?? null,
         target_rpe: exercise.rpe ?? null,
         target_rir_by_set: toImportedRirBySet(exercise.rir_by_set),
@@ -560,8 +582,7 @@ const createStrengthTemplate = async (
           workout_template_exercise_id: inserted.id,
           week_index: weekIndex,
           target_sets: exercise.sets,
-          target_reps_min: exercise.reps_min ?? exercise.reps ?? null,
-          target_reps_max: exercise.reps_max ?? exercise.reps ?? null,
+          ...getTrainingPlanStrengthTargetValues(exercise, null),
           target_weight_kg: exercise.weight_kg ?? null,
           target_rpe: exercise.rpe ?? null,
           target_rir_by_set: toImportedRirBySet(exercise.rir_by_set),
