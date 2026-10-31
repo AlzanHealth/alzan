@@ -1,46 +1,29 @@
 import React from 'react';
-import {
-  Activity,
-  Bike,
-  CircleDot,
-  Dumbbell,
-  Flag,
-  Footprints,
-  Goal,
-  Mountain,
-  MountainSnow,
-  Route,
-  Snowflake,
-  Swords,
-  Volleyball,
-  Waves,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { Activity, Dumbbell, Footprints } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
 import { StyleProp, useColorScheme, ViewStyle } from 'react-native';
 import { SPORT_COLORS } from '../../theme/sportColors';
 
-const SPORT_ICONS: Record<string, LucideIcon> = {
-  running: Footprints,
-  cycling: Bike,
-  swimming: Waves,
-  football: Goal,
-  basketball: CircleDot,
-  tennis: CircleDot,
-  padel: CircleDot,
-  hiking: Mountain,
-  trail: Route,
-  martial_arts: Swords,
-  climbing: Mountain,
-  volleyball: Volleyball,
-  surf: Waves,
-  skiing: MountainSnow,
-  snowboard: Snowflake,
-  golf: Flag,
-  hyrox: Dumbbell,
-  gym: Dumbbell,
-  strength: Dumbbell,
-  walking: Footprints,
-  other: Activity,
+type SportGlyph = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+
+const SPORT_ICONS: Record<string, SportGlyph> = {
+  running: 'run',
+  cycling: 'bike',
+  swimming: 'swim',
+  football: 'soccer',
+  basketball: 'basketball-hoop',
+  tennis: 'tennis',
+  padel: 'tennis',
+  hiking: 'hiking',
+  martial_arts: 'karate',
+  climbing: 'terrain',
+  volleyball: 'volleyball',
+  surf: 'surfing',
+  skiing: 'ski',
+  snowboard: 'snowboard',
+  golf: 'golf',
+  hyrox: 'weight-lifter',
 };
 
 export interface SportIconProps {
@@ -54,9 +37,19 @@ export interface SportIconProps {
 export const SportIcon: React.FC<SportIconProps> = ({ sport, size = 24, color, strokeWidth = 2, style }) => {
   const systemColorScheme = useColorScheme();
   const normalizedSport = sport?.trim().toLowerCase() || '';
-  const Icon = SPORT_ICONS[normalizedSport] || Activity;
+  const [fontsLoaded] = useFonts(MaterialCommunityIcons.font);
+  const iconName = SPORT_ICONS[normalizedSport];
+  const Icon = ['gym', 'strength'].includes(normalizedSport)
+    ? Dumbbell
+    : ['trail', 'walking'].includes(normalizedSport)
+      ? Footprints
+      : Activity;
   const defaultColor = systemColorScheme === 'dark' ? '#FFFFFF' : '#333333';
   const iconColor = color || SPORT_COLORS[normalizedSport] || defaultColor;
+
+  if (iconName && fontsLoaded) {
+    return <MaterialCommunityIcons name={iconName} size={size} color={iconColor} style={style} />;
+  }
 
   return <Icon size={size} color={iconColor} strokeWidth={strokeWidth} style={style} />;
 };
