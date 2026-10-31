@@ -1,12 +1,13 @@
 import React from 'react';
 import { SportIcon } from '../components/icons/SportIcon';
-import { SportIconProps } from '../components/icons/SportIcon';
+import type { SportIconProps } from '../components/icons/SportIcon';
 import { SportType } from '../types/requests.types';
 import { TranslationKey } from '../i18n/locales/en';
 import { formatDurationTime } from '../utils/unitConversionUtils';
 
 // Create wrapper components for each sport that use SportIcon
 const RunningIcon = (props: SportIconProps) => <SportIcon {...props} sport="running" />;
+const GymIcon = (props: SportIconProps) => <SportIcon {...props} sport="gym" />;
 const CyclingIcon = (props: SportIconProps) => <SportIcon {...props} sport="cycling" />;
 const SwimmingIcon = (props: SportIconProps) => <SportIcon {...props} sport="swimming" />;
 const HikingIcon = (props: SportIconProps) => <SportIcon {...props} sport="hiking" />;
@@ -154,7 +155,7 @@ export const SPORTS_CONFIG: Record<string, SportConfig> = {
   gym: {
     id: 'gym',
     label: 'constants.gym',
-    icon: OtherIcon,
+    icon: GymIcon,
     units: {},
     fields: { distance: false, duration: true, elevation: false, calories: true, rpe: true, heartRate: false },
     defaultTitle: 'constants.gymTitle',

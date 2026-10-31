@@ -8,7 +8,7 @@ import { colors, spacing, borderRadius, typography } from '../../theme';
 import { useTrainingStyles } from '../../hooks/useTrainingStyles';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { SportIcon } from '../../components/icons/SportIcon';
-import { ChevronLeft, Dumbbell } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { TranslationKey } from '../../i18n/locales/en';
 
@@ -17,7 +17,6 @@ type ActivityType = {
   label: TranslationKey;
   sportType: string;
   color: string;
-  isGym?: boolean;
 };
 
 const ACTIVITIES: ActivityType[] = [
@@ -43,7 +42,7 @@ const ACTIVITIES: ActivityType[] = [
   { id: 'snowboard', label: 'constants.snowboardTitle', sportType: 'snowboard', color: SPORT_COLORS.snowboard },
   { id: 'golf', label: 'constants.golfTitle', sportType: 'golf', color: SPORT_COLORS.golf },
   { id: 'hyrox', label: 'constants.hyroxTitle', sportType: 'hyrox', color: SPORT_COLORS.hyrox },
-  { id: 'gym', label: 'constants.gym', sportType: 'gym', color: SPORT_COLORS.gym, isGym: true },
+  { id: 'gym', label: 'constants.gym', sportType: 'gym', color: SPORT_COLORS.gym },
   { id: 'other', label: 'constants.other', sportType: 'other', color: SPORT_COLORS.other },
 ];
 
@@ -82,11 +81,7 @@ export const ActivityTypeSelectorScreen = () => {
                 activeOpacity={0.7}
               >
                 <View style={[styles.iconContainer, { backgroundColor: activity.color }]}>
-                  {activity.isGym ? (
-                    <Dumbbell size={32} color="#FFFFFF" />
-                  ) : (
-                    <SportIcon sport={activity.sportType} size={32} color="#FFFFFF" />
-                  )}
+                  <SportIcon sport={activity.sportType} size={32} color="#FFFFFF" />
                 </View>
                 <Text style={[styles.activityLabel, dynamicStyles.label]}>{t(activity.label)}</Text>
               </TouchableOpacity>
