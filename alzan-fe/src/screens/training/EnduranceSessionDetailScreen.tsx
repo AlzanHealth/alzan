@@ -70,6 +70,7 @@ import { useSportCatalog } from '../../hooks/useSportCatalog';
 import { SPORT_COLORS } from '../../theme/sportColors';
 import { getHeartRateZoneFillPercentage } from './helpers/heartRateZoneDisplay.helper';
 import { CopyCompletedSessionModal } from '../../modules/training/components/CopyCompletedSessionModal';
+import { RunningShoeAssignment } from '../../modules/training/components/RunningShoeAssignment';
 import { useCopyCompletedSession } from '../../modules/training/hooks/useCopyCompletedSession';
 import { getSessionLocalDate } from '../../modules/training/services/copyCompletedSessionService';
 import { getDefaultCopyTargetDate } from '../../modules/training/helpers/copyCompletedSession.helper';
@@ -1757,6 +1758,10 @@ export const EnduranceSessionDetailScreen = () => {
               </View>
             )}
           </View>
+
+          {session.sport_type === 'running' && (
+            <RunningShoeAssignment sessionId={session.id} runningShoeId={session.running_shoe_id} />
+          )}
 
           {/* Route Map — shown only for endurance sessions with a polyline */}
           {!isGymSession && routePolyline && (

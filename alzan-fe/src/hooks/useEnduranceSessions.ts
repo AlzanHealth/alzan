@@ -242,6 +242,28 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
     },
   });
 
+  const assignRunningShoe = useMutation({
+    mutationFn: async ({ sessionId, runningShoeId }: { sessionId: string; runningShoeId: string | null }) => {
+      if (!user) throw new Error('No user');
+      const { data, error } = await supabase
+        .from('activity_sessions')
+        .update({ running_shoe_id: runningShoeId })
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .eq('sport_type', 'running')
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['activitySession', variables.sessionId] });
+      queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+      queryClient.invalidateQueries({ queryKey: ['runningShoes', user?.id] });
+    },
+  });
+
   return {
     sessions,
     isLoading,
@@ -250,6 +272,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
     totalCount,
     createSession,
     updateSession,
+    assignRunningShoe,
     deleteSession,
   };
 };
