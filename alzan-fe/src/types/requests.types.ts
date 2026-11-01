@@ -1377,6 +1377,9 @@ export type SleepLogUpdate = Update<'sleep_logs'>;
 export type ActivitySession = Row<'activity_sessions'>;
 export type ActivitySessionInsert = Insert<'activity_sessions'>;
 export type ActivitySessionUpdate = Update<'activity_sessions'>;
+export type RunningShoe = Row<'running_shoes'>;
+export type RunningShoeInsert = Insert<'running_shoes'>;
+export type RunningShoeUpdate = Update<'running_shoes'>;
 
 // Workout Templates
 export type WorkoutTemplate = Row<'workout_templates'>;

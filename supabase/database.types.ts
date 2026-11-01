@@ -595,6 +595,7 @@ export type Database = {
           rival: string | null
           route_polyline: string | null
           rpe: number | null
+          running_shoe_id: string | null
           ski_type: string | null
           slope_type: string | null
           snowboard_type: string | null
@@ -685,6 +686,7 @@ export type Database = {
           rival?: string | null
           route_polyline?: string | null
           rpe?: number | null
+          running_shoe_id?: string | null
           ski_type?: string | null
           slope_type?: string | null
           snowboard_type?: string | null
@@ -775,6 +777,7 @@ export type Database = {
           rival?: string | null
           route_polyline?: string | null
           rpe?: number | null
+          running_shoe_id?: string | null
           ski_type?: string | null
           slope_type?: string | null
           snowboard_type?: string | null
@@ -839,6 +842,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "external_raw_payloads_v2"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_sessions_running_shoe_owner_fkey"
+            columns: ["running_shoe_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "running_shoes"
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "activity_sessions_suggested_endurance_template_id_fkey"
@@ -3649,6 +3659,56 @@ export type Database = {
           },
         ]
       }
+      running_shoes: {
+        Row: {
+          brand: string | null
+          created_at: string
+          id: string
+          in_use_since: string
+          is_default: boolean
+          model: string | null
+          name: string
+          purchase_date: string | null
+          recommended_max_km: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          in_use_since?: string
+          is_default?: boolean
+          model?: string | null
+          name: string
+          purchase_date?: string | null
+          recommended_max_km?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          in_use_since?: string
+          is_default?: boolean
+          model?: string | null
+          name?: string
+          purchase_date?: string | null
+          recommended_max_km?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "running_shoes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_feedback: {
         Row: {
           created_at: string
@@ -5619,6 +5679,21 @@ export type Database = {
         Args: { p_sections: Json; p_session: Json }
         Returns: string
       }
+      create_running_shoe_with_backfill: {
+        Args: {
+          p_brand?: string
+          p_in_use_since: string
+          p_is_default?: boolean
+          p_model?: string
+          p_name: string
+          p_purchase_date?: string
+          p_recommended_max_km?: number
+        }
+        Returns: {
+          assigned_sessions: number
+          shoe_id: string
+        }[]
+      }
       delete_coros_user_data: { Args: { p_user_id: string }; Returns: Json }
       delete_training_template: {
         Args: { p_template_id: string; p_template_kind: string }
@@ -5739,6 +5814,7 @@ export type Database = {
           rival: string | null
           route_polyline: string | null
           rpe: number | null
+          running_shoe_id: string | null
           ski_type: string | null
           slope_type: string | null
           snowboard_type: string | null
@@ -5823,6 +5899,14 @@ export type Database = {
       get_nutrition_menu_import_snapshot: {
         Args: { p_dates: string[] }
         Returns: Json
+      }
+      get_running_shoe_mileage: {
+        Args: never
+        Returns: {
+          sessions_count: number
+          shoe_id: string
+          total_distance_m: number
+        }[]
       }
       get_training_calendar_marks: {
         Args: {
@@ -6008,6 +6092,10 @@ export type Database = {
           total_count: number
         }[]
       }
+      set_default_running_shoe: {
+        Args: { p_make_default: boolean; p_shoe_id: string }
+        Returns: undefined
+      }
       set_one_off_workout_plan: {
         Args: {
           p_planned_date?: string
@@ -6036,6 +6124,18 @@ export type Database = {
       }
       unaccent: { Args: { "": string }; Returns: string }
       unpublish_recipe: { Args: { p_recipe_id: string }; Returns: undefined }
+      update_running_shoe_with_backfill: {
+        Args: {
+          p_brand?: string
+          p_in_use_since: string
+          p_model?: string
+          p_name: string
+          p_purchase_date?: string
+          p_recommended_max_km?: number
+          p_shoe_id: string
+        }
+        Returns: number
+      }
       upsert_integration_sync_state: {
         Args: {
           p_anchor_token: string

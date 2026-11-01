@@ -54,6 +54,7 @@ export function useHealthConnectConnection() {
     onSettled: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['runningShoes', user?.id] }),
         queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id), refetchType: 'active' }),
       ]);
     },

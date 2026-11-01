@@ -6,6 +6,7 @@ async function assertEveryCalendarKeyIsInvalidated(): Promise<void> {
   const queryClient = new QueryClient();
   for (const key of Object.values(trainingQueryKeys)) queryClient.setQueryData(key, { stale: false });
   queryClient.setQueryData(['dashboard', 'home-summary', 'user-1'], { stale: false });
+  queryClient.setQueryData(['runningShoes', 'user-1'], { total_distance_m: 5000 });
 
   invalidateTrainingCalendar(queryClient);
   await Promise.resolve();
@@ -14,6 +15,7 @@ async function assertEveryCalendarKeyIsInvalidated(): Promise<void> {
     assert.equal(queryClient.getQueryState(key)?.isInvalidated, true, `expected ${key.join('/')} to be invalidated`);
   }
   assert.equal(queryClient.getQueryState(['dashboard', 'home-summary', 'user-1'])?.isInvalidated, true);
+  assert.equal(queryClient.getQueryState(['runningShoes', 'user-1'])?.isInvalidated, true);
 }
 
 void assertEveryCalendarKeyIsInvalidated();
