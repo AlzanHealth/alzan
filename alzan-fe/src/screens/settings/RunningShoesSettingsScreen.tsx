@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { Alert } from '../../components/common/Alert';
+import { CalendarDatePickerModal } from '../../components/common/CalendarDatePickerModal';
 import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { useRunningShoes } from '../../modules/training/hooks/useRunningShoes';
 import { RunningShoeWithMileage } from '../../modules/training/services/runningShoesService';
@@ -277,6 +278,20 @@ export const RunningShoesSettingsScreen = () => {
 
   const renderDatePicker = () => {
     if (!dateField) return null;
+    if (Platform.OS === 'web') {
+      return (
+        <CalendarDatePickerModal
+          visible
+          value={selectedPickerDate}
+          title={t(dateField === 'purchase' ? 'settings.runningShoesPurchaseDate' : 'settings.runningShoesInUseSince')}
+          maximumDate={new Date()}
+          onCancel={() => setDateField(null)}
+          onConfirm={date =>
+            handleDateChange({ type: 'set', nativeEvent: { timestamp: date.getTime(), utcOffset: 0 } }, date)
+          }
+        />
+      );
+    }
     const picker = (
       <DateTimePicker
         value={selectedPickerDate}

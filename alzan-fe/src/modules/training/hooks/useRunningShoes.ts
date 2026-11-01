@@ -32,6 +32,7 @@ export const useRunningShoes = () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey }),
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] }),
+      queryClient.invalidateQueries({ queryKey: ['activitySession'] }),
     ]);
   };
 

@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 
 export const trainingQueryKeys = {
+  runningShoes: ['runningShoes'] as const,
   dailyPlans: ['dailyPlans'] as const,
   completedSessions: ['completedSessions'] as const,
   dashboard: ['dashboard'] as const,

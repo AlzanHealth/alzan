@@ -143,11 +143,36 @@ BEGIN
     v_other_result.shoe_id, 'Edited other user shoe', CURRENT_DATE, NULL, NULL, NULL, 700
   );
 
-  IF v_updated_sessions <> 1
-    OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_other_session_id) <> v_other_result.shoe_id
+  IF v_updated_sessions <> 0
+    OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_other_session_id) IS NOT NULL
     OR (SELECT name FROM public.running_shoes WHERE id = v_other_result.shoe_id) <> 'Edited other user shoe'
   THEN
-    RAISE EXCEPTION 'RUNNING_SHOE_EDIT_BACKFILL_FAILED';
+    RAISE EXCEPTION 'RUNNING_SHOE_METADATA_EDIT_BACKFILLED_UNASSIGNED_SESSION';
+  END IF;
+
+  v_updated_sessions := public.update_running_shoe_with_backfill(
+    v_other_result.shoe_id, 'Edited other user shoe', CURRENT_DATE - 1, NULL, NULL, NULL, 700
+  );
+
+  IF v_updated_sessions <> 1
+    OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_other_session_id) <> v_other_result.shoe_id
+  THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_START_DATE_CHANGE_DID_NOT_BACKFILL';
+  END IF;
+
+  UPDATE public.activity_sessions
+  SET running_shoe_id = NULL
+  WHERE id = v_other_session_id;
+
+  v_updated_sessions := public.update_running_shoe_with_backfill(
+    v_other_result.shoe_id, 'Updated metadata after removal', CURRENT_DATE - 1,
+    'New brand', 'New model', CURRENT_DATE - 2, 800
+  );
+
+  IF v_updated_sessions <> 0
+    OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_other_session_id) IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_METADATA_EDIT_OVERWROTE_EXPLICIT_REMOVAL';
   END IF;
 
   INSERT INTO running_shoe_test_context (

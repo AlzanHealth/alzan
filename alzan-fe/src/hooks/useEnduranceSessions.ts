@@ -157,6 +157,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
+      queryClient.invalidateQueries({ queryKey: ['runningShoes', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['completedSessions'] });
@@ -196,6 +197,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
+      queryClient.invalidateQueries({ queryKey: ['runningShoes', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['activeSessionBanner'] });
       queryClient.invalidateQueries({ queryKey: ['activeSession'] });
@@ -232,6 +234,7 @@ export const useEnduranceSessions = (options?: UseEnduranceSessionsOptions) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: healthQueryKeys.all(user?.id) });
+      queryClient.invalidateQueries({ queryKey: ['runningShoes', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
       queryClient.invalidateQueries({ queryKey: ['activeSessionBanner'] });
       queryClient.invalidateQueries({ queryKey: ['activeSession'] });
