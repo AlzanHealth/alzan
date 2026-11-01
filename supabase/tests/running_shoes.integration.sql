@@ -246,6 +246,76 @@ BEGIN
 END;
 $timezone_boundary$;
 
+DO $numeric_activity_offsets$
+DECLARE
+  v_owner_id uuid;
+  v_offset text;
+  v_start_date date := CURRENT_DATE - 10;
+  v_included_id uuid;
+  v_excluded_id uuid;
+  v_default_included_id uuid;
+  v_default_excluded_id uuid;
+  v_update_included_id uuid;
+  v_shoe_id uuid;
+  v_assigned integer;
+  v_included_time timestamptz;
+  v_excluded_time timestamptz;
+BEGIN
+  FOREACH v_offset IN ARRAY ARRAY['+02:00', '-02:00'] LOOP
+    v_owner_id := gen_random_uuid();
+    v_included_id := gen_random_uuid();
+    v_excluded_id := gen_random_uuid();
+    v_default_included_id := gen_random_uuid();
+    v_default_excluded_id := gen_random_uuid();
+    v_update_included_id := gen_random_uuid();
+    v_included_time := (v_start_date::timestamp AT TIME ZONE 'UTC') - v_offset::interval + interval '30 minutes';
+    v_excluded_time := v_included_time - interval '1 hour';
+
+    INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data)
+    VALUES (v_owner_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+      v_owner_id::text || '@running-shoe-offset.test', '', '{}'::jsonb, '{}'::jsonb);
+    PERFORM set_config('request.jwt.claim.sub', v_owner_id::text, true);
+
+    INSERT INTO public.activity_sessions (id, user_id, sport_type, start_time, started_at_local, timezone)
+    VALUES
+      (v_included_id, v_owner_id, 'running', v_included_time, NULL, v_offset),
+      (v_excluded_id, v_owner_id, 'running', v_excluded_time, NULL, v_offset);
+
+    SELECT shoe_id, assigned_sessions INTO v_shoe_id, v_assigned
+    FROM public.create_running_shoe_with_backfill('Offset shoe', v_start_date);
+    IF v_assigned <> 1
+      OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_included_id) IS DISTINCT FROM v_shoe_id
+      OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_excluded_id) IS NOT NULL
+    THEN
+      RAISE EXCEPTION 'RUNNING_SHOE_CREATE_BACKFILL_NUMERIC_OFFSET_FAILED: %', v_offset;
+    END IF;
+
+    PERFORM public.set_default_running_shoe(v_shoe_id, true);
+    INSERT INTO public.activity_sessions (id, user_id, sport_type, start_time, started_at_local, timezone)
+    VALUES
+      (v_default_included_id, v_owner_id, 'running', v_included_time, NULL, v_offset),
+      (v_default_excluded_id, v_owner_id, 'running', v_excluded_time, NULL, v_offset);
+    IF (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_default_included_id) IS DISTINCT FROM v_shoe_id
+      OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_default_excluded_id) IS NOT NULL
+    THEN
+      RAISE EXCEPTION 'RUNNING_SHOE_DEFAULT_NUMERIC_OFFSET_FAILED: %', v_offset;
+    END IF;
+
+    PERFORM public.set_default_running_shoe(v_shoe_id, false);
+    INSERT INTO public.activity_sessions (id, user_id, sport_type, start_time, started_at_local, timezone)
+    VALUES (v_update_included_id, v_owner_id, 'running', v_included_time, NULL, v_offset);
+    -- Move the start date one day later first, then restore it to exercise update backfill.
+    PERFORM public.update_running_shoe_with_backfill(v_shoe_id, 'Offset edited shoe', v_start_date + 1);
+    PERFORM public.update_running_shoe_with_backfill(v_shoe_id, 'Offset edited shoe', v_start_date);
+    IF (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_update_included_id) IS DISTINCT FROM v_shoe_id
+      OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_excluded_id) IS NOT NULL
+    THEN
+      RAISE EXCEPTION 'RUNNING_SHOE_UPDATE_BACKFILL_NUMERIC_OFFSET_FAILED: %', v_offset;
+    END IF;
+  END LOOP;
+END;
+$numeric_activity_offsets$;
+
 SET LOCAL ROLE authenticated;
 
 DO $rls$
