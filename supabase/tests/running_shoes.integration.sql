@@ -22,6 +22,9 @@ DECLARE
   v_trail_session_id uuid := gen_random_uuid();
   v_explicit_session_id uuid := gen_random_uuid();
   v_new_default_session_id uuid := gen_random_uuid();
+  v_historical_session_id uuid := gen_random_uuid();
+  v_start_date_session_id uuid := gen_random_uuid();
+  v_explicit_historical_session_id uuid := gen_random_uuid();
   v_other_session_id uuid := gen_random_uuid();
   v_first_result record;
   v_second_result record;
@@ -73,6 +76,19 @@ BEGIN
     OR (SELECT is_default FROM public.running_shoes WHERE id = v_first_shoe_id)
   THEN
     RAISE EXCEPTION 'RUNNING_SHOE_BACKFILL_OVERWROTE_ASSIGNMENT_OR_DEFAULT_FAILED';
+  END IF;
+
+  INSERT INTO public.activity_sessions (id, user_id, sport_type, distance_m, start_time, started_at_local, timezone, running_shoe_id)
+  VALUES
+    (v_historical_session_id, v_owner_id, 'running', 0, now(), (CURRENT_DATE - 4)::timestamp, 'UTC', NULL),
+    (v_start_date_session_id, v_owner_id, 'running', 0, now(), (CURRENT_DATE - 3)::timestamp, 'UTC', NULL),
+    (v_explicit_historical_session_id, v_owner_id, 'running', 0, now(), (CURRENT_DATE - 4)::timestamp, 'UTC', v_first_shoe_id);
+
+  IF (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_historical_session_id) IS NOT NULL
+    OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_start_date_session_id) IS DISTINCT FROM v_second_shoe_id
+    OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_explicit_historical_session_id) IS DISTINCT FROM v_first_shoe_id
+  THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_DEFAULT_IGNORED_USAGE_DATE_OR_EXPLICIT_ASSIGNMENT';
   END IF;
 
   INSERT INTO public.activity_sessions (id, user_id, sport_type, distance_m, start_time, started_at_local, timezone)
@@ -182,6 +198,53 @@ BEGIN
   );
 END;
 $fixture$;
+
+DO $timezone_boundary$
+DECLARE
+  v_owner_id uuid;
+  v_timezone text;
+  v_today date;
+  v_shoe_id uuid;
+BEGIN
+  SELECT owner_id INTO STRICT v_owner_id FROM running_shoe_test_context;
+  v_timezone := CASE
+    WHEN (now() AT TIME ZONE 'Pacific/Kiritimati')::date <> (now() AT TIME ZONE 'UTC')::date
+      THEN 'Pacific/Kiritimati'
+    ELSE 'Etc/GMT+12'
+  END;
+  v_today := (now() AT TIME ZONE v_timezone)::date;
+  IF v_today = (now() AT TIME ZONE 'UTC')::date THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_TIMEZONE_FIXTURE_HAS_NO_DATE_DIFFERENCE';
+  END IF;
+
+  INSERT INTO public.user_preferences (user_id, timezone)
+  VALUES (v_owner_id, v_timezone)
+  ON CONFLICT (user_id) DO UPDATE SET timezone = EXCLUDED.timezone;
+  PERFORM set_config('request.jwt.claim.sub', v_owner_id::text, true);
+
+  SELECT shoe_id INTO v_shoe_id
+  FROM public.create_running_shoe_with_backfill('Timezone shoe', v_today, NULL, NULL, v_today);
+  PERFORM public.update_running_shoe_with_backfill(v_shoe_id, 'Timezone edited shoe', v_today, NULL, NULL, v_today);
+
+  BEGIN
+    PERFORM public.create_running_shoe_with_backfill('Future shoe', v_today + 1);
+    RAISE EXCEPTION 'RUNNING_SHOE_ACCEPTED_FUTURE_LOCAL_START_DATE';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+  END;
+
+  BEGIN
+    PERFORM public.update_running_shoe_with_backfill(v_shoe_id, 'Future start', v_today + 1);
+    RAISE EXCEPTION 'RUNNING_SHOE_UPDATE_ACCEPTED_FUTURE_LOCAL_START_DATE';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+  END;
+
+  BEGIN
+    UPDATE public.running_shoes SET purchase_date = v_today + 1 WHERE id = v_shoe_id;
+    RAISE EXCEPTION 'RUNNING_SHOE_TRIGGER_ACCEPTED_FUTURE_LOCAL_PURCHASE_DATE';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+  END;
+END;
+$timezone_boundary$;
 
 SET LOCAL ROLE authenticated;
 

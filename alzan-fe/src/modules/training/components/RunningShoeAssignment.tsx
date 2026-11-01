@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Check, ChevronRight, Footprints, Star } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { Alert } from '../../../components/common/Alert';
 import { useEnduranceSessions } from '../../../hooks/useEnduranceSessions';
 import { useRunningShoes } from '../hooks/useRunningShoes';
+import { RunningShoeWithMileage } from '../services/runningShoesService';
 import { TrainingScreenNavigationProp } from '../../../types/navigation.types';
 import { borderRadius, spacing, typography } from '../../../theme';
 
@@ -25,15 +26,43 @@ export const RunningShoeAssignment = ({ sessionId, runningShoeId }: RunningShoeA
 
   const selectedShoe = shoes.find(shoe => shoe.id === runningShoeId);
 
-  const assign = async (shoeId: string | null) => {
-    try {
-      await assignRunningShoe.mutateAsync({ sessionId, runningShoeId: shoeId });
-      setSelectorVisible(false);
-      Alert.alert(t('training.runningShoeSelectorTitle'), t('training.runningShoeSaved'));
-    } catch {
-      Alert.alert(t('training.runningShoeSelectorTitle'), t('training.runningShoeSaveError'));
-    }
-  };
+  const assignShoe = assignRunningShoe.mutateAsync;
+  const assign = useCallback(
+    async (shoeId: string | null) => {
+      try {
+        await assignShoe({ sessionId, runningShoeId: shoeId });
+        setSelectorVisible(false);
+        Alert.alert(t('training.runningShoeSelectorTitle'), t('training.runningShoeSaved'));
+      } catch {
+        Alert.alert(t('training.runningShoeSelectorTitle'), t('training.runningShoeSaveError'));
+      }
+    },
+    [assignShoe, sessionId, t],
+  );
+
+  const renderShoeOption = useCallback(
+    ({ item: shoe }: { item: RunningShoeWithMileage }) => (
+      <TouchableOpacity
+        style={[styles.option, { borderBottomColor: colors.border }]}
+        onPress={() => void assign(shoe.id)}
+        disabled={assignRunningShoe.isPending}
+      >
+        <View style={styles.optionTextBlock}>
+          <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{shoe.name}</Text>
+          {shoe.is_default && (
+            <View style={styles.defaultHint}>
+              <Star size={12} color={colors.primary} />
+              <Text style={[styles.defaultText, { color: colors.primary }]}>
+                {t('training.runningShoeRecommended')}
+              </Text>
+            </View>
+          )}
+        </View>
+        {runningShoeId === shoe.id && <Check size={18} color={colors.primary} />}
+      </TouchableOpacity>
+    ),
+    [assign, assignRunningShoe.isPending, colors, runningShoeId, t],
+  );
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surfaceSolid, borderColor: colors.border }]}>
@@ -90,27 +119,13 @@ export const RunningShoeAssignment = ({ sessionId, runningShoeId }: RunningShoeA
               <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{t('training.runningShoeNone')}</Text>
               {!runningShoeId && <Check size={18} color={colors.primary} />}
             </TouchableOpacity>
-            {shoes.map(shoe => (
-              <TouchableOpacity
-                key={shoe.id}
-                style={[styles.option, { borderBottomColor: colors.border }]}
-                onPress={() => void assign(shoe.id)}
-                disabled={assignRunningShoe.isPending}
-              >
-                <View style={styles.optionTextBlock}>
-                  <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{shoe.name}</Text>
-                  {shoe.is_default && (
-                    <View style={styles.defaultHint}>
-                      <Star size={12} color={colors.primary} />
-                      <Text style={[styles.defaultText, { color: colors.primary }]}>
-                        {t('training.runningShoeRecommended')}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                {runningShoeId === shoe.id && <Check size={18} color={colors.primary} />}
-              </TouchableOpacity>
-            ))}
+            <FlatList
+              style={styles.optionList}
+              data={shoes}
+              keyExtractor={shoe => shoe.id}
+              renderItem={renderShoeOption}
+              extraData={runningShoeId}
+            />
             <TouchableOpacity style={styles.cancelButton} onPress={() => setSelectorVisible(false)}>
               <Text style={[styles.cancelText, { color: colors.primary }]}>{t('common.cancel')}</Text>
             </TouchableOpacity>
@@ -144,7 +159,8 @@ const styles = StyleSheet.create({
   hint: { ...typography.caption, lineHeight: 18 },
   manageText: { ...typography.body, fontWeight: '600' },
   modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.m },
-  modalCard: { width: '100%', maxWidth: 440, borderRadius: borderRadius.l, padding: spacing.m },
+  modalCard: { width: '100%', maxWidth: 440, maxHeight: '85%', borderRadius: borderRadius.l, padding: spacing.m },
+  optionList: { flexGrow: 0, flexShrink: 1 },
   modalTitle: { ...typography.h3, marginBottom: spacing.s },
   option: {
     minHeight: 54,

@@ -436,10 +436,9 @@ export const RunningShoesSettingsScreen = () => {
                 </ScrollView>
               </KeyboardAvoidingView>
             </SafeAreaView>
+            {renderDatePicker()}
           </LinearGradient>
         </Modal>
-
-        {renderDatePicker()}
       </SafeAreaView>
     </LinearGradient>
   );
