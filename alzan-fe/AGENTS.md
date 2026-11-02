@@ -19,6 +19,13 @@ Detailed frontend implementation reference: `./docs/ai-frontend-reference.md`
 - For planning, debugging, or verification discipline, use the shared workflow skills such as `shared-writing-plans`, `shared-systematic-debugging`, and `shared-verification-before-completion`.
 - Any code change must finish with `shared-pnpm-quality-gate`.
 
+## Primary Usage: iPhone PWA
+
+- The user commonly uses the web app installed on an iPhone home screen (PWA, standalone mode), not only a native iOS build or desktop browser.
+- Include mobile Web and iOS Safari/PWA compatibility when implementing or reviewing UI. Check icon and font loading, assets, safe areas, keyboard behavior, scrolling, and modals when relevant to the change.
+- Prefer existing SVG icon designs over icon fonts when this avoids font-loading failures on Safari/PWA; preserve the user's chosen icons instead of drawing replacements.
+- Desktop browser checks and native iOS checks do not establish that the installed iPhone PWA works. State the actual environment verified and report iPhone PWA verification as pending when it was unavailable.
+
 ## Key Commands
 
 - `pnpm --prefix alzan-fe run typecheck`

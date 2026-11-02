@@ -21,6 +21,10 @@ Compatibility layers:
 4. Prefer the smallest matching skill set instead of loading everything.
 5. More specific subtree instructions win over broader ones.
 
+## Primary Usage Context
+
+- The user commonly uses Alzan as a PWA installed on an iPhone home screen. Treat mobile Web and iOS Safari standalone mode as primary frontend targets; see `alzan-fe/AGENTS.md` for verification guidance.
+
 ## Local Demo Access
 
 - Use only against local Supabase: `info@alzan.com` / `FakePassword1`.
