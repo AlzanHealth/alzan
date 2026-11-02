@@ -11,6 +11,59 @@ CREATE TEMP TABLE running_shoe_test_context (
 
 GRANT SELECT ON running_shoe_test_context TO authenticated;
 
+DO $optional_backfill$
+DECLARE
+  v_owner_id uuid := gen_random_uuid();
+  v_session_id uuid := gen_random_uuid();
+  v_shoe_id uuid;
+  v_assigned integer;
+  v_flag boolean;
+BEGIN
+  INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_owner_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+    v_owner_id::text || '@running-shoe-opt-in.test', '', '{}'::jsonb, '{}'::jsonb);
+  PERFORM set_config('request.jwt.claim.sub', v_owner_id::text, true);
+  INSERT INTO public.activity_sessions (id, user_id, sport_type, distance_m, start_time, started_at_local, timezone)
+  VALUES (v_session_id, v_owner_id, 'running', 5000, now() - interval '1 day', (CURRENT_DATE - 1)::timestamp, 'UTC');
+
+  SELECT shoe_id, assigned_sessions INTO v_shoe_id, v_assigned
+  FROM public.create_running_shoe_with_backfill('Default opt-in omitted', CURRENT_DATE - 3, p_is_default => true);
+  IF v_assigned <> 0 OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_session_id) IS NOT NULL THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_CREATE_OMITTED_FLAG_BACKFILLED';
+  END IF;
+  PERFORM public.set_default_running_shoe(v_shoe_id, false);
+
+  FOREACH v_flag IN ARRAY ARRAY[false, NULL::boolean] LOOP
+    SELECT shoe_id, assigned_sessions INTO v_shoe_id, v_assigned
+    FROM public.create_running_shoe_with_backfill('Explicit opt-in choice', CURRENT_DATE - 3, p_backfill_previous_runs => v_flag);
+    IF v_assigned <> 0 OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_session_id) IS NOT NULL THEN
+      RAISE EXCEPTION 'RUNNING_SHOE_CREATE_WITHOUT_TRUE_BACKFILLED';
+    END IF;
+  END LOOP;
+
+  v_assigned := public.update_running_shoe_with_backfill(v_shoe_id, 'Omitted update opt-in', CURRENT_DATE - 4);
+  IF v_assigned <> 0 OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_session_id) IS NOT NULL THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_UPDATE_OMITTED_FLAG_BACKFILLED';
+  END IF;
+  FOREACH v_flag IN ARRAY ARRAY[false, NULL::boolean] LOOP
+    v_assigned := public.update_running_shoe_with_backfill(v_shoe_id, 'Explicit update choice', CURRENT_DATE - 3, p_backfill_previous_runs => v_flag);
+    IF v_assigned <> 0 OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_session_id) IS NOT NULL THEN
+      RAISE EXCEPTION 'RUNNING_SHOE_UPDATE_WITHOUT_TRUE_BACKFILLED: %', v_flag;
+    END IF;
+  END LOOP;
+
+  v_assigned := public.update_running_shoe_with_backfill(v_shoe_id, 'Enabled update opt-in', CURRENT_DATE - 3, p_backfill_previous_runs => true);
+  IF v_assigned <> 1 OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_session_id) IS DISTINCT FROM v_shoe_id THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_EXPLICIT_UPDATE_WITH_SAME_DATE_DID_NOT_BACKFILL';
+  END IF;
+
+  DELETE FROM public.running_shoes WHERE id = v_shoe_id;
+  IF NOT EXISTS (SELECT 1 FROM public.activity_sessions WHERE id = v_session_id AND running_shoe_id IS NULL) THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_DELETE_REMOVED_HISTORY';
+  END IF;
+END;
+$optional_backfill$;
+
 DO $fixture$
 DECLARE
   v_owner_id uuid := gen_random_uuid();
@@ -51,7 +104,7 @@ BEGIN
 
   SELECT * INTO v_first_result
   FROM public.create_running_shoe_with_backfill(
-    'Everyday shoe', CURRENT_DATE - 1, 'Test brand', 'Model A', CURRENT_DATE - 2, 600, true
+    'Everyday shoe', CURRENT_DATE - 1, 'Test brand', 'Model A', CURRENT_DATE - 2, 600, true, true
   );
   v_first_shoe_id := v_first_result.shoe_id;
 
@@ -65,7 +118,7 @@ BEGIN
 
   SELECT * INTO v_second_result
   FROM public.create_running_shoe_with_backfill(
-    'Race shoe', CURRENT_DATE - 3, NULL, NULL, NULL, 350, true
+    'Race shoe', CURRENT_DATE - 3, NULL, NULL, NULL, 350, true, true
   );
   v_second_shoe_id := v_second_result.shoe_id;
 
@@ -167,7 +220,7 @@ BEGIN
   END IF;
 
   v_updated_sessions := public.update_running_shoe_with_backfill(
-    v_other_result.shoe_id, 'Edited other user shoe', CURRENT_DATE - 1, NULL, NULL, NULL, 700
+    v_other_result.shoe_id, 'Edited other user shoe', CURRENT_DATE - 1, NULL, NULL, NULL, 700, true
   );
 
   IF v_updated_sessions <> 1
@@ -282,7 +335,7 @@ BEGIN
       (v_excluded_id, v_owner_id, 'running', v_excluded_time, NULL, v_offset);
 
     SELECT shoe_id, assigned_sessions INTO v_shoe_id, v_assigned
-    FROM public.create_running_shoe_with_backfill('Offset shoe', v_start_date);
+    FROM public.create_running_shoe_with_backfill('Offset shoe', v_start_date, p_backfill_previous_runs => true);
     IF v_assigned <> 1
       OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_included_id) IS DISTINCT FROM v_shoe_id
       OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_excluded_id) IS NOT NULL
@@ -306,7 +359,7 @@ BEGIN
     VALUES (v_update_included_id, v_owner_id, 'running', v_included_time, NULL, v_offset);
     -- Move the start date one day later first, then restore it to exercise update backfill.
     PERFORM public.update_running_shoe_with_backfill(v_shoe_id, 'Offset edited shoe', v_start_date + 1);
-    PERFORM public.update_running_shoe_with_backfill(v_shoe_id, 'Offset edited shoe', v_start_date);
+    PERFORM public.update_running_shoe_with_backfill(v_shoe_id, 'Offset edited shoe', v_start_date, p_backfill_previous_runs => true);
     IF (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_update_included_id) IS DISTINCT FROM v_shoe_id
       OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_excluded_id) IS NOT NULL
     THEN

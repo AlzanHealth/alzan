@@ -159,7 +159,7 @@ BEGIN
     RAISE EXCEPTION 'RUNNING_SHOE_NOT_FOUND' USING ERRCODE = '22023';
   END IF;
 
-  IF NOT p_backfill_previous_runs THEN
+  IF p_backfill_previous_runs IS NOT TRUE THEN
     RETURN 0;
   END IF;
 
