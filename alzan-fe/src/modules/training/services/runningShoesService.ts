@@ -11,10 +11,12 @@ export type RunningShoeWithMileage = RunningShoe & RunningShoeMileage;
 export type RunningShoeInput = Pick<
   RunningShoe,
   'name' | 'brand' | 'model' | 'purchase_date' | 'in_use_since' | 'recommended_max_km'
-> & { is_default: boolean };
+> & { is_default: boolean; backfill_previous_runs: boolean };
 
 export type RunningShoeUpdateInput = Pick<RunningShoe, 'name' | 'in_use_since'> &
-  Partial<Pick<RunningShoeUpdate, 'brand' | 'model' | 'purchase_date' | 'recommended_max_km'>>;
+  Partial<Pick<RunningShoeUpdate, 'brand' | 'model' | 'purchase_date' | 'recommended_max_km'>> & {
+    backfill_previous_runs: boolean;
+  };
 
 export type CreateRunningShoeResult = {
   shoe_id: string;
@@ -61,6 +63,7 @@ export const createRunningShoe = async (input: RunningShoeInput): Promise<Create
     p_purchase_date: input.purchase_date ?? undefined,
     p_recommended_max_km: input.recommended_max_km ?? undefined,
     p_is_default: input.is_default,
+    p_backfill_previous_runs: input.backfill_previous_runs,
   });
 
   if (error) throw new Error(error.message);
@@ -78,6 +81,7 @@ export const updateRunningShoe = async (shoeId: string, updates: RunningShoeUpda
     p_model: updates.model ?? undefined,
     p_purchase_date: updates.purchase_date ?? undefined,
     p_recommended_max_km: updates.recommended_max_km ?? undefined,
+    p_backfill_previous_runs: updates.backfill_previous_runs,
   });
 
   if (error) throw new Error(error.message);

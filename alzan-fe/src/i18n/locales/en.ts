@@ -2384,7 +2384,11 @@ const en = {
     runningShoesRecommendedMaximum: 'Recommended maximum (km, optional)',
     runningShoesDefault: 'Default for new runs',
     runningShoesDefaultBadge: 'Default',
-    runningShoesBackfillHint: 'Unassigned runs from this date onward will be added to these shoes.',
+    runningShoesBackfillHint:
+      'Previous runs stay unassigned by default. Use the option below to assign them from this date.',
+    runningShoesBackfillPrevious: 'Assign previous runs automatically',
+    runningShoesBackfillPreviousHint:
+      'Unassigned running activities from the date above will be assigned to this pair.',
     runningShoesNameRequired: 'Enter a name for these shoes.',
     runningShoesMaximumInvalid: 'The recommended maximum must be greater than zero.',
     runningShoesSaveError: 'Could not save these shoes. Please try again.',

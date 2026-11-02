@@ -2415,7 +2415,11 @@ export default {
     runningShoesRecommendedMaximum: 'Máximo recomendado (km, opcional)',
     runningShoesDefault: 'Predeterminadas para nuevas carreras',
     runningShoesDefaultBadge: 'Predeterminadas',
-    runningShoesBackfillHint: 'Las carreras sin zapatilla desde esta fecha se asociarán a este par.',
+    runningShoesBackfillHint:
+      'Por defecto, las carreras anteriores quedan sin asociar. Usa la opción de abajo para asignarlas desde esta fecha.',
+    runningShoesBackfillPrevious: 'Asociar carreras anteriores automáticamente',
+    runningShoesBackfillPreviousHint:
+      'Las carreras de running sin zapatilla desde la fecha indicada se asociarán a este par.',
     runningShoesNameRequired: 'Escribe un nombre para estas zapatillas.',
     runningShoesMaximumInvalid: 'El máximo recomendado debe ser mayor que cero.',
     runningShoesSaveError: 'No se han podido guardar las zapatillas. Inténtalo de nuevo.',

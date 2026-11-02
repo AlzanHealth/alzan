@@ -5615,6 +5615,7 @@ export type Database = {
       };
       create_running_shoe_with_backfill: {
         Args: {
+          p_backfill_previous_runs?: boolean;
           p_brand?: string;
           p_in_use_since: string;
           p_is_default?: boolean;
@@ -6056,6 +6057,7 @@ export type Database = {
       unpublish_recipe: { Args: { p_recipe_id: string }; Returns: undefined };
       update_running_shoe_with_backfill: {
         Args: {
+          p_backfill_previous_runs?: boolean;
           p_brand?: string;
           p_in_use_since: string;
           p_model?: string;
