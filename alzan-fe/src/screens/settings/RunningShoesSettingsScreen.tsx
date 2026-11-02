@@ -46,9 +46,9 @@ export const RunningShoesSettingsScreen = () => {
   const [purchaseDate, setPurchaseDate] = useState<string | null>(null);
   const [inUseSince, setInUseSince] = useState(today());
   const [recommendedMaximum, setRecommendedMaximum] = useState('');
+  const [backfillPreviousRuns, setBackfillPreviousRuns] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
   const [dateField, setDateField] = useState<DateField | null>(null);
-  const [hasManuallySetStartDate, setHasManuallySetStartDate] = useState(false);
 
   const isSaving = createRunningShoe.isPending || updateRunningShoe.isPending || setDefaultRunningShoe.isPending;
   const selectedPickerDate = useMemo(() => {
@@ -65,9 +65,9 @@ export const RunningShoesSettingsScreen = () => {
     setPurchaseDate(null);
     setInUseSince(today());
     setRecommendedMaximum('');
+    setBackfillPreviousRuns(false);
     setIsDefault(false);
     setDateField(null);
-    setHasManuallySetStartDate(false);
   };
 
   const openCreateForm = () => {
@@ -78,8 +78,8 @@ export const RunningShoesSettingsScreen = () => {
     setPurchaseDate(null);
     setInUseSince(today());
     setRecommendedMaximum('');
+    setBackfillPreviousRuns(false);
     setIsDefault(shoes.length === 0);
-    setHasManuallySetStartDate(false);
     setFormVisible(true);
   };
 
@@ -91,8 +91,8 @@ export const RunningShoesSettingsScreen = () => {
     setPurchaseDate(shoe.purchase_date);
     setInUseSince(shoe.in_use_since);
     setRecommendedMaximum(shoe.recommended_max_km?.toString() ?? '');
+    setBackfillPreviousRuns(false);
     setIsDefault(shoe.is_default);
-    setHasManuallySetStartDate(true);
     setFormVisible(true);
   };
 
@@ -106,10 +106,8 @@ export const RunningShoesSettingsScreen = () => {
     const value = format(selectedDate, 'yyyy-MM-dd');
     if (dateField === 'purchase') {
       setPurchaseDate(value);
-      if (!editingShoe && !hasManuallySetStartDate) setInUseSince(value);
     } else {
       setInUseSince(value);
-      setHasManuallySetStartDate(true);
     }
 
     if (Platform.OS !== 'ios') setDateField(null);
@@ -134,6 +132,7 @@ export const RunningShoesSettingsScreen = () => {
       purchase_date: purchaseDate,
       in_use_since: inUseSince,
       recommended_max_km: parsedMaximum,
+      backfill_previous_runs: backfillPreviousRuns,
     };
 
     try {
@@ -419,6 +418,22 @@ export const RunningShoesSettingsScreen = () => {
                     {t('settings.runningShoesBackfillHint')}
                   </Text>
 
+                  <View style={[styles.defaultSwitchRow, { borderTopColor: colors.border }]}>
+                    <View style={styles.switchLabelBlock}>
+                      <Text style={[styles.defaultSwitchLabel, { color: colors.textPrimary }]}>
+                        {t('settings.runningShoesBackfillPrevious')}
+                      </Text>
+                      <Text style={[styles.formHint, { color: colors.textSecondary }]}>
+                        {t('settings.runningShoesBackfillPreviousHint')}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={backfillPreviousRuns}
+                      onValueChange={setBackfillPreviousRuns}
+                      trackColor={{ true: colors.primary }}
+                    />
+                  </View>
+
                   <Text style={labelStyle}>{t('settings.runningShoesRecommendedMaximum')}</Text>
                   <TextInput
                     value={recommendedMaximum}
@@ -535,6 +550,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  switchLabelBlock: { flex: 1, marginRight: spacing.m },
   defaultSwitchLabel: { ...typography.body, flex: 1, marginRight: spacing.m },
   dateModalOverlay: { flex: 1, justifyContent: 'flex-end' },
   dateModalContent: {
