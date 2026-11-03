@@ -10,10 +10,10 @@ export type RunningShoeWithMileage = RunningShoe & RunningShoeMileage;
 
 export type RunningShoeInput = Pick<
   RunningShoe,
-  'name' | 'brand' | 'model' | 'purchase_date' | 'in_use_since' | 'recommended_max_km'
+  'name' | 'brand' | 'model' | 'purchase_date' | 'in_use_since' | 'recommended_max_km' | 'initial_km'
 > & { is_default: boolean; backfill_previous_runs: boolean };
 
-export type RunningShoeUpdateInput = Pick<RunningShoe, 'name' | 'in_use_since'> &
+export type RunningShoeUpdateInput = Pick<RunningShoe, 'name' | 'in_use_since' | 'initial_km'> &
   Partial<Pick<RunningShoeUpdate, 'brand' | 'model' | 'purchase_date' | 'recommended_max_km'>> & {
     backfill_previous_runs: boolean;
   };
@@ -28,7 +28,7 @@ export const getRunningShoes = async (userId: string): Promise<RunningShoeWithMi
     supabase
       .from('running_shoes')
       .select(
-        'id, user_id, name, brand, model, purchase_date, in_use_since, recommended_max_km, is_default, created_at, updated_at',
+        'id, user_id, name, brand, model, purchase_date, in_use_since, initial_km, recommended_max_km, is_default, created_at, updated_at',
       )
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
@@ -62,6 +62,7 @@ export const createRunningShoe = async (input: RunningShoeInput): Promise<Create
     p_model: input.model ?? undefined,
     p_purchase_date: input.purchase_date ?? undefined,
     p_recommended_max_km: input.recommended_max_km ?? undefined,
+    p_initial_km: input.initial_km,
     p_is_default: input.is_default,
     p_backfill_previous_runs: input.backfill_previous_runs,
   });
@@ -81,6 +82,7 @@ export const updateRunningShoe = async (shoeId: string, updates: RunningShoeUpda
     p_model: updates.model ?? undefined,
     p_purchase_date: updates.purchase_date ?? undefined,
     p_recommended_max_km: updates.recommended_max_km ?? undefined,
+    p_initial_km: updates.initial_km,
     p_backfill_previous_runs: updates.backfill_previous_runs,
   });
 

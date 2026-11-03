@@ -24,6 +24,7 @@ import { CalendarDatePickerModal } from '../../components/common/CalendarDatePic
 import { formatLocalizedDate } from '../../i18n/dateLocale';
 import { useRunningShoes } from '../../modules/training/hooks/useRunningShoes';
 import { RunningShoeWithMileage } from '../../modules/training/services/runningShoesService';
+import { parseRunningShoeInitialKilometers } from '../../modules/training/helpers/runningShoeInitialKilometers';
 import { getRunningShoeMileage, getRunningShoeMileageState } from '../../modules/training/helpers/runningShoeMileage';
 import { borderRadius, spacing, typography } from '../../theme';
 
@@ -46,6 +47,7 @@ export const RunningShoesSettingsScreen = () => {
   const [purchaseDate, setPurchaseDate] = useState<string | null>(null);
   const [inUseSince, setInUseSince] = useState(today());
   const [recommendedMaximum, setRecommendedMaximum] = useState('');
+  const [initialKilometers, setInitialKilometers] = useState('');
   const [backfillPreviousRuns, setBackfillPreviousRuns] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
   const [dateField, setDateField] = useState<DateField | null>(null);
@@ -65,6 +67,7 @@ export const RunningShoesSettingsScreen = () => {
     setPurchaseDate(null);
     setInUseSince(today());
     setRecommendedMaximum('');
+    setInitialKilometers('');
     setBackfillPreviousRuns(false);
     setIsDefault(false);
     setDateField(null);
@@ -78,6 +81,7 @@ export const RunningShoesSettingsScreen = () => {
     setPurchaseDate(null);
     setInUseSince(today());
     setRecommendedMaximum('');
+    setInitialKilometers('');
     setBackfillPreviousRuns(false);
     setIsDefault(shoes.length === 0);
     setFormVisible(true);
@@ -91,6 +95,7 @@ export const RunningShoesSettingsScreen = () => {
     setPurchaseDate(shoe.purchase_date);
     setInUseSince(shoe.in_use_since);
     setRecommendedMaximum(shoe.recommended_max_km?.toString() ?? '');
+    setInitialKilometers(shoe.initial_km.toString());
     setBackfillPreviousRuns(false);
     setIsDefault(shoe.is_default);
     setFormVisible(true);
@@ -119,6 +124,12 @@ export const RunningShoesSettingsScreen = () => {
       return;
     }
 
+    const parsedInitialKilometers = parseRunningShoeInitialKilometers(initialKilometers);
+    if (parsedInitialKilometers === null) {
+      Alert.alert(t('settings.runningShoesTitle'), t('settings.runningShoesInitialKilometersInvalid'));
+      return;
+    }
+
     const parsedMaximum = recommendedMaximum.trim() ? Number(recommendedMaximum.replace(',', '.')) : null;
     if (parsedMaximum !== null && (!Number.isFinite(parsedMaximum) || parsedMaximum <= 0)) {
       Alert.alert(t('settings.runningShoesTitle'), t('settings.runningShoesMaximumInvalid'));
@@ -132,6 +143,7 @@ export const RunningShoesSettingsScreen = () => {
       purchase_date: purchaseDate,
       in_use_since: inUseSince,
       recommended_max_km: parsedMaximum,
+      initial_km: parsedInitialKilometers,
       backfill_previous_runs: backfillPreviousRuns,
     };
 
@@ -441,6 +453,18 @@ export const RunningShoesSettingsScreen = () => {
                     style={inputStyle}
                     keyboardType="decimal-pad"
                   />
+
+                  <Text style={labelStyle}>{t('settings.runningShoesInitialKilometers')}</Text>
+                  <TextInput
+                    value={initialKilometers}
+                    onChangeText={setInitialKilometers}
+                    style={inputStyle}
+                    keyboardType="decimal-pad"
+                    accessibilityLabel={t('settings.runningShoesInitialKilometers')}
+                  />
+                  <Text style={[styles.formHint, { color: colors.textSecondary }]}>
+                    {t('settings.runningShoesInitialKilometersHint')}
+                  </Text>
 
                   <View style={[styles.defaultSwitchRow, { borderTopColor: colors.border }]}>
                     <Text style={[styles.defaultSwitchLabel, { color: colors.textPrimary }]}>

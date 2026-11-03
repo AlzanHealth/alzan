@@ -2413,6 +2413,9 @@ export default {
     runningShoesNoPurchaseDate: 'Sin indicar',
     runningShoesInUseSince: 'Las uso desde',
     runningShoesRecommendedMaximum: 'Máximo recomendado (km, opcional)',
+    runningShoesInitialKilometers: 'Distancia previa recorrida (km, opcional)',
+    runningShoesInitialKilometersHint:
+      'Incluye solo kilómetros que no estén registrados en Alzan. Las carreras registradas, incluidas las asociadas arriba, se suman aparte.',
     runningShoesDefault: 'Predeterminadas para nuevas carreras',
     runningShoesDefaultBadge: 'Predeterminadas',
     runningShoesBackfillHint:
@@ -2422,6 +2425,7 @@ export default {
       'Las carreras de running sin zapatilla desde la fecha indicada se asociarán a este par.',
     runningShoesNameRequired: 'Escribe un nombre para estas zapatillas.',
     runningShoesMaximumInvalid: 'El máximo recomendado debe ser mayor que cero.',
+    runningShoesInitialKilometersInvalid: 'Introduce una distancia válida de cero o más kilómetros.',
     runningShoesSaveError: 'No se han podido guardar las zapatillas. Inténtalo de nuevo.',
     runningShoesLoadError: 'No se han podido cargar tus zapatillas de running.',
     runningShoesRetry: 'Reintentar',

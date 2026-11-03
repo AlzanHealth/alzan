@@ -2382,6 +2382,9 @@ const en = {
     runningShoesNoPurchaseDate: 'Not set',
     runningShoesInUseSince: 'I have used them since',
     runningShoesRecommendedMaximum: 'Recommended maximum (km, optional)',
+    runningShoesInitialKilometers: 'Previously run distance (km, optional)',
+    runningShoesInitialKilometersHint:
+      'Include only distance not tracked in Alzan. Registered races, including backfilled races above, are added separately.',
     runningShoesDefault: 'Default for new runs',
     runningShoesDefaultBadge: 'Default',
     runningShoesBackfillHint:
@@ -2391,6 +2394,7 @@ const en = {
       'Unassigned running activities from the date above will be assigned to this pair.',
     runningShoesNameRequired: 'Enter a name for these shoes.',
     runningShoesMaximumInvalid: 'The recommended maximum must be greater than zero.',
+    runningShoesInitialKilometersInvalid: 'Enter a valid distance of zero or more kilometers.',
     runningShoesSaveError: 'Could not save these shoes. Please try again.',
     runningShoesLoadError: 'Could not load your running shoes.',
     runningShoesRetry: 'Try again',

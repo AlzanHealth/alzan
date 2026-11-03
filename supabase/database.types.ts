@@ -3665,6 +3665,7 @@ export type Database = {
           created_at: string
           id: string
           in_use_since: string
+          initial_km: number
           is_default: boolean
           model: string | null
           name: string
@@ -3678,6 +3679,7 @@ export type Database = {
           created_at?: string
           id?: string
           in_use_since?: string
+          initial_km?: number
           is_default?: boolean
           model?: string | null
           name: string
@@ -3691,6 +3693,7 @@ export type Database = {
           created_at?: string
           id?: string
           in_use_since?: string
+          initial_km?: number
           is_default?: boolean
           model?: string | null
           name?: string
@@ -5684,6 +5687,7 @@ export type Database = {
           p_backfill_previous_runs?: boolean
           p_brand?: string
           p_in_use_since: string
+          p_initial_km?: number
           p_is_default?: boolean
           p_model?: string
           p_name: string
@@ -6130,6 +6134,7 @@ export type Database = {
           p_backfill_previous_runs?: boolean
           p_brand?: string
           p_in_use_since: string
+          p_initial_km?: number
           p_model?: string
           p_name: string
           p_purchase_date?: string

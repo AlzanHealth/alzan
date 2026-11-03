@@ -124,5 +124,8 @@ jobs:
       - name: Verify training plan import
         run: pnpm run verify:training-plan-import
 
+      - name: Verify running shoes
+        run: pnpm run verify:running-shoes
+
       - name: Verify diet copy
         run: pnpm run verify:diet-copy
