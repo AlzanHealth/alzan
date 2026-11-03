@@ -1,5 +1,7 @@
 BEGIN;
 
+SELECT plan(1);
+
 CREATE TEMP TABLE running_shoe_test_context (
   owner_id uuid NOT NULL,
   other_owner_id uuid NOT NULL,
@@ -63,6 +65,169 @@ BEGIN
   END IF;
 END;
 $optional_backfill$;
+
+DO $initial_kilometers_finite_constraint$
+DECLARE
+  v_owner_id uuid := gen_random_uuid();
+  v_shoe_id uuid;
+  v_invalid_km numeric;
+BEGIN
+  INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_owner_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+    v_owner_id::text || '@running-shoe-finite-constraint.test', '', '{}'::jsonb, '{}'::jsonb);
+  PERFORM set_config('request.jwt.claim.sub', v_owner_id::text, true);
+
+  SELECT shoe_id INTO v_shoe_id
+  FROM public.create_running_shoe_with_backfill('Finite constraint shoe', CURRENT_DATE);
+
+  FOREACH v_invalid_km IN ARRAY ARRAY[
+    -0.1::numeric,
+    'NaN'::numeric,
+    'Infinity'::numeric,
+    '-Infinity'::numeric,
+    '1e306'::numeric
+  ] LOOP
+    BEGIN
+      UPDATE public.running_shoes SET initial_km = v_invalid_km WHERE id = v_shoe_id;
+      RAISE EXCEPTION 'RUNNING_SHOE_TABLE_ACCEPTED_INVALID_INITIAL_KM: %', v_invalid_km;
+    EXCEPTION WHEN check_violation THEN NULL;
+    END;
+  END LOOP;
+END;
+$initial_kilometers_finite_constraint$;
+
+DO $initial_kilometers$
+DECLARE
+  v_owner_id uuid := gen_random_uuid();
+  v_session_id uuid := gen_random_uuid();
+  v_shoe_id uuid;
+  v_assigned integer;
+  v_mileage numeric;
+  v_sessions_count bigint;
+  v_max_shoe_id uuid;
+  v_max_mileage numeric;
+  v_max_sessions_count bigint;
+  v_invalid_km numeric;
+BEGIN
+  INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_owner_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+    v_owner_id::text || '@running-shoe-initial-km.test', '', '{}'::jsonb, '{}'::jsonb);
+  PERFORM set_config('request.jwt.claim.sub', v_owner_id::text, true);
+
+  INSERT INTO public.activity_sessions (id, user_id, sport_type, distance_m, start_time, started_at_local, timezone)
+  VALUES (v_session_id, v_owner_id, 'running', 4000, now(), CURRENT_DATE::timestamp, 'UTC');
+
+  SELECT shoe_id, assigned_sessions INTO v_shoe_id, v_assigned
+  FROM public.create_running_shoe_with_backfill(
+    'Initial mileage shoe', CURRENT_DATE, p_backfill_previous_runs => true, p_initial_km => 12.5
+  );
+
+  IF v_assigned <> 1
+    OR (SELECT running_shoe_id FROM public.activity_sessions WHERE id = v_session_id) IS DISTINCT FROM v_shoe_id
+  THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_INITIAL_KM_CREATE_DID_NOT_ASSIGN_RUN';
+  END IF;
+
+  SELECT total_distance_m, sessions_count INTO v_mileage, v_sessions_count
+  FROM public.get_running_shoe_mileage()
+  WHERE shoe_id = v_shoe_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_INITIAL_KM_CREATE_MILEAGE_ROW_MISSING';
+  END IF;
+
+  IF v_mileage IS DISTINCT FROM 16500 OR v_sessions_count IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_INITIAL_KM_CREATE_TOTAL_FAILED: %, %', v_mileage, v_sessions_count;
+  END IF;
+
+  PERFORM public.update_running_shoe_with_backfill(
+    v_shoe_id, 'Updated initial mileage shoe', CURRENT_DATE, p_initial_km => 5.25
+  );
+
+  SELECT total_distance_m, sessions_count INTO v_mileage, v_sessions_count
+  FROM public.get_running_shoe_mileage()
+  WHERE shoe_id = v_shoe_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_INITIAL_KM_UPDATE_MILEAGE_ROW_MISSING';
+  END IF;
+
+  IF v_mileage IS DISTINCT FROM 9250 OR v_sessions_count IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_INITIAL_KM_UPDATE_TOTAL_FAILED: %, %', v_mileage, v_sessions_count;
+  END IF;
+
+  PERFORM public.update_running_shoe_with_backfill(
+    v_shoe_id, 'Maximum initial mileage shoe', CURRENT_DATE, p_initial_km => '1e305'::numeric
+  );
+
+  SELECT total_distance_m, sessions_count INTO v_mileage, v_sessions_count
+  FROM public.get_running_shoe_mileage()
+  WHERE shoe_id = v_shoe_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_MAXIMUM_UPDATE_MILEAGE_ROW_MISSING';
+  END IF;
+
+  IF v_mileage IS DISTINCT FROM ('1e308'::numeric + 4000) OR v_sessions_count IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_MAXIMUM_UPDATE_TOTAL_FAILED: %, %', v_mileage, v_sessions_count;
+  END IF;
+
+  SELECT shoe_id INTO v_max_shoe_id
+  FROM public.create_running_shoe_with_backfill(
+    'Maximum initial mileage create', CURRENT_DATE, p_initial_km => '1e305'::numeric
+  );
+
+  SELECT total_distance_m, sessions_count INTO v_max_mileage, v_max_sessions_count
+  FROM public.get_running_shoe_mileage()
+  WHERE shoe_id = v_max_shoe_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_MAXIMUM_CREATE_MILEAGE_ROW_MISSING';
+  END IF;
+
+  IF v_max_mileage IS DISTINCT FROM '1e308'::numeric OR v_max_sessions_count IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_MAXIMUM_CREATE_TOTAL_FAILED: %, %', v_max_mileage, v_max_sessions_count;
+  END IF;
+
+  PERFORM public.update_running_shoe_with_backfill(
+    v_shoe_id, 'Updated initial mileage shoe', CURRENT_DATE, p_initial_km => 5.25
+  );
+
+  BEGIN
+    PERFORM public.create_running_shoe_with_backfill(
+      'Negative initial mileage shoe', CURRENT_DATE, p_initial_km => -0.1
+    );
+    RAISE EXCEPTION 'RUNNING_SHOE_CREATE_ACCEPTED_NEGATIVE_INITIAL_KM';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+  END;
+
+  BEGIN
+    PERFORM public.update_running_shoe_with_backfill(
+      v_shoe_id, 'Negative initial mileage shoe', CURRENT_DATE, p_initial_km => -0.1
+    );
+    RAISE EXCEPTION 'RUNNING_SHOE_UPDATE_ACCEPTED_NEGATIVE_INITIAL_KM';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+  END;
+
+  FOREACH v_invalid_km IN ARRAY ARRAY['NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric, '1e306'::numeric] LOOP
+    BEGIN
+      PERFORM public.create_running_shoe_with_backfill(
+        'Invalid initial mileage shoe', CURRENT_DATE, p_initial_km => v_invalid_km
+      );
+      RAISE EXCEPTION 'RUNNING_SHOE_CREATE_ACCEPTED_INVALID_INITIAL_KM: %', v_invalid_km;
+    EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+    END;
+
+    BEGIN
+      PERFORM public.update_running_shoe_with_backfill(
+        v_shoe_id, 'Invalid initial mileage shoe', CURRENT_DATE, p_initial_km => v_invalid_km
+      );
+      RAISE EXCEPTION 'RUNNING_SHOE_UPDATE_ACCEPTED_INVALID_INITIAL_KM: %', v_invalid_km;
+    EXCEPTION WHEN SQLSTATE '22023' THEN NULL;
+    END;
+  END LOOP;
+END;
+$initial_kilometers$;
 
 DO $fixture$
 DECLARE
@@ -175,7 +340,11 @@ BEGIN
   FROM public.get_running_shoe_mileage()
   WHERE shoe_id = v_first_shoe_id;
 
-  IF v_mileage <> 10200 THEN
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_MILEAGE_AGGREGATE_ROW_MISSING';
+  END IF;
+
+  IF v_mileage IS DISTINCT FROM 10200 THEN
     RAISE EXCEPTION 'RUNNING_SHOE_MILEAGE_AGGREGATE_FAILED: %', v_mileage;
   END IF;
 
@@ -187,7 +356,11 @@ BEGIN
   FROM public.get_running_shoe_mileage()
   WHERE shoe_id = v_first_shoe_id;
 
-  IF v_mileage <> 6200 THEN
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_REASSIGNMENT_SUBTRACT_MILEAGE_ROW_MISSING';
+  END IF;
+
+  IF v_mileage IS DISTINCT FROM 6200 THEN
     RAISE EXCEPTION 'RUNNING_SHOE_REASSIGNMENT_DID_NOT_SUBTRACT_MILEAGE: %', v_mileage;
   END IF;
 
@@ -195,7 +368,11 @@ BEGIN
   FROM public.get_running_shoe_mileage()
   WHERE shoe_id = v_second_shoe_id;
 
-  IF v_mileage <> 9500 THEN
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'RUNNING_SHOE_REASSIGNMENT_ADD_MILEAGE_ROW_MISSING';
+  END IF;
+
+  IF v_mileage IS DISTINCT FROM 9500 THEN
     RAISE EXCEPTION 'RUNNING_SHOE_REASSIGNMENT_DID_NOT_ADD_MILEAGE: %', v_mileage;
   END IF;
 
@@ -399,4 +576,5 @@ END;
 $rls$;
 
 RESET ROLE;
+SELECT pass('running shoe integration assertions completed');
 ROLLBACK;
