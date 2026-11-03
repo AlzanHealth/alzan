@@ -51,8 +51,20 @@ export const RunningShoesSettingsScreen = () => {
   const [backfillPreviousRuns, setBackfillPreviousRuns] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
   const [dateField, setDateField] = useState<DateField | null>(null);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   const isSaving = createRunningShoe.isPending || updateRunningShoe.isPending || setDefaultRunningShoe.isPending;
+  const parsedInitialKilometers = parseRunningShoeInitialKilometers(initialKilometers);
+  const parsedMaximum = recommendedMaximum.trim() ? Number(recommendedMaximum.replace(',', '.')) : null;
+  const fieldErrors = {
+    name: name.trim() ? null : t('settings.runningShoesNameRequired'),
+    recommendedMaximum:
+      parsedMaximum !== null && (!Number.isFinite(parsedMaximum) || parsedMaximum <= 0)
+        ? t('settings.runningShoesMaximumInvalid')
+        : null,
+    initialKilometers: parsedInitialKilometers === null ? t('settings.runningShoesInitialKilometersInvalid') : null,
+  };
+  const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
   const selectedPickerDate = useMemo(() => {
     const value = dateField === 'purchase' ? purchaseDate : inUseSince;
     return value ? parseISO(value) : new Date();
@@ -71,6 +83,7 @@ export const RunningShoesSettingsScreen = () => {
     setBackfillPreviousRuns(false);
     setIsDefault(false);
     setDateField(null);
+    setShowValidationErrors(false);
   };
 
   const openCreateForm = () => {
@@ -85,6 +98,7 @@ export const RunningShoesSettingsScreen = () => {
     setBackfillPreviousRuns(false);
     setIsDefault(shoes.length === 0);
     setFormVisible(true);
+    setShowValidationErrors(false);
   };
 
   const openEditForm = (shoe: RunningShoeWithMileage) => {
@@ -99,6 +113,7 @@ export const RunningShoesSettingsScreen = () => {
     setBackfillPreviousRuns(false);
     setIsDefault(shoe.is_default);
     setFormVisible(true);
+    setShowValidationErrors(false);
   };
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -119,22 +134,8 @@ export const RunningShoesSettingsScreen = () => {
   };
 
   const saveShoe = async () => {
-    if (!name.trim()) {
-      Alert.alert(t('settings.runningShoesTitle'), t('settings.runningShoesNameRequired'));
-      return;
-    }
-
-    const parsedInitialKilometers = parseRunningShoeInitialKilometers(initialKilometers);
-    if (parsedInitialKilometers === null) {
-      Alert.alert(t('settings.runningShoesTitle'), t('settings.runningShoesInitialKilometersInvalid'));
-      return;
-    }
-
-    const parsedMaximum = recommendedMaximum.trim() ? Number(recommendedMaximum.replace(',', '.')) : null;
-    if (parsedMaximum !== null && (!Number.isFinite(parsedMaximum) || parsedMaximum <= 0)) {
-      Alert.alert(t('settings.runningShoesTitle'), t('settings.runningShoesMaximumInvalid'));
-      return;
-    }
+    setShowValidationErrors(true);
+    if (hasValidationErrors || parsedInitialKilometers === null) return;
 
     const shoeData = {
       name: name.trim(),
@@ -330,11 +331,21 @@ export const RunningShoesSettingsScreen = () => {
     );
   };
 
-  const inputStyle = [
+  const inputStyle = (hasError = false) => [
     styles.input,
-    { backgroundColor: colors.surfaceSolid, borderColor: colors.border, color: colors.textPrimary },
+    {
+      backgroundColor: colors.surfaceSolid,
+      borderColor: showValidationErrors && hasError ? colors.danger : colors.border,
+      color: colors.textPrimary,
+    },
   ];
   const labelStyle = [styles.inputLabel, { color: colors.textSecondary }];
+  const renderFieldError = (error: string | null) =>
+    showValidationErrors && error ? (
+      <Text accessibilityRole="alert" style={[styles.fieldError, { color: colors.danger }]}>
+        {error}
+      </Text>
+    ) : null;
 
   return (
     <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={styles.screen}>
@@ -392,13 +403,33 @@ export const RunningShoesSettingsScreen = () => {
 
                 <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
                   <Text style={labelStyle}>{t('settings.runningShoesName')}</Text>
-                  <TextInput value={name} onChangeText={setName} style={inputStyle} returnKeyType="next" />
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    style={inputStyle(!!fieldErrors.name)}
+                    returnKeyType="next"
+                    accessibilityLabel={t('settings.runningShoesName')}
+                    accessibilityHint={showValidationErrors ? (fieldErrors.name ?? undefined) : undefined}
+                  />
+                  {renderFieldError(fieldErrors.name)}
 
                   <Text style={labelStyle}>{t('settings.runningShoesBrand')}</Text>
-                  <TextInput value={brand} onChangeText={setBrand} style={inputStyle} returnKeyType="next" />
+                  <TextInput
+                    value={brand}
+                    onChangeText={setBrand}
+                    style={inputStyle()}
+                    returnKeyType="next"
+                    accessibilityLabel={t('settings.runningShoesBrand')}
+                  />
 
                   <Text style={labelStyle}>{t('settings.runningShoesModel')}</Text>
-                  <TextInput value={model} onChangeText={setModel} style={inputStyle} returnKeyType="next" />
+                  <TextInput
+                    value={model}
+                    onChangeText={setModel}
+                    style={inputStyle()}
+                    returnKeyType="next"
+                    accessibilityLabel={t('settings.runningShoesModel')}
+                  />
 
                   <Text style={labelStyle}>{t('settings.runningShoesPurchaseDate')}</Text>
                   <TouchableOpacity
@@ -450,18 +481,23 @@ export const RunningShoesSettingsScreen = () => {
                   <TextInput
                     value={recommendedMaximum}
                     onChangeText={setRecommendedMaximum}
-                    style={inputStyle}
+                    style={inputStyle(!!fieldErrors.recommendedMaximum)}
                     keyboardType="decimal-pad"
+                    accessibilityLabel={t('settings.runningShoesRecommendedMaximum')}
+                    accessibilityHint={showValidationErrors ? (fieldErrors.recommendedMaximum ?? undefined) : undefined}
                   />
+                  {renderFieldError(fieldErrors.recommendedMaximum)}
 
                   <Text style={labelStyle}>{t('settings.runningShoesInitialKilometers')}</Text>
                   <TextInput
                     value={initialKilometers}
                     onChangeText={setInitialKilometers}
-                    style={inputStyle}
+                    style={inputStyle(!!fieldErrors.initialKilometers)}
                     keyboardType="decimal-pad"
                     accessibilityLabel={t('settings.runningShoesInitialKilometers')}
+                    accessibilityHint={showValidationErrors ? (fieldErrors.initialKilometers ?? undefined) : undefined}
                   />
+                  {renderFieldError(fieldErrors.initialKilometers)}
                   <Text style={[styles.formHint, { color: colors.textSecondary }]}>
                     {t('settings.runningShoesInitialKilometersHint')}
                   </Text>
@@ -553,6 +589,7 @@ const styles = StyleSheet.create({
   formContent: { padding: spacing.m, paddingBottom: spacing.xl },
   inputLabel: { ...typography.caption, marginTop: spacing.m, marginBottom: spacing.xs },
   input: { minHeight: 48, borderWidth: 1, borderRadius: borderRadius.m, paddingHorizontal: spacing.m, fontSize: 16 },
+  fieldError: { ...typography.caption, marginTop: spacing.xs, fontWeight: '600' },
   dateButton: {
     minHeight: 48,
     flexDirection: 'row',
