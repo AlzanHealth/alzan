@@ -16,7 +16,6 @@ import {
   FileText,
   LogOut,
   Dumbbell,
-  Footprints,
   Apple,
   Heart,
   ChevronLeft,
@@ -182,12 +181,6 @@ export const SettingsHomeScreen = () => {
                 icon={Dumbbell}
                 label={t('settings.workout')}
                 onPress={() => navigation.navigate('TrainingSettings')}
-                {...itemProps}
-              />
-              <SettingsItem
-                icon={Footprints}
-                label={t('settings.runningShoesTitle')}
-                onPress={() => navigation.navigate('RunningShoesSettings')}
                 {...itemProps}
               />
               <SettingsItem
