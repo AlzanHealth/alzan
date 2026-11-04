@@ -12,7 +12,10 @@ import axios from 'axios';
 import { createHash } from 'crypto';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { parseActivityFileToCanonical } from '../../activity-import/parsers/activity-import-canonical.parser';
-import { applySuuntoWorkoutSummaryTimeMetadata } from '../../activity-import/parsers/suunto-activity-canonical.mapper';
+import {
+  applySuuntoWorkoutSummaryTimeMetadata,
+  applySuuntoWorkoutExtensions,
+} from '../../activity-import/parsers/suunto-activity-canonical.mapper';
 import { CanonicalProvenance } from '../domain/wearable.types';
 import { CanonicalActivityWriterService } from './canonical-activity-writer.service';
 import { IntegrationSyncStateService } from './integration-sync-state.service';
@@ -67,7 +70,7 @@ const SUUNTO_REQUEST_RETRIES = 3;
 const SUUNTO_RETRY_BASE_DELAY_MS = 250;
 const SUUNTO_REQUEST_TIMEOUT_MS = 30_000;
 const SUUNTO_RETRY_CANCELLATION_POLL_MS = 1_000;
-const CANONICAL_ACTIVITY_VERSION = 10;
+const CANONICAL_ACTIVITY_VERSION = 16;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EPOCH_MS_THRESHOLD = 100_000_000_000;
 
@@ -375,10 +378,48 @@ export class SuuntoCloudSyncService {
     const fitBytes = await this.fetchWorkoutFit(accessToken, workoutKey, lifecycleJobId);
     this.addPhaseDuration(phaseDurationsMs, 'downloadFit', Date.now() - downloadStartedAt);
     const parseStartedAt = Date.now();
-    const activity = applySuuntoWorkoutSummaryTimeMetadata(
+    let activity = applySuuntoWorkoutSummaryTimeMetadata(
       parseActivityFileToCanonical(fitBytes, `suunto-${workoutKey}.fit`),
       summary,
     );
+    activity = applySuuntoWorkoutExtensions(activity, summary);
+    if (this.shouldFetchWorkoutExtensions(summary, activity)) {
+      const extensionsStartedAt = Date.now();
+      try {
+        const workoutExtensions = await this.fetchWorkoutExtensions(accessToken, workoutKey, lifecycleJobId);
+        activity = applySuuntoWorkoutExtensions(activity, workoutExtensions);
+        this.logger.log({
+          provider: 'suunto',
+          phase: 'downloadExtensions',
+          result: 'enriched',
+          workoutKeyHash: this.anonymize(workoutKey),
+          lapCount: activity.laps.length,
+          intervalLapCount: activity.intervalLaps?.length ?? 0,
+        });
+      } catch (error: unknown) {
+        if (this.getErrorMessage(error) === WEARABLE_SYNC_CANCEL_REQUESTED) throw error;
+        this.logger.warn({
+          provider: 'suunto',
+          phase: 'downloadExtensions',
+          result: 'unavailable',
+          workoutKeyHash: this.anonymize(workoutKey),
+          errorCode: this.getErrorMessage(error),
+          message: 'Suunto workout extension fallback unavailable; keeping FIT data',
+        });
+      } finally {
+        this.addPhaseDuration(phaseDurationsMs, 'downloadExtensions', Date.now() - extensionsStartedAt);
+      }
+    }
+    this.logger.log({
+      provider: 'suunto',
+      phase: 'parseFit',
+      result: 'parsed',
+      workoutKeyHash: this.anonymize(workoutKey),
+      lapCount: activity.laps.length,
+      intervalLapCount: activity.intervalLaps?.length ?? 0,
+      hasVo2Max: activity.summary.vo2Max != null,
+      hasEpoc: activity.summary.epoc != null,
+    });
     this.addPhaseDuration(phaseDurationsMs, 'parseFit', Date.now() - parseStartedAt);
     const provenance: CanonicalProvenance = {
       provider: 'suunto',
@@ -589,6 +630,47 @@ export class SuuntoCloudSyncService {
     } catch (error: unknown) {
       throw this.toHttpException(error);
     }
+  }
+
+  private shouldFetchWorkoutExtensions(
+    summary: JsonRecord,
+    activity: ReturnType<typeof parseActivityFileToCanonical>,
+  ): boolean {
+    const extensionTypes = Array.isArray(summary.extensionTypes)
+      ? summary.extensionTypes.filter((value): value is string => typeof value === 'string')
+      : [];
+    const normalizedTypes = extensionTypes.map(value =>
+      value
+        .toLowerCase()
+        .replace(/extension$/, '')
+        .replace(/[^a-z]/g, ''),
+    );
+    const hasLapExtension = normalizedTypes.some(value =>
+      ['interval', 'intervalstream', 'manuallapstream', 'distancelap', 'durationlap', 'verticallap'].includes(value),
+    );
+    const hasIntervalExtension = normalizedTypes.some(value => value.includes('interval'));
+    const hasFitnessExtensions = normalizedTypes.includes('fitness');
+    const hasSummaryExtension = normalizedTypes.includes('summary');
+    const hasEpocStreamExtension = normalizedTypes.includes('epocstream');
+    const metricsMissing =
+      activity.summary.vo2Max == null || activity.summary.epoc == null || activity.summary.pte == null;
+    return (
+      (hasIntervalExtension && (activity.intervalLaps?.length ?? 0) === 0) ||
+      (activity.laps.length <= 1 && (hasLapExtension || normalizedTypes.length === 0)) ||
+      (metricsMissing && (hasFitnessExtensions || hasSummaryExtension || hasEpocStreamExtension))
+    );
+  }
+
+  private async fetchWorkoutExtensions(accessToken: string, workoutKey: string, jobId: string): Promise<JsonRecord> {
+    return this.getSuunto<JsonRecord>(
+      `/v3/workouts/${encodeURIComponent(workoutKey)}`,
+      accessToken,
+      {
+        extensions:
+          'FitnessExtension,SummaryExtension,EpocStreamExtension,IntervalStreamExtension,ManualLapStreamExtension,DistanceLapExtension,DurationLapExtension,VerticalLapExtension',
+      },
+      jobId,
+    );
   }
 
   private async getUsableToken(userId: string, jobId?: string): Promise<ProviderTokenRow> {

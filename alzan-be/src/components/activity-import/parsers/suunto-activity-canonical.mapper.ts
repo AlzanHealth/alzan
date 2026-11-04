@@ -32,7 +32,15 @@ interface FitFieldDefinition {
 }
 
 interface FitDeveloperFieldDefinition {
+  fieldNumber: number;
   size: number;
+  developerDataIndex: number;
+}
+
+interface FitDeveloperFieldDescription {
+  fieldName: string;
+  units: string | null;
+  baseType: number;
 }
 
 interface FitMessageDefinition {
@@ -58,6 +66,9 @@ interface FitParseState {
   lapStartTimestamps: Array<string | null>;
   lapElapsedDurations: Array<number | null>;
   nativeHeartRateZones: CanonicalActivityHeartRateZone[];
+  developerFieldDescriptions: Map<string, FitDeveloperFieldDescription>;
+  developerDataApplications: Map<number, string>;
+  developerFieldValues: Record<string, string | number | number[]>;
   device: CanonicalActivity['device'];
   localTimestampSeconds: number | null;
 }
@@ -92,15 +103,25 @@ const FIT_SESSION_MESSAGE_NUMBER = 18;
 const FIT_LAP_MESSAGE_NUMBER = 19;
 const FIT_RECORD_MESSAGE_NUMBER = 20;
 const FIT_ACTIVITY_MESSAGE_NUMBER = 34;
+const FIT_FIELD_DESCRIPTION_MESSAGE_NUMBER = 206;
+const FIT_DEVELOPER_DATA_ID_MESSAGE_NUMBER = 207;
 const FIT_LAP_TRIGGER_FIELD_NUMBER = 24;
 const FIT_LAP_TRIGGER_MANUAL = 0;
 const FIT_LAP_TRIGGER_DURATION = 1;
 const FIT_LAP_TRIGGER_DISTANCE = 2;
 const FIT_LAP_TRIGGER_FITNESS_EQUIPMENT = 8;
 const FIT_EPOCH_OFFSET_SECONDS = 631065600;
+const SUUNTO_EPOCH_MS_THRESHOLD = 100_000_000_000;
 const FIT_INVALID_SINT32 = 2147483647;
 const FIT_SEMICIRCLES_TO_DEGREES = 180 / 2147483648;
 const RADIANS_TO_DEGREES = 180 / Math.PI;
+const SUUNTO_LAP_EXTENSION_TYPES = new Set([
+  'intervalstream',
+  'manuallapstream',
+  'distancelap',
+  'durationlap',
+  'verticallap',
+]);
 const SUMMARY_FIT_DISTANCE_TOLERANCE_M = 25;
 
 const EMPTY_STREAMS: CanonicalActivityStreams = {
@@ -282,6 +303,490 @@ export function applySuuntoWorkoutSummaryTimeMetadata(
       startedAtLocal: toLocalTimestamp(activity.summary.startedAt, offsetMinutes),
       endedAtLocal: toLocalTimestamp(activity.summary.endedAt, offsetMinutes),
     },
+  };
+}
+
+function unwrapSuuntoWorkoutObject(value: unknown): JsonRecord | null {
+  if (!isRecord(value)) return null;
+  let current = value;
+  for (let depth = 0; depth < 3 && isRecord(current.payload); depth += 1) {
+    current = current.payload;
+  }
+  return current;
+}
+
+function readSuuntoWorkoutExtensions(value: unknown): JsonRecord[] {
+  const workout = unwrapSuuntoWorkoutObject(value);
+  if (!workout) return [];
+  if (Array.isArray(workout.extensions)) return workout.extensions.filter(isRecord);
+
+  const extensions: JsonRecord[] = [];
+  for (const [key, extension] of Object.entries(workout)) {
+    if (key.toLowerCase().endsWith('extension') && isRecord(extension)) {
+      extensions.push({ ...extension, type: key });
+    }
+  }
+  return extensions;
+}
+
+function readNonNegativeMetric(record: JsonRecord, ...keys: string[]): number | null {
+  for (const key of keys) {
+    const value = readNumber(record[key]);
+    if (value != null && value >= 0) return value;
+  }
+  return null;
+}
+
+function readPositiveMetric(record: JsonRecord, ...keys: string[]): number | null {
+  const value = readNonNegativeMetric(record, ...keys);
+  return value != null && value > 0 ? value : null;
+}
+
+function roundSuuntoMetric(value: number | null, precision: number): number | null {
+  if (value == null) return null;
+  const scale = 10 ** precision;
+  return Math.round(value * scale) / scale;
+}
+
+function readPeakEpocFromStream(extension: JsonRecord): number | null {
+  const values = [extension.samples, extension.values, extension.data, extension.stream].find(Array.isArray);
+  if (!Array.isArray(values)) return null;
+  const epocValues = values
+    .map(value =>
+      typeof value === 'number'
+        ? value
+        : isRecord(value)
+          ? readNonNegativeMetric(value, 'epoc', 'value', 'epocValue', 'peakEpoc', 'peak_epoc')
+          : null,
+    )
+    .filter((value): value is number => value != null && Number.isFinite(value));
+  return epocValues.length > 0 ? Math.max(...epocValues) : null;
+}
+
+function readWorkoutExtensionType(extension: JsonRecord): string {
+  return (readString(extension.type) ?? readString(extension.extensionType) ?? '').toLowerCase();
+}
+
+function readWorkoutLapMarkers(sources: unknown[], startedAt: string | null): Array<{ start: number; end: number }> {
+  if (!startedAt) return [];
+  const startedAtMs = Date.parse(startedAt);
+  if (!Number.isFinite(startedAtMs)) return [];
+
+  const readEpochMs = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value))
+      return value < SUUNTO_EPOCH_MS_THRESHOLD ? value * 1000 : value;
+    if (typeof value !== 'string' || value.trim().length === 0) return null;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && /^\d+(\.\d+)?$/.test(value.trim())) {
+      return numeric < SUUNTO_EPOCH_MS_THRESHOLD ? numeric * 1000 : numeric;
+    }
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const markers: Array<{ start: number; end: number }> = [];
+  for (const source of sources) {
+    for (const extension of readSuuntoWorkoutExtensions(source)) {
+      const extensionType = readWorkoutExtensionType(extension)
+        .replace(/extension$/, '')
+        .replace(/[^a-z]/g, '');
+      if (!SUUNTO_LAP_EXTENSION_TYPES.has(extensionType)) continue;
+      const collections = [extension.intervals, extension.markers, extension.laps, extension.values, extension.data];
+      const entries = collections.find(Array.isArray);
+      if (!Array.isArray(entries)) continue;
+      for (const entry of entries) {
+        if (!isRecord(entry)) continue;
+        const startMs = readEpochMs(entry.startTime ?? entry.start_time ?? entry.start);
+        const endMs = readEpochMs(entry.endTime ?? entry.end_time ?? entry.stopTime ?? entry.end);
+        if (startMs == null || endMs == null || endMs <= startMs) continue;
+        const start = (startMs - startedAtMs) / 1000;
+        const end = (endMs - startedAtMs) / 1000;
+        if (start < 0 || end <= 0) continue;
+        if (!markers.some(marker => Math.abs(marker.start - start) < 0.5 && Math.abs(marker.end - end) < 0.5)) {
+          markers.push({ start, end });
+        }
+      }
+    }
+  }
+
+  return markers.sort((left, right) => left.start - right.start);
+}
+
+function interpolateDistanceAtOffset(activity: CanonicalActivity, offsetSeconds: number): number | null {
+  if (offsetSeconds <= 0) return 0;
+  const samples = activity.streams.distance
+    .filter(
+      sample => sample.offsetSeconds != null && Number.isFinite(sample.offsetSeconds) && Number.isFinite(sample.value),
+    )
+    .sort((left, right) => (left.offsetSeconds as number) - (right.offsetSeconds as number));
+  if (samples.length === 0) return null;
+
+  const exact = samples.find(sample => Math.abs((sample.offsetSeconds as number) - offsetSeconds) <= 0.25);
+  if (exact) return exact.value;
+
+  let before: CanonicalActivityMetricSample | null = null;
+  let after: CanonicalActivityMetricSample | null = null;
+  for (const sample of samples) {
+    const sampleOffset = sample.offsetSeconds as number;
+    if (sampleOffset < offsetSeconds) before = sample;
+    else if (sampleOffset > offsetSeconds) {
+      after = sample;
+      break;
+    }
+  }
+  if (before && after) {
+    const beforeOffset = before.offsetSeconds as number;
+    const afterOffset = after.offsetSeconds as number;
+    const span = afterOffset - beforeOffset;
+    if (span <= 0) return null;
+    return before.value + ((after.value - before.value) * (offsetSeconds - beforeOffset)) / span;
+  }
+
+  const durationSeconds = activity.summary.durationSeconds;
+  if (
+    after == null &&
+    durationSeconds != null &&
+    Math.abs(offsetSeconds - durationSeconds) <= 2 &&
+    activity.summary.distanceM != null
+  ) {
+    return activity.summary.distanceM;
+  }
+  return null;
+}
+
+function buildLapFromIntervalWindow(
+  activity: CanonicalActivity,
+  lapIndex: number,
+  startOffsetSeconds: number,
+  endOffsetSeconds: number,
+  distanceM: number | null,
+  lapType: CanonicalActivityLap['lapType'],
+): CanonicalActivityLap {
+  const durationSeconds = endOffsetSeconds - startOffsetSeconds;
+  const heartRates = activity.streams.heartRate
+    .filter(
+      sample =>
+        sample.offsetSeconds != null &&
+        sample.offsetSeconds >= startOffsetSeconds &&
+        sample.offsetSeconds < endOffsetSeconds,
+    )
+    .map(sample => sample.value);
+  return {
+    lapIndex,
+    lapType,
+    distanceM,
+    durationSeconds,
+    avgPaceSecondsPerKm: distanceM != null && distanceM > 0 ? (durationSeconds * 1000) / distanceM : null,
+    avgHeartRate: heartRates.length > 0 ? heartRates.reduce((sum, value) => sum + value, 0) / heartRates.length : null,
+    maxHeartRate: heartRates.length > 0 ? Math.max(...heartRates) : null,
+    startOffsetSeconds,
+    endOffsetSeconds,
+  };
+}
+
+function readSuuntoIntervalEntries(source: unknown): JsonRecord[] {
+  const workout = unwrapSuuntoWorkoutObject(source);
+  if (!workout) return [];
+
+  const deviceLog = isRecord(workout.DeviceLog) ? workout.DeviceLog : workout;
+  const windows = deviceLog.Windows ?? workout.Windows;
+  const windowEntries = Array.isArray(windows)
+    ? windows
+        .map(candidate => (isRecord(candidate) && isRecord(candidate.Window) ? candidate.Window : candidate))
+        .filter((entry): entry is JsonRecord => isRecord(entry) && readString(entry.Type)?.toLowerCase() === 'interval')
+    : [];
+
+  const extensionEntries = readSuuntoWorkoutExtensions(source).flatMap(extension => {
+    const type = readWorkoutExtensionType(extension)
+      .replace(/extension$/, '')
+      .replace(/[^a-z]/g, '');
+    if (!type.includes('interval')) return [];
+
+    const collections = [extension.intervals, extension.windows, extension.laps, extension.values, extension.data];
+    const entries: JsonRecord[] = [];
+    for (const collection of collections) {
+      if (Array.isArray(collection)) {
+        entries.push(...collection.filter(isRecord));
+      } else if (isRecord(collection)) {
+        for (const nested of Object.values(collection)) {
+          if (Array.isArray(nested)) entries.push(...nested.filter(isRecord));
+        }
+      }
+    }
+    if (entries.length === 0 && (extension.startTime != null || extension.start_time != null)) {
+      entries.push(extension);
+    }
+    return entries;
+  });
+
+  return [...windowEntries, ...extensionEntries];
+}
+
+function readIntervalValue(record: JsonRecord, ...keys: string[]): number | null {
+  for (const key of keys) {
+    const candidate = record[key];
+    const value = isRecord(candidate) ? readNumber(candidate.value) : readNumber(candidate);
+    if (value != null && value >= 0) return value;
+  }
+  return null;
+}
+
+function readIntervalOffset(value: unknown, startedAtMs: number): number | null {
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (value.trim().length > 0 && Number.isFinite(numeric)) return readIntervalOffset(numeric, startedAtMs);
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? Math.max(0, (parsed - startedAtMs) / 1000) : null;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
+  if (value >= SUUNTO_EPOCH_MS_THRESHOLD) return Math.max(0, (value - startedAtMs) / 1000);
+  if (value >= 1_000_000_000) return Math.max(0, value - startedAtMs / 1000);
+  return value;
+}
+
+function readIntervalName(entry: JsonRecord): string | null {
+  return (
+    readString(entry.IntervalNotes) ??
+    readString(entry.intervalNotes) ??
+    readString(entry.notes) ??
+    readString(entry.name) ??
+    readString(entry.label) ??
+    readString(entry.title) ??
+    readString(entry.intervalName) ??
+    readString(entry.phaseName) ??
+    readString(entry.IntervalType) ??
+    readString(entry.intervalType) ??
+    readString(entry.phaseType)
+  );
+}
+
+function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]): CanonicalActivityLap[] {
+  const startedAtMs = activity.summary.startedAt == null ? null : Date.parse(activity.summary.startedAt);
+  if (startedAtMs == null || !Number.isFinite(startedAtMs)) return [];
+
+  const entries = sources.flatMap(source => readSuuntoIntervalEntries(source));
+  const laps: CanonicalActivityLap[] = [];
+  let nextStartOffsetSeconds = 0;
+
+  for (const entry of entries) {
+    const startOffsetSeconds =
+      readIntervalOffset(
+        entry.startOffsetSeconds ?? entry.start_offset_s ?? entry.startOffset ?? entry.startTime ?? entry.start_time,
+        startedAtMs,
+      ) ?? nextStartOffsetSeconds;
+    const explicitEndOffsetSeconds = readIntervalOffset(
+      entry.endOffsetSeconds ?? entry.end_offset_s ?? entry.endOffset ?? entry.endTime ?? entry.end_time,
+      startedAtMs,
+    );
+    const explicitDurationSeconds = readIntervalValue(
+      entry,
+      'Duration',
+      'duration',
+      'durationSeconds',
+      'duration_s',
+      'totalTimerTime',
+      'total_timer_time',
+      'totalElapsedTime',
+      'total_elapsed_time',
+    );
+    const endOffsetSeconds =
+      explicitEndOffsetSeconds ??
+      (explicitDurationSeconds != null ? startOffsetSeconds + explicitDurationSeconds : null);
+    const durationSeconds =
+      explicitDurationSeconds ??
+      (endOffsetSeconds != null && endOffsetSeconds > startOffsetSeconds
+        ? endOffsetSeconds - startOffsetSeconds
+        : null);
+    if (durationSeconds == null || durationSeconds <= 0) continue;
+
+    const resolvedEndOffsetSeconds = endOffsetSeconds ?? startOffsetSeconds + durationSeconds;
+    const intervalDistanceM = readIntervalValue(
+      entry,
+      'Distance',
+      'distance',
+      'distanceM',
+      'distance_m',
+      'totalDistance',
+      'total_distance',
+    );
+    const startDistanceM = intervalDistanceM == null ? interpolateDistanceAtOffset(activity, startOffsetSeconds) : null;
+    const endDistanceM =
+      intervalDistanceM == null ? interpolateDistanceAtOffset(activity, resolvedEndOffsetSeconds) : null;
+    const distanceM =
+      intervalDistanceM ??
+      (startDistanceM != null && endDistanceM != null && endDistanceM > startDistanceM
+        ? endDistanceM - startDistanceM
+        : null);
+    const matchingFitLap = activity.laps.find(
+      lap =>
+        lap.startOffsetSeconds != null &&
+        lap.endOffsetSeconds != null &&
+        Math.abs(lap.startOffsetSeconds - startOffsetSeconds) <= 15 &&
+        Math.abs(lap.endOffsetSeconds - resolvedEndOffsetSeconds) <= 30,
+    );
+    const windowAverageHeartRate = readWindowMetric(entry, 'HR', 'Avg');
+    const windowMaxHeartRate = readWindowMetric(entry, 'HR', 'Max');
+    const intervalLap: CanonicalActivityLap = {
+      lapIndex: laps.length + 1,
+      lapName: readIntervalName(entry),
+      lapType: 'manual',
+      distanceM: distanceM ?? matchingFitLap?.distanceM ?? null,
+      durationSeconds,
+      avgPaceSecondsPerKm:
+        distanceM != null && distanceM > 0
+          ? (durationSeconds * 1000) / distanceM
+          : (matchingFitLap?.avgPaceSecondsPerKm ?? null),
+      avgHeartRate:
+        windowAverageHeartRate != null
+          ? normaliseHeartRate(windowAverageHeartRate)
+          : (matchingFitLap?.avgHeartRate ?? null),
+      maxHeartRate:
+        windowMaxHeartRate != null ? normaliseHeartRate(windowMaxHeartRate) : (matchingFitLap?.maxHeartRate ?? null),
+      startOffsetSeconds,
+      endOffsetSeconds: resolvedEndOffsetSeconds,
+    };
+    const duplicate = laps.some(
+      lap =>
+        lap.startOffsetSeconds != null &&
+        Math.abs(lap.startOffsetSeconds - intervalLap.startOffsetSeconds!) < 1 &&
+        Math.abs((lap.endOffsetSeconds ?? 0) - (intervalLap.endOffsetSeconds ?? 0)) < 1,
+    );
+    if (!duplicate) {
+      laps.push(intervalLap);
+      nextStartOffsetSeconds = resolvedEndOffsetSeconds;
+    }
+  }
+
+  return laps;
+}
+
+function reconstructMissingWorkoutBoundaryLaps(
+  activity: CanonicalActivity,
+  markers: Array<{ start: number; end: number }>,
+): CanonicalActivityLap[] | null {
+  if (activity.laps.length > 1 || markers.length === 0) return null;
+  const durationSeconds = activity.summary.durationSeconds;
+  const elapsedSeconds = activity.summary.elapsedSeconds;
+  const totalDistanceM = activity.summary.distanceM;
+  if (
+    durationSeconds == null ||
+    durationSeconds <= 0 ||
+    totalDistanceM == null ||
+    totalDistanceM <= 0 ||
+    (elapsedSeconds != null && Math.abs(elapsedSeconds - durationSeconds) > 30)
+  ) {
+    return null;
+  }
+
+  let cursor = 0;
+  const segments: Array<{ start: number; end: number; isMarker: boolean }> = [];
+  for (const marker of markers) {
+    if (marker.start < cursor - 0.5 || marker.end > durationSeconds + 0.5) return null;
+    if (marker.start - cursor > 30) segments.push({ start: cursor, end: marker.start, isMarker: false });
+    segments.push({ start: marker.start, end: marker.end, isMarker: true });
+    cursor = marker.end;
+  }
+  if (durationSeconds - cursor > 30) segments.push({ start: cursor, end: durationSeconds, isMarker: false });
+
+  const existingLap = activity.laps[0];
+  let matchedSegmentIndex = -1;
+  if (existingLap) {
+    if (
+      existingLap.startOffsetSeconds == null ||
+      existingLap.durationSeconds == null ||
+      existingLap.durationSeconds <= 0 ||
+      existingLap.distanceM == null ||
+      existingLap.distanceM <= 0
+    ) {
+      return null;
+    }
+    const existingEnd = existingLap.endOffsetSeconds ?? existingLap.startOffsetSeconds + existingLap.durationSeconds;
+    matchedSegmentIndex = segments.findIndex(
+      segment =>
+        segment.isMarker &&
+        Math.abs(segment.start - existingLap.startOffsetSeconds!) <= 15 &&
+        Math.abs(segment.end - existingEnd) <= 30,
+    );
+    if (matchedSegmentIndex < 0) return null;
+  }
+
+  const reconstructed: CanonicalActivityLap[] = [];
+  for (const segment of segments) {
+    const segmentDuration = segment.end - segment.start;
+    if (segmentDuration <= 0) return null;
+    const startDistanceM = interpolateDistanceAtOffset(activity, segment.start);
+    const endDistanceM = interpolateDistanceAtOffset(activity, segment.end);
+    if (startDistanceM == null || endDistanceM == null || endDistanceM <= startDistanceM) return null;
+    const lap =
+      existingLap &&
+      segment.isMarker &&
+      Math.abs(segment.start - existingLap.startOffsetSeconds!) <= 15 &&
+      Math.abs(
+        segment.end - (existingLap.endOffsetSeconds ?? existingLap.startOffsetSeconds! + existingLap.durationSeconds!),
+      ) <= 30
+        ? { ...existingLap, lapIndex: reconstructed.length + 1 }
+        : buildLapFromIntervalWindow(
+            activity,
+            reconstructed.length + 1,
+            segment.start,
+            segment.end,
+            endDistanceM - startDistanceM,
+            'unknown',
+          );
+    reconstructed.push(lap);
+  }
+
+  if (reconstructed.length <= activity.laps.length) return null;
+  const reconstructedDistanceM = reconstructed.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0);
+  if (Math.abs(reconstructedDistanceM - totalDistanceM) > Math.max(50, totalDistanceM * 0.03)) return null;
+  return reconstructed;
+}
+
+/** Enriches cloud FIT data with the documented summary and interval extensions returned by Suunto. */
+export function applySuuntoWorkoutExtensions(activity: CanonicalActivity, ...sources: unknown[]): CanonicalActivity {
+  let vo2Max = activity.summary.vo2Max;
+  let epoc = activity.summary.epoc;
+  let pte = activity.summary.pte;
+  let recoveryTimeSeconds = activity.summary.recoveryTimeSeconds;
+
+  for (const source of sources) {
+    const workout = unwrapSuuntoWorkoutObject(source);
+    if (workout) {
+      const extensions = readSuuntoWorkoutExtensions(source);
+      const fitness = extensions.find(extension => readWorkoutExtensionType(extension) === 'fitnessextension');
+      const summary = extensions.find(extension => readWorkoutExtensionType(extension) === 'summaryextension');
+      const epocStream = extensions.find(extension => readWorkoutExtensionType(extension) === 'epocstreamextension');
+      vo2Max ??= fitness
+        ? roundSuuntoMetric(
+            readPositiveMetric(fitness, 'estimatedVo2Max', 'estimatedVO2Max', 'estimated_vo2_max', 'vo2Max', 'vo2_max'),
+            1,
+          )
+        : null;
+      epoc ??= roundSuuntoMetric(
+        (summary ? readNonNegativeMetric(summary, 'peakEpoc', 'peak_epoc', 'epoc') : null) ??
+          (epocStream ? readPeakEpocFromStream(epocStream) : null),
+        1,
+      );
+      pte ??= summary
+        ? roundSuuntoMetric(readPositiveMetric(summary, 'pte', 'peakTrainingEffect', 'trainingEffect'), 1)
+        : null;
+      recoveryTimeSeconds ??= summary
+        ? readNonNegativeMetric(summary, 'recoveryTime', 'recovery_time')
+        : readNonNegativeMetric(workout, 'recoveryTime', 'recovery_time');
+    }
+  }
+
+  const markers = readWorkoutLapMarkers(sources, activity.summary.startedAt);
+  const reconstructedLaps = reconstructMissingWorkoutBoundaryLaps(activity, markers);
+  const parsedIntervalLaps = buildSuuntoIntervalLaps(activity, sources);
+  const existingIntervalLaps = activity.intervalLaps ?? [];
+  const intervalLaps =
+    parsedIntervalLaps.length >= existingIntervalLaps.length ? parsedIntervalLaps : existingIntervalLaps;
+  return {
+    ...activity,
+    summary: { ...activity.summary, vo2Max, epoc, pte, recoveryTimeSeconds },
+    ...(reconstructedLaps ? { laps: reconstructedLaps } : {}),
+    ...(intervalLaps.length > 0 ? { intervalLaps } : {}),
   };
 }
 
@@ -507,6 +1012,46 @@ function getFitBaseTypeSize(baseType: number): number | null {
   }
 }
 
+function fitDeveloperFieldKey(developerDataIndex: number, fieldNumber: number): string {
+  return `${developerDataIndex}:${fieldNumber}`;
+}
+
+function normaliseSuuntoDeveloperMetric(fieldName: string, value: number): number {
+  if (
+    fieldName === 'estimated_vo2_max' ||
+    fieldName === 'peak_epoc' ||
+    fieldName === 'peak_training_effect' ||
+    fieldName === 'training_effect'
+  ) {
+    return Math.round(value * 10) / 10;
+  }
+  if (fieldName === 'recovery_time') return Math.round(value);
+  return value;
+}
+
+function decodeFitFieldAsString(dataView: DataView, offset: number, size: number): string | null {
+  if (size <= 0 || offset + size > dataView.byteLength) return null;
+  const bytes: number[] = [];
+  for (let index = 0; index < size; index += 1) {
+    const byte = dataView.getUint8(offset + index);
+    if (byte === 0) break;
+    bytes.push(byte);
+  }
+  if (bytes.length === 0) return null;
+  return new TextDecoder().decode(new Uint8Array(bytes)).trim() || null;
+}
+
+function decodeFitFieldAsByteString(dataView: DataView, offset: number, size: number): string | null {
+  if (size <= 0 || offset + size > dataView.byteLength) return null;
+  const bytes: number[] = [];
+  for (let index = 0; index < size; index += 1) {
+    const byte = dataView.getUint8(offset + index);
+    if (byte === 0) break;
+    bytes.push(byte);
+  }
+  return bytes.length > 0 ? String.fromCharCode(...bytes) : null;
+}
+
 function decodeFitFieldAsNumber(
   dataView: DataView,
   offset: number,
@@ -628,11 +1173,16 @@ function parseFitDefinitionMessage(
   }
   const developerFields: FitDeveloperFieldDefinition[] = [];
   if (hasDeveloperData) {
+    if (offset + 1 > dataEnd) throw new Error('Invalid Suunto FIT file.');
     const developerFieldCount = dataView.getUint8(offset);
     offset += 1;
     for (let index = 0; index < developerFieldCount; index += 1) {
       if (offset + 3 > dataEnd) throw new Error('Invalid Suunto FIT file.');
-      developerFields.push({ size: dataView.getUint8(offset + 1) });
+      developerFields.push({
+        fieldNumber: dataView.getUint8(offset),
+        size: dataView.getUint8(offset + 1),
+        developerDataIndex: dataView.getUint8(offset + 2),
+      });
       offset += 3;
     }
   }
@@ -679,6 +1229,7 @@ function parseFitDataMessage(
   definition: FitMessageDefinition,
   state: FitParseState,
 ): number {
+  const developerMessageFields = new Map<number, string | number | number[]>();
   const record: FitRecordAccumulator = {
     timestampSeconds: null,
     lat: null,
@@ -705,6 +1256,28 @@ function parseFitDataMessage(
   for (const field of definition.fields) {
     if (offset + field.size > dataEnd) throw new Error('Invalid Suunto FIT file.');
     const numericValue = decodeFitFieldAsNumber(dataView, offset, field.size, field.baseType, definition.littleEndian);
+
+    if (definition.globalMessageNumber === FIT_FIELD_DESCRIPTION_MESSAGE_NUMBER) {
+      if (field.fieldNumber === 0 && numericValue != null) developerMessageFields.set(0, Math.round(numericValue));
+      if (field.fieldNumber === 1 && numericValue != null) developerMessageFields.set(1, Math.round(numericValue));
+      if (field.fieldNumber === 2 && numericValue != null) developerMessageFields.set(2, Math.round(numericValue));
+      if (field.fieldNumber === 3) {
+        const fieldName = decodeFitFieldAsString(dataView, offset, field.size);
+        if (fieldName) developerMessageFields.set(3, fieldName);
+      }
+      if (field.fieldNumber === 8) {
+        const units = decodeFitFieldAsString(dataView, offset, field.size);
+        if (units) developerMessageFields.set(8, units);
+      }
+    }
+
+    if (definition.globalMessageNumber === FIT_DEVELOPER_DATA_ID_MESSAGE_NUMBER) {
+      if (field.fieldNumber === 0 && numericValue != null) developerMessageFields.set(0, Math.round(numericValue));
+      if (field.fieldNumber === 1) {
+        const applicationId = decodeFitFieldAsByteString(dataView, offset, field.size);
+        if (applicationId) developerMessageFields.set(1, applicationId);
+      }
+    }
 
     if (
       definition.globalMessageNumber === FIT_FILE_ID_MESSAGE_NUMBER &&
@@ -787,7 +1360,71 @@ function parseFitDataMessage(
 
   for (const developerField of definition.developerFields) {
     if (offset + developerField.size > dataEnd) throw new Error('Invalid Suunto FIT file.');
+    const descriptor = state.developerFieldDescriptions.get(
+      fitDeveloperFieldKey(developerField.developerDataIndex, developerField.fieldNumber),
+    );
+    if (descriptor) {
+      const fieldValue =
+        descriptor.baseType === 0x07
+          ? decodeFitFieldAsString(dataView, offset, developerField.size)
+          : decodeFitFieldAsNumbers(
+              dataView,
+              offset,
+              developerField.size,
+              descriptor.baseType,
+              definition.littleEndian,
+            );
+      const normalizedValue =
+        typeof fieldValue === 'string'
+          ? fieldValue
+          : fieldValue != null && fieldValue.length === 1
+            ? normaliseSuuntoDeveloperMetric(descriptor.fieldName, fieldValue[0])
+            : fieldValue;
+      if (
+        normalizedValue != null &&
+        (definition.globalMessageNumber === FIT_SESSION_MESSAGE_NUMBER ||
+          definition.globalMessageNumber === FIT_LAP_MESSAGE_NUMBER)
+      ) {
+        state.developerFieldValues[descriptor.fieldName] = normalizedValue;
+        if (definition.globalMessageNumber === FIT_SESSION_MESSAGE_NUMBER && typeof normalizedValue === 'number') {
+          if (descriptor.fieldName === 'estimated_vo2_max') setLargest(state.summary, 'vo2Max', normalizedValue);
+          if (descriptor.fieldName === 'peak_epoc') setLargest(state.summary, 'epoc', normalizedValue);
+          if (descriptor.fieldName === 'recovery_time')
+            setLargest(state.summary, 'recoveryTimeSeconds', normalizedValue);
+          if (descriptor.fieldName === 'peak_training_effect' || descriptor.fieldName === 'training_effect')
+            setLargest(state.summary, 'pte', normalizedValue);
+        }
+      }
+    }
     offset += developerField.size;
+  }
+
+  if (definition.globalMessageNumber === FIT_FIELD_DESCRIPTION_MESSAGE_NUMBER) {
+    const developerDataIndex = developerMessageFields.get(0);
+    const fieldNumber = developerMessageFields.get(1);
+    const baseType = developerMessageFields.get(2);
+    const fieldName = developerMessageFields.get(3);
+    const units = developerMessageFields.get(8);
+    if (
+      typeof developerDataIndex === 'number' &&
+      typeof fieldNumber === 'number' &&
+      typeof baseType === 'number' &&
+      typeof fieldName === 'string'
+    ) {
+      state.developerFieldDescriptions.set(fitDeveloperFieldKey(developerDataIndex, fieldNumber), {
+        fieldName,
+        units: typeof units === 'string' ? units : null,
+        baseType,
+      });
+    }
+  }
+
+  if (definition.globalMessageNumber === FIT_DEVELOPER_DATA_ID_MESSAGE_NUMBER) {
+    const developerDataIndex = developerMessageFields.get(0);
+    const applicationId = developerMessageFields.get(1);
+    if (typeof developerDataIndex === 'number' && typeof applicationId === 'string') {
+      state.developerDataApplications.set(developerDataIndex, applicationId);
+    }
   }
 
   appendFitRecord(state, record);
@@ -1042,6 +1679,9 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
     lapStartTimestamps: [],
     lapElapsedDurations: [],
     nativeHeartRateZones: [],
+    developerFieldDescriptions: new Map(),
+    developerDataApplications: new Map(),
+    developerFieldValues: {},
     device: null,
     localTimestampSeconds: null,
   };
@@ -1096,7 +1736,16 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
     },
     laps: canonicalLaps.map(lap => enrichFitLap(lap, state)),
     device: state.device,
-    vendorFields: { suuntoFitSport: state.sport, suuntoFitSubSport: state.subSport },
+    vendorFields: {
+      suuntoFitSport: state.sport,
+      suuntoFitSubSport: state.subSport,
+      ...(Object.keys(state.developerFieldValues).length > 0
+        ? { suuntoFitDeveloperFields: state.developerFieldValues }
+        : {}),
+      ...(state.developerDataApplications.size > 0
+        ? { suuntoFitDeveloperApplications: Object.fromEntries(state.developerDataApplications) }
+        : {}),
+    },
     heartRateZones: state.nativeHeartRateZones,
     estimatedMaxHeartRate: options?.estimatedMaxHeartRate,
   });
@@ -1180,6 +1829,7 @@ function mapSuuntoWindowsToLaps(windows: unknown): CanonicalActivityLap[] {
       if (durationSeconds != null && durationSeconds > 0) elapsedByType[lapType] += durationSeconds;
       return {
         lapIndex: index + 1,
+        lapName: readString(window.IntervalNotes) ?? readString(window.IntervalType) ?? null,
         lapType,
         distanceM,
         durationSeconds,

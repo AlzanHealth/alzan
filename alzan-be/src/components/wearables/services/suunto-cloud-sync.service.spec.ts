@@ -1,6 +1,7 @@
 import { strict as assert } from 'assert';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
+import { CanonicalActivity } from '../../activity-import/parsers/activity-import-canonical.types';
 import { CanonicalActivityWriterService } from './canonical-activity-writer.service';
 import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
@@ -12,6 +13,7 @@ type JsonRecord = Record<string, unknown>;
 
 interface SuuntoCloudSyncServicePrivate {
   fetchWorkoutSummaries(accessToken: string): Promise<{ workouts: JsonRecord[]; isPaginationVerified: boolean }>;
+  fetchWorkoutExtensions(accessToken: string, workoutKey: string): Promise<JsonRecord>;
   getSuunto<T>(path: string, accessToken: string, params?: Record<string, string>): Promise<T>;
   executeSuuntoRequest<T>(request: () => Promise<T>): Promise<T>;
   selectWorkoutLookbackStartMs(
@@ -20,6 +22,7 @@ interface SuuntoCloudSyncServicePrivate {
     hasPendingImport: boolean,
     lastSuccessAt?: string | null,
   ): number;
+  shouldFetchWorkoutExtensions(summary: JsonRecord, activity: CanonicalActivity): boolean;
   sleep(milliseconds: number): Promise<void>;
 }
 
@@ -110,14 +113,65 @@ async function assertSaturatedWorkoutListIsReportedAsUnverified(): Promise<void>
   assert.deepEqual(requestedOffsets, [0]);
 }
 
+async function assertIntervalExtensionFallbackUsesOfficialV3Endpoint(): Promise<void> {
+  const response = { payload: { extensions: [{ type: 'IntervalStreamExtension', intervals: [] }] } };
+  const { capturedRequest, service } = createService([response]);
+  const activity = {
+    laps: [{}],
+    summary: { vo2Max: 47.5, epoc: 52.3, pte: 3.2 },
+  } as unknown as CanonicalActivity;
+
+  assert.equal(service.shouldFetchWorkoutExtensions({ extensionTypes: ['INTERVAL'] }, activity), true);
+  assert.equal(
+    service.shouldFetchWorkoutExtensions({}, {
+      ...activity,
+      laps: [],
+    } as unknown as CanonicalActivity),
+    true,
+  );
+  assert.equal(
+    service.shouldFetchWorkoutExtensions({ extensionTypes: ['MANUAL_LAP_STREAM'] }, {
+      ...activity,
+      laps: [],
+    } as unknown as CanonicalActivity),
+    true,
+  );
+  assert.equal(
+    service.shouldFetchWorkoutExtensions({ extensionTypes: ['INTERVAL'] }, {
+      ...activity,
+      laps: [{}, {}],
+    } as unknown as CanonicalActivity),
+    true,
+  );
+  assert.equal(
+    service.shouldFetchWorkoutExtensions({ extensionTypes: ['INTERVAL'] }, {
+      ...activity,
+      laps: [{}, {}, {}],
+      intervalLaps: [{}],
+    } as unknown as CanonicalActivity),
+    false,
+  );
+  assert.equal(service.shouldFetchWorkoutExtensions({ extensionTypes: ['SUMMARY'] }, activity), false);
+
+  const result = await service.fetchWorkoutExtensions('access-token', 'workout-key');
+  assert.deepEqual(result, [response]);
+  assert.equal(capturedRequest.path, '/v3/workouts/workout-key');
+  assert.equal(capturedRequest.accessToken, 'access-token');
+  assert.deepEqual(capturedRequest.params, {
+    extensions:
+      'FitnessExtension,SummaryExtension,EpocStreamExtension,IntervalStreamExtension,ManualLapStreamExtension,DistanceLapExtension,DurationLapExtension,VerticalLapExtension',
+  });
+}
+
 function assertIncrementalAndRepairLookbacks(): void {
   const { service } = createService([]);
   const now = Date.parse('2026-06-15T10:00:00.000Z');
   const dayMs = 24 * 60 * 60 * 1000;
   const lastSuccessAt = new Date(now).toISOString();
 
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 10, false, lastSuccessAt), now - 3 * dayMs);
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 10, true, lastSuccessAt), now - 20 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 16, false, lastSuccessAt), now - 3 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 16, true, lastSuccessAt), now - 20 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 11, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 9, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 7, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 6, false, lastSuccessAt), now - 30 * dayMs);
@@ -189,7 +243,7 @@ async function assertSyncRepairsOlderVersionAndSkipsCurrentWorkout(): Promise<vo
             : { action: 'skip', importId: 'import-existing', sessionId: 'session-existing' };
         }
         if (input.sourceRecordId === 'current-workout') {
-          return input.canonicalVersion >= 10
+          return input.canonicalVersion >= 15
             ? { action: 'skip', importId: 'import-current', sessionId: 'session-current' }
             : { action: 'import', importId: 'import-current', sessionId: null };
         }
@@ -260,10 +314,10 @@ async function assertSyncRepairsOlderVersionAndSkipsCurrentWorkout(): Promise<vo
   assert.deepEqual(
     [...claimedCanonicalVersions].sort((left, right) => left.sourceRecordId.localeCompare(right.sourceRecordId)),
     [
-      { sourceRecordId: 'broken-workout', version: 10 },
-      { sourceRecordId: 'current-workout', version: 10 },
-      { sourceRecordId: 'existing-workout', version: 10 },
-      { sourceRecordId: 'new-workout', version: 10 },
+      { sourceRecordId: 'broken-workout', version: 15 },
+      { sourceRecordId: 'current-workout', version: 15 },
+      { sourceRecordId: 'existing-workout', version: 15 },
+      { sourceRecordId: 'new-workout', version: 15 },
     ],
   );
   assert.equal(result.activitiesImported, 1);
@@ -284,6 +338,7 @@ async function run(): Promise<void> {
   assertUnverifiedStrategyNeverInventsAnOffset();
   await assertFirstWorkoutSyncIsLimitedToLastThirtyDays();
   await assertSaturatedWorkoutListIsReportedAsUnverified();
+  await assertIntervalExtensionFallbackUsesOfficialV3Endpoint();
   assertIncrementalAndRepairLookbacks();
   await assertRateLimitRetriesRespectRetryAfter();
   await assertSyncRepairsOlderVersionAndSkipsCurrentWorkout();

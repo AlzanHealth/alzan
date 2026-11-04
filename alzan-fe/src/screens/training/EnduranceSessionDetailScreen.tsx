@@ -538,7 +538,9 @@ export const EnduranceSessionDetailScreen = () => {
         label:
           group.splitGroup === 'distance' && group.splitDistanceM != null && group.splitDistanceM > 0
             ? formatSplitDistanceBucketLabel(group.splitDistanceM)
-            : t('training.splitCustom'),
+            : group.splitGroup === 'custom' && group.splitGroupOrder > 0
+              ? t('training.interval')
+              : t('training.splitCustom'),
         laps: [...group.laps].sort((left, right) => left.lap_index - right.lap_index),
       }));
   }, [formatSplitDistanceBucketLabel, laps, t]);
@@ -560,7 +562,11 @@ export const EnduranceSessionDetailScreen = () => {
   const activeSplitTab = splitTabs.find(tab => tab.key === selectedSplitTabKey) ?? splitTabs[0] ?? null;
   const activeSplits = activeSplitTab?.laps ?? [];
   const activeSplitPhaseLabels = useMemo(() => {
-    if (activeSplitTab?.splitGroup !== 'custom' || !templateSteps || activeSplits.length === 0) return [];
+    if (activeSplitTab?.splitGroup !== 'custom' || activeSplits.length === 0) return [];
+    if (activeSplits.some(lap => lap.lap_name != null && lap.lap_name.trim().length > 0)) {
+      return activeSplits.map(lap => lap.lap_name?.trim() ?? '');
+    }
+    if (!templateSteps) return [];
     const topLevelPhases = templateSteps
       .filter(step => !step.is_group && step.parent_step_id == null)
       .sort((left, right) => left.order_index - right.order_index);
@@ -980,6 +986,13 @@ export const EnduranceSessionDetailScreen = () => {
         key: 'vo2',
         label: t('training.vo2Max'),
         value: `${session.vo2_max.toFixed(1)}`,
+      });
+    }
+    if (session.epoc != null && session.epoc > 0) {
+      secondaryMetrics.push({
+        key: 'epoc',
+        label: t('training.epoc'),
+        value: `${session.epoc.toFixed(1)}`,
       });
     }
     if (session.total_steps != null && session.total_steps > 0) {

@@ -912,6 +912,40 @@ async function assertExactSuuntoSeriesPersistsElevenNativeLaps(): Promise<void> 
   );
 }
 
+async function assertNamedSuuntoIntervalsPersistAsSeparateLapGroup(): Promise<void> {
+  const activity = buildCanonicalRun();
+  activity.intervalLaps = [
+    {
+      lapIndex: 1,
+      lapName: 'Calentamiento',
+      lapType: 'manual',
+      distanceM: 1149,
+      durationSeconds: 480,
+      avgPaceSecondsPerKm: 480 / 1.149,
+      avgHeartRate: 125,
+      maxHeartRate: null,
+      startOffsetSeconds: 0,
+      endOffsetSeconds: 480,
+    },
+  ];
+  const client = createFullSupabaseClient({});
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {} as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.replaceLaps('session-1', 'user-1', activity);
+
+  const insertedRows = client.inserts.find(insert => insert.table === 'activity_laps')?.rows ?? [];
+  assert.equal(insertedRows.length, activity.laps.length + 1);
+  assert.equal(insertedRows.at(-1)?.lap_name, 'Calentamiento');
+  assert.equal(insertedRows.at(-1)?.split_group, 'custom');
+  assert.equal(insertedRows.at(-1)?.split_group_order, 1);
+  assert.equal(insertedRows.at(-1)?.distance_m, 1149);
+}
+
 function assertPositionSamplesAreSanitizedForValidRoutes(): void {
   const client = createFakeSupabaseClient(250);
   const service = createService(client);
@@ -967,6 +1001,7 @@ async function run(): Promise<void> {
   await assertTransportFailurePreservesPreviouslyImportedSession();
   await assertOneKilometerWearableLapsArePersistedAsDistanceGroups();
   await assertExactSuuntoSeriesPersistsElevenNativeLaps();
+  await assertNamedSuuntoIntervalsPersistAsSeparateLapGroup();
 }
 
 void run();

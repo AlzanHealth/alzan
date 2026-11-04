@@ -5,6 +5,7 @@ export interface ActivityLap {
   id: string;
   session_id: string;
   lap_index: number;
+  lap_name: string | null;
   lap_type: 'manual' | 'auto' | 'distance' | 'time' | 'unknown';
   split_group: 'legacy' | 'custom' | 'distance';
   split_group_order: number;
@@ -50,6 +51,7 @@ export const useSessionLaps = (sessionId?: string) => {
         id: lap.id,
         session_id: lap.session_id,
         lap_index: lap.lap_index,
+        lap_name: lap.lap_name,
         lap_type: normalizeLapType(lap.lap_type),
         split_group: normalizeSplitGroup(lap.split_group),
         split_group_order: lap.split_group_order,

@@ -513,6 +513,13 @@ export class CanonicalActivityWriterService {
     }));
     const providerFields = this.buildProviderFieldsPayload(sessionId, input.userId, input.activity, input.provenance);
     const lapRows = this.buildLapRows(sessionId, input.userId, input.activity);
+    this.logger.log({
+      provider: input.provenance.provider,
+      phase: 'prepareLaps',
+      sourceLapCount: input.activity.laps.length,
+      persistedLapCount: lapRows.length,
+      replaceLaps: params.replaceLaps,
+    });
     const heartRateZones = input.activity.heartRateZones.map(zone => ({
       session_id: sessionId,
       zone: zone.zone,
@@ -686,12 +693,12 @@ export class CanonicalActivityWriterService {
   }
 
   private buildLapRows(sessionId: string, userId: string, activity: CanonicalActivity): ActivityLapInsert[] {
-    if (activity.laps.length === 0) return [];
     const laps = normaliseCanonicalActivityLaps(activity.laps, activity.summary);
-    if (laps.length === 0) return [];
+    const intervalLaps = normaliseCanonicalActivityLaps(activity.intervalLaps ?? [], activity.summary);
+    if (laps.length === 0 && intervalLaps.length === 0) return [];
 
     const distanceBuckets = buildDistanceSplitBucketsFromLaps(laps);
-    const tabRows =
+    const lapRows =
       distanceBuckets.length > 0
         ? distanceBuckets.flatMap((bucket, bucketIndex) =>
             bucket.laps.map(lap =>
@@ -715,7 +722,17 @@ export class CanonicalActivityWriterService {
               splitDistanceM: isOneKilometerAutoLapSequence(laps) ? 1000 : null,
             }),
           );
-    return tabRows;
+    const intervalRows = intervalLaps.map(lap =>
+      this.buildActivityLapInsert({
+        lap,
+        sessionId,
+        userId,
+        splitGroup: 'custom',
+        splitGroupOrder: 1,
+        splitDistanceM: null,
+      }),
+    );
+    return [...lapRows, ...intervalRows];
   }
 
   private buildActivityLapInsert(params: {
@@ -731,6 +748,7 @@ export class CanonicalActivityWriterService {
       user_id: params.userId,
       lap_index: params.lap.lapIndex,
       lap_type: params.lap.lapType,
+      lap_name: params.lap.lapName ?? null,
       split_group: params.splitGroup,
       split_group_order: params.splitGroupOrder,
       split_distance_m: params.splitDistanceM,

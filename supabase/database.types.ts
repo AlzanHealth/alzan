@@ -148,6 +148,7 @@ export type Database = {
           end_offset_s: number | null
           id: string
           lap_index: number
+          lap_name: string | null
           lap_type: Database["public"]["Enums"]["lap_type_enum"]
           max_heart_rate: number | null
           session_id: string
@@ -165,6 +166,7 @@ export type Database = {
           end_offset_s?: number | null
           id?: string
           lap_index: number
+          lap_name?: string | null
           lap_type?: Database["public"]["Enums"]["lap_type_enum"]
           max_heart_rate?: number | null
           session_id: string
@@ -182,6 +184,7 @@ export type Database = {
           end_offset_s?: number | null
           id?: string
           lap_index?: number
+          lap_name?: string | null
           lap_type?: Database["public"]["Enums"]["lap_type_enum"]
           max_heart_rate?: number | null
           session_id?: string

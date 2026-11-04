@@ -78,6 +78,7 @@ export interface CanonicalActivitySummary {
 
 export interface CanonicalActivityLap {
   lapIndex: number;
+  lapName?: string | null;
   lapType: 'manual' | 'auto' | 'distance' | 'time' | 'unknown';
   distanceM: number | null;
   durationSeconds: number | null;
@@ -111,6 +112,7 @@ export interface CanonicalActivity {
   summary: CanonicalActivitySummary;
   streams: CanonicalActivityStreams;
   laps: CanonicalActivityLap[];
+  intervalLaps?: CanonicalActivityLap[];
   heartRateZones: CanonicalActivityHeartRateZone[];
   device: CanonicalActivityDevice | null;
   vendorFields: Record<string, unknown>;

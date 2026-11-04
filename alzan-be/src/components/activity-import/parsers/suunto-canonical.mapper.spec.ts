@@ -1,5 +1,6 @@
 import { strict as assert } from 'assert';
 import {
+  applySuuntoWorkoutExtensions,
   applySuuntoWorkoutSummaryTimeMetadata,
   mapSuuntoActivityToCanonicalSport,
   parseSuuntoActivityFileToCanonical,
@@ -17,7 +18,13 @@ type FitFieldDefinition = {
   fieldNumber: number;
   size: number;
   baseType: number;
-  value: number | number[];
+  value: number | number[] | string;
+};
+
+type TestFitDeveloperField = {
+  fieldNumber: number;
+  size: number;
+  developerDataIndex: number;
 };
 
 type TestFitLap = {
@@ -44,6 +51,12 @@ function fitTimestamp(iso: string): number {
 function writeFitField(target: number[], field: FitFieldDefinition): void {
   const buffer = new ArrayBuffer(field.size);
   const view = new DataView(buffer);
+  if (typeof field.value === 'string') {
+    const encoded = new TextEncoder().encode(field.value);
+    new Uint8Array(buffer).set(encoded.subarray(0, field.size - 1));
+    target.push(...new Uint8Array(buffer));
+    return;
+  }
   const values = Array.isArray(field.value) ? field.value : [field.value];
   const elementSize = field.baseType === 0x02 || field.baseType === 0x0d ? 1 : field.baseType === 0x84 ? 2 : 4;
 
@@ -59,6 +72,8 @@ function writeFitField(target: number[], field: FitFieldDefinition): void {
       view.setInt32(offset, value, true);
     } else if (field.baseType === 0x86) {
       view.setUint32(offset, value, true);
+    } else if (field.baseType === 0x88) {
+      view.setFloat32(offset, value, true);
     } else {
       throw new Error(`Unsupported test FIT base type: ${field.baseType}`);
     }
@@ -72,19 +87,36 @@ function appendFitDefinition(
   localMessageType: number,
   globalMessageNumber: number,
   fields: Array<Omit<FitFieldDefinition, 'value'>>,
+  developerFields: TestFitDeveloperField[] = [],
 ): void {
-  target.push(0x40 | localMessageType, 0, 0);
+  target.push((developerFields.length > 0 ? 0x60 : 0x40) | localMessageType, 0, 0);
   target.push(globalMessageNumber & 0xff, (globalMessageNumber >> 8) & 0xff);
   target.push(fields.length);
   for (const field of fields) {
     target.push(field.fieldNumber, field.size, field.baseType);
   }
+  if (developerFields.length > 0) {
+    target.push(developerFields.length);
+    for (const field of developerFields) {
+      target.push(field.fieldNumber, field.size, field.developerDataIndex);
+    }
+  }
 }
 
-function appendFitData(target: number[], localMessageType: number, fields: FitFieldDefinition[]): void {
+function appendFitData(
+  target: number[],
+  localMessageType: number,
+  fields: FitFieldDefinition[],
+  developerValues: number[] = [],
+): void {
   target.push(localMessageType);
   for (const field of fields) {
     writeFitField(target, field);
+  }
+  for (const value of developerValues) {
+    const buffer = new ArrayBuffer(4);
+    new DataView(buffer).setFloat32(0, value, true);
+    target.push(...new Uint8Array(buffer));
   }
 }
 
@@ -105,6 +137,7 @@ function buildTestFit(params: {
   records?: TestFitRecord[];
   summaryLast?: boolean;
   localOffsetMinutes?: number;
+  suuntoDeveloperMetrics?: { estimatedVo2Max: number; peakEpoc: number; recoveryTime: number };
 }): Uint8Array {
   const startedAt = fitTimestamp('2026-05-01T08:00:00Z');
   const durationSeconds = params.durationSeconds ?? 3600;
@@ -210,6 +243,62 @@ function buildTestFit(params: {
         { ...recordFields[5], value: startedAt + record.offsetSeconds },
       ]);
     }
+  }
+
+  if (params.suuntoDeveloperMetrics) {
+    const developerIndex = 0;
+    const developerDataIdFields = [
+      { fieldNumber: 0, size: 1, baseType: 0x02 },
+      { fieldNumber: 1, size: 16, baseType: 0x0d },
+    ];
+    appendFitDefinition(data, 4, 207, developerDataIdFields);
+    appendFitData(data, 4, [
+      { ...developerDataIdFields[0], value: developerIndex },
+      {
+        ...developerDataIdFields[1],
+        value: [83, 117, 117, 110, 116, 111, 70, 105, 116, 69, 120, 112, 111, 114, 116, 49],
+      },
+    ]);
+
+    const fieldDescriptionFields = [
+      { fieldNumber: 0, size: 1, baseType: 0x02 },
+      { fieldNumber: 1, size: 1, baseType: 0x02 },
+      { fieldNumber: 2, size: 1, baseType: 0x02 },
+      { fieldNumber: 3, size: 32, baseType: 0x07 },
+      { fieldNumber: 8, size: 8, baseType: 0x07 },
+    ];
+    appendFitDefinition(data, 5, 206, fieldDescriptionFields);
+    const descriptions = [
+      { fieldNumber: 4, name: 'peak_epoc', units: 'l/kg' },
+      { fieldNumber: 9, name: 'estimated_vo2_max', units: 'ml/min/kg' },
+      { fieldNumber: 10, name: 'recovery_time', units: 's' },
+    ];
+    descriptions.forEach(description => {
+      appendFitData(data, 5, [
+        { ...fieldDescriptionFields[0], value: developerIndex },
+        { ...fieldDescriptionFields[1], value: description.fieldNumber },
+        { ...fieldDescriptionFields[2], value: 0x88 },
+        { ...fieldDescriptionFields[3], value: description.name },
+        { ...fieldDescriptionFields[4], value: description.units },
+      ]);
+    });
+
+    const developerSessionFields: TestFitDeveloperField[] = descriptions.map(description => ({
+      fieldNumber: description.fieldNumber,
+      size: 4,
+      developerDataIndex: developerIndex,
+    }));
+    appendFitDefinition(data, 6, 18, [], developerSessionFields);
+    appendFitData(
+      data,
+      6,
+      [],
+      [
+        params.suuntoDeveloperMetrics.peakEpoc,
+        params.suuntoDeveloperMetrics.estimatedVo2Max,
+        params.suuntoDeveloperMetrics.recoveryTime,
+      ],
+    );
   }
 
   const fitData = params.summaryLast ? [...data, ...sessionData] : [...sessionData, ...data];
@@ -362,6 +451,39 @@ function assertSuuntoFitCanonicalParsesGpsAndLaps(): void {
     { zone: 4, durationSeconds: 1200, percentage: 33 },
     { zone: 5, durationSeconds: 600, percentage: 17 },
   ]);
+}
+
+function assertSuuntoFitReadsStandardDeveloperMetrics(): void {
+  const fit = buildTestFit({
+    sport: 1,
+    subSport: 0,
+    distanceM: 5156,
+    durationSeconds: 1875,
+    laps: [
+      { startOffsetSeconds: 0, durationSeconds: 481, distanceM: 1149, avgHeartRate: 124, lapTrigger: 0 },
+      { startOffsetSeconds: 481, durationSeconds: 840, distanceM: 2204, avgHeartRate: 137, lapTrigger: 0 },
+      { startOffsetSeconds: 1321, durationSeconds: 554, distanceM: 1767, avgHeartRate: 150, lapTrigger: 0 },
+    ],
+    suuntoDeveloperMetrics: { estimatedVo2Max: 47.5, peakEpoc: 52.2, recoveryTime: 14400 },
+  });
+  const canonical = parseSuuntoActivityFileToCanonical(fit, 'suunto-running-developer-metrics.fit');
+
+  assert.equal(canonical.summary.vo2Max, 47.5);
+  assert.equal(canonical.summary.epoc, 52.2);
+  assert.equal(canonical.summary.recoveryTimeSeconds, 14400);
+  assert.deepEqual(
+    canonical.laps.map(lap => [lap.distanceM, lap.durationSeconds]),
+    [
+      [1149, 481],
+      [2204, 840],
+      [1767, 554],
+    ],
+  );
+  assert.deepEqual(canonical.vendorFields.suuntoFitDeveloperFields, {
+    peak_epoc: 52.2,
+    estimated_vo2_max: 47.5,
+    recovery_time: 14400,
+  });
 }
 
 function assertSuuntoFitMapsOfficialLapTriggers(): void {
@@ -913,6 +1035,163 @@ function assertSuuntoSummaryOffsetOverridesFitFallback(): void {
   assert.equal(enriched.summary.endedAtLocal, '2026-05-01T05:30:00');
 }
 
+function assertSuuntoWorkoutExtensionsFillMissingMetrics(): void {
+  const activity = parseSuuntoActivityFileToCanonical(
+    buildTestFit({ sport: 1, subSport: 0, distanceM: 5000, durationSeconds: 1800 }),
+    'suunto-summary-extensions.fit',
+  );
+  const enriched = applySuuntoWorkoutExtensions(activity, {
+    extensions: [
+      { type: 'FitnessExtension', vo2Max: 48, estimatedVo2Max: 47.527355 },
+      { type: 'SummaryExtension', peakEpoc: 52.3, pte: 3.2, recoveryTime: 24600 },
+    ],
+  });
+
+  assert.equal(enriched.summary.vo2Max, 47.5);
+  assert.equal(enriched.summary.epoc, 52.3);
+  assert.equal(enriched.summary.pte, 3.2);
+  assert.equal(enriched.summary.recoveryTimeSeconds, 24600);
+
+  const streamMetrics = applySuuntoWorkoutExtensions(
+    { ...activity, summary: { ...activity.summary, vo2Max: null, epoc: null } },
+    {
+      payload: {
+        extensions: [
+          { type: 'FitnessExtension', estimatedVO2Max: 47.5 },
+          { type: 'EpocStreamExtension', values: [{ value: 48.2 }, { value: 52.3 }] },
+        ],
+      },
+    },
+  );
+  assert.equal(streamMetrics.summary.vo2Max, 47.5);
+  assert.equal(streamMetrics.summary.epoc, 52.3);
+}
+
+function assertSuuntoIntervalExtensionReconstructsMissingWarmupAndCooldown(): void {
+  const activity = parseSuuntoActivityFileToCanonical(
+    buildTestFit({
+      sport: 1,
+      subSport: 0,
+      distanceM: 5156,
+      durationSeconds: 1875,
+      elapsedSeconds: 1888,
+      endedOffsetSeconds: 1888,
+      laps: [
+        {
+          startOffsetSeconds: 481,
+          durationSeconds: 840,
+          elapsedSeconds: 850,
+          distanceM: 2204,
+          lapTrigger: 8,
+        },
+      ],
+      records: [
+        { offsetSeconds: 0, distanceM: 0, heartRate: 110 },
+        { offsetSeconds: 481, distanceM: 1149, heartRate: 135 },
+        { offsetSeconds: 1321, distanceM: 3353, heartRate: 150 },
+        { offsetSeconds: 1875, distanceM: 5156, heartRate: 142 },
+      ],
+    }),
+    'suunto-interval-cloud.fit',
+  );
+  const enriched = applySuuntoWorkoutExtensions(activity, {
+    extensions: [
+      {
+        type: 'IntervalStreamExtension',
+        intervals: [
+          {
+            startTime: Date.parse('2026-05-01T08:08:01Z'),
+            endTime: Date.parse('2026-05-01T08:22:01Z'),
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    enriched.laps.map(lap => ({
+      lapIndex: lap.lapIndex,
+      distanceM: lap.distanceM,
+      durationSeconds: lap.durationSeconds,
+    })),
+    [
+      { lapIndex: 1, distanceM: 1149, durationSeconds: 481 },
+      { lapIndex: 2, distanceM: 2204, durationSeconds: 840 },
+      { lapIndex: 3, distanceM: 1803, durationSeconds: 554 },
+    ],
+  );
+  assert.ok(enriched.laps.every(lap => lap.startOffsetSeconds != null && lap.endOffsetSeconds != null));
+
+  const normalRun = applySuuntoWorkoutExtensions(activity, { extensions: [] });
+  assert.equal(normalRun.laps.length, 1);
+
+  const mismatchedInterval = applySuuntoWorkoutExtensions(activity, {
+    extensions: [
+      {
+        type: 'IntervalStreamExtension',
+        intervals: [
+          {
+            startTime: Date.parse('2026-05-01T08:10:00Z'),
+            endTime: Date.parse('2026-05-01T08:30:00Z'),
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(mismatchedInterval.laps.length, 1);
+}
+
+function assertSuuntoLapExtensionsReconstructMultipleWorkoutSections(): void {
+  const activity = parseSuuntoActivityFileToCanonical(
+    buildTestFit({
+      sport: 1,
+      subSport: 0,
+      distanceM: 6000,
+      durationSeconds: 3600,
+      elapsedSeconds: 3600,
+      laps: [
+        {
+          startOffsetSeconds: 600,
+          durationSeconds: 600,
+          distanceM: 1000,
+          lapTrigger: 8,
+        },
+      ],
+      records: [
+        { offsetSeconds: 0, distanceM: 0, heartRate: 110 },
+        { offsetSeconds: 600, distanceM: 1000, heartRate: 130 },
+        { offsetSeconds: 1200, distanceM: 2000, heartRate: 140 },
+        { offsetSeconds: 1800, distanceM: 3000, heartRate: 145 },
+        { offsetSeconds: 3000, distanceM: 4500, heartRate: 150 },
+        { offsetSeconds: 3600, distanceM: 6000, heartRate: 140 },
+      ],
+    }),
+    'suunto-multiple-lap-extensions.fit',
+  );
+  const enriched = applySuuntoWorkoutExtensions(activity, {
+    extensions: [
+      {
+        type: 'ManualLapStreamExtension',
+        markers: [
+          { startTime: Date.parse('2026-05-01T08:10:00Z'), endTime: Date.parse('2026-05-01T08:20:00Z') },
+          { startTime: Date.parse('2026-05-01T08:30:00Z'), endTime: Date.parse('2026-05-01T08:50:00Z') },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    enriched.laps.map(lap => [lap.lapIndex, lap.lapType, lap.distanceM, lap.durationSeconds]),
+    [
+      [1, 'unknown', 1000, 600],
+      [2, 'manual', 1000, 600],
+      [3, 'unknown', 1000, 600],
+      [4, 'unknown', 1500, 1200],
+      [5, 'unknown', 1500, 600],
+    ],
+  );
+}
+
 function assertSuuntoFitWithoutGpsStillParsesAsRouteImport(): void {
   const fit = buildTestFit({ sport: 64, subSport: 85, distanceM: 0, includeGps: false });
   const routeImport = parseRouteFileWithSummary(fit, 'suunto-padel.fit', { estimatedMaxHeartRate: 190 });
@@ -938,6 +1217,8 @@ function assertSuuntoJsonCanonicalParsesSummary(): void {
         DateTime: '2026-05-01T08:00:00Z',
         Duration: 3600,
         Distance: 6000,
+        MAXVO2: 47.5,
+        EPOC: 52.3,
         Energy: 418400,
         AverageHeartRate: 1.8,
         MaxHeartRate: 150,
@@ -949,6 +1230,35 @@ function assertSuuntoJsonCanonicalParsesSummary(): void {
         { TimeISO8601: '2026-05-01T08:00:00Z', Latitude: 0.7054, Longitude: -0.0646, HR: 1.8 },
         { TimeISO8601: '2026-05-01T08:01:00Z', Latitude: 0.7055, Longitude: -0.0647, HR: 110 },
       ],
+      Windows: [
+        {
+          Window: {
+            Type: 'Interval',
+            IntervalType: 'Warmup',
+            IntervalNotes: 'Calentamiento',
+            Duration: 480,
+            Distance: 1149,
+          },
+        },
+        {
+          Window: {
+            Type: 'Interval',
+            IntervalType: 'Interval',
+            IntervalNotes: 'Intervalo',
+            Duration: 840,
+            Distance: 2231,
+          },
+        },
+        {
+          Window: {
+            Type: 'Interval',
+            IntervalType: 'Cooldown',
+            IntervalNotes: 'Relajación',
+            Duration: 300,
+            Distance: 791,
+          },
+        },
+      ],
     },
   });
 
@@ -959,7 +1269,92 @@ function assertSuuntoJsonCanonicalParsesSummary(): void {
   assert.equal(canonical.summary.caloriesKcal, 100);
   assert.equal(canonical.summary.avgHeartRate, 108);
   assert.equal(canonical.summary.totalSteps, 7500);
+  assert.equal(canonical.summary.vo2Max, 47.5);
+  assert.equal(canonical.summary.epoc, 52.3);
+  assert.deepEqual(
+    canonical.laps.map(lap => [lap.distanceM, lap.durationSeconds]),
+    [
+      [1149, 480],
+      [2231, 840],
+      [791, 300],
+    ],
+  );
+  assert.deepEqual(
+    canonical.laps.map(lap => lap.lapName),
+    ['Calentamiento', 'Intervalo', 'Relajación'],
+  );
   assert.equal(canonical.streams.position.length, 2);
+}
+
+function assertSuuntoWorkoutExtensionsPreserveNamedIntervalsSeparatelyFromFitLaps(): void {
+  const activity = parseSuuntoActivityFileToCanonical(
+    buildTestFit({
+      sport: 1,
+      subSport: 0,
+      distanceM: 5156,
+      durationSeconds: 1875,
+      elapsedSeconds: 1888,
+      endedOffsetSeconds: 1888,
+      laps: [
+        { startOffsetSeconds: 0, durationSeconds: 480, distanceM: 1149, lapTrigger: 8 },
+        { startOffsetSeconds: 480, durationSeconds: 840, distanceM: 2204, lapTrigger: 8 },
+        { startOffsetSeconds: 1320, durationSeconds: 300, distanceM: 791, lapTrigger: 8 },
+      ],
+      records: [
+        { offsetSeconds: 0, distanceM: 0, heartRate: 110 },
+        { offsetSeconds: 480, distanceM: 1149, heartRate: 125 },
+        { offsetSeconds: 1320, distanceM: 3380, heartRate: 145 },
+        { offsetSeconds: 1620, distanceM: 4171, heartRate: 150 },
+        { offsetSeconds: 1875, distanceM: 5156, heartRate: 140 },
+      ],
+    }),
+    'suunto-interval-cloud.fit',
+  );
+  const enriched = applySuuntoWorkoutExtensions(activity, {
+    payload: {
+      extensions: [
+        {
+          type: 'IntervalStreamExtension',
+          intervals: [
+            {
+              startTime: Date.parse('2026-05-01T08:00:00Z'),
+              endTime: Date.parse('2026-05-01T08:08:00Z'),
+              intervalType: 'Warmup',
+              intervalNotes: 'Calentamiento',
+              duration: 480,
+              distance: 1149,
+            },
+            {
+              startTime: Date.parse('2026-05-01T08:08:00Z'),
+              endTime: Date.parse('2026-05-01T08:22:00Z'),
+              intervalType: 'Interval',
+              intervalNotes: 'Intervalo',
+              duration: 840,
+              distance: 2231,
+            },
+            {
+              startTime: Date.parse('2026-05-01T08:22:00Z'),
+              endTime: Date.parse('2026-05-01T08:27:00Z'),
+              intervalType: 'Cooldown',
+              intervalNotes: 'Relajación',
+              duration: 300,
+              distance: 791,
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(enriched.laps.length, activity.laps.length);
+  assert.deepEqual(
+    enriched.intervalLaps?.map(lap => [lap.lapName, lap.distanceM, lap.durationSeconds]),
+    [
+      ['Calentamiento', 1149, 480],
+      ['Intervalo', 2231, 840],
+      ['Relajación', 791, 300],
+    ],
+  );
 }
 
 function assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks(): void {
@@ -1110,6 +1505,7 @@ function assertOfficialSuuntoSleepPayloadMapsCorrectly(): void {
 
 assertSuuntoSportMapping();
 assertSuuntoFitCanonicalParsesGpsAndLaps();
+assertSuuntoFitReadsStandardDeveloperMetrics();
 assertSuuntoFitMapsOfficialLapTriggers();
 assertSuuntoFitRemovesMixedOneKilometerAutolaps();
 assertSuuntoFitKeepsFifteenStructuredIntervals();
@@ -1123,6 +1519,10 @@ assertSuuntoFitAcceptsLeadingBytesBeforeHeader();
 assertSuuntoFitCanonicalParsesWithoutGps();
 assertSuuntoFitCanonicalPreservesOriginalLocalTime();
 assertSuuntoSummaryOffsetOverridesFitFallback();
+assertSuuntoWorkoutExtensionsFillMissingMetrics();
+assertSuuntoWorkoutExtensionsPreserveNamedIntervalsSeparatelyFromFitLaps();
+assertSuuntoIntervalExtensionReconstructsMissingWarmupAndCooldown();
+assertSuuntoLapExtensionsReconstructMultipleWorkoutSections();
 assertSuuntoFitWithoutGpsStillParsesAsRouteImport();
 assertSuuntoJsonCanonicalParsesSummary();
 assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks();
