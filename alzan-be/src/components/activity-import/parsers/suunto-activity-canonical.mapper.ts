@@ -882,6 +882,32 @@ function resolveFitOffsetsAfterSummary(state: FitParseState): void {
   });
 }
 
+function enrichFitLap(lap: CanonicalActivityLap, state: FitParseState): CanonicalActivityLap {
+  const { startOffsetSeconds: start, endOffsetSeconds: end, durationSeconds } = lap;
+  if (start == null || end == null || end <= start) return lap;
+
+  const distanceAt = (offset: number) => state.distance.find(sample => sample.offsetSeconds === offset)?.value;
+  const from = distanceAt(start) ?? (start === 0 ? 0 : undefined);
+  const to = distanceAt(end);
+  const distanceM = lap.distanceM ?? (from != null && to != null && to > from ? to - from : null);
+  const heartRates = state.heartRate.filter(
+    sample => sample.offsetSeconds != null && sample.offsetSeconds >= start && sample.offsetSeconds < end,
+  );
+  return {
+    ...lap,
+    distanceM,
+    avgPaceSecondsPerKm:
+      lap.avgPaceSecondsPerKm ??
+      (distanceM != null && distanceM > 0 && durationSeconds != null ? (durationSeconds * 1000) / distanceM : null),
+    avgHeartRate:
+      lap.avgHeartRate ??
+      (heartRates.length ? heartRates.reduce((sum, sample) => sum + sample.value, 0) / heartRates.length : null),
+    maxHeartRate:
+      lap.maxHeartRate ??
+      (heartRates.length ? heartRates.reduce((max, sample) => Math.max(max, sample.value), 0) : null),
+  };
+}
+
 function fitLapsOverlap(left: CanonicalActivityLap, right: CanonicalActivityLap): boolean {
   if (
     left.startOffsetSeconds == null ||
@@ -1068,7 +1094,7 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
       power: state.power,
       temperature: state.temperature,
     },
-    laps: canonicalLaps,
+    laps: canonicalLaps.map(lap => enrichFitLap(lap, state)),
     device: state.device,
     vendorFields: { suuntoFitSport: state.sport, suuntoFitSubSport: state.subSport },
     heartRateZones: state.nativeHeartRateZones,
