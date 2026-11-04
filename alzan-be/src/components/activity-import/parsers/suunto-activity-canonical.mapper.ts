@@ -1136,29 +1136,25 @@ function readWindowMetric(window: JsonRecord, metricName: string, metricKey: 'Av
   return null;
 }
 
-function mapWindowTypeToLapType(windowType: string | null): CanonicalActivityLap['lapType'] {
-  if (windowType?.toLowerCase() === 'autolap') return 'distance';
-  return 'unknown';
-}
-
 function mapSuuntoWindowsToLaps(windows: unknown): CanonicalActivityLap[] {
   if (!Array.isArray(windows)) return [];
-  let elapsedSeconds = 0;
+  const elapsedByType = { manual: 0, distance: 0 };
   return windows
     .map(candidate => (isRecord(candidate) && isRecord(candidate.Window) ? candidate.Window : null))
     .filter((window): window is JsonRecord => {
       if (!window) return false;
       const type = readString(window.Type)?.toLowerCase();
-      return type === 'autolap';
+      return type === 'autolap' || type === 'interval';
     })
     .map((window, index) => {
       const distanceM = readNumber(window.Distance) ?? readNumber(window.DistanceMax);
       const durationSeconds = readNumber(window.Duration);
-      const startOffsetSeconds = elapsedSeconds;
-      if (durationSeconds != null && durationSeconds > 0) elapsedSeconds += durationSeconds;
+      const lapType = readString(window.Type)?.toLowerCase() === 'interval' ? 'manual' : 'distance';
+      const startOffsetSeconds = elapsedByType[lapType];
+      if (durationSeconds != null && durationSeconds > 0) elapsedByType[lapType] += durationSeconds;
       return {
         lapIndex: index + 1,
-        lapType: mapWindowTypeToLapType(readString(window.Type)),
+        lapType,
         distanceM,
         durationSeconds,
         avgPaceSecondsPerKm:
