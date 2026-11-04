@@ -453,6 +453,7 @@ export const EnduranceSessionDetailScreen = () => {
     Array<{
       key: string;
       label: string;
+      splitGroup: 'legacy' | 'custom' | 'distance';
       laps: SessionLap[];
     }>
   >(() => {
@@ -533,6 +534,7 @@ export const EnduranceSessionDetailScreen = () => {
       })
       .map(group => ({
         key: group.key,
+        splitGroup: group.splitGroup,
         label:
           group.splitGroup === 'distance' && group.splitDistanceM != null && group.splitDistanceM > 0
             ? formatSplitDistanceBucketLabel(group.splitDistanceM)
@@ -557,6 +559,14 @@ export const EnduranceSessionDetailScreen = () => {
 
   const activeSplitTab = splitTabs.find(tab => tab.key === selectedSplitTabKey) ?? splitTabs[0] ?? null;
   const activeSplits = activeSplitTab?.laps ?? [];
+  const activeSplitPhaseLabels = useMemo(() => {
+    if (activeSplitTab?.splitGroup !== 'custom' || !templateSteps || activeSplits.length === 0) return [];
+    const topLevelPhases = templateSteps
+      .filter(step => !step.is_group && step.parent_step_id == null)
+      .sort((left, right) => left.order_index - right.order_index);
+    if (topLevelPhases.length !== activeSplits.length) return [];
+    return topLevelPhases.map(step => t(getPhaseLabel(step.phase_type)));
+  }, [activeSplitTab?.splitGroup, activeSplits.length, t, templateSteps]);
   const activeSplitPaceValues = activeSplits
     .map(split => split.avg_pace_s_per_km)
     .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
@@ -2276,7 +2286,14 @@ export const EnduranceSessionDetailScreen = () => {
                     { borderBottomColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
                   ]}
                 >
-                  <Text style={[styles.splitsHeaderCell, { width: 28, color: themeColors.textSecondary }]}>#</Text>
+                  <Text
+                    style={[
+                      styles.splitsHeaderCell,
+                      { width: activeSplitPhaseLabels.length > 0 ? 82 : 28, color: themeColors.textSecondary },
+                    ]}
+                  >
+                    {activeSplitPhaseLabels.length > 0 ? t('training.phaseType') : '#'}
+                  </Text>
                   <Text style={[styles.splitsHeaderCell, { flex: 1, color: themeColors.textSecondary }]}>
                     {t('settings.distance')}
                   </Text>
@@ -2311,9 +2328,14 @@ export const EnduranceSessionDetailScreen = () => {
                       },
                     ]}
                   >
-                    <Text style={[styles.splitCell, { width: 28, color: themeColors.textSecondary }]}>
-                      {lap.lap_index}
-                    </Text>
+                    <View style={{ width: activeSplitPhaseLabels.length > 0 ? 82 : 28 }}>
+                      <Text style={[styles.splitCell, { color: themeColors.textSecondary }]}>{lap.lap_index}</Text>
+                      {activeSplitPhaseLabels[index] ? (
+                        <Text style={[styles.splitPhaseLabel, { color: themeColors.textSecondary }]} numberOfLines={2}>
+                          {activeSplitPhaseLabels[index]}
+                        </Text>
+                      ) : null}
+                    </View>
                     <Text style={[styles.splitCell, { flex: 1, color: themeColors.textPrimary }]}>
                       {formatSplitDistance(lap.distance_m)}
                     </Text>
@@ -3134,6 +3156,12 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontSize: 13,
     fontWeight: '600',
+  },
+  splitPhaseLabel: {
+    ...typography.caption,
+    fontSize: 10,
+    lineHeight: 13,
+    marginTop: 2,
   },
   paceCell: {
     borderRadius: borderRadius.s,

@@ -191,7 +191,7 @@ export class WearableImportLifecycleService implements OnModuleDestroy {
       .eq('id', input.jobId)
       .eq('lease_token', input.leaseToken)
       .eq('status', 'running')
-      .or(`last_error.is.null,last_error.neq.${WEARABLE_SYNC_CANCEL_REQUESTED}`)
+      .is('last_error', null)
       .select('id');
     if (error) throw new InternalServerErrorException('WEARABLE_SYNC_JOB_FINISH_FAILED');
     if (data?.length) return input.lastError === WEARABLE_SYNC_CANCEL_REQUESTED;

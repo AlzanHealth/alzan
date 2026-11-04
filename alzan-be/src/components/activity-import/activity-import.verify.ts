@@ -76,6 +76,12 @@ const verificationCases: VerificationCase[] = [
   },
   {
     kind: 'service',
+    provider: 'suunto',
+    check: 'Suunto sync jobs finish without overwriting concurrent cancellation requests',
+    specFile: 'src/components/wearables/services/wearable-import-lifecycle.service.spec.ts',
+  },
+  {
+    kind: 'service',
     provider: 'matching',
     check: 'endurance template match scoring (structural and totals)',
     specFile: 'src/components/activity-import/matching/endurance-template-match.spec.ts',

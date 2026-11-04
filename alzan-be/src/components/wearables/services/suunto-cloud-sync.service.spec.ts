@@ -116,9 +116,9 @@ function assertIncrementalAndRepairLookbacks(): void {
   const dayMs = 24 * 60 * 60 * 1000;
   const lastSuccessAt = new Date(now).toISOString();
 
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 9, false, lastSuccessAt), now - 3 * dayMs);
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 9, true, lastSuccessAt), now - 20 * dayMs);
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 8, false, lastSuccessAt), now - 30 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 10, false, lastSuccessAt), now - 3 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 10, true, lastSuccessAt), now - 20 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 9, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 7, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 6, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 5, false, lastSuccessAt), now - 30 * dayMs);
@@ -128,10 +128,10 @@ function assertIncrementalAndRepairLookbacks(): void {
   assert.equal(service.selectWorkoutLookbackStartMs(now, 1, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(
     service.selectWorkoutLookbackStartMs(now, 9, false, new Date(now - 5 * dayMs).toISOString()),
-    now - 8 * dayMs,
+    now - 30 * dayMs,
   );
   assert.equal(
-    service.selectWorkoutLookbackStartMs(now, 9, false, new Date(now - 60 * dayMs).toISOString()),
+    service.selectWorkoutLookbackStartMs(now, 10, false, new Date(now - 60 * dayMs).toISOString()),
     now - 30 * dayMs,
   );
   assert.equal(service.selectWorkoutLookbackStartMs(now, undefined, false), now - 30 * dayMs);
@@ -159,8 +159,9 @@ async function assertRateLimitRetriesRespectRetryAfter(): Promise<void> {
   assert.deepEqual(delays, [2000, 2000]);
 }
 
-async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
+async function assertSyncRepairsOlderVersionAndSkipsCurrentWorkout(): Promise<void> {
   const importedWorkoutKeys: string[] = [];
+  const claimedCanonicalVersions: Array<{ sourceRecordId: string; version: number }> = [];
   const completedImports: string[] = [];
   const finishedJobs: JsonRecord[] = [];
   const savedStates: JsonRecord[] = [];
@@ -180,10 +181,20 @@ async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
         leaseExpiresAt: '2026-06-15T10:05:00.000Z',
       }),
       isSyncCancellationRequested: async () => false,
-      claimActivity: async (input: { sourceRecordId: string }) =>
-        input.sourceRecordId === 'existing-workout'
-          ? { action: 'skip', importId: 'import-existing', sessionId: 'session-existing' }
-          : { action: 'import', importId: `import-${input.sourceRecordId}`, sessionId: null },
+      claimActivity: async (input: { sourceRecordId: string; canonicalVersion: number }) => {
+        claimedCanonicalVersions.push({ sourceRecordId: input.sourceRecordId, version: input.canonicalVersion });
+        if (input.sourceRecordId === 'existing-workout') {
+          return input.canonicalVersion > 9
+            ? { action: 'repair', importId: 'import-existing', sessionId: 'session-existing' }
+            : { action: 'skip', importId: 'import-existing', sessionId: 'session-existing' };
+        }
+        if (input.sourceRecordId === 'current-workout') {
+          return input.canonicalVersion >= 10
+            ? { action: 'skip', importId: 'import-current', sessionId: 'session-current' }
+            : { action: 'import', importId: 'import-current', sessionId: null };
+        }
+        return { action: 'import', importId: `import-${input.sourceRecordId}`, sessionId: null };
+      },
       completeActivity: async (importId: string) => void completedImports.push(importId),
       failActivity: async () => {
         throw new Error('lifecycle write unavailable');
@@ -229,6 +240,7 @@ async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
   service.fetchWorkoutSummaries = async () => ({
     workouts: [
       { startTime: '2026-06-14T09:00:00.000Z', workoutKey: 'existing-workout' },
+      { startTime: '2026-06-14T09:30:00.000Z', workoutKey: 'current-workout' },
       { startTime: '2026-06-15T09:00:00.000Z', workoutKey: 'new-workout' },
       { startTime: '2026-06-15T09:30:00.000Z', workoutKey: 'broken-workout' },
     ],
@@ -244,11 +256,20 @@ async function assertSyncSkipsAlreadyImportedWorkouts(): Promise<void> {
 
   const result = await service.syncActivities('user-id');
 
-  assert.deepEqual(importedWorkoutKeys, ['new-workout']);
+  assert.deepEqual([...importedWorkoutKeys].sort(), ['existing-workout', 'new-workout']);
+  assert.deepEqual(
+    [...claimedCanonicalVersions].sort((left, right) => left.sourceRecordId.localeCompare(right.sourceRecordId)),
+    [
+      { sourceRecordId: 'broken-workout', version: 10 },
+      { sourceRecordId: 'current-workout', version: 10 },
+      { sourceRecordId: 'existing-workout', version: 10 },
+      { sourceRecordId: 'new-workout', version: 10 },
+    ],
+  );
   assert.equal(result.activitiesImported, 1);
   assert.equal(result.activitiesSkipped, 1);
-  assert.equal(result.activitiesReconciled, 1);
-  assert.equal(result.activitiesRepaired, 0);
+  assert.equal(result.activitiesReconciled, 2);
+  assert.equal(result.activitiesRepaired, 1);
   assert.equal(result.activitiesFailed, 1);
   assert.equal(result.status, 'partial');
   assert.deepEqual(completedImports, [], 'bundle persistence owns the lifecycle completion');
@@ -265,7 +286,7 @@ async function run(): Promise<void> {
   await assertSaturatedWorkoutListIsReportedAsUnverified();
   assertIncrementalAndRepairLookbacks();
   await assertRateLimitRetriesRespectRetryAfter();
-  await assertSyncSkipsAlreadyImportedWorkouts();
+  await assertSyncRepairsOlderVersionAndSkipsCurrentWorkout();
   await assertCancelledSyncDoesNotReportSuccessTime();
 }
 

@@ -165,9 +165,10 @@ export class ImportReconciliationService {
   public async runEnduranceTemplateMatch(userId: string, sessionId: string): Promise<void> {
     const session = await this.getSession(userId, sessionId);
     if (!session || session.sport_type === 'strength') return;
-    const isReevaluatingTotalsAssociation =
-      session.endurance_template_id != null && session.template_match_method === 'totals';
-    if (session.endurance_template_id != null && !isReevaluatingTotalsAssociation) return;
+    const isReevaluatingWeakAssociation =
+      session.endurance_template_id != null &&
+      (session.template_match_method === 'totals' || session.template_match_method === 'planned_day');
+    if (session.endurance_template_id != null && !isReevaluatingWeakAssociation) return;
 
     const localDate = resolveActivityLocalDate({
       startTime: session.start_time,
@@ -179,6 +180,30 @@ export class ImportReconciliationService {
     const laps = await this.getSessionLaps(sessionId);
 
     const allTemplates = await this.findTemplatesBySport(userId, session.sport_type);
+    const uniqueSameDayPlan = plannedPlans.length === 1 ? plannedPlans[0] : null;
+    if (!isReevaluatingWeakAssociation && uniqueSameDayPlan) {
+      const plan = uniqueSameDayPlan;
+      const template = allTemplates.find(candidate => candidate.id === plan.endurance_template_id);
+      const otherSessions = (await this.findTodaysSessions(userId, [session.sport_type], session, sessionId)).filter(
+        candidate => candidate.status !== 'cancelled',
+      );
+      if (template && otherSessions.length === 0) {
+        const { error } = await this.supabaseAdminService.client.rpc('associate_activity_session_template', {
+          p_user_id: userId,
+          p_session_id: sessionId,
+          p_endurance_template_id: template.id,
+          p_workout_template_id: undefined,
+          p_workout_plan_id: plan.id,
+        });
+        if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_ASSOCIATION_FAILED');
+        await this.updateSession(sessionId, {
+          template_match_score: 100,
+          template_match_method: 'planned_day',
+          ...(session.name == null ? { name: template.base_name } : {}),
+        });
+        return;
+      }
+    }
     const best = await this.scoreTemplates(
       session,
       laps,
@@ -188,17 +213,40 @@ export class ImportReconciliationService {
     );
     if (best == null || best.score < POSSIBLE_MATCH) return;
 
+    if (
+      !isReevaluatingWeakAssociation &&
+      uniqueSameDayPlan != null &&
+      best.templateId === uniqueSameDayPlan.endurance_template_id &&
+      best.plannedPlanId === uniqueSameDayPlan.id &&
+      isMatchMarginSufficient(best.score, best.runnerUpScore)
+    ) {
+      const { error } = await this.supabaseAdminService.client.rpc('associate_activity_session_template', {
+        p_user_id: userId,
+        p_session_id: sessionId,
+        p_endurance_template_id: best.templateId,
+        p_workout_template_id: undefined,
+        p_workout_plan_id: uniqueSameDayPlan.id,
+      });
+      if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_ASSOCIATION_FAILED');
+      await this.updateSession(sessionId, {
+        template_match_score: best.score,
+        template_match_method: 'planned_day',
+        ...(session.name == null ? { name: best.templateName } : {}),
+      });
+      return;
+    }
+
     const canAutoAssociate =
       best.score >= STRONG_MATCH &&
       best.signalCount >= 2 &&
       best.isAutoMatchEligible &&
       !best.planSelectionRequired &&
       isMatchMarginSufficient(best.score, best.runnerUpScore);
-    if (isReevaluatingTotalsAssociation && (best.method !== 'structural' || !canAutoAssociate)) return;
+    if (isReevaluatingWeakAssociation && (best.method !== 'structural' || !canAutoAssociate)) return;
 
     if (canAutoAssociate) {
-      if (best.plannedPlanId != null || isReevaluatingTotalsAssociation) {
-        if (isReevaluatingTotalsAssociation && best.templateId === session.endurance_template_id) {
+      if (best.plannedPlanId != null || isReevaluatingWeakAssociation) {
+        if (isReevaluatingWeakAssociation && best.templateId === session.endurance_template_id) {
           await this.updateSession(sessionId, {
             template_match_score: best.score,
             template_match_method: best.method,
@@ -230,7 +278,7 @@ export class ImportReconciliationService {
       });
       return;
     }
-    if (isReevaluatingTotalsAssociation) return;
+    if (isReevaluatingWeakAssociation) return;
     await this.updateSession(sessionId, {
       suggested_endurance_template_id: best.templateId,
       template_match_score: best.score,

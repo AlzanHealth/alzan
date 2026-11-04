@@ -6251,7 +6251,7 @@ export type Database = {
         | "manual"
         | "unknown"
       import_duplicate_resolution_enum: "pending" | "merged" | "kept_both"
-      import_match_method_enum: "structural" | "totals"
+      import_match_method_enum: "structural" | "totals" | "planned_day"
       ingredients_category:
         | "proteina_animal"
         | "proteina_vegetal"
@@ -6586,7 +6586,7 @@ export const Constants = {
         "unknown",
       ],
       import_duplicate_resolution_enum: ["pending", "merged", "kept_both"],
-      import_match_method_enum: ["structural", "totals"],
+      import_match_method_enum: ["structural", "totals", "planned_day"],
       ingredients_category: [
         "proteina_animal",
         "proteina_vegetal",

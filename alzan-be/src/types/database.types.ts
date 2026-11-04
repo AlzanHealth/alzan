@@ -6168,7 +6168,7 @@ export type Database = {
       exercise_load_type: 'assisted' | 'bodyweight' | 'external' | 'mixed';
       health_data_quality_enum: 'complete' | 'partial' | 'estimated' | 'manual' | 'unknown';
       import_duplicate_resolution_enum: 'pending' | 'merged' | 'kept_both';
-      import_match_method_enum: 'structural' | 'totals';
+      import_match_method_enum: 'structural' | 'totals' | 'planned_day';
       ingredients_category:
         | 'proteina_animal'
         | 'proteina_vegetal'
@@ -6439,7 +6439,7 @@ export const Constants = {
       exercise_load_type: ['assisted', 'bodyweight', 'external', 'mixed'],
       health_data_quality_enum: ['complete', 'partial', 'estimated', 'manual', 'unknown'],
       import_duplicate_resolution_enum: ['pending', 'merged', 'kept_both'],
-      import_match_method_enum: ['structural', 'totals'],
+      import_match_method_enum: ['structural', 'totals', 'planned_day'],
       ingredients_category: [
         'proteina_animal',
         'proteina_vegetal',

@@ -134,6 +134,10 @@ export function useSuuntoConnection() {
       }
       invalidateTrainingCalendar(queryClient);
       queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+      queryClient.invalidateQueries({ queryKey: ['activitySession'] });
+      queryClient.invalidateQueries({ queryKey: ['sessionLaps'] });
+      queryClient.invalidateQueries({ queryKey: ['activitySessionSections'] });
+      queryClient.invalidateQueries({ queryKey: ['enduranceTemplateSteps'] });
       queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
       queryClient.invalidateQueries({ queryKey: ['health', user?.id], refetchType: 'active' });
       if (result.cancelled) {

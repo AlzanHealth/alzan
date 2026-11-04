@@ -24,6 +24,7 @@ import { CanonicalActivityWriterService } from './canonical-activity-writer.serv
 import { DedupeService } from './dedupe.service';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { CanonicalActivity } from '../../activity-import/parsers/activity-import-canonical.types';
+import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
 
 config({ path: resolve(__dirname, '../../../../.env') });
 
@@ -46,6 +47,7 @@ async function main(): Promise<void> {
   const reconciliation = new ImportReconciliationService(adminStub);
   const review = new ImportReviewService(adminStub, rawPayload, reconciliation);
   const writer = new CanonicalActivityWriterService(adminStub, rawPayload, new DedupeService(), reconciliation);
+  const lifecycle = new WearableImportLifecycleService(adminStub);
 
   const email = `import-review-check+${Date.now()}@example.com`;
   const { data: created, error: userError } = await client.auth.admin.createUser({
@@ -90,6 +92,35 @@ async function main(): Promise<void> {
   const pass = (name: string) => results.push(`[PASS] ${name}`);
 
   try {
+    // --- SYNC JOB FINALIZATION: exercise the same PostgREST update used by Suunto sync ---
+    {
+      const claim = await lifecycle.claimSyncJob({
+        userId,
+        provider: 'suunto',
+        syncDomain: 'activities',
+        leaseSeconds: 1800,
+      });
+      assert.equal(claim.action, 'acquired');
+      await lifecycle.finishSyncJob({
+        jobId: claim.jobId,
+        leaseToken: claim.leaseToken,
+        status: 'success',
+        counters: { activitiesImported: 1, activitiesReconciled: 1 },
+        lastError: null,
+      });
+      lifecycle.releaseSyncJob(claim.jobId);
+      const { data: finishedJob, error: finishedJobError } = await client
+        .from('wearable_sync_jobs')
+        .select('status, counters, completed_at')
+        .eq('id', claim.jobId)
+        .single();
+      if (finishedJobError) throw new Error(`read finished sync job failed: ${finishedJobError.message}`);
+      assert.equal(finishedJob.status, 'success');
+      assert.equal(finishedJob.counters.activitiesImported, 1);
+      assert.ok(finishedJob.completed_at);
+      pass('sync lifecycle: a successful cloud import closes its job through PostgREST');
+    }
+
     // --- Endurance MERGE: existing survives, imported deleted, laps moved ---
     {
       const existing = await insertSession({
@@ -651,6 +682,244 @@ async function main(): Promise<void> {
         'writer and re-sync must create exactly one session',
       );
       pass('endurance series match: 11 laps kept, template linked, plan completed, no duplicate session');
+    }
+
+    // --- Endurance SAME-DAY PLAN: a sole planned run still matches if another run exists that day ---
+    {
+      const templateId = randomUUID();
+      const planId = randomUUID();
+      const sourceRecordId = `suunto-planned-day-source-${Date.now()}`;
+      createdTemplateIds.add(templateId);
+      createdPlanIds.add(planId);
+
+      const { error: templateError } = await client.from('endurance_workout_templates').insert({
+        id: templateId,
+        user_id: userId,
+        base_name: 'Planned Suunto run',
+        sport_type: 'running',
+        total_distance_m: 5156,
+        total_duration_s: 1980,
+      });
+      if (templateError) throw new Error(`insert same-day endurance template failed: ${templateError.message}`);
+
+      const { error: stepsError } = await client.from('endurance_workout_steps').insert([
+        {
+          id: randomUUID(),
+          template_id: templateId,
+          user_id: userId,
+          order_index: 0,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'warmup',
+          duration_type: 'time',
+          duration_s: 480,
+          target_type: 'none',
+        },
+        {
+          id: randomUUID(),
+          template_id: templateId,
+          user_id: userId,
+          order_index: 1,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'interval',
+          duration_type: 'time',
+          duration_s: 1200,
+          target_type: 'none',
+        },
+        {
+          id: randomUUID(),
+          template_id: templateId,
+          user_id: userId,
+          order_index: 2,
+          is_group: false,
+          repetitions: 1,
+          phase_type: 'cooldown',
+          duration_type: 'time',
+          duration_s: 300,
+          target_type: 'none',
+        },
+      ]);
+      if (stepsError) throw new Error(`insert same-day endurance steps failed: ${stepsError.message}`);
+
+      const { error: planError } = await client.from('workout_plans').insert({
+        id: planId,
+        user_id: userId,
+        planned_date: '2026-06-14',
+        status: 'planned',
+        endurance_template_id: templateId,
+      });
+      if (planError) throw new Error(`insert same-day workout plan failed: ${planError.message}`);
+
+      const laps = [
+        { distanceM: 1149, durationSeconds: 481, avgHeartRate: 124 },
+        { distanceM: 2204, durationSeconds: 840, avgHeartRate: 137 },
+        { distanceM: 1767, durationSeconds: 554, avgHeartRate: 150 },
+      ];
+      const activity: CanonicalActivity = {
+        provider: 'suunto',
+        sourceFileType: 'fit',
+        sportType: 'running',
+        sportSubtype: 'outdoor',
+        providerActivityId: sourceRecordId,
+        summary: {
+          startedAt: '2026-06-14T20:34:52Z',
+          endedAt: '2026-06-14T21:06:07Z',
+          timezone: '+02:00',
+          startedAtLocal: '2026-06-14T22:34:52',
+          endedAtLocal: '2026-06-14T23:06:07',
+          durationSeconds: 1875,
+          elapsedSeconds: 1888,
+          distanceM: 5156,
+          caloriesKcal: 338,
+          avgHeartRate: 138,
+          maxHeartRate: 163,
+          minHeartRate: null,
+          avgSpeedMps: 5156 / 1875,
+          maxSpeedMps: null,
+          avgCadence: 69,
+          maxCadence: 74,
+          avgPowerW: 261,
+          maxPowerW: 413,
+          elevationGainM: 5,
+          elevationLossM: 4,
+          avgTemperatureC: null,
+          maxTemperatureC: null,
+          totalSteps: 2183,
+          recoveryTimeSeconds: 0,
+          vo2Max: 47.5,
+          epoc: 52.3,
+          pte: 3.2,
+          tss: null,
+        },
+        streams: {
+          position: [],
+          heartRate: [],
+          speed: [],
+          distance: [],
+          altitude: [],
+          cadence: [],
+          power: [],
+          temperature: [],
+        },
+        laps: laps.map((lap, index) => ({
+          lapIndex: index + 1,
+          lapType: 'manual',
+          distanceM: lap.distanceM,
+          durationSeconds: lap.durationSeconds,
+          avgPaceSecondsPerKm: (lap.durationSeconds / lap.distanceM) * 1000,
+          avgHeartRate: lap.avgHeartRate,
+          maxHeartRate: null,
+          startOffsetSeconds: laps.slice(0, index).reduce((total, previous) => total + previous.durationSeconds, 0),
+          endOffsetSeconds: laps.slice(0, index + 1).reduce((total, previous) => total + previous.durationSeconds, 0),
+        })),
+        heartRateZones: [],
+        device: null,
+        vendorFields: {},
+      };
+      await insertSession({
+        sport_type: 'running',
+        start_time: '2026-06-14T07:00:00Z',
+        started_at_local: '2026-06-14T07:00:00',
+        timezone: '+00:00',
+        distance_m: 12000,
+        duration_s: 3600,
+      });
+      const sessionId = await writer.upsertActivity({
+        userId,
+        activity,
+        provenance: {
+          provider: 'suunto',
+          sourceChannel: 'cloud',
+          sourcePackage: null,
+          sourceProviderKey: 'suunto',
+          sourceRecordId,
+          sourceUpdatedAt: null,
+          rawPayloadId: null,
+        },
+        canonicalVersion: 10,
+      });
+      createdSessionIds.add(sessionId);
+
+      const matchedSession = await getSession(sessionId);
+      assert.equal(matchedSession.endurance_template_id, templateId, 'the unique planned running workout is linked');
+      assert.equal(matchedSession.template_match_method, 'planned_day');
+      assert.ok(matchedSession.template_match_score >= 60, 'the planned workout must be a credible template match');
+      assert.equal(matchedSession.suggested_endurance_template_id, null);
+      const { data: matchedPlan, error: matchedPlanError } = await client
+        .from('workout_plans')
+        .select('*')
+        .eq('id', planId)
+        .single();
+      if (matchedPlanError) throw new Error(`read same-day workout plan failed: ${matchedPlanError.message}`);
+      assert.equal(matchedPlan.status, 'completed', 'the unique scheduled plan is completed');
+      assert.equal(matchedPlan.activity_session_id, sessionId);
+      const { count: lapCount } = await client
+        .from('activity_laps')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', sessionId);
+      assert.equal(lapCount, 3, 'all three Suunto laps are retained on the linked session');
+      pass('endurance same-day plan: unique run linked despite another run, plan completed, all three laps retained');
+    }
+
+    // --- Endurance SAME-DAY PLAN SAFETY: another run prevents date-only association ---
+    {
+      const templateId = randomUUID();
+      const planId = randomUUID();
+      createdTemplateIds.add(templateId);
+      createdPlanIds.add(planId);
+      const { error: templateError } = await client.from('endurance_workout_templates').insert({
+        id: templateId,
+        user_id: userId,
+        base_name: 'Ambiguous same-day planned run',
+        sport_type: 'running',
+      });
+      if (templateError) throw new Error(`insert competing endurance template failed: ${templateError.message}`);
+      const { error: planError } = await client.from('workout_plans').insert({
+        id: planId,
+        user_id: userId,
+        planned_date: '2026-06-15',
+        status: 'planned',
+        endurance_template_id: templateId,
+      });
+      if (planError) throw new Error(`insert competing workout plan failed: ${planError.message}`);
+      await insertSession({
+        sport_type: 'running',
+        start_time: '2026-06-15T07:00:00Z',
+        started_at_local: '2026-06-15T07:00:00',
+        timezone: '+00:00',
+        distance_m: 12000,
+        duration_s: 3600,
+      });
+      const sessionId = await insertSession({
+        sport_type: 'running',
+        start_time: '2026-06-15T20:34:52Z',
+        started_at_local: '2026-06-15T20:34:52',
+        timezone: '+00:00',
+        source: 'imported',
+        provider: 'suunto',
+        provider_activity_id: `suunto-competing-run-${Date.now()}`,
+        distance_m: 5156,
+        duration_s: 1875,
+      });
+      await reconciliation.runEnduranceTemplateMatch(userId, sessionId);
+
+      const competingSession = await getSession(sessionId);
+      console.log('[DEBUG] competing session match', {
+        enduranceTemplateId: competingSession.endurance_template_id,
+        suggestedTemplateId: competingSession.suggested_endurance_template_id,
+        score: competingSession.template_match_score,
+        method: competingSession.template_match_method,
+      });
+      assert.equal(competingSession.endurance_template_id, null, 'date alone does not resolve competing runs');
+      const { data: stillPlanned, error: planReadError } = await client
+        .from('workout_plans')
+        .select('*')
+        .eq('id', planId)
+        .single();
+      if (planReadError) throw new Error(`read competing workout plan failed: ${planReadError.message}`);
+      assert.equal(stillPlanned.status, 'planned', 'ambiguous plan remains scheduled');
+      pass('endurance same-day safety: competing run prevents date-only association');
     }
 
     // --- Strength REVERT (keep mine): previous app values restored ---
