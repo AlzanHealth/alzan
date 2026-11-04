@@ -862,35 +862,51 @@ async function main(): Promise<void> {
       pass('endurance same-day plan: unique run linked despite another run, plan completed, all three laps retained');
     }
 
-    // --- Endurance SAME-DAY PLAN SAFETY: another run prevents date-only association ---
+    // --- Endurance SAME-DAY PLAN SAFETY: equally plausible planned runs need a choice ---
     {
       const templateId = randomUUID();
+      const secondTemplateId = randomUUID();
       const planId = randomUUID();
+      const secondPlanId = randomUUID();
       createdTemplateIds.add(templateId);
+      createdTemplateIds.add(secondTemplateId);
       createdPlanIds.add(planId);
+      createdPlanIds.add(secondPlanId);
       const { error: templateError } = await client.from('endurance_workout_templates').insert({
         id: templateId,
         user_id: userId,
-        base_name: 'Ambiguous same-day planned run',
+        base_name: 'Ambiguous same-day planned run A',
         sport_type: 'running',
+        total_distance_m: 12000,
+        total_duration_s: 3600,
       });
       if (templateError) throw new Error(`insert competing endurance template failed: ${templateError.message}`);
+      const { error: secondTemplateError } = await client.from('endurance_workout_templates').insert({
+        id: secondTemplateId,
+        user_id: userId,
+        base_name: 'Ambiguous same-day planned run B',
+        sport_type: 'running',
+        total_distance_m: 12000,
+        total_duration_s: 3600,
+      });
+      if (secondTemplateError)
+        throw new Error(`insert second competing endurance template failed: ${secondTemplateError.message}`);
       const { error: planError } = await client.from('workout_plans').insert({
         id: planId,
         user_id: userId,
         planned_date: '2026-06-15',
         status: 'planned',
-        endurance_template_id: templateId,
+        endurance_template_id: secondTemplateId,
       });
       if (planError) throw new Error(`insert competing workout plan failed: ${planError.message}`);
-      await insertSession({
-        sport_type: 'running',
-        start_time: '2026-06-15T07:00:00Z',
-        started_at_local: '2026-06-15T07:00:00',
-        timezone: '+00:00',
-        distance_m: 12000,
-        duration_s: 3600,
+      const { error: secondPlanError } = await client.from('workout_plans').insert({
+        id: secondPlanId,
+        user_id: userId,
+        planned_date: '2026-06-15',
+        status: 'planned',
+        endurance_template_id: templateId,
       });
+      if (secondPlanError) throw new Error(`insert second competing workout plan failed: ${secondPlanError.message}`);
       const sessionId = await insertSession({
         sport_type: 'running',
         start_time: '2026-06-15T20:34:52Z',
@@ -899,19 +915,13 @@ async function main(): Promise<void> {
         source: 'imported',
         provider: 'suunto',
         provider_activity_id: `suunto-competing-run-${Date.now()}`,
-        distance_m: 5156,
-        duration_s: 1875,
+        distance_m: 12000,
+        duration_s: 3600,
       });
       await reconciliation.runEnduranceTemplateMatch(userId, sessionId);
 
       const competingSession = await getSession(sessionId);
-      console.log('[DEBUG] competing session match', {
-        enduranceTemplateId: competingSession.endurance_template_id,
-        suggestedTemplateId: competingSession.suggested_endurance_template_id,
-        score: competingSession.template_match_score,
-        method: competingSession.template_match_method,
-      });
-      assert.equal(competingSession.endurance_template_id, null, 'date alone does not resolve competing runs');
+      assert.equal(competingSession.endurance_template_id, null, 'equally plausible scheduled runs need a user choice');
       const { data: stillPlanned, error: planReadError } = await client
         .from('workout_plans')
         .select('*')
@@ -919,7 +929,15 @@ async function main(): Promise<void> {
         .single();
       if (planReadError) throw new Error(`read competing workout plan failed: ${planReadError.message}`);
       assert.equal(stillPlanned.status, 'planned', 'ambiguous plan remains scheduled');
-      pass('endurance same-day safety: competing run prevents date-only association');
+      const { data: stillSecondPlan, error: secondPlanReadError } = await client
+        .from('workout_plans')
+        .select('status')
+        .eq('id', secondPlanId)
+        .single();
+      if (secondPlanReadError)
+        throw new Error(`read second competing workout plan failed: ${secondPlanReadError.message}`);
+      assert.equal(stillSecondPlan.status, 'planned', 'the second ambiguous plan also remains scheduled');
+      pass('endurance same-day safety: equally plausible planned runs are not auto-selected');
     }
 
     // --- Strength REVERT (keep mine): previous app values restored ---
