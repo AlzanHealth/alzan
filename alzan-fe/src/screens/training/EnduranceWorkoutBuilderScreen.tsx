@@ -2426,7 +2426,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
             <TouchableOpacity
               onPress={() => {
                 if (currentView === 'builder') {
-                  requestBuilderExit(leaveWorkoutBuilder);
+                  leaveWorkoutBuilder();
                 } else {
                   handleSave();
                 }
