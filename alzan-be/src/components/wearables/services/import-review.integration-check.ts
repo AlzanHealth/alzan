@@ -670,7 +670,8 @@ async function main(): Promise<void> {
       const { count: persistedLapCount } = await client
         .from('activity_laps')
         .select('id', { count: 'exact', head: true })
-        .eq('session_id', sessionId);
+        .eq('session_id', sessionId)
+        .eq('split_group', 'custom');
       assert.equal(persistedLapCount, 11, 'the exact Suunto workout must retain its eleven native laps');
       const { count: sessionsAfterMatch } = await client
         .from('activity_sessions')
@@ -857,7 +858,8 @@ async function main(): Promise<void> {
       const { count: lapCount } = await client
         .from('activity_laps')
         .select('id', { count: 'exact', head: true })
-        .eq('session_id', sessionId);
+        .eq('session_id', sessionId)
+        .eq('split_group', 'custom');
       assert.equal(lapCount, 3, 'all three Suunto laps are retained on the linked session');
       pass('endurance same-day plan: unique run linked despite another run, plan completed, all three laps retained');
     }

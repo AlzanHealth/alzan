@@ -70,7 +70,7 @@ const SUUNTO_REQUEST_RETRIES = 3;
 const SUUNTO_RETRY_BASE_DELAY_MS = 250;
 const SUUNTO_REQUEST_TIMEOUT_MS = 30_000;
 const SUUNTO_RETRY_CANCELLATION_POLL_MS = 1_000;
-const CANONICAL_ACTIVITY_VERSION = 16;
+const CANONICAL_ACTIVITY_VERSION = 19;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EPOCH_MS_THRESHOLD = 100_000_000_000;
 
@@ -652,10 +652,22 @@ export class SuuntoCloudSyncService {
     const hasFitnessExtensions = normalizedTypes.includes('fitness');
     const hasSummaryExtension = normalizedTypes.includes('summary');
     const hasEpocStreamExtension = normalizedTypes.includes('epocstream');
+    const hasNamedIntervalLaps = (activity.intervalLaps ?? []).some(
+      lap => lap.lapName != null && lap.lapName.trim().length > 0,
+    );
+    const hasUnnamedNativeLapStructure =
+      activity.laps.length > 1 &&
+      activity.laps.some(lap => lap.lapName == null || lap.lapName.trim().length === 0) &&
+      !hasNamedIntervalLaps;
+    const hasUnnamedIntervalLapStructure =
+      (activity.intervalLaps?.length ?? 0) > 0 &&
+      (activity.intervalLaps ?? []).some(lap => lap.lapName == null || lap.lapName.trim().length === 0);
     const metricsMissing =
       activity.summary.vo2Max == null || activity.summary.epoc == null || activity.summary.pte == null;
     return (
       (hasIntervalExtension && (activity.intervalLaps?.length ?? 0) === 0) ||
+      hasUnnamedNativeLapStructure ||
+      hasUnnamedIntervalLapStructure ||
       (activity.laps.length <= 1 && (hasLapExtension || normalizedTypes.length === 0)) ||
       (metricsMissing && (hasFitnessExtensions || hasSummaryExtension || hasEpocStreamExtension))
     );

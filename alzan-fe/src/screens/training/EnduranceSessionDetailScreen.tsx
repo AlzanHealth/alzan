@@ -95,12 +95,14 @@ const SPORTS_WITH_SPECIFIC_MODALITY_METRIC = new Set<string>([
 
 function isOneKilometerSessionLapSequence(laps: SessionLap[]): boolean {
   if (laps.length === 0) return false;
+  if (laps.some(lap => lap.lap_type !== 'auto' && lap.lap_type !== 'distance')) return false;
 
   return laps.every((lap, index) => {
     if (lap.distance_m == null || !Number.isFinite(lap.distance_m) || lap.distance_m <= 0) return false;
     const isLast = index === laps.length - 1;
     const fullLap = Math.abs(lap.distance_m - 1000) <= SPLIT_DISTANCE_TOLERANCE_M;
-    const partialFinalLap = isLast && lap.distance_m > 0 && lap.distance_m < 1000 + SPLIT_DISTANCE_TOLERANCE_M;
+    const partialFinalLap =
+      isLast && laps.length > 1 && lap.distance_m > 0 && lap.distance_m < 1000 + SPLIT_DISTANCE_TOLERANCE_M;
 
     return fullLap || partialFinalLap;
   });
@@ -109,14 +111,23 @@ function isOneKilometerSessionLapSequence(laps: SessionLap[]): boolean {
 function buildDistanceSplitTargets(totalDistanceM: number): number[] {
   if (!Number.isFinite(totalDistanceM) || totalDistanceM < 1000 - SPLIT_DISTANCE_TOLERANCE_M) return [];
 
-  const targets = new Set<number>([1000]);
-  const upperFiveKmBucket = Math.ceil(Math.max(totalDistanceM, 1000) / 5000) * 5000;
+  const targets = [1000];
+  if (totalDistanceM < 5000 - SPLIT_DISTANCE_TOLERANCE_M) return targets;
 
-  for (let target = 5000; target <= upperFiveKmBucket; target += 5000) {
-    targets.add(target);
+  targets.push(5000);
+  let lastIncludedTarget = 5000;
+  let nextTarget = 10000;
+  while (Number.isSafeInteger(nextTarget)) {
+    const completeTarget = nextTarget <= totalDistanceM + SPLIT_DISTANCE_TOLERANCE_M;
+    const nextSuuntoStyleTarget = totalDistanceM > lastIncludedTarget + SPLIT_DISTANCE_TOLERANCE_M;
+    if (!completeTarget && !nextSuuntoStyleTarget) break;
+
+    targets.push(nextTarget);
+    lastIncludedTarget = nextTarget;
+    nextTarget *= 2;
   }
 
-  return Array.from(targets).sort((left, right) => left - right);
+  return targets;
 }
 
 function buildDistanceSessionLapBuckets(laps: SessionLap[]): Array<{ splitDistanceM: number; laps: SessionLap[] }> {
@@ -519,7 +530,9 @@ export const EnduranceSessionDetailScreen = () => {
     return groupsWithDerivedDistance
       .sort((left, right) => {
         if (left.splitGroup !== right.splitGroup) {
-          return left.splitGroup === 'distance' ? -1 : 1;
+          const leftPriority = left.splitGroup === 'distance' ? 1 : 0;
+          const rightPriority = right.splitGroup === 'distance' ? 1 : 0;
+          if (leftPriority !== rightPriority) return leftPriority - rightPriority;
         }
 
         if (left.splitGroup === 'distance' && right.splitGroup === 'distance') {
@@ -572,7 +585,7 @@ export const EnduranceSessionDetailScreen = () => {
       .sort((left, right) => left.order_index - right.order_index);
     if (topLevelPhases.length !== activeSplits.length) return [];
     return topLevelPhases.map(step => t(getPhaseLabel(step.phase_type)));
-  }, [activeSplitTab?.splitGroup, activeSplits.length, t, templateSteps]);
+  }, [activeSplitTab?.key, activeSplitTab?.splitGroup, activeSplits, t, templateSteps]);
   const activeSplitPaceValues = activeSplits
     .map(split => split.avg_pace_s_per_km)
     .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
