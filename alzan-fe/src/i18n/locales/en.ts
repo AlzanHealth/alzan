@@ -3129,6 +3129,11 @@ const en = {
     keepEditing: 'Keep editing',
     discardChanges: 'Exit without saving',
     saveAndExit: 'Save and exit',
+    sessionUnsavedChangesTitle: 'Unsaved session changes',
+    sessionUnsavedChangesMessage:
+      'Keep the session changes in this template draft, or discard them without affecting the rest of the form.',
+    discardSessionChanges: 'Discard session',
+    keepSessionAndExit: 'Keep session and exit',
     goalResistenciaTitle: 'Endurance',
     goalResistenciaDesc: 'Improve aerobic base and build running stamina.',
     goalVelocidadTitle: 'Speed',

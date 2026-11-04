@@ -3345,6 +3345,11 @@ export default {
     keepEditing: 'Seguir editando',
     discardChanges: 'Salir sin guardar',
     saveAndExit: 'Guardar y salir',
+    sessionUnsavedChangesTitle: 'Cambios de la sesión sin guardar',
+    sessionUnsavedChangesMessage:
+      'Conserva los cambios de la sesión en el borrador de la plantilla o descártalos sin afectar al resto del formulario.',
+    discardSessionChanges: 'Descartar sesión',
+    keepSessionAndExit: 'Conservar sesión y salir',
     goalResistenciaTitle: 'Resistencia',
     goalResistenciaDesc: 'Mejorar la base aeróbica y aguantar más tiempo corriendo.',
     goalVelocidadTitle: 'Velocidad',

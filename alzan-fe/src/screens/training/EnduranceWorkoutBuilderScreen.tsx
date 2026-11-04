@@ -104,6 +104,7 @@ import {
   hasUnsavedChanges as compareUnsavedChanges,
   serializeEditableState,
 } from '../../modules/training/helpers/unsavedChanges.helper';
+import { finishTemplateSave, startTemplateSave } from '../../modules/training/helpers/templateSaveFlow.helper';
 
 interface Step {
   id: string; // temp id
@@ -232,11 +233,26 @@ export const EnduranceWorkoutBuilderScreen = () => {
   const [showRecurrenceStartPicker, setShowRecurrenceStartPicker] = useState(false);
   const [isFormHydrated, setIsFormHydrated] = useState(!isEditMode);
   const initialEditableStateSnapshotRef = useRef<string | null>(null);
+  const saveFlowLockRef = useRef(false);
+  const [isSaveFlowActive, setIsSaveFlowActive] = useState(false);
+  const navigateAfterSaveRef = useRef(false);
   const builderInitialStateRef = useRef<{
     steps: Step[];
     stepProgressions: StepProgressionOverride[];
     snapshot: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (isSaveFlowActive || !navigateAfterSaveRef.current) return;
+
+    const timer = setTimeout(() => {
+      navigateAfterSaveRef.current = false;
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.navigate('TrainingHome');
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [isSaveFlowActive, navigation]);
 
   useEffect(() => {
     if (!isRecurring) {
@@ -979,6 +995,17 @@ export const EnduranceWorkoutBuilderScreen = () => {
     return trimmedEndDate.length > 0 ? trimmedEndDate : null;
   };
 
+  const beginSaveFlow = () => {
+    if (!startTemplateSave(saveFlowLockRef)) return false;
+    setIsSaveFlowActive(true);
+    return true;
+  };
+
+  const finishSaveFlow = () => {
+    finishTemplateSave(saveFlowLockRef);
+    setIsSaveFlowActive(false);
+  };
+
   const executeSave = async (detachFromImport = false, onSaved?: () => void) => {
     try {
       const savedOneOffDate = isImportedDateDrivenTemplate ? null : resolveOneOffDate(isRecurring, oneOffDate);
@@ -1088,6 +1115,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
         templateId: templateId,
       });
 
+      // A successful save is the new baseline. Otherwise the route-removal
+      // guard can mistake the just-saved form for a draft and offer to save it
+      // a second time when navigation happens.
+      initialEditableStateSnapshotRef.current = editableStateSnapshot;
+
       const scheduledDateLabel = savedOneOffDate
         ? format(new Date(`${savedOneOffDate}T00:00:00`), 'dd/MM/yyyy', { locale: getDateFnsLocale() })
         : '';
@@ -1102,16 +1134,22 @@ export const EnduranceWorkoutBuilderScreen = () => {
         [
           {
             text: t('common.ok'),
-            onPress:
-              onSaved ??
-              (() => {
-                if (navigation.canGoBack()) navigation.goBack();
-                else navigation.navigate('TrainingHome');
-              }),
+            onPress: () => {
+              if (onSaved) {
+                finishSaveFlow();
+                onSaved();
+              } else {
+                // Navigate after the released busy state has rendered so the
+                // route-removal guard cannot observe its previous snapshot.
+                navigateAfterSaveRef.current = true;
+                finishSaveFlow();
+              }
+            },
           },
         ],
       );
     } catch (e) {
+      finishSaveFlow();
       console.error(e);
       Alert.alert(t('common.error'), t('training.workoutSaveError'));
     }
@@ -1190,6 +1228,11 @@ export const EnduranceWorkoutBuilderScreen = () => {
       }
     }
 
+    // Keep the whole save-and-confirm flow single-flight. The lock remains
+    // held while the success alert is open so a second tap cannot insert a
+    // duplicate template before the first navigation completes.
+    if (!beginSaveFlow()) return;
+
     const effectiveNewDay = isRecurring && scheduledDays.length > 0 ? scheduledDays[0] : null;
     const dayChanged =
       isEditMode && originalScheduledDay !== null && isRecurring && effectiveNewDay !== originalScheduledDay;
@@ -1197,7 +1240,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
     if (recurrenceRemoved) {
       Alert.alert(t('training.recurrenceRemovedTitle'), t('training.recurrenceRemovedMessage'), [
-        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel', onPress: finishSaveFlow },
         {
           text: t('training.confirm'),
           style: 'destructive',
@@ -1229,7 +1272,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
         t('training.dayChangeTitle'),
         t('training.dayChangeMessage', { oldDay: oldDayName, newDay: newDayName }),
         [
-          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel', onPress: finishSaveFlow },
           {
             text: t('training.confirm'),
             style: 'destructive',
@@ -1345,7 +1388,8 @@ export const EnduranceWorkoutBuilderScreen = () => {
   };
 
   const requestExit = useUnsavedChangesGuard({
-    hasUnsavedChanges: hasEditableChanges,
+    hasUnsavedChanges: currentView === 'main' && hasEditableChanges,
+    isBusy: isSaveFlowActive,
     title: t('training.unsavedChangesTitle'),
     message: t('training.unsavedChangesMessage'),
     stayLabel: t('training.keepEditing'),
@@ -1356,18 +1400,19 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
   const requestBuilderExit = useUnsavedChangesGuard({
     hasUnsavedChanges: hasBuilderChanges,
-    title: t('training.unsavedChangesTitle'),
-    message: t('training.unsavedChangesMessage'),
+    isBusy: isSaveFlowActive,
+    interceptRouteRemoval: currentView === 'builder',
+    onRouteRemoval: leaveWorkoutBuilder,
+    title: t('training.sessionUnsavedChangesTitle'),
+    message: t('training.sessionUnsavedChangesMessage'),
     stayLabel: t('training.keepEditing'),
-    discardLabel: t('training.discardChanges'),
-    saveLabel: t('training.saveAndExit'),
+    discardLabel: t('training.discardSessionChanges'),
+    saveLabel: t('training.keepSessionAndExit'),
     onDiscard: discardWorkoutBuilderChanges,
-    onSaveAndExit: onSaved =>
-      handleSave(() => {
-        initialEditableStateSnapshotRef.current = editableStateSnapshot;
-        builderInitialStateRef.current = null;
-        onSaved();
-      }),
+    // The builder only edits the session draft held by this screen. Saving
+    // and exiting it returns to the template form; the parent Save button is
+    // the only action that writes the complete template to the database.
+    onSaveAndExit: onSaved => onSaved(),
   });
 
   const handleAddGroup = () => {
@@ -2390,20 +2435,17 @@ export const EnduranceWorkoutBuilderScreen = () => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
+            disabled={isSaveFlowActive}
             onPress={() => {
               if (currentView === 'builder') {
                 requestBuilderExit(leaveWorkoutBuilder);
-              } else if (!sportType) {
+              } else if (!sportType || isEditMode) {
                 requestExit(() => navigation.goBack());
-              } else if (!['running', 'cycling', 'swimming', 'hyrox'].includes(sportType)) {
-                setSportType(null);
-              } else if (sportType && !isEditMode) {
-                setSportType(null);
               } else {
-                requestExit(() => navigation.goBack());
+                requestExit(() => navigation.replace('EnduranceWorkoutBuilder', {}));
               }
             }}
-            style={styles.headerButton}
+            style={[styles.headerButton, isSaveFlowActive && styles.disabledHeaderButton]}
             accessibilityRole="button"
             accessibilityLabel={t('common.back')}
           >
@@ -2424,6 +2466,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
 
           {sportType && (
             <TouchableOpacity
+              disabled={isSaveFlowActive}
               onPress={() => {
                 if (currentView === 'builder') {
                   leaveWorkoutBuilder();
@@ -2431,7 +2474,7 @@ export const EnduranceWorkoutBuilderScreen = () => {
                   handleSave();
                 }
               }}
-              style={styles.headerButton}
+              style={[styles.headerButton, isSaveFlowActive && styles.disabledHeaderButton]}
               accessibilityRole="button"
               accessibilityLabel={currentView === 'builder' ? t('training.confirm') : t('common.save')}
             >
@@ -4953,6 +4996,9 @@ const styles = StyleSheet.create({
     minHeight: 44,
     padding: spacing.s,
     justifyContent: 'center',
+  },
+  disabledHeaderButton: {
+    opacity: 0.5,
   },
   headerCenter: {
     flex: 1,

@@ -15,7 +15,7 @@ import {
   replaceEnduranceStepProgressions,
 } from '../modules/training/services/enduranceProgressionService';
 import { buildUserEditedTemplateIdentity } from '../modules/training/helpers/templateEditorIdentity.helper';
-import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
+import { invalidateEnduranceTemplates, invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 import {
   removeOneOffTrainingPlans,
   syncOneOffTrainingPlan,
@@ -320,12 +320,15 @@ export const useEnduranceWorkoutBuilder = () => {
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['enduranceWorkouts'] });
-      queryClient.invalidateQueries({ queryKey: ['enduranceTemplate'] });
-      queryClient.invalidateQueries({ queryKey: ['enduranceTemplateProgressions'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['enduranceWorkouts'] }),
+        queryClient.invalidateQueries({ queryKey: ['enduranceTemplate'] }),
+        queryClient.invalidateQueries({ queryKey: ['enduranceTemplateProgressions'] }),
+        invalidateEnduranceTemplates(queryClient),
+      ]);
 
       invalidateTrainingCalendar(queryClient);
-      queryClient.invalidateQueries({ queryKey: ['scheduledTemplates'] });
+      await queryClient.invalidateQueries({ queryKey: ['scheduledTemplates'] });
     },
   });
 

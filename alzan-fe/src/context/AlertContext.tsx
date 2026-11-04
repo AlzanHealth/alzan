@@ -38,11 +38,23 @@ export const AlertProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }
 
   const buttons = config?.buttons || [{ text: 'OK', style: 'default' as const }];
+  const handleRequestClose = () => {
+    const cancelButton = buttons.find(button => button.style === 'cancel');
+    if (cancelButton) {
+      handleButtonPress(cancelButton);
+    } else if (buttons.length === 1) {
+      // A one-button success or information alert should behave the same as
+      // acknowledging it when dismissed with Escape or the system back action.
+      handleButtonPress(buttons[0]);
+    } else {
+      setVisible(false);
+    }
+  };
 
   return (
     <>
       {children}
-      <Modal transparent visible={visible} animationType="fade" onRequestClose={() => setVisible(false)}>
+      <Modal transparent visible={visible} animationType="fade" onRequestClose={handleRequestClose}>
         <View style={[styles.overlay, { backgroundColor: colors.modalOverlay }]}>
           <View style={[styles.alertBox, { backgroundColor: colors.cardBackground }]}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>{config?.title}</Text>
