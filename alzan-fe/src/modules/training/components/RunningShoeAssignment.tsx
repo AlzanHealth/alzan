@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Check, ChevronRight, Footprints, Pencil, Star } from 'lucide-react-native';
+import { Check, ChevronRight, Footprints, Star } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../../context/ThemeContext';
@@ -85,35 +85,23 @@ export const RunningShoeAssignment = ({ sessionId, runningShoeId }: RunningShoeA
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel={t('training.runningShoeSelectorTitle')}
-            style={[styles.changeButton, { backgroundColor: colors.selectedOptionBackground }]}
+            style={styles.changeButton}
             onPress={() => setSelectorVisible(true)}
             activeOpacity={0.75}
           >
-            <Pencil size={15} color={colors.primary} />
-            <Text style={[styles.changeText, { color: colors.primary }]}>{t('common.edit')}</Text>
-            <ChevronRight size={21} color={colors.primary} />
+            <ChevronRight size={22} color={colors.primary} />
           </TouchableOpacity>
         ) : null}
       </View>
 
       {selectedShoe && selectedShoeDistance !== null ? (
-        <View style={[styles.shoeDetails, { backgroundColor: colors.selectedOptionBackground }]}>
-          <View style={styles.mileageBlock}>
-            <Text style={[styles.mileageLabel, { color: colors.textSecondary }]}>
-              {t('training.runningShoeMileageLabel')}
-            </Text>
-            <Text style={[styles.mileageValue, { color: colors.textPrimary }]}>
-              {t('settings.runningShoesMileage', { distance: selectedShoeDistance })}
-            </Text>
-          </View>
-          {selectedShoe.is_default && (
-            <View style={styles.defaultBadge}>
-              <Star size={13} color={colors.primary} />
-              <Text style={[styles.defaultBadgeText, { color: colors.primary }]}>
-                {t('training.runningShoeRecommended')}
-              </Text>
-            </View>
-          )}
+        <View style={[styles.shoeDetails, { borderTopColor: colors.border }]}>
+          <Text style={[styles.mileageLabel, { color: colors.textSecondary }]}>
+            {t('training.runningShoeMileageLabel')}
+          </Text>
+          <Text style={[styles.mileageValue, { color: colors.textPrimary }]}>
+            {t('settings.runningShoesMileage', { distance: selectedShoeDistance })}
+          </Text>
         </View>
       ) : null}
 
@@ -122,11 +110,10 @@ export const RunningShoeAssignment = ({ sessionId, runningShoeId }: RunningShoeA
           <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('training.runningShoeNoShoes')}</Text>
           <TouchableOpacity
             accessibilityRole="button"
-            style={[styles.manageButton, { backgroundColor: colors.selectedOptionBackground }]}
+            style={styles.manageButton}
             onPress={() => navigation.navigate('Settings', { screen: 'RunningShoesSettings' })}
             activeOpacity={0.75}
           >
-            <Footprints size={16} color={colors.primary} />
             <Text style={[styles.manageText, { color: colors.primary }]}>{t('training.runningShoeManage')}</Text>
             <ChevronRight size={18} color={colors.primary} />
           </TouchableOpacity>
@@ -177,38 +164,31 @@ const styles = StyleSheet.create({
     padding: spacing.m,
     marginHorizontal: spacing.m,
     marginTop: spacing.m,
-    gap: spacing.m,
+    gap: spacing.s,
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
-  icon: { width: 42, height: 42, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  icon: { width: 40, height: 40, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
   labelBlock: { flex: 1, gap: 3 },
-  label: { ...typography.caption, fontWeight: '600' },
-  value: { ...typography.body, fontWeight: '600' },
+  label: { ...typography.body, fontWeight: '600' },
+  value: { ...typography.caption },
   changeButton: {
-    minHeight: 38,
-    flexDirection: 'row',
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.s,
     borderRadius: borderRadius.full,
   },
-  changeText: { ...typography.caption, fontWeight: '600' },
   shoeDetails: {
-    minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.s,
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
-    borderRadius: borderRadius.m,
+    marginLeft: 40 + spacing.s,
+    paddingTop: spacing.s,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  mileageBlock: { flex: 1, gap: 2 },
   mileageLabel: { ...typography.caption },
-  mileageValue: { ...typography.body, fontWeight: '600' },
-  defaultBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  defaultBadgeText: { ...typography.caption, fontWeight: '600' },
+  mileageValue: { ...typography.caption, fontWeight: '600' },
   emptyActions: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: spacing.m,
@@ -219,10 +199,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.s,
-    paddingHorizontal: spacing.m,
-    borderRadius: borderRadius.m,
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
   },
   manageText: { ...typography.body, fontWeight: '600' },
   modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.m },
