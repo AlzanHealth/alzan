@@ -64,6 +64,7 @@ interface FitParseState {
   temperature: CanonicalActivityMetricSample[];
   laps: CanonicalActivityLap[];
   lapStartTimestamps: Array<string | null>;
+  lapEndTimestamps: Array<string | null>;
   lapElapsedDurations: Array<number | null>;
   nativeHeartRateZones: CanonicalActivityHeartRateZone[];
   developerFieldDescriptions: Map<string, FitDeveloperFieldDescription>;
@@ -81,6 +82,7 @@ interface FitLapAccumulator {
   avgHeartRate: number | null;
   maxHeartRate: number | null;
   startTimestampSeconds: number | null;
+  endTimestampSeconds: number | null;
   lapType: CanonicalActivityLap['lapType'];
 }
 
@@ -390,7 +392,7 @@ function interpolateDistanceAtOffset(activity: CanonicalActivity, offsetSeconds:
     return before.value + ((after.value - before.value) * (offsetSeconds - beforeOffset)) / span;
   }
 
-  const durationSeconds = activity.summary.durationSeconds;
+  const durationSeconds = activity.summary.elapsedSeconds ?? activity.summary.durationSeconds;
   if (
     after == null &&
     durationSeconds != null &&
@@ -548,11 +550,33 @@ function mergeIntervalLapDetails(
   };
 }
 
+function readSuuntoPauses(sources: unknown[], startedAtMs: number): Array<{ start: number; end: number }> | null {
+  const extension = sources
+    .flatMap(readSuuntoWorkoutExtensions)
+    .find(candidate => readWorkoutExtensionType(candidate) === 'pausemarkerextension');
+  if (!extension || !Array.isArray(extension.pauseMarkers)) return null;
+  const pauses: Array<{ start: number; end: number }> = [];
+  for (const entry of extension.pauseMarkers) {
+    if (!isRecord(entry)) return null;
+    const start = readIntervalOffset(entry.startTime, startedAtMs);
+    const end = readIntervalOffset(entry.endTime, startedAtMs);
+    if (start == null || end == null || end <= start) return null;
+    pauses.push({ start, end });
+  }
+  pauses.sort((left, right) => left.start - right.start);
+  return pauses.some((pause, index) => index > 0 && pause.start < pauses[index - 1].end) ? null : pauses;
+}
+
+function pausedSecondsInWindow(pauses: Array<{ start: number; end: number }>, start: number, end: number): number {
+  return pauses.reduce((sum, pause) => sum + Math.max(0, Math.min(end, pause.end) - Math.max(start, pause.start)), 0);
+}
+
 function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]): CanonicalActivityLap[] {
   const startedAtMs = activity.summary.startedAt == null ? null : Date.parse(activity.summary.startedAt);
   if (startedAtMs == null || !Number.isFinite(startedAtMs)) return [];
 
   const entries = sources.flatMap(source => readSuuntoIntervalEntries(source));
+  const pauses = readSuuntoPauses(sources, startedAtMs);
   const laps: CanonicalActivityLap[] = [];
   let nextStartOffsetSeconds = 0;
 
@@ -616,7 +640,9 @@ function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]
       explicitDurationSeconds ??
       (entry.requiresExplicitBounds === true ? matchingFitLap?.durationSeconds : null) ??
       readIntervalValue(entry, 'totalElapsedTime', 'total_elapsed_time') ??
-      resolvedEndOffsetSeconds - startOffsetSeconds;
+      resolvedEndOffsetSeconds -
+        startOffsetSeconds -
+        pausedSecondsInWindow(pauses ?? [], startOffsetSeconds, resolvedEndOffsetSeconds);
     if (durationSeconds <= 0) continue;
     const windowAverageHeartRate =
       readWindowMetric(entry, 'HR', 'Avg') ?? readIntervalValue(entry, 'avgHeartRate', 'avg_heart_rate');
@@ -668,6 +694,91 @@ function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]
   return laps;
 }
 
+/** Fills recorded time outside native laps without claiming those gaps are workout phases. */
+function completeSuuntoCustomLapCoverage(
+  activity: CanonicalActivity,
+  intervalLaps: CanonicalActivityLap[],
+  sources: unknown[],
+): CanonicalActivityLap[] {
+  const elapsedSeconds = activity.summary.elapsedSeconds;
+  const timerSeconds = activity.summary.durationSeconds;
+  const startedAtMs = Date.parse(activity.summary.startedAt ?? '');
+  if (elapsedSeconds == null || timerSeconds == null || !Number.isFinite(startedAtMs)) return activity.laps;
+  const sourceLaps = activity.laps.length > 0 ? activity.laps : intervalLaps;
+  if (sourceLaps.length === 0 || sourceLaps.some(lap => lap.lapType !== 'manual' && lap.lapType !== 'unknown')) {
+    return activity.laps;
+  }
+  const nativeDuration = sourceLaps.reduce((sum, lap) => sum + (lap.durationSeconds ?? 0), 0);
+  if (Math.abs(nativeDuration - timerSeconds) <= 2) return activity.laps;
+
+  const pauses = readSuuntoPauses(sources, startedAtMs);
+  // A missing pause list must not turn elapsed time into active time.
+  if (Math.abs(elapsedSeconds - timerSeconds) > 2 && pauses == null) return activity.laps;
+
+  const nativeLaps = sourceLaps
+    .map(
+      lap =>
+        intervalLaps.find(
+          interval =>
+            interval.startOffsetSeconds != null &&
+            interval.endOffsetSeconds != null &&
+            lap.startOffsetSeconds != null &&
+            lap.endOffsetSeconds != null &&
+            Math.abs(interval.startOffsetSeconds - lap.startOffsetSeconds) <= 1 &&
+            Math.abs(interval.endOffsetSeconds - lap.endOffsetSeconds) <= 1,
+        ) ?? lap,
+    )
+    .sort((left, right) => (left.startOffsetSeconds ?? 0) - (right.startOffsetSeconds ?? 0));
+  const completed: CanonicalActivityLap[] = [];
+  let cursor = 0;
+  const appendGap = (start: number, end: number): boolean => {
+    if (end - start <= 0.001) return true;
+    const startDistance = interpolateDistanceAtOffset(activity, start);
+    const endDistance = interpolateDistanceAtOffset(activity, end);
+    if (startDistance == null || endDistance == null || endDistance < startDistance) return false;
+    const durationSeconds = end - start - pausedSecondsInWindow(pauses ?? [], start, end);
+    if (durationSeconds <= 0) return endDistance === startDistance;
+    const gap = buildLapFromIntervalWindow(activity, 0, start, end, endDistance - startDistance, 'unknown');
+    completed.push({
+      ...gap,
+      durationSeconds,
+      avgPaceSecondsPerKm: gap.distanceM != null && gap.distanceM > 0 ? (durationSeconds * 1000) / gap.distanceM : null,
+    });
+    return true;
+  };
+  for (const lap of nativeLaps) {
+    const start = lap.startOffsetSeconds;
+    const end = lap.endOffsetSeconds;
+    if (
+      start == null ||
+      end == null ||
+      end <= start ||
+      start < cursor ||
+      end > elapsedSeconds + 1 ||
+      !appendGap(cursor, start)
+    ) {
+      return activity.laps;
+    }
+    completed.push(lap);
+    cursor = end;
+  }
+  if (!appendGap(cursor, elapsedSeconds)) return activity.laps;
+  const completedDuration = completed.reduce((sum, lap) => sum + (lap.durationSeconds ?? 0), 0);
+  if (Math.abs(completedDuration - timerSeconds) > 2) return activity.laps;
+  const finalGap = [...completed].reverse().find(lap => lap.lapType === 'unknown');
+  if (finalGap?.durationSeconds != null && completedDuration !== timerSeconds) {
+    const durationSeconds = finalGap.durationSeconds + timerSeconds - completedDuration;
+    if (durationSeconds <= 0) return activity.laps;
+    completed[completed.lastIndexOf(finalGap)] = {
+      ...finalGap,
+      durationSeconds,
+      avgPaceSecondsPerKm:
+        finalGap.distanceM != null && finalGap.distanceM > 0 ? (durationSeconds * 1000) / finalGap.distanceM : null,
+    };
+  }
+  return completed.map((lap, index) => ({ ...lap, lapIndex: index + 1 }));
+}
+
 /** Enriches cloud FIT data with the documented summary and interval extensions returned by Suunto. */
 export function applySuuntoWorkoutExtensions(activity: CanonicalActivity, ...sources: unknown[]): CanonicalActivity {
   let vo2Max = activity.summary.vo2Max;
@@ -708,10 +819,27 @@ export function applySuuntoWorkoutExtensions(activity: CanonicalActivity, ...sou
   const primaryIntervals = useParsedIntervals ? parsedIntervalLaps : existingIntervalLaps;
   const secondaryIntervals = useParsedIntervals ? existingIntervalLaps : parsedIntervalLaps;
   const intervalLaps = primaryIntervals.map(lap => mergeIntervalLapDetails(lap, secondaryIntervals));
+  for (const lap of secondaryIntervals) {
+    const overlapsExisting = intervalLaps.some(
+      existing =>
+        existing.startOffsetSeconds != null &&
+        existing.endOffsetSeconds != null &&
+        lap.startOffsetSeconds != null &&
+        lap.endOffsetSeconds != null &&
+        Math.min(existing.endOffsetSeconds, lap.endOffsetSeconds) -
+          Math.max(existing.startOffsetSeconds, lap.startOffsetSeconds) >
+          0,
+    );
+    if (!overlapsExisting) intervalLaps.push(lap);
+  }
+  intervalLaps.sort((left, right) => (left.startOffsetSeconds ?? 0) - (right.startOffsetSeconds ?? 0));
   return {
     ...activity,
+    laps: completeSuuntoCustomLapCoverage(activity, intervalLaps, sources),
     summary: { ...activity.summary, vo2Max, epoc, pte, recoveryTimeSeconds },
-    ...(intervalLaps.length > 0 ? { intervalLaps } : {}),
+    ...(intervalLaps.length > 0
+      ? { intervalLaps: intervalLaps.map((lap, index) => ({ ...lap, lapIndex: index + 1 })) }
+      : {}),
   };
 }
 
@@ -1175,6 +1303,7 @@ function parseFitDataMessage(
     avgHeartRate: null,
     maxHeartRate: null,
     startTimestampSeconds: null,
+    endTimestampSeconds: null,
     lapType: 'unknown',
   };
 
@@ -1266,6 +1395,7 @@ function parseFitDataMessage(
     }
 
     if (definition.globalMessageNumber === FIT_LAP_MESSAGE_NUMBER) {
+      if (field.fieldNumber === 253) lap.endTimestampSeconds = fitTimestampToSeconds(numericValue);
       if (field.fieldNumber === 2) lap.startTimestampSeconds = fitTimestampToSeconds(numericValue);
       if (field.fieldNumber === 7 && numericValue != null) {
         lap.elapsedSeconds = numericValue / 1000;
@@ -1385,7 +1515,10 @@ function appendFitLap(state: FitParseState, lap: FitLapAccumulator): void {
   const startTime = secondsToIso(lap.startTimestampSeconds);
   const startOffsetSeconds = resolveOffsetSeconds(state.summary.startedAt ?? null, startTime);
   const endOffsetSeconds =
-    startOffsetSeconds != null && lap.durationSeconds != null ? startOffsetSeconds + lap.durationSeconds : null;
+    resolveOffsetSeconds(state.summary.startedAt ?? null, secondsToIso(lap.endTimestampSeconds)) ??
+    (startOffsetSeconds != null && (lap.elapsedSeconds ?? lap.durationSeconds) != null
+      ? startOffsetSeconds + (lap.elapsedSeconds ?? lap.durationSeconds)!
+      : null);
   const avgPaceSecondsPerKm =
     lap.avgSpeedMps != null && lap.avgSpeedMps > 0
       ? 1000 / lap.avgSpeedMps
@@ -1405,6 +1538,7 @@ function appendFitLap(state: FitParseState, lap: FitLapAccumulator): void {
     endOffsetSeconds,
   });
   state.lapStartTimestamps.push(startTime);
+  state.lapEndTimestamps.push(secondsToIso(lap.endTimestampSeconds));
   state.lapElapsedDurations.push(lap.elapsedSeconds);
 }
 
@@ -1437,9 +1571,10 @@ function resolveFitOffsetsAfterSummary(state: FitParseState): void {
       ...lap,
       startOffsetSeconds,
       endOffsetSeconds:
-        startOffsetSeconds != null && lap.durationSeconds != null
-          ? startOffsetSeconds + lap.durationSeconds
-          : lap.endOffsetSeconds,
+        resolveOffsetSeconds(startedAt, state.lapEndTimestamps[index] ?? null) ??
+        (startOffsetSeconds != null && (state.lapElapsedDurations[index] ?? lap.durationSeconds) != null
+          ? startOffsetSeconds + (state.lapElapsedDurations[index] ?? lap.durationSeconds)!
+          : lap.endOffsetSeconds),
     };
   });
 }
@@ -1513,9 +1648,9 @@ function buildFitTerminalRemainderLap(
   const distanceSamples = state.distance
     .filter(sample => sample.offsetSeconds != null && Number.isFinite(sample.value))
     .sort((left, right) => (left.offsetSeconds as number) - (right.offsetSeconds as number));
-  const distanceAtManualEnd = [...distanceSamples]
-    .reverse()
-    .find(sample => (sample.offsetSeconds as number) <= latestManualEnd);
+  const distanceAtManualEnd =
+    distanceSamples.find(sample => Math.abs((sample.offsetSeconds as number) - latestManualEnd) <= 1) ??
+    [...distanceSamples].reverse().find(sample => (sample.offsetSeconds as number) <= latestManualEnd);
   const finalDistanceSample = [...distanceSamples]
     .reverse()
     .find(sample => (sample.offsetSeconds as number) > latestManualEnd);
@@ -1602,6 +1737,7 @@ function parseSuuntoFit(binary: Uint8Array, options?: ParseSuuntoActivityOptions
     temperature: [],
     laps: [],
     lapStartTimestamps: [],
+    lapEndTimestamps: [],
     lapElapsedDurations: [],
     nativeHeartRateZones: [],
     developerFieldDescriptions: new Map(),

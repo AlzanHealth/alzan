@@ -31,6 +31,8 @@ type TestFitLap = {
   startOffsetSeconds: number;
   durationSeconds: number;
   elapsedSeconds?: number;
+  endOffsetSeconds?: number;
+  omitElapsedSeconds?: boolean;
   distanceM: number;
   avgHeartRate?: number;
   maxHeartRate?: number;
@@ -195,6 +197,7 @@ function buildTestFit(params: {
     { fieldNumber: 15, size: 1, baseType: 0x02 },
     { fieldNumber: 16, size: 1, baseType: 0x02 },
     { fieldNumber: 24, size: 1, baseType: 0x02 },
+    { fieldNumber: 253, size: 4, baseType: 0x86 },
   ];
   appendFitDefinition(data, 1, 19, lapFields);
   const laps: TestFitLap[] = params.laps ?? [
@@ -210,12 +213,16 @@ function buildTestFit(params: {
   for (const lap of laps) {
     appendFitData(data, 1, [
       { ...lapFields[0], value: lap.omitStartTimestamp ? 0 : startedAt + lap.startOffsetSeconds },
-      { ...lapFields[1], value: Math.round((lap.elapsedSeconds ?? lap.durationSeconds) * 1000) },
+      {
+        ...lapFields[1],
+        value: lap.omitElapsedSeconds ? 0xffffffff : Math.round((lap.elapsedSeconds ?? lap.durationSeconds) * 1000),
+      },
       { ...lapFields[2], value: Math.round(lap.durationSeconds * 1000) },
       { ...lapFields[3], value: Math.round(lap.distanceM * 100) },
       { ...lapFields[4], value: lap.avgHeartRate ?? 120 },
       { ...lapFields[5], value: lap.maxHeartRate ?? 150 },
       { ...lapFields[6], value: lap.lapTrigger ?? params.lapTrigger ?? 2 },
+      { ...lapFields[7], value: lap.endOffsetSeconds == null ? 0xffffffff : startedAt + lap.endOffsetSeconds },
     ]);
   }
 
@@ -1178,7 +1185,14 @@ function assertSuuntoLapExtensionsKeepExplicitMarkerWindows(): void {
     ],
   });
 
-  assert.deepEqual(enriched.laps, activity.laps);
+  assert.deepEqual(
+    enriched.laps.filter(lap => lap.lapType === 'manual').map((lap, index) => ({ ...lap, lapIndex: index + 1 })),
+    activity.laps,
+  );
+  assert.equal(
+    enriched.laps.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0),
+    6000,
+  );
   assert.deepEqual(
     enriched.intervalLaps?.map(lap => [lap.lapIndex, lap.lapType, lap.distanceM, lap.durationSeconds]),
     [
@@ -1515,6 +1529,138 @@ function assertOfficialSuuntoSleepPayloadMapsCorrectly(): void {
   assert.equal(sleep.sourceSleepId, '1736112540');
 }
 
+function assertCloudPartialLapsRetainRecordedCoverageAndPauseTimes(): void {
+  const activity = parseSuuntoActivityFileToCanonical(
+    buildTestFit({
+      sport: 1,
+      subSport: 0,
+      distanceM: 6000,
+      durationSeconds: 3580,
+      elapsedSeconds: 3600,
+      laps: [
+        {
+          startOffsetSeconds: 600,
+          durationSeconds: 600,
+          elapsedSeconds: 610,
+          distanceM: 1000,
+          lapTrigger: 8,
+        },
+      ],
+      records: [
+        { offsetSeconds: 0, distanceM: 0, heartRate: 110 },
+        { offsetSeconds: 600, distanceM: 1000, heartRate: 130 },
+        { offsetSeconds: 1210, distanceM: 2000, heartRate: 145 },
+        { offsetSeconds: 3600, distanceM: 6000, heartRate: 140 },
+      ],
+    }),
+    'suunto-partial-coverage.fit',
+  );
+  assert.equal(activity.laps[0].endOffsetSeconds, 1210);
+  const timestamp = (offset: number) => Date.parse('2026-05-01T08:00:00Z') + offset * 1000;
+  const intervals = {
+    type: 'IntervalStreamExtension',
+    markers: [{ startTime: timestamp(600), endTime: timestamp(1210) }],
+  };
+  const partial = applySuuntoWorkoutExtensions(activity, { extensions: [intervals] });
+  assert.equal(partial.laps.length, 1, 'unknown pause timing cannot be fabricated');
+  const source = {
+    extensions: [
+      intervals,
+      {
+        type: 'PauseMarkerExtension',
+        pauseMarkers: [
+          { startTime: timestamp(1000), endTime: timestamp(1010) },
+          { startTime: timestamp(3000), endTime: timestamp(3010) },
+        ],
+      },
+    ],
+  };
+  const complete = applySuuntoWorkoutExtensions(activity, source);
+  assert.deepEqual(
+    complete.laps.map(lap => [
+      lap.lapType,
+      lap.distanceM,
+      lap.durationSeconds,
+      lap.startOffsetSeconds,
+      lap.endOffsetSeconds,
+    ]),
+    [
+      ['unknown', 1000, 600, 0, 600],
+      ['manual', 1000, 600, 600, 1210],
+      ['unknown', 4000, 2380, 1210, 3600],
+    ],
+  );
+  assert.ok(
+    complete.laps.every(lap => !lap.lapName),
+    'recorded gaps are not named phases',
+  );
+  assert.deepEqual(applySuuntoWorkoutExtensions(complete, source).laps, complete.laps);
+  const markerOnly = applySuuntoWorkoutExtensions({ ...activity, laps: [] }, source);
+  assert.deepEqual(
+    markerOnly.laps.map(lap => [lap.distanceM, lap.durationSeconds, lap.startOffsetSeconds, lap.endOffsetSeconds]),
+    complete.laps.map(lap => [lap.distanceM, lap.durationSeconds, lap.startOffsetSeconds, lap.endOffsetSeconds]),
+    'interval markers also work when the FIT contains no laps',
+  );
+  const roundedTimer = applySuuntoWorkoutExtensions(
+    {
+      ...activity,
+      summary: { ...activity.summary, durationSeconds: 3579 },
+    },
+    source,
+  );
+  assert.equal(
+    roundedTimer.laps.reduce((sum, lap) => sum + (lap.durationSeconds ?? 0), 0),
+    3579,
+  );
+}
+
+function assertPartialIntervalResponsesKeepAllDisjointRepetitions(): void {
+  const activity = parseSuuntoActivityFileToCanonical(buildTestFit({ sport: 1, subSport: 0 }), 'suunto-union.fit');
+  const source = (starts: number[]) => ({
+    extensions: [
+      {
+        type: 'IntervalStreamExtension',
+        intervals: starts.map(start => ({ startOffsetSeconds: start, durationSeconds: 1 })),
+      },
+    ],
+  });
+  const first = applySuuntoWorkoutExtensions(activity, source([10, 20]));
+  const combined = applySuuntoWorkoutExtensions(first, source([20, 30]));
+  assert.deepEqual(
+    combined.intervalLaps?.map(lap => lap.startOffsetSeconds),
+    [10, 20, 30],
+  );
+  assert.deepEqual(applySuuntoWorkoutExtensions(combined, source([30, 20])).intervalLaps, combined.intervalLaps);
+}
+
+function assertSummaryLastFitPreservesExplicitLapEndWithoutElapsedTime(): void {
+  const activity = parseSuuntoActivityFileToCanonical(
+    buildTestFit({
+      sport: 1,
+      subSport: 0,
+      summaryLast: true,
+      durationSeconds: 600,
+      elapsedSeconds: 610,
+      laps: [
+        {
+          startOffsetSeconds: 0,
+          endOffsetSeconds: 610,
+          durationSeconds: 600,
+          omitElapsedSeconds: true,
+          distanceM: 1000,
+          lapTrigger: 0,
+        },
+      ],
+    }),
+    'suunto-summary-last-timer.fit',
+  );
+  assert.equal(activity.laps[0].durationSeconds, 600);
+  assert.equal(activity.laps[0].endOffsetSeconds, 610);
+}
+
+assertSummaryLastFitPreservesExplicitLapEndWithoutElapsedTime();
+assertPartialIntervalResponsesKeepAllDisjointRepetitions();
+assertCloudPartialLapsRetainRecordedCoverageAndPauseTimes();
 assertSuuntoSportMapping();
 assertSuuntoFitCanonicalParsesGpsAndLaps();
 assertSuuntoFitReadsStandardDeveloperMetrics();

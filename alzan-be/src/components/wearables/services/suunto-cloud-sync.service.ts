@@ -70,7 +70,7 @@ const SUUNTO_REQUEST_RETRIES = 3;
 const SUUNTO_RETRY_BASE_DELAY_MS = 250;
 const SUUNTO_REQUEST_TIMEOUT_MS = 30_000;
 const SUUNTO_RETRY_CANCELLATION_POLL_MS = 1_000;
-const CANONICAL_ACTIVITY_VERSION = 21;
+const CANONICAL_ACTIVITY_VERSION = 23;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EPOCH_MS_THRESHOLD = 100_000_000_000;
 
@@ -618,7 +618,7 @@ export class SuuntoCloudSyncService {
     try {
       const response = await this.executeSuuntoRequest(
         signal =>
-          axios.get<ArrayBuffer>(`${this.apiBaseUrl}/v2/workout/exportFit/${encodeURIComponent(workoutKey)}`, {
+          axios.get<ArrayBuffer>(`${this.apiBaseUrl}/v3/workouts/${encodeURIComponent(workoutKey)}/fit`, {
             headers: this.buildApiHeaders(accessToken),
             responseType: 'arraybuffer',
             timeout: SUUNTO_REQUEST_TIMEOUT_MS,
@@ -679,7 +679,7 @@ export class SuuntoCloudSyncService {
       accessToken,
       {
         extensions:
-          'FitnessExtension,SummaryExtension,EpocStreamExtension,IntervalStreamExtension,ManualLapStreamExtension,DistanceLapExtension,DurationLapExtension,VerticalLapExtension',
+          'FitnessExtension,SummaryExtension,EpocStreamExtension,IntervalStreamExtension,ManualLapStreamExtension,DistanceLapExtension,DurationLapExtension,VerticalLapExtension,PauseMarkerExtension',
       },
       jobId,
     );

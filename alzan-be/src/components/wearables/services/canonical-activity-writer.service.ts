@@ -169,7 +169,7 @@ export class CanonicalActivityWriterService {
     if (completeAssociatedPlans) await this.ensurePreWearableMergeSnapshot(sessionId);
 
     await this.persistActivityBundle({
-      input,
+      input: await this.preserveNamedSuuntoLaps(input, sessionId),
       sessionId,
       sessionPayload: sessionPayloadToPersist,
       clearProvenanceSessionId,
@@ -201,6 +201,36 @@ export class CanonicalActivityWriterService {
     }
 
     return sessionId;
+  }
+
+  private async preserveNamedSuuntoLaps(input: UpsertActivityInput, sessionId: string): Promise<UpsertActivityInput> {
+    if (input.provenance.provider !== 'suunto' || input.provenance.sourceChannel !== 'cloud') return input;
+    const { data, error } = await this.supabaseAdminService.client
+      .from('activity_laps')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('user_id', input.userId)
+      .eq('split_group', 'custom')
+      .eq('split_group_order', 0);
+    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_EXISTING_LAPS_READ_FAILED');
+    if (!data?.length || !data.every(lap => lap.lap_name?.trim())) return input;
+    const incomingNamedCount = input.activity.laps.filter(lap => lap.lapName?.trim()).length;
+    if (incomingNamedCount >= data.length) return input;
+    const laps = [...data]
+      .sort((left, right) => left.lap_index - right.lap_index)
+      .map(lap => ({
+        lapIndex: lap.lap_index,
+        lapName: lap.lap_name,
+        lapType: lap.lap_type,
+        distanceM: lap.distance_m,
+        durationSeconds: lap.duration_s,
+        avgPaceSecondsPerKm: lap.avg_pace_s_per_km,
+        avgHeartRate: lap.avg_heart_rate,
+        maxHeartRate: lap.max_heart_rate,
+        startOffsetSeconds: lap.start_offset_s,
+        endOffsetSeconds: lap.end_offset_s,
+      }));
+    return { ...input, activity: { ...input.activity, laps } };
   }
 
   private async ensurePreWearableMergeSnapshot(sessionId: string): Promise<void> {

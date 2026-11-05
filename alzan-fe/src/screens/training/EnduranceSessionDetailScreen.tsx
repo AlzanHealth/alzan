@@ -2283,6 +2283,14 @@ export const EnduranceSessionDetailScreen = () => {
                   })}
                 </View>
 
+                {session?.provider === 'suunto' &&
+                  activeSplitTab?.splitGroup === 'custom' &&
+                  activeSplits.some(lap => lap.lap_type === 'unknown') && (
+                    <Text style={[styles.splitLegendText, { color: themeColors.textSecondary }]}>
+                      {t('training.suuntoUnidentifiedSegments')}
+                    </Text>
+                  )}
+
                 <View style={styles.splitLegendRow}>
                   <Text style={[styles.splitLegendText, { color: themeColors.textSecondary }]}>
                     {t('training.splitFast')}
