@@ -132,6 +132,25 @@ async function assertCancellationMarkerIsObservedByWorker(): Promise<void> {
   assert(calls.some(call => call.method === 'eq' && call.args[0] === 'id' && call.args[1] === 'job-1'));
 }
 
+async function assertFinishUsesPostgrestCompatibleCancellationGuard(): Promise<void> {
+  const calls: Array<{ method: string; args: unknown[] }> = [];
+  const client = {
+    from: () => createQuery({ data: [{ id: 'job-1' }], error: null }, calls),
+  };
+  const service = new WearableImportLifecycleService({ client } as unknown as SupabaseAdminService);
+
+  await service.finishSyncJob({
+    jobId: 'job-1',
+    leaseToken: 'lease-1',
+    status: 'success',
+    counters: { activitiesImported: 1 },
+    lastError: null,
+  });
+
+  assert(calls.some(call => call.method === 'is' && call.args[0] === 'last_error' && call.args[1] === null));
+  assert(!calls.some(call => call.method === 'or'), 'sync-job finalization must not rely on an OR update filter');
+}
+
 async function assertFinishKeepsConcurrentCancellation(): Promise<void> {
   const calls: Array<{ method: string; args: unknown[] }> = [];
   let updateCount = 0;
@@ -156,9 +175,11 @@ async function assertFinishKeepsConcurrentCancellation(): Promise<void> {
   assert.equal((updates[1].args[0] as Record<string, unknown>).status, 'partial');
   assert.equal((updates[1].args[0] as Record<string, unknown>).last_error, 'WEARABLE_SYNC_CANCEL_REQUESTED');
   assert(calls.some(call => call.method === 'eq' && call.args[0] === 'lease_token' && call.args[1] === 'lease-1'));
+  assert(calls.some(call => call.method === 'is' && call.args[0] === 'last_error' && call.args[1] === null));
   assert(
     calls.some(
-      call => call.method === 'or' && String(call.args[0]).includes('last_error.neq.WEARABLE_SYNC_CANCEL_REQUESTED'),
+      call =>
+        call.method === 'eq' && call.args[0] === 'last_error' && call.args[1] === 'WEARABLE_SYNC_CANCEL_REQUESTED',
     ),
   );
 }
@@ -204,6 +225,7 @@ async function run(): Promise<void> {
   await assertActiveJobsAreScopedToCurrentUser();
   await assertCancellationOnlyMarksJobsAndDoesNotFinishThem();
   await assertCancellationMarkerIsObservedByWorker();
+  await assertFinishUsesPostgrestCompatibleCancellationGuard();
   await assertFinishKeepsConcurrentCancellation();
   await assertExpiredWorkerIsClosedInsteadOfShownAsActive();
 }

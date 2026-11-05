@@ -148,6 +148,7 @@ export type Database = {
           end_offset_s: number | null
           id: string
           lap_index: number
+          lap_name: string | null
           lap_type: Database["public"]["Enums"]["lap_type_enum"]
           max_heart_rate: number | null
           session_id: string
@@ -165,6 +166,7 @@ export type Database = {
           end_offset_s?: number | null
           id?: string
           lap_index: number
+          lap_name?: string | null
           lap_type?: Database["public"]["Enums"]["lap_type_enum"]
           max_heart_rate?: number | null
           session_id: string
@@ -182,6 +184,7 @@ export type Database = {
           end_offset_s?: number | null
           id?: string
           lap_index?: number
+          lap_name?: string | null
           lap_type?: Database["public"]["Enums"]["lap_type_enum"]
           max_heart_rate?: number | null
           session_id?: string
@@ -6251,7 +6254,7 @@ export type Database = {
         | "manual"
         | "unknown"
       import_duplicate_resolution_enum: "pending" | "merged" | "kept_both"
-      import_match_method_enum: "structural" | "totals"
+      import_match_method_enum: "structural" | "totals" | "planned_day"
       ingredients_category:
         | "proteina_animal"
         | "proteina_vegetal"
@@ -6586,7 +6589,7 @@ export const Constants = {
         "unknown",
       ],
       import_duplicate_resolution_enum: ["pending", "merged", "kept_both"],
-      import_match_method_enum: ["structural", "totals"],
+      import_match_method_enum: ["structural", "totals", "planned_day"],
       ingredients_category: [
         "proteina_animal",
         "proteina_vegetal",

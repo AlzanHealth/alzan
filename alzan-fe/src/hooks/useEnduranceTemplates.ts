@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { expireTrainingTemplates } from '../modules/training/services/templateLifecycleService';
+import { enduranceTemplatesQueryKey } from '../lib/trainingQueryKeys';
 
 const emptyUsageCounts: Record<string, number> = {};
 
@@ -97,7 +98,7 @@ export const useEnduranceTemplates = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['enduranceTemplates', user?.id],
+    queryKey: [...enduranceTemplatesQueryKey, user?.id],
     queryFn: fetchTemplates,
     enabled: !!user,
   });
@@ -122,7 +123,7 @@ export const useEnduranceTemplates = () => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['enduranceTemplates'] });
+      queryClient.invalidateQueries({ queryKey: enduranceTemplatesQueryKey });
       queryClient.invalidateQueries({ queryKey: ['enduranceWorkouts'] });
       queryClient.invalidateQueries({ queryKey: ['dailyPlans'] });
       queryClient.invalidateQueries({ queryKey: ['weekDots'] });

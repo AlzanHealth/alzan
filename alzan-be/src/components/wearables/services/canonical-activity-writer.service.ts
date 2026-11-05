@@ -11,6 +11,8 @@ import {
 import { normaliseCanonicalActivityLaps } from '../../activity-import/parsers/canonical-lap-normalizer';
 import {
   buildDistanceSplitBucketsFromLaps,
+  buildDistanceSplitBucketsFromSamples,
+  buildDistanceSplitTargets,
   isOneKilometerAutoLapSequence,
 } from '../../activity-import/parsers/lap-split-utils';
 import { encodePolyline } from '../../activity-import/parsers/route-import.parser';
@@ -513,6 +515,13 @@ export class CanonicalActivityWriterService {
     }));
     const providerFields = this.buildProviderFieldsPayload(sessionId, input.userId, input.activity, input.provenance);
     const lapRows = this.buildLapRows(sessionId, input.userId, input.activity);
+    this.logger.log({
+      provider: input.provenance.provider,
+      phase: 'prepareLaps',
+      sourceLapCount: input.activity.laps.length,
+      persistedLapCount: lapRows.length,
+      replaceLaps: params.replaceLaps,
+    });
     const heartRateZones = input.activity.heartRateZones.map(zone => ({
       session_id: sessionId,
       zone: zone.zone,
@@ -686,36 +695,65 @@ export class CanonicalActivityWriterService {
   }
 
   private buildLapRows(sessionId: string, userId: string, activity: CanonicalActivity): ActivityLapInsert[] {
-    if (activity.laps.length === 0) return [];
     const laps = normaliseCanonicalActivityLaps(activity.laps, activity.summary);
-    if (laps.length === 0) return [];
+    const intervalLaps = normaliseCanonicalActivityLaps(activity.intervalLaps ?? [], activity.summary);
+    if (laps.length === 0 && intervalLaps.length === 0 && activity.streams.distance.length === 0) return [];
 
-    const distanceBuckets = buildDistanceSplitBucketsFromLaps(laps);
-    const tabRows =
-      distanceBuckets.length > 0
-        ? distanceBuckets.flatMap((bucket, bucketIndex) =>
-            bucket.laps.map(lap =>
-              this.buildActivityLapInsert({
-                lap,
-                sessionId,
-                userId,
-                splitGroup: 'distance',
-                splitGroupOrder: bucketIndex,
-                splitDistanceM: bucket.splitDistanceM,
-              }),
-            ),
-          )
-        : laps.map(lap =>
-            this.buildActivityLapInsert({
-              lap,
-              sessionId,
-              userId,
-              splitGroup: isOneKilometerAutoLapSequence(laps) ? 'distance' : 'custom',
-              splitGroupOrder: 0,
-              splitDistanceM: isOneKilometerAutoLapSequence(laps) ? 1000 : null,
-            }),
-          );
-    return tabRows;
+    const hasOneKilometerAutoLaps = isOneKilometerAutoLapSequence(laps) && !laps.some(lap => lap.lapName?.trim());
+    const sampledDistanceBuckets = buildDistanceSplitBucketsFromSamples(
+      activity.streams.distance,
+      activity.streams.heartRate,
+      activity.summary.distanceM,
+      activity.summary.durationSeconds,
+      laps,
+    );
+    const expectedTargets = buildDistanceSplitTargets(activity.summary.distanceM ?? 0);
+    const needsLapFallback =
+      sampledDistanceBuckets.length === 0 ||
+      expectedTargets.some(target => !sampledDistanceBuckets.some(bucket => bucket.splitDistanceM === target));
+    const distanceBuckets = needsLapFallback
+      ? [
+          ...sampledDistanceBuckets,
+          ...buildDistanceSplitBucketsFromLaps(laps, activity.summary.distanceM).filter(
+            fallback => !sampledDistanceBuckets.some(bucket => bucket.splitDistanceM === fallback.splitDistanceM),
+          ),
+        ].sort((left, right) => left.splitDistanceM - right.splitDistanceM)
+      : sampledDistanceBuckets;
+    const distanceRows = distanceBuckets.flatMap((bucket, bucketIndex) =>
+      bucket.laps.map(lap =>
+        this.buildActivityLapInsert({
+          lap,
+          sessionId,
+          userId,
+          splitGroup: 'distance',
+          splitGroupOrder: bucketIndex,
+          splitDistanceM: bucket.splitDistanceM,
+        }),
+      ),
+    );
+    const customRows = hasOneKilometerAutoLaps
+      ? []
+      : laps.map(lap =>
+          this.buildActivityLapInsert({
+            lap,
+            sessionId,
+            userId,
+            splitGroup: 'custom',
+            splitGroupOrder: 0,
+            splitDistanceM: null,
+          }),
+        );
+    const intervalRows = intervalLaps.map(lap =>
+      this.buildActivityLapInsert({
+        lap,
+        sessionId,
+        userId,
+        splitGroup: 'custom',
+        splitGroupOrder: 1,
+        splitDistanceM: null,
+      }),
+    );
+    return [...customRows, ...intervalRows, ...distanceRows];
   }
 
   private buildActivityLapInsert(params: {
@@ -731,6 +769,7 @@ export class CanonicalActivityWriterService {
       user_id: params.userId,
       lap_index: params.lap.lapIndex,
       lap_type: params.lap.lapType,
+      lap_name: params.splitGroup === 'distance' ? null : (params.lap.lapName ?? null),
       split_group: params.splitGroup,
       split_group_order: params.splitGroupOrder,
       split_distance_m: params.splitDistanceM,

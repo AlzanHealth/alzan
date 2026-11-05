@@ -13,6 +13,17 @@ import { invalidateTrainingCalendar } from '../lib/trainingQueryKeys';
 const SUUNTO_PROVIDER = 'suunto';
 const QUERY_KEY = ['suuntoConnection'];
 
+const invalidateSuuntoSyncedData = (queryClient: ReturnType<typeof useQueryClient>, userId?: string) => {
+  invalidateTrainingCalendar(queryClient);
+  queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
+  queryClient.invalidateQueries({ queryKey: ['activitySession'] });
+  queryClient.invalidateQueries({ queryKey: ['sessionLaps'] });
+  queryClient.invalidateQueries({ queryKey: ['activitySessionSections'] });
+  queryClient.invalidateQueries({ queryKey: ['enduranceTemplateSteps'] });
+  queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
+  queryClient.invalidateQueries({ queryKey: ['health', userId], refetchType: 'active' });
+};
+
 // On web the OAuth popup may lose its window.opener across the cross-origin
 // redirect chain (helmet sets COOP: same-origin on the backend callback), which
 // prevents expo-web-browser from messaging us back / auto-closing the popup. To
@@ -132,10 +143,7 @@ export function useSuuntoConnection() {
         );
         return;
       }
-      invalidateTrainingCalendar(queryClient);
-      queryClient.invalidateQueries({ queryKey: ['enduranceSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['importReviewQueue'] });
-      queryClient.invalidateQueries({ queryKey: ['health', user?.id], refetchType: 'active' });
+      invalidateSuuntoSyncedData(queryClient, user?.id);
       if (result.cancelled) {
         Alert.alert(t('settings.syncCancelledTitle'), t('settings.syncCancelledMessage'));
         return;
@@ -157,6 +165,10 @@ export function useSuuntoConnection() {
       );
     },
     onError: (error: Error) => {
+      // The backend can persist workouts and fail while closing the sync job.
+      // Refresh the saved activity data even when the request ends with an error.
+      queryClient.invalidateQueries({ queryKey: ['activeCloudSyncs', user?.id] });
+      invalidateSuuntoSyncedData(queryClient, user?.id);
       Alert.alert(t('common.error'), error.message);
     },
   });

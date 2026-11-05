@@ -1,6 +1,11 @@
 import { strict as assert } from 'assert';
 import { QueryClient } from '@tanstack/react-query';
-import { invalidateTrainingCalendar, trainingQueryKeys } from './trainingQueryKeys';
+import {
+  enduranceTemplatesQueryKey,
+  invalidateEnduranceTemplates,
+  invalidateTrainingCalendar,
+  trainingQueryKeys,
+} from './trainingQueryKeys';
 
 async function assertEveryCalendarKeyIsInvalidated(): Promise<void> {
   const queryClient = new QueryClient();
@@ -19,3 +24,15 @@ async function assertEveryCalendarKeyIsInvalidated(): Promise<void> {
 }
 
 void assertEveryCalendarKeyIsInvalidated();
+
+async function assertEnduranceTemplateListsAreInvalidated(): Promise<void> {
+  const queryClient = new QueryClient();
+  const userTemplateKey = [...enduranceTemplatesQueryKey, 'user-1'] as const;
+  queryClient.setQueryData(userTemplateKey, [{ id: 'template-1' }]);
+
+  await invalidateEnduranceTemplates(queryClient);
+
+  assert.equal(queryClient.getQueryState(userTemplateKey)?.isInvalidated, true);
+}
+
+void assertEnduranceTemplateListsAreInvalidated();

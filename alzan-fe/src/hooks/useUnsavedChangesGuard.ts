@@ -4,6 +4,9 @@ import { Alert } from '../components/common/Alert';
 
 interface UnsavedChangesGuardOptions {
   hasUnsavedChanges: boolean;
+  isBusy?: boolean;
+  interceptRouteRemoval?: boolean;
+  onRouteRemoval?: () => void;
   title: string;
   message: string;
   stayLabel: string;
@@ -15,6 +18,9 @@ interface UnsavedChangesGuardOptions {
 
 export const useUnsavedChangesGuard = ({
   hasUnsavedChanges,
+  isBusy = false,
+  interceptRouteRemoval = false,
+  onRouteRemoval,
   title,
   message,
   stayLabel,
@@ -64,10 +70,22 @@ export const useUnsavedChangesGuard = ({
     [continueRemoval, discardLabel, message, onDiscard, onSaveAndExit, saveLabel, stayLabel, title],
   );
 
-  usePreventRemove(hasUnsavedChanges, ({ data }) => {
+  usePreventRemove(hasUnsavedChanges || isBusy || interceptRouteRemoval, ({ data }) => {
     if (allowNextRemovalRef.current) {
       allowNextRemovalRef.current = false;
       navigation.dispatch(data.action);
+      return;
+    }
+
+    if (isBusy) return;
+
+    if (interceptRouteRemoval) {
+      if (!hasUnsavedChanges) {
+        onRouteRemoval?.();
+        return;
+      }
+
+      showExitConfirmation(() => onRouteRemoval?.());
       return;
     }
 
@@ -76,6 +94,8 @@ export const useUnsavedChangesGuard = ({
 
   return useCallback(
     (onExit: () => void) => {
+      if (isBusy) return;
+
       if (!hasUnsavedChanges) {
         onExit();
         return;
@@ -83,6 +103,6 @@ export const useUnsavedChangesGuard = ({
 
       showExitConfirmation(onExit);
     },
-    [hasUnsavedChanges, showExitConfirmation],
+    [hasUnsavedChanges, isBusy, showExitConfirmation],
   );
 };

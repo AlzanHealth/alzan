@@ -165,9 +165,10 @@ export class ImportReconciliationService {
   public async runEnduranceTemplateMatch(userId: string, sessionId: string): Promise<void> {
     const session = await this.getSession(userId, sessionId);
     if (!session || session.sport_type === 'strength') return;
-    const isReevaluatingTotalsAssociation =
-      session.endurance_template_id != null && session.template_match_method === 'totals';
-    if (session.endurance_template_id != null && !isReevaluatingTotalsAssociation) return;
+    const isReevaluatingWeakAssociation =
+      session.endurance_template_id != null &&
+      (session.template_match_method === 'totals' || session.template_match_method === 'planned_day');
+    if (session.endurance_template_id != null && !isReevaluatingWeakAssociation) return;
 
     const localDate = resolveActivityLocalDate({
       startTime: session.start_time,
@@ -175,10 +176,13 @@ export class ImportReconciliationService {
       timezone: session.timezone,
     });
     if (!localDate) return;
-    const plannedPlans = await this.findEndurancePlannedPlans(userId, localDate);
-    const laps = await this.getSessionLaps(sessionId);
-
     const allTemplates = await this.findTemplatesBySport(userId, session.sport_type);
+    const sameSportTemplateIds = new Set(allTemplates.map(template => template.id));
+    const plannedPlans = (await this.findEndurancePlannedPlans(userId, localDate)).filter(
+      plan => plan.endurance_template_id != null && sameSportTemplateIds.has(plan.endurance_template_id),
+    );
+    const uniqueSameDayPlan = plannedPlans.length === 1 ? plannedPlans[0] : null;
+    const laps = await this.getSessionLaps(sessionId);
     const best = await this.scoreTemplates(
       session,
       laps,
@@ -188,17 +192,41 @@ export class ImportReconciliationService {
     );
     if (best == null || best.score < POSSIBLE_MATCH) return;
 
+    if (
+      !isReevaluatingWeakAssociation &&
+      uniqueSameDayPlan != null &&
+      best.templateId === uniqueSameDayPlan.endurance_template_id &&
+      best.plannedPlanId === uniqueSameDayPlan.id &&
+      best.signalCount >= 2 &&
+      isMatchMarginSufficient(best.score, best.runnerUpScore)
+    ) {
+      const { error } = await this.supabaseAdminService.client.rpc('associate_activity_session_template', {
+        p_user_id: userId,
+        p_session_id: sessionId,
+        p_endurance_template_id: best.templateId,
+        p_workout_template_id: undefined,
+        p_workout_plan_id: uniqueSameDayPlan.id,
+      });
+      if (error) throw new InternalServerErrorException('IMPORT_RECONCILIATION_PLAN_ASSOCIATION_FAILED');
+      await this.updateSession(sessionId, {
+        template_match_score: best.score,
+        template_match_method: 'planned_day',
+        ...(session.name == null ? { name: best.templateName } : {}),
+      });
+      return;
+    }
+
     const canAutoAssociate =
       best.score >= STRONG_MATCH &&
       best.signalCount >= 2 &&
       best.isAutoMatchEligible &&
       !best.planSelectionRequired &&
       isMatchMarginSufficient(best.score, best.runnerUpScore);
-    if (isReevaluatingTotalsAssociation && (best.method !== 'structural' || !canAutoAssociate)) return;
+    if (isReevaluatingWeakAssociation && (best.method !== 'structural' || !canAutoAssociate)) return;
 
     if (canAutoAssociate) {
-      if (best.plannedPlanId != null || isReevaluatingTotalsAssociation) {
-        if (isReevaluatingTotalsAssociation && best.templateId === session.endurance_template_id) {
+      if (best.plannedPlanId != null || isReevaluatingWeakAssociation) {
+        if (isReevaluatingWeakAssociation && best.templateId === session.endurance_template_id) {
           await this.updateSession(sessionId, {
             template_match_score: best.score,
             template_match_method: best.method,
@@ -206,6 +234,9 @@ export class ImportReconciliationService {
           });
           return;
         }
+        // The manual association RPC can choose a different same-sport plan when
+        // no plan is supplied. Automatic repairs require the scored template's plan.
+        if (best.plannedPlanId == null && plannedPlans.length > 0) return;
         const { error } = await this.supabaseAdminService.client.rpc('associate_activity_session_template', {
           p_user_id: userId,
           p_session_id: sessionId,
@@ -230,7 +261,7 @@ export class ImportReconciliationService {
       });
       return;
     }
-    if (isReevaluatingTotalsAssociation) return;
+    if (isReevaluatingWeakAssociation) return;
     await this.updateSession(sessionId, {
       suggested_endurance_template_id: best.templateId,
       template_match_score: best.score,
@@ -416,12 +447,23 @@ export class ImportReconciliationService {
       templates.map(template => template.id),
     );
 
-    const lapLikes = laps.map(lap => ({
-      distanceM: lap.distance_m,
-      durationSeconds: lap.duration_s,
-      avgPaceSecondsPerKm: lap.avg_pace_s_per_km,
-      lapType: lap.lap_type,
-    }));
+    // Native laps and named intervals may describe the same stretch of time.
+    // Their lap indexes restart per group, so each group is scored independently.
+    const lapGroups = new Map<string, ActivityLapRow[]>();
+    for (const lap of laps) {
+      const groupKey = `${lap.split_group}:${lap.split_group_order}`;
+      const group = lapGroups.get(groupKey);
+      if (group) group.push(lap);
+      else lapGroups.set(groupKey, [lap]);
+    }
+    const lapLikeGroups = Array.from(lapGroups.values(), group =>
+      group.map(lap => ({
+        distanceM: lap.distance_m,
+        durationSeconds: lap.duration_s,
+        avgPaceSecondsPerKm: lap.avg_pace_s_per_km,
+        lapType: lap.lap_type,
+      })),
+    );
     const activityTotals = buildActivityTotals({ distanceM: session.distance_m, durationS: session.duration_s });
 
     const matches: TemplateMatchResult[] = [];
@@ -442,24 +484,33 @@ export class ImportReconciliationService {
         steps = applyProgressionsToSteps(steps, weekIndex, progressionRows);
       }
 
-      const templateAwareStructure =
-        deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps) ??
-        deriveTemplateDistanceMatchedActivityCoreStructure(lapLikes, steps);
-      const activityStructure =
-        templateAwareStructure ??
-        (templateHasBoundaryPhases(steps) || templateHasRecoveryPhases(steps)
-          ? null
-          : deriveActivityStructure(lapLikes));
+      const templateStructure = deriveTemplateStructure(steps);
+      const usePaceHeuristic = !templateHasBoundaryPhases(steps) && !templateHasRecoveryPhases(steps);
+      const structuralMatches = templateStructure
+        ? lapLikeGroups.flatMap(lapLikes => {
+            const structure =
+              deriveTemplateDistanceMatchedActivityStructure(lapLikes, steps) ??
+              deriveTemplateDistanceMatchedActivityCoreStructure(lapLikes, steps) ??
+              (usePaceHeuristic ? deriveActivityStructure(lapLikes) : null);
+            if (!structure) return [];
+            return [
+              {
+                score: scoreStructuralMatch(structure, templateStructure),
+                signalCount: countComparableStructuralSignals(structure, templateStructure),
+                isAutoMatchEligible: isStructuralAutoMatchEligible(structure, templateStructure),
+              },
+            ];
+          })
+        : [];
+      structuralMatches.sort((left, right) => right.score - left.score || right.signalCount - left.signalCount);
+      const structuralMatch = structuralMatches[0];
       let score: number;
       let method: MatchMethod;
       let signalCount: number;
       let isAutoMatchEligible: boolean;
-      const templateStructure = activityStructure != null ? deriveTemplateStructure(steps) : null;
-      if (activityStructure != null && templateStructure != null) {
-        score = scoreStructuralMatch(activityStructure, templateStructure);
+      if (structuralMatch) {
+        ({ score, signalCount, isAutoMatchEligible } = structuralMatch);
         method = 'structural';
-        signalCount = countComparableStructuralSignals(activityStructure, templateStructure);
-        isAutoMatchEligible = isStructuralAutoMatchEligible(activityStructure, templateStructure);
       } else {
         const templateTotals = buildTemplateTotals(
           { totalDistanceM: template.total_distance_m, totalDurationS: template.total_duration_s },

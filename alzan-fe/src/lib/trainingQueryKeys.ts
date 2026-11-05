@@ -11,6 +11,12 @@ export const trainingQueryKeys = {
   scheduledWorkoutPreview: ['scheduledWorkoutPreview'] as const,
 };
 
+export const enduranceTemplatesQueryKey = ['enduranceTemplates'] as const;
+
+export function invalidateEnduranceTemplates(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: enduranceTemplatesQueryKey });
+}
+
 export function invalidateTrainingCalendar(queryClient: QueryClient): void {
   for (const queryKey of Object.values(trainingQueryKeys)) {
     void queryClient.invalidateQueries({ queryKey });

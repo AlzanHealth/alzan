@@ -95,12 +95,14 @@ const SPORTS_WITH_SPECIFIC_MODALITY_METRIC = new Set<string>([
 
 function isOneKilometerSessionLapSequence(laps: SessionLap[]): boolean {
   if (laps.length === 0) return false;
+  if (laps.some(lap => lap.lap_type !== 'auto' && lap.lap_type !== 'distance')) return false;
 
   return laps.every((lap, index) => {
     if (lap.distance_m == null || !Number.isFinite(lap.distance_m) || lap.distance_m <= 0) return false;
     const isLast = index === laps.length - 1;
     const fullLap = Math.abs(lap.distance_m - 1000) <= SPLIT_DISTANCE_TOLERANCE_M;
-    const partialFinalLap = isLast && lap.distance_m > 0 && lap.distance_m < 1000 + SPLIT_DISTANCE_TOLERANCE_M;
+    const partialFinalLap =
+      isLast && laps.length > 1 && lap.distance_m > 0 && lap.distance_m < 1000 + SPLIT_DISTANCE_TOLERANCE_M;
 
     return fullLap || partialFinalLap;
   });
@@ -109,14 +111,23 @@ function isOneKilometerSessionLapSequence(laps: SessionLap[]): boolean {
 function buildDistanceSplitTargets(totalDistanceM: number): number[] {
   if (!Number.isFinite(totalDistanceM) || totalDistanceM < 1000 - SPLIT_DISTANCE_TOLERANCE_M) return [];
 
-  const targets = new Set<number>([1000]);
-  const upperFiveKmBucket = Math.ceil(Math.max(totalDistanceM, 1000) / 5000) * 5000;
+  const targets = [1000];
+  if (totalDistanceM < 5000 - SPLIT_DISTANCE_TOLERANCE_M) return targets;
 
-  for (let target = 5000; target <= upperFiveKmBucket; target += 5000) {
-    targets.add(target);
+  targets.push(5000);
+  let lastIncludedTarget = 5000;
+  let nextTarget = 10000;
+  while (Number.isSafeInteger(nextTarget)) {
+    const completeTarget = nextTarget <= totalDistanceM + SPLIT_DISTANCE_TOLERANCE_M;
+    const nextSuuntoStyleTarget = totalDistanceM > lastIncludedTarget + SPLIT_DISTANCE_TOLERANCE_M;
+    if (!completeTarget && !nextSuuntoStyleTarget) break;
+
+    targets.push(nextTarget);
+    lastIncludedTarget = nextTarget;
+    nextTarget *= 2;
   }
 
-  return Array.from(targets).sort((left, right) => left - right);
+  return targets;
 }
 
 function buildDistanceSessionLapBuckets(laps: SessionLap[]): Array<{ splitDistanceM: number; laps: SessionLap[] }> {
@@ -453,6 +464,7 @@ export const EnduranceSessionDetailScreen = () => {
     Array<{
       key: string;
       label: string;
+      splitGroup: 'legacy' | 'custom' | 'distance';
       laps: SessionLap[];
     }>
   >(() => {
@@ -511,14 +523,17 @@ export const EnduranceSessionDetailScreen = () => {
           group.splitDistanceM != null &&
           derivedDistanceGroups.some(derivedGroup => derivedGroup.splitDistanceM === group.splitDistanceM);
 
-        return !customIsOneKilometer && !duplicatedByDerivedDistance;
+        const hasNamedLaps = group.laps.some(lap => Boolean(lap.lap_name?.trim()));
+        return (!customIsOneKilometer || hasNamedLaps) && !duplicatedByDerivedDistance;
       }),
     ];
 
     return groupsWithDerivedDistance
       .sort((left, right) => {
         if (left.splitGroup !== right.splitGroup) {
-          return left.splitGroup === 'distance' ? -1 : 1;
+          const leftPriority = left.splitGroup === 'distance' ? 1 : 0;
+          const rightPriority = right.splitGroup === 'distance' ? 1 : 0;
+          if (leftPriority !== rightPriority) return leftPriority - rightPriority;
         }
 
         if (left.splitGroup === 'distance' && right.splitGroup === 'distance') {
@@ -533,10 +548,13 @@ export const EnduranceSessionDetailScreen = () => {
       })
       .map(group => ({
         key: group.key,
+        splitGroup: group.splitGroup,
         label:
           group.splitGroup === 'distance' && group.splitDistanceM != null && group.splitDistanceM > 0
             ? formatSplitDistanceBucketLabel(group.splitDistanceM)
-            : t('training.splitCustom'),
+            : group.splitGroup === 'custom' && group.splitGroupOrder > 0
+              ? t('training.interval')
+              : t('training.splitCustom'),
         laps: [...group.laps].sort((left, right) => left.lap_index - right.lap_index),
       }));
   }, [formatSplitDistanceBucketLabel, laps, t]);
@@ -557,6 +575,13 @@ export const EnduranceSessionDetailScreen = () => {
 
   const activeSplitTab = splitTabs.find(tab => tab.key === selectedSplitTabKey) ?? splitTabs[0] ?? null;
   const activeSplits = activeSplitTab?.laps ?? [];
+  const activeSplitPhaseLabels = useMemo(() => {
+    if (activeSplitTab?.splitGroup !== 'custom' || activeSplits.length === 0) return [];
+    if (activeSplits.some(lap => lap.lap_name != null && lap.lap_name.trim().length > 0)) {
+      return activeSplits.map(lap => lap.lap_name?.trim() ?? '');
+    }
+    return [];
+  }, [activeSplitTab?.splitGroup, activeSplits]);
   const activeSplitPaceValues = activeSplits
     .map(split => split.avg_pace_s_per_km)
     .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);
@@ -970,6 +995,13 @@ export const EnduranceSessionDetailScreen = () => {
         key: 'vo2',
         label: t('training.vo2Max'),
         value: `${session.vo2_max.toFixed(1)}`,
+      });
+    }
+    if (session.epoc != null && session.epoc > 0) {
+      secondaryMetrics.push({
+        key: 'epoc',
+        label: t('training.epoc'),
+        value: `${session.epoc.toFixed(1)}`,
       });
     }
     if (session.total_steps != null && session.total_steps > 0) {
@@ -2276,7 +2308,14 @@ export const EnduranceSessionDetailScreen = () => {
                     { borderBottomColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
                   ]}
                 >
-                  <Text style={[styles.splitsHeaderCell, { width: 28, color: themeColors.textSecondary }]}>#</Text>
+                  <Text
+                    style={[
+                      styles.splitsHeaderCell,
+                      { width: activeSplitPhaseLabels.length > 0 ? 82 : 28, color: themeColors.textSecondary },
+                    ]}
+                  >
+                    {activeSplitPhaseLabels.length > 0 ? t('training.phaseType') : '#'}
+                  </Text>
                   <Text style={[styles.splitsHeaderCell, { flex: 1, color: themeColors.textSecondary }]}>
                     {t('settings.distance')}
                   </Text>
@@ -2311,9 +2350,14 @@ export const EnduranceSessionDetailScreen = () => {
                       },
                     ]}
                   >
-                    <Text style={[styles.splitCell, { width: 28, color: themeColors.textSecondary }]}>
-                      {lap.lap_index}
-                    </Text>
+                    <View style={{ width: activeSplitPhaseLabels.length > 0 ? 82 : 28 }}>
+                      <Text style={[styles.splitCell, { color: themeColors.textSecondary }]}>{lap.lap_index}</Text>
+                      {activeSplitPhaseLabels[index] ? (
+                        <Text style={[styles.splitPhaseLabel, { color: themeColors.textSecondary }]} numberOfLines={2}>
+                          {activeSplitPhaseLabels[index]}
+                        </Text>
+                      ) : null}
+                    </View>
                     <Text style={[styles.splitCell, { flex: 1, color: themeColors.textPrimary }]}>
                       {formatSplitDistance(lap.distance_m)}
                     </Text>
@@ -3134,6 +3178,12 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontSize: 13,
     fontWeight: '600',
+  },
+  splitPhaseLabel: {
+    ...typography.caption,
+    fontSize: 10,
+    lineHeight: 13,
+    marginTop: 2,
   },
   paceCell: {
     borderRadius: borderRadius.s,

@@ -901,13 +901,219 @@ async function assertExactSuuntoSeriesPersistsElevenNativeLaps(): Promise<void> 
   await service.replaceLaps('session-1', 'user-1', activity);
 
   const insertedRows = client.inserts.find(insert => insert.table === 'activity_laps')?.rows ?? [];
-  assert.equal(insertedRows.length, 11);
+  const nativeRows = insertedRows.filter(row => row.split_group === 'custom');
+  const distanceRows = insertedRows.filter(row => row.split_group === 'distance');
+  assert.equal(nativeRows.length, 11);
   assert.deepEqual(
-    insertedRows.map(row => Math.round(Number(row.distance_m))),
+    nativeRows.map(row => Math.round(Number(row.distance_m))),
     [1477, 1000, 190, 1000, 163, 1000, 173, 1000, 171, 1526, 36],
   );
+  assert.deepEqual(
+    Array.from(new Set(distanceRows.map(row => row.split_distance_m))).sort(
+      (left, right) => Number(left) - Number(right),
+    ),
+    [1000, 5000, 10000],
+  );
   assert.equal(
-    insertedRows.every(row => row.split_group === 'custom'),
+    distanceRows.some(row => Math.round(Number(row.distance_m)) === 7739),
+    true,
+  );
+}
+
+async function assertNamedSuuntoIntervalsPersistAsSeparateLapGroup(): Promise<void> {
+  const activity = buildCanonicalRun();
+  activity.intervalLaps = [
+    {
+      lapIndex: 1,
+      lapName: 'Calentamiento',
+      lapType: 'manual',
+      distanceM: 1149,
+      durationSeconds: 480,
+      avgPaceSecondsPerKm: 480 / 1.149,
+      avgHeartRate: 125,
+      maxHeartRate: null,
+      startOffsetSeconds: 0,
+      endOffsetSeconds: 480,
+    },
+  ];
+  const client = createFullSupabaseClient({});
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {} as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.replaceLaps('session-1', 'user-1', activity);
+
+  const insertedRows = client.inserts.find(insert => insert.table === 'activity_laps')?.rows ?? [];
+  assert.equal(insertedRows.length, activity.laps.length + 1);
+  assert.equal(insertedRows.at(-1)?.lap_name, 'Calentamiento');
+  assert.equal(insertedRows.at(-1)?.split_group, 'custom');
+  assert.equal(insertedRows.at(-1)?.split_group_order, 1);
+  assert.equal(insertedRows.at(-1)?.distance_m, 1149);
+}
+
+async function assertSuuntoDistanceSamplesPersistCustomIntervalsAndStandardSplits(): Promise<void> {
+  const activity = buildCanonicalRun();
+  activity.summary.distanceM = 5156;
+  activity.summary.durationSeconds = 1875;
+  const distanceSamples = Array.from({ length: 11 }, (_, index) => {
+    const distanceM = index * 500;
+    return {
+      offsetSeconds: (distanceM / 5156) * 1875,
+      timestamp: null,
+      value: distanceM,
+    };
+  });
+  distanceSamples.push({ offsetSeconds: 1875, timestamp: null, value: 5156 });
+  activity.streams.distance = distanceSamples;
+  activity.streams.heartRate = distanceSamples.map(sample => ({ ...sample, value: 140 }));
+  activity.intervalLaps = [
+    {
+      lapIndex: 1,
+      lapName: 'Calentamiento',
+      lapType: 'manual',
+      distanceM: 1149,
+      durationSeconds: 480,
+      avgPaceSecondsPerKm: 480 / 1.149,
+      avgHeartRate: 125,
+      maxHeartRate: 140,
+      startOffsetSeconds: 0,
+      endOffsetSeconds: 480,
+    },
+    {
+      lapIndex: 2,
+      lapName: 'Intervalo',
+      lapType: 'manual',
+      distanceM: 2231,
+      durationSeconds: 840,
+      avgPaceSecondsPerKm: 840 / 2.231,
+      avgHeartRate: 140,
+      maxHeartRate: 160,
+      startOffsetSeconds: 480,
+      endOffsetSeconds: 1320,
+    },
+    {
+      lapIndex: 3,
+      lapName: 'Relajación',
+      lapType: 'manual',
+      distanceM: 791,
+      durationSeconds: 300,
+      avgPaceSecondsPerKm: 300 / 0.791,
+      avgHeartRate: 135,
+      maxHeartRate: 150,
+      startOffsetSeconds: 1320,
+      endOffsetSeconds: 1620,
+    },
+  ];
+  const client = createFullSupabaseClient({});
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {} as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.replaceLaps('session-1', 'user-1', activity);
+
+  const insertedRows = client.inserts.find(insert => insert.table === 'activity_laps')?.rows ?? [];
+  const distanceRows = insertedRows.filter(row => row.split_group === 'distance');
+  const groups = new Map<number, Record<string, unknown>[]>();
+  for (const row of distanceRows) {
+    const distance = Number(row.split_distance_m);
+    groups.set(distance, [...(groups.get(distance) ?? []), row]);
+  }
+
+  assert.deepEqual(
+    Array.from(groups.keys()).sort((left, right) => left - right),
+    [1000, 5000, 10000],
+  );
+  assert.deepEqual(
+    [1000, 5000, 10000].map(distance => (groups.get(distance) ?? []).map(row => Math.round(Number(row.distance_m)))),
+    [[1000, 1000, 1000, 1000, 1000, 156], [5000, 156], [5156]],
+  );
+  assert.equal(
+    insertedRows.filter(row => row.split_group === 'custom' && row.split_group_order === 0).length,
+    activity.laps.length,
+  );
+  assert.deepEqual(
+    insertedRows.filter(row => row.split_group === 'custom' && row.split_group_order === 1).map(row => row.lap_name),
+    ['Calentamiento', 'Intervalo', 'Relajación'],
+  );
+}
+
+async function assertIrregularNativeLapsFallbackToStandardDistanceSplits(): Promise<void> {
+  const activity = buildCanonicalRun();
+  activity.summary.distanceM = 5156;
+  activity.summary.durationSeconds = 1875;
+  activity.streams.distance = [];
+  activity.laps = [
+    {
+      lapIndex: 1,
+      lapName: null,
+      lapType: 'manual',
+      distanceM: 1149,
+      durationSeconds: 481,
+      avgPaceSecondsPerKm: 481 / 1.149,
+      avgHeartRate: 124,
+      maxHeartRate: 140,
+      startOffsetSeconds: 0,
+      endOffsetSeconds: 481,
+    },
+    {
+      lapIndex: 2,
+      lapName: null,
+      lapType: 'manual',
+      distanceM: 2204,
+      durationSeconds: 840,
+      avgPaceSecondsPerKm: 840 / 2.204,
+      avgHeartRate: 137,
+      maxHeartRate: 160,
+      startOffsetSeconds: 481,
+      endOffsetSeconds: 1321,
+    },
+    {
+      lapIndex: 3,
+      lapName: null,
+      lapType: 'manual',
+      distanceM: 1803,
+      durationSeconds: 554,
+      avgPaceSecondsPerKm: 554 / 1.803,
+      avgHeartRate: 150,
+      maxHeartRate: 170,
+      startOffsetSeconds: 1331,
+      endOffsetSeconds: 1885,
+    },
+  ];
+  const client = createFullSupabaseClient({});
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as unknown as RawPayloadService,
+    {} as unknown as DedupeService,
+    {} as unknown as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+
+  await service.replaceLaps('session-1', 'user-1', activity);
+
+  const rows = client.inserts.find(insert => insert.table === 'activity_laps')?.rows ?? [];
+  const distanceRows = rows.filter(row => row.split_group === 'distance');
+  const groups = new Map<number, Record<string, unknown>[]>();
+  for (const row of distanceRows) {
+    const distance = Number(row.split_distance_m);
+    groups.set(distance, [...(groups.get(distance) ?? []), row]);
+  }
+  assert.deepEqual(
+    Array.from(groups.keys()).sort((left, right) => left - right),
+    [1000, 5000, 10000],
+  );
+  assert.deepEqual(
+    [1000, 5000, 10000].map(distance => (groups.get(distance) ?? []).map(row => Math.round(Number(row.distance_m)))),
+    [[1000, 1000, 1000, 1000, 1000, 156], [5000, 156], [5156]],
+  );
+  assert.equal(rows.filter(row => row.split_group === 'custom').length, 3);
+  assert.equal(
+    distanceRows.every(row => row.lap_name == null),
     true,
   );
 }
@@ -967,6 +1173,9 @@ async function run(): Promise<void> {
   await assertTransportFailurePreservesPreviouslyImportedSession();
   await assertOneKilometerWearableLapsArePersistedAsDistanceGroups();
   await assertExactSuuntoSeriesPersistsElevenNativeLaps();
+  await assertNamedSuuntoIntervalsPersistAsSeparateLapGroup();
+  await assertSuuntoDistanceSamplesPersistCustomIntervalsAndStandardSplits();
+  await assertIrregularNativeLapsFallbackToStandardDistanceSplits();
 }
 
 void run();
