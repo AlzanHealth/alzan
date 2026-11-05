@@ -703,11 +703,10 @@ function completeSuuntoCustomLapCoverage(
   const nativeManualLaps = activity.laps.filter(lap => lap.lapType === 'manual');
   const nativeStructure = nativeManualLaps.length > 0 ? nativeManualLaps : activity.laps;
   const recordedEnd = activity.summary.elapsedSeconds;
-  const hasNamedPhaseSequence =
+  const hasExplicitPhaseSequence =
     intervalLaps.length > 0 &&
     intervalLaps.every(
       (lap, index) =>
-        Boolean(lap.lapName?.trim()) &&
         lap.startOffsetSeconds != null &&
         lap.endOffsetSeconds != null &&
         Number.isFinite(lap.startOffsetSeconds) &&
@@ -719,7 +718,9 @@ function completeSuuntoCustomLapCoverage(
     );
   // Provider phases need not cover the entire recording. Keep their actual
   // boundaries instead of replacing them with inferred leading/trailing gaps.
-  if (hasNamedPhaseSequence && intervalLaps.length >= nativeStructure.length) {
+  // A lone marker can be only the middle phase of an incomplete export.
+  const hasPhaseStructure = intervalLaps.length > 1;
+  if (hasExplicitPhaseSequence && hasPhaseStructure && intervalLaps.length >= nativeStructure.length) {
     return intervalLaps.map((lap, index) => ({ ...lap, lapIndex: index + 1 }));
   }
   const elapsedSeconds = activity.summary.elapsedSeconds;

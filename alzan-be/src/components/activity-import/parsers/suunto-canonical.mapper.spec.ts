@@ -1185,13 +1185,13 @@ function assertSuuntoLapExtensionsKeepExplicitMarkerWindows(): void {
     ],
   });
 
+  assert.deepEqual(enriched.laps, enriched.intervalLaps);
   assert.deepEqual(
-    enriched.laps.filter(lap => lap.lapType === 'manual').map((lap, index) => ({ ...lap, lapIndex: index + 1 })),
-    activity.laps,
-  );
-  assert.equal(
-    enriched.laps.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0),
-    6000,
+    enriched.laps.map(lap => [lap.startOffsetSeconds, lap.endOffsetSeconds]),
+    [
+      [600, 1210],
+      [1800, 3000],
+    ],
   );
   assert.deepEqual(
     enriched.intervalLaps?.map(lap => [lap.lapIndex, lap.lapType, lap.distanceM, lap.durationSeconds]),
@@ -1714,6 +1714,18 @@ function assertNamedCloudPhasesBecomePrimaryCustomLaps(): void {
         `Primary custom laps must retain every named phase (${repetitions} repetitions, sparse=${sparseFit})`,
       );
       assert.deepEqual(applySuuntoWorkoutExtensions(enriched, {}).laps, enriched.laps);
+      const unnamedIntervals = intervals.map(({ name: _name, ...phase }, index) => ({
+        ...phase,
+        avgHeartRate: 130 + index,
+      }));
+      const unnamed = applySuuntoWorkoutExtensions(activity, {
+        extensions: [{ type: 'IntervalStreamExtension', intervals: unnamedIntervals }],
+      });
+      assert.deepEqual(
+        unnamed.laps.map(lap => [lap.durationSeconds, lap.distanceM, lap.avgPaceSecondsPerKm, lap.avgHeartRate]),
+        unnamedIntervals.map(phase => [phase.duration, phase.distance, 1000 / 3, phase.avgHeartRate]),
+        'Missing names must not discard phase timing, pace or heart rate',
+      );
       const invalidPhases = enriched.intervalLaps!.map((lap, index, laps) =>
         index === laps.length - 1 ? { ...lap, endOffsetSeconds: offset + trailingSeconds + 100 } : lap,
       );
