@@ -2450,6 +2450,7 @@ export default {
     runningShoeSaveError: 'No se han podido cambiar las zapatillas de esta carrera. Inténtalo de nuevo.',
     runningShoeNoShoes: 'Añade tus zapatillas de running en Ajustes para asociarlas a esta carrera.',
     runningShoeManage: 'Gestionar zapatillas',
+    runningShoeMileageLabel: 'Kilómetros de este par',
     completedStatus: 'Completado',
     viewSummary: 'Ver resumen',
     finishedDraftCleanupError:

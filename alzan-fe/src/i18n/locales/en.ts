@@ -2419,6 +2419,7 @@ const en = {
     runningShoeSaveError: 'Could not update the shoe for this run. Please try again.',
     runningShoeNoShoes: 'Add your running shoes in Settings to assign them to this run.',
     runningShoeManage: 'Manage shoes',
+    runningShoeMileageLabel: 'Mileage on this pair',
     completedStatus: 'Completed',
     viewSummary: 'View summary',
     finishedDraftCleanupError: 'The session was saved, but its local copy could not be cleared. Do not save it again.',
