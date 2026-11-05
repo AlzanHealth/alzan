@@ -22,10 +22,7 @@ import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
 import { WEARABLE_SYNC_CANCEL_REQUESTED } from './wearable-import-lifecycle.service';
-import {
-  SuuntoWorkoutPaginationStrategy,
-  UnverifiedSinglePageWorkoutPaginationStrategy,
-} from './suunto-workout-pagination.strategy';
+import { SuuntoWorkoutPaginationStrategy, OffsetWorkoutPaginationStrategy } from './suunto-workout-pagination.strategy';
 
 type JsonRecord = Record<string, unknown>;
 type ProviderTokenRow = {
@@ -65,12 +62,13 @@ const FIRST_SYNC_LOOKBACK_DAYS = 30;
 const NORMAL_SYNC_OVERLAP_DAYS = 3;
 const REPAIR_LOOKBACK_DAYS = 20;
 const WORKOUT_LIST_LIMIT = 100;
+const WORKOUT_LIST_MAX_PAGES = 100;
 const WORKOUT_IMPORT_CONCURRENCY = 3;
 const SUUNTO_REQUEST_RETRIES = 3;
 const SUUNTO_RETRY_BASE_DELAY_MS = 250;
 const SUUNTO_REQUEST_TIMEOUT_MS = 30_000;
 const SUUNTO_RETRY_CANCELLATION_POLL_MS = 1_000;
-const CANONICAL_ACTIVITY_VERSION = 24;
+const CANONICAL_ACTIVITY_VERSION = 25;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EPOCH_MS_THRESHOLD = 100_000_000_000;
 
@@ -79,8 +77,9 @@ export class SuuntoCloudSyncService {
   private readonly logger = new Logger(SuuntoCloudSyncService.name);
   private readonly apiBaseUrl = 'https://cloudapi.suunto.com';
   private readonly tokenUrl = 'https://cloudapi-oauth.suunto.com/oauth/token';
-  private readonly workoutPaginationStrategy: SuuntoWorkoutPaginationStrategy =
-    new UnverifiedSinglePageWorkoutPaginationStrategy(WORKOUT_LIST_LIMIT);
+  private readonly workoutPaginationStrategy: SuuntoWorkoutPaginationStrategy = new OffsetWorkoutPaginationStrategy(
+    WORKOUT_LIST_LIMIT,
+  );
 
   constructor(
     private readonly configService: ConfigService,
@@ -404,8 +403,9 @@ export class SuuntoCloudSyncService {
           result: 'unavailable',
           workoutKeyHash: this.anonymize(workoutKey),
           errorCode: this.getErrorMessage(error),
-          message: 'Suunto workout extension fallback unavailable; keeping FIT data',
+          message: 'Suunto workout enrichment failed; leaving activity retryable',
         });
+        throw error;
       } finally {
         this.addPhaseDuration(phaseDurationsMs, 'downloadExtensions', Date.now() - extensionsStartedAt);
       }
@@ -485,29 +485,56 @@ export class SuuntoCloudSyncService {
     jobId?: string,
   ): Promise<WorkoutSummaryFetchResult> {
     const since = await this.resolveWorkoutLookbackStartMs(userId);
-    const response = await this.getSuunto<JsonRecord | JsonRecord[]>(
-      '/v2/workouts',
-      accessToken,
-      this.workoutPaginationStrategy.buildRequest(String(since)),
-      jobId,
-    );
-    const page = this.extractWorkoutSummaries(response);
+    const until = Date.now();
     const workoutsByKey = new Map<string, JsonRecord>();
-    page.forEach(workout => {
-      const workoutKey = this.readWorkoutKey(workout);
-      if (workoutKey && !workoutsByKey.has(workoutKey)) workoutsByKey.set(workoutKey, workout);
-    });
+    let offset = 0;
+    let isPaginationVerified = false;
+    for (let pageNumber = 0; pageNumber < WORKOUT_LIST_MAX_PAGES; pageNumber += 1) {
+      const response = await this.getSuunto<JsonRecord | JsonRecord[]>(
+        '/v3/workouts',
+        accessToken,
+        this.workoutPaginationStrategy.buildRequest(String(since), String(until), offset),
+        jobId,
+      );
+      const page = this.extractWorkoutSummaries(response);
+      const previousCount = workoutsByKey.size;
+      for (const workout of page) {
+        const workoutKey = this.readWorkoutKey(workout)!;
+        if (!workoutsByKey.has(workoutKey)) workoutsByKey.set(workoutKey, workout);
+      }
+      // Do not loop forever or report success if the provider ignores offset.
+      if (page.length > 0 && workoutsByKey.size === previousCount) break;
+      if (this.workoutPaginationStrategy.isComplete(page.length)) {
+        isPaginationVerified = true;
+        break;
+      }
+      offset += page.length;
+    }
     return {
       workouts: this.filterRecentWorkoutSummaries([...workoutsByKey.values()], since),
-      isPaginationVerified: this.workoutPaginationStrategy.isComplete(page.length),
+      isPaginationVerified,
     };
   }
 
   private extractWorkoutSummaries(response: JsonRecord | JsonRecord[]): JsonRecord[] {
-    if (Array.isArray(response)) return response.filter(this.isRecord);
-    const workouts = response.payload ?? response.workouts ?? response.data;
-    if (Array.isArray(workouts)) return workouts.filter(this.isRecord);
-    return [];
+    this.assertSuuntoResponseSucceeded(response);
+    const workouts = Array.isArray(response) ? response : (response.payload ?? response.workouts ?? response.data);
+    if (
+      !Array.isArray(workouts) ||
+      workouts.some(workout => !this.isRecord(workout) || !this.readWorkoutKey(workout))
+    ) {
+      throw new BadGatewayException('SUUNTO_WORKOUT_LIST_INVALID');
+    }
+    return workouts as JsonRecord[];
+  }
+
+  private assertSuuntoResponseSucceeded(response: unknown): void {
+    if (!this.isRecord(response) && !Array.isArray(response)) {
+      throw new BadGatewayException('SUUNTO_RESPONSE_INVALID');
+    }
+    if (this.isRecord(response) && response.error != null) {
+      throw new BadGatewayException('SUUNTO_RESPONSE_ERROR');
+    }
   }
 
   private filterRecentWorkoutSummaries(values: unknown[], since: number): JsonRecord[] {
@@ -674,7 +701,7 @@ export class SuuntoCloudSyncService {
   }
 
   private async fetchWorkoutExtensions(accessToken: string, workoutKey: string, jobId: string): Promise<JsonRecord> {
-    return this.getSuunto<JsonRecord>(
+    const response = await this.getSuunto<JsonRecord>(
       `/v3/workouts/${encodeURIComponent(workoutKey)}`,
       accessToken,
       {
@@ -683,6 +710,12 @@ export class SuuntoCloudSyncService {
       },
       jobId,
     );
+    this.assertSuuntoResponseSucceeded(response);
+    const workout = this.isRecord(response.payload) ? response.payload : response;
+    if (!Array.isArray(workout.extensions) || workout.extensions.some(extension => !this.isRecord(extension))) {
+      throw new BadGatewayException('SUUNTO_WORKOUT_EXTENSIONS_INVALID');
+    }
+    return response;
   }
 
   private async getUsableToken(userId: string, jobId?: string): Promise<ProviderTokenRow> {
@@ -794,8 +827,10 @@ export class SuuntoCloudSyncService {
           }),
         jobId,
       );
+      this.assertSuuntoResponseSucceeded(response.data);
       return response.data;
     } catch (error: unknown) {
+      if (error instanceof BadGatewayException) throw error;
       throw this.toHttpException(error);
     }
   }

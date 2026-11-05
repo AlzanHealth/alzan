@@ -1,17 +1,20 @@
-/**
- * Conservative workout-list strategy used until Suunto's private partner
- * contract confirms the endpoint pagination mechanism.
- */
+/** Offset pagination documented by Suunto Workout API v3 (List workouts). */
 export interface SuuntoWorkoutPaginationStrategy {
-  buildRequest(since: string): Record<string, string>;
+  buildRequest(since: string, until: string, offset: number): Record<string, string>;
   isComplete(returnedRows: number): boolean;
 }
 
-export class UnverifiedSinglePageWorkoutPaginationStrategy implements SuuntoWorkoutPaginationStrategy {
+export class OffsetWorkoutPaginationStrategy implements SuuntoWorkoutPaginationStrategy {
   public constructor(private readonly pageSize: number) {}
 
-  public buildRequest(since: string): Record<string, string> {
-    return { since, limit: String(this.pageSize) };
+  public buildRequest(since: string, until: string, offset: number): Record<string, string> {
+    return {
+      since,
+      until,
+      limit: String(this.pageSize),
+      offset: String(offset),
+      'filter-by-modification-time': 'false',
+    };
   }
 
   public isComplete(returnedRows: number): boolean {
