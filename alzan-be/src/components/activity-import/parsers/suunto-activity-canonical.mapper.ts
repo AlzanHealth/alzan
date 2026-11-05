@@ -115,13 +115,6 @@ const SUUNTO_EPOCH_MS_THRESHOLD = 100_000_000_000;
 const FIT_INVALID_SINT32 = 2147483647;
 const FIT_SEMICIRCLES_TO_DEGREES = 180 / 2147483648;
 const RADIANS_TO_DEGREES = 180 / Math.PI;
-const SUUNTO_LAP_EXTENSION_TYPES = new Set([
-  'intervalstream',
-  'manuallapstream',
-  'distancelap',
-  'durationlap',
-  'verticallap',
-]);
 const SUMMARY_FIT_DISTANCE_TOLERANCE_M = 25;
 
 const EMPTY_STREAMS: CanonicalActivityStreams = {
@@ -367,51 +360,6 @@ function readWorkoutExtensionType(extension: JsonRecord): string {
   return (readString(extension.type) ?? readString(extension.extensionType) ?? '').toLowerCase();
 }
 
-function readWorkoutLapMarkers(sources: unknown[], startedAt: string | null): Array<{ start: number; end: number }> {
-  if (!startedAt) return [];
-  const startedAtMs = Date.parse(startedAt);
-  if (!Number.isFinite(startedAtMs)) return [];
-
-  const readEpochMs = (value: unknown): number | null => {
-    if (typeof value === 'number' && Number.isFinite(value))
-      return value < SUUNTO_EPOCH_MS_THRESHOLD ? value * 1000 : value;
-    if (typeof value !== 'string' || value.trim().length === 0) return null;
-    const numeric = Number(value);
-    if (Number.isFinite(numeric) && /^\d+(\.\d+)?$/.test(value.trim())) {
-      return numeric < SUUNTO_EPOCH_MS_THRESHOLD ? numeric * 1000 : numeric;
-    }
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-
-  const markers: Array<{ start: number; end: number }> = [];
-  for (const source of sources) {
-    for (const extension of readSuuntoWorkoutExtensions(source)) {
-      const extensionType = readWorkoutExtensionType(extension)
-        .replace(/extension$/, '')
-        .replace(/[^a-z]/g, '');
-      if (!SUUNTO_LAP_EXTENSION_TYPES.has(extensionType)) continue;
-      const collections = [extension.intervals, extension.markers, extension.laps, extension.values, extension.data];
-      const entries = collections.find(Array.isArray);
-      if (!Array.isArray(entries)) continue;
-      for (const entry of entries) {
-        if (!isRecord(entry)) continue;
-        const startMs = readEpochMs(entry.startTime ?? entry.start_time ?? entry.start);
-        const endMs = readEpochMs(entry.endTime ?? entry.end_time ?? entry.stopTime ?? entry.end);
-        if (startMs == null || endMs == null || endMs <= startMs) continue;
-        const start = (startMs - startedAtMs) / 1000;
-        const end = (endMs - startedAtMs) / 1000;
-        if (start < 0 || end <= 0) continue;
-        if (!markers.some(marker => Math.abs(marker.start - start) < 0.5 && Math.abs(marker.end - end) < 0.5)) {
-          markers.push({ start, end });
-        }
-      }
-    }
-  }
-
-  return markers.sort((left, right) => left.start - right.start);
-}
-
 function interpolateDistanceAtOffset(activity: CanonicalActivity, offsetSeconds: number): number | null {
   if (offsetSeconds <= 0) return 0;
   const samples = activity.streams.distance
@@ -500,10 +448,24 @@ function readSuuntoIntervalEntries(source: unknown): JsonRecord[] {
     const type = readWorkoutExtensionType(extension)
       .replace(/extension$/, '')
       .replace(/[^a-z]/g, '');
-    if (!type.includes('interval')) return [];
+    if (!type.includes('interval') && type !== 'manuallapstream') return [];
 
     const collections = [extension.intervals, extension.windows, extension.laps, extension.values, extension.data];
     const entries: JsonRecord[] = [];
+    if (Array.isArray(extension.markers)) {
+      for (const marker of extension.markers.filter(isRecord)) {
+        const startTime = marker.startTime ?? marker.start_time ?? marker.start;
+        const endTime = marker.endTime ?? marker.end_time ?? marker.stopTime ?? marker.end;
+        if (startTime == null || endTime == null) continue;
+        entries.push({
+          ...(isRecord(marker.totals) ? marker.totals : {}),
+          ...marker,
+          startTime,
+          endTime,
+          requiresExplicitBounds: true,
+        });
+      }
+    }
     for (const collection of collections) {
       if (Array.isArray(collection)) {
         entries.push(...collection.filter(isRecord));
@@ -560,6 +522,32 @@ function readIntervalName(entry: JsonRecord): string | null {
   );
 }
 
+function mergeIntervalLapDetails(
+  lap: CanonicalActivityLap,
+  alternatives: CanonicalActivityLap[],
+): CanonicalActivityLap {
+  const match = alternatives.find(
+    candidate =>
+      candidate.startOffsetSeconds != null &&
+      lap.startOffsetSeconds != null &&
+      candidate.endOffsetSeconds != null &&
+      lap.endOffsetSeconds != null &&
+      Math.abs(candidate.startOffsetSeconds - lap.startOffsetSeconds) < 1 &&
+      Math.abs(candidate.endOffsetSeconds - lap.endOffsetSeconds) < 1,
+  );
+  if (!match) return lap;
+
+  return {
+    ...lap,
+    lapName: lap.lapName?.trim() ? lap.lapName : match.lapName,
+    distanceM: lap.distanceM ?? match.distanceM,
+    durationSeconds: lap.durationSeconds ?? match.durationSeconds,
+    avgPaceSecondsPerKm: lap.avgPaceSecondsPerKm ?? match.avgPaceSecondsPerKm,
+    avgHeartRate: lap.avgHeartRate ?? match.avgHeartRate,
+    maxHeartRate: lap.maxHeartRate ?? match.maxHeartRate,
+  };
+}
+
 function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]): CanonicalActivityLap[] {
   const startedAtMs = activity.summary.startedAt == null ? null : Date.parse(activity.summary.startedAt);
   if (startedAtMs == null || !Number.isFinite(startedAtMs)) return [];
@@ -578,6 +566,14 @@ function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]
       entry.endOffsetSeconds ?? entry.end_offset_s ?? entry.endOffset ?? entry.endTime ?? entry.end_time,
       startedAtMs,
     );
+    if (
+      entry.requiresExplicitBounds === true &&
+      (readIntervalOffset(entry.startTime, startedAtMs) == null ||
+        explicitEndOffsetSeconds == null ||
+        explicitEndOffsetSeconds <= startOffsetSeconds)
+    ) {
+      continue;
+    }
     const explicitDurationSeconds = readIntervalValue(
       entry,
       'Duration',
@@ -586,20 +582,12 @@ function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]
       'duration_s',
       'totalTimerTime',
       'total_timer_time',
-      'totalElapsedTime',
-      'total_elapsed_time',
     );
     const endOffsetSeconds =
       explicitEndOffsetSeconds ??
       (explicitDurationSeconds != null ? startOffsetSeconds + explicitDurationSeconds : null);
-    const durationSeconds =
-      explicitDurationSeconds ??
-      (endOffsetSeconds != null && endOffsetSeconds > startOffsetSeconds
-        ? endOffsetSeconds - startOffsetSeconds
-        : null);
-    if (durationSeconds == null || durationSeconds <= 0) continue;
-
-    const resolvedEndOffsetSeconds = endOffsetSeconds ?? startOffsetSeconds + durationSeconds;
+    if (endOffsetSeconds == null || endOffsetSeconds <= startOffsetSeconds) continue;
+    const resolvedEndOffsetSeconds = endOffsetSeconds;
     const intervalDistanceM = readIntervalValue(
       entry,
       'Distance',
@@ -624,8 +612,24 @@ function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]
         Math.abs(lap.startOffsetSeconds - startOffsetSeconds) <= 15 &&
         Math.abs(lap.endOffsetSeconds - resolvedEndOffsetSeconds) <= 30,
     );
-    const windowAverageHeartRate = readWindowMetric(entry, 'HR', 'Avg');
-    const windowMaxHeartRate = readWindowMetric(entry, 'HR', 'Max');
+    const durationSeconds =
+      explicitDurationSeconds ??
+      (entry.requiresExplicitBounds === true ? matchingFitLap?.durationSeconds : null) ??
+      readIntervalValue(entry, 'totalElapsedTime', 'total_elapsed_time') ??
+      resolvedEndOffsetSeconds - startOffsetSeconds;
+    if (durationSeconds <= 0) continue;
+    const windowAverageHeartRate =
+      readWindowMetric(entry, 'HR', 'Avg') ?? readIntervalValue(entry, 'avgHeartRate', 'avg_heart_rate');
+    const windowMaxHeartRate =
+      readWindowMetric(entry, 'HR', 'Max') ?? readIntervalValue(entry, 'maxHeartRate', 'max_heart_rate');
+    const sampledLap = buildLapFromIntervalWindow(
+      activity,
+      laps.length + 1,
+      startOffsetSeconds,
+      resolvedEndOffsetSeconds,
+      distanceM,
+      'manual',
+    );
     const intervalLap: CanonicalActivityLap = {
       lapIndex: laps.length + 1,
       lapName: readIntervalName(entry),
@@ -639,107 +643,29 @@ function buildSuuntoIntervalLaps(activity: CanonicalActivity, sources: unknown[]
       avgHeartRate:
         windowAverageHeartRate != null
           ? normaliseHeartRate(windowAverageHeartRate)
-          : (matchingFitLap?.avgHeartRate ?? null),
+          : (matchingFitLap?.avgHeartRate ?? sampledLap.avgHeartRate),
       maxHeartRate:
-        windowMaxHeartRate != null ? normaliseHeartRate(windowMaxHeartRate) : (matchingFitLap?.maxHeartRate ?? null),
+        windowMaxHeartRate != null
+          ? normaliseHeartRate(windowMaxHeartRate)
+          : (matchingFitLap?.maxHeartRate ?? sampledLap.maxHeartRate),
       startOffsetSeconds,
       endOffsetSeconds: resolvedEndOffsetSeconds,
     };
-    const duplicate = laps.some(
+    const duplicate = laps.findIndex(
       lap =>
         lap.startOffsetSeconds != null &&
-        Math.abs(lap.startOffsetSeconds - intervalLap.startOffsetSeconds!) < 1 &&
-        Math.abs((lap.endOffsetSeconds ?? 0) - (intervalLap.endOffsetSeconds ?? 0)) < 1,
+        Math.abs(lap.startOffsetSeconds - startOffsetSeconds) < 1 &&
+        Math.abs((lap.endOffsetSeconds ?? 0) - resolvedEndOffsetSeconds) < 1,
     );
-    if (!duplicate) {
+    if (duplicate >= 0) {
+      laps[duplicate] = mergeIntervalLapDetails(laps[duplicate], [intervalLap]);
+    } else {
       laps.push(intervalLap);
       nextStartOffsetSeconds = resolvedEndOffsetSeconds;
     }
   }
 
   return laps;
-}
-
-function reconstructMissingWorkoutBoundaryLaps(
-  activity: CanonicalActivity,
-  markers: Array<{ start: number; end: number }>,
-): CanonicalActivityLap[] | null {
-  if (activity.laps.length > 1 || markers.length === 0) return null;
-  const durationSeconds = activity.summary.durationSeconds;
-  const elapsedSeconds = activity.summary.elapsedSeconds;
-  const totalDistanceM = activity.summary.distanceM;
-  if (
-    durationSeconds == null ||
-    durationSeconds <= 0 ||
-    totalDistanceM == null ||
-    totalDistanceM <= 0 ||
-    (elapsedSeconds != null && Math.abs(elapsedSeconds - durationSeconds) > 30)
-  ) {
-    return null;
-  }
-
-  let cursor = 0;
-  const segments: Array<{ start: number; end: number; isMarker: boolean }> = [];
-  for (const marker of markers) {
-    if (marker.start < cursor - 0.5 || marker.end > durationSeconds + 0.5) return null;
-    if (marker.start - cursor > 30) segments.push({ start: cursor, end: marker.start, isMarker: false });
-    segments.push({ start: marker.start, end: marker.end, isMarker: true });
-    cursor = marker.end;
-  }
-  if (durationSeconds - cursor > 30) segments.push({ start: cursor, end: durationSeconds, isMarker: false });
-
-  const existingLap = activity.laps[0];
-  let matchedSegmentIndex = -1;
-  if (existingLap) {
-    if (
-      existingLap.startOffsetSeconds == null ||
-      existingLap.durationSeconds == null ||
-      existingLap.durationSeconds <= 0 ||
-      existingLap.distanceM == null ||
-      existingLap.distanceM <= 0
-    ) {
-      return null;
-    }
-    const existingEnd = existingLap.endOffsetSeconds ?? existingLap.startOffsetSeconds + existingLap.durationSeconds;
-    matchedSegmentIndex = segments.findIndex(
-      segment =>
-        segment.isMarker &&
-        Math.abs(segment.start - existingLap.startOffsetSeconds!) <= 15 &&
-        Math.abs(segment.end - existingEnd) <= 30,
-    );
-    if (matchedSegmentIndex < 0) return null;
-  }
-
-  const reconstructed: CanonicalActivityLap[] = [];
-  for (const segment of segments) {
-    const segmentDuration = segment.end - segment.start;
-    if (segmentDuration <= 0) return null;
-    const startDistanceM = interpolateDistanceAtOffset(activity, segment.start);
-    const endDistanceM = interpolateDistanceAtOffset(activity, segment.end);
-    if (startDistanceM == null || endDistanceM == null || endDistanceM <= startDistanceM) return null;
-    const lap =
-      existingLap &&
-      segment.isMarker &&
-      Math.abs(segment.start - existingLap.startOffsetSeconds!) <= 15 &&
-      Math.abs(
-        segment.end - (existingLap.endOffsetSeconds ?? existingLap.startOffsetSeconds! + existingLap.durationSeconds!),
-      ) <= 30
-        ? { ...existingLap, lapIndex: reconstructed.length + 1 }
-        : buildLapFromIntervalWindow(
-            activity,
-            reconstructed.length + 1,
-            segment.start,
-            segment.end,
-            endDistanceM - startDistanceM,
-            'unknown',
-          );
-    reconstructed.push(lap);
-  }
-
-  if (reconstructed.length <= activity.laps.length) return null;
-  const reconstructedDistanceM = reconstructed.reduce((sum, lap) => sum + (lap.distanceM ?? 0), 0);
-  if (Math.abs(reconstructedDistanceM - totalDistanceM) > Math.max(50, totalDistanceM * 0.03)) return null;
-  return reconstructed;
 }
 
 /** Enriches cloud FIT data with the documented summary and interval extensions returned by Suunto. */
@@ -776,16 +702,15 @@ export function applySuuntoWorkoutExtensions(activity: CanonicalActivity, ...sou
     }
   }
 
-  const markers = readWorkoutLapMarkers(sources, activity.summary.startedAt);
-  const reconstructedLaps = reconstructMissingWorkoutBoundaryLaps(activity, markers);
   const parsedIntervalLaps = buildSuuntoIntervalLaps(activity, sources);
   const existingIntervalLaps = activity.intervalLaps ?? [];
-  const intervalLaps =
-    parsedIntervalLaps.length >= existingIntervalLaps.length ? parsedIntervalLaps : existingIntervalLaps;
+  const useParsedIntervals = parsedIntervalLaps.length > existingIntervalLaps.length;
+  const primaryIntervals = useParsedIntervals ? parsedIntervalLaps : existingIntervalLaps;
+  const secondaryIntervals = useParsedIntervals ? existingIntervalLaps : parsedIntervalLaps;
+  const intervalLaps = primaryIntervals.map(lap => mergeIntervalLapDetails(lap, secondaryIntervals));
   return {
     ...activity,
     summary: { ...activity.summary, vo2Max, epoc, pte, recoveryTimeSeconds },
-    ...(reconstructedLaps ? { laps: reconstructedLaps } : {}),
     ...(intervalLaps.length > 0 ? { intervalLaps } : {}),
   };
 }

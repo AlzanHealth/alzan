@@ -115,6 +115,20 @@ function assertDistanceSplitSurvivesPauseAtOneKilometer(): void {
   );
 }
 
+function assertShortRemainderIsRetained(): void {
+  const samples = [makeMetricSample(0, 0), makeMetricSample(300, 1000), makeMetricSample(303, 1008)];
+  const [bucket] = buildDistanceSplitBucketsFromSamples(samples, [], 1008, 303);
+
+  assert.deepEqual(
+    bucket.laps.map(lap => lap.distanceM),
+    [1000, 8],
+  );
+  assert.deepEqual(
+    bucket.laps.map(lap => lap.durationSeconds),
+    [300, 3],
+  );
+}
+
 function assertOneKilometerAutolapsAreAggregated(): void {
   const laps = Array.from({ length: 9 }, (_, index) => makeLap(index + 1, 1000, 300 + index));
   laps.push(makeLap(10, 220, 70));
@@ -178,6 +192,7 @@ assertDistanceSamplesCreateSuuntoStyleSplits();
 assertShortRunOnlyHasOneKmDistanceTab();
 assertDistanceSplitTimesExcludeRecordedPauseGaps();
 assertDistanceSplitSurvivesPauseAtOneKilometer();
+assertShortRemainderIsRetained();
 assertOneKilometerAutolapsAreAggregated();
 assertNonStandardSeriesStayCustom();
 assertManualLapFallbackCreatesExactDistanceSplits();

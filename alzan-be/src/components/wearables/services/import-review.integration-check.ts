@@ -582,6 +582,7 @@ async function main(): Promise<void> {
             endOffsetSeconds: null,
           },
         ],
+        intervalLaps: [{ ...nativeLaps[0], lapName: 'Warm-up' }],
         heartRateZones: [],
         device: null,
         vendorFields: {},
@@ -637,6 +638,40 @@ async function main(): Promise<void> {
         .eq('id', sessionId);
       if (historicalScoreError)
         throw new Error(`mark historical totals association failed: ${historicalScoreError.message}`);
+      // A repair with no plan for the scored template must not complete a different plan.
+      const unrelatedPlanId = randomUUID();
+      createdPlanIds.add(unrelatedPlanId);
+      const { error: movePlanError } = await client
+        .from('workout_plans')
+        .update({ planned_date: '2026-06-12' })
+        .eq('id', planId);
+      if (movePlanError) throw movePlanError;
+      const { error: unrelatedPlanError } = await client.from('workout_plans').insert({
+        id: unrelatedPlanId,
+        user_id: userId,
+        planned_date: '2026-06-13',
+        status: 'planned',
+        endurance_template_id: genericTemplateId,
+      });
+      if (unrelatedPlanError) throw unrelatedPlanError;
+      await reconciliation.runEnduranceTemplateMatch(userId, sessionId);
+      const { data: unrelatedPlan, error: unrelatedPlanReadError } = await client
+        .from('workout_plans')
+        .select('status, activity_session_id')
+        .eq('id', unrelatedPlanId)
+        .single();
+      if (unrelatedPlanReadError) throw unrelatedPlanReadError;
+      assert.equal(unrelatedPlan.status, 'planned', 'repair must not complete an unrelated pending plan');
+      assert.equal(unrelatedPlan.activity_session_id, null);
+      const { error: deleteUnrelatedPlanError } = await client.from('workout_plans').delete().eq('id', unrelatedPlanId);
+      if (deleteUnrelatedPlanError) throw deleteUnrelatedPlanError;
+      createdPlanIds.delete(unrelatedPlanId);
+      const { error: restorePlanError } = await client
+        .from('workout_plans')
+        .update({ planned_date: '2026-06-13' })
+        .eq('id', planId);
+      if (restorePlanError) throw restorePlanError;
+
       const repeatedSessionId = await writer.upsertActivity(writerInput);
       assert.equal(repeatedSessionId, sessionId, 're-sync must update the same imported session');
       const matchedSession = await getSession(sessionId);
@@ -671,7 +706,8 @@ async function main(): Promise<void> {
         .from('activity_laps')
         .select('id', { count: 'exact', head: true })
         .eq('session_id', sessionId)
-        .eq('split_group', 'custom');
+        .eq('split_group', 'custom')
+        .eq('split_group_order', 0);
       assert.equal(persistedLapCount, 11, 'the exact Suunto workout must retain its eleven native laps');
       const { count: sessionsAfterMatch } = await client
         .from('activity_sessions')
@@ -689,9 +725,13 @@ async function main(): Promise<void> {
     {
       const templateId = randomUUID();
       const planId = randomUUID();
+      const cyclingTemplateId = randomUUID();
+      const cyclingPlanId = randomUUID();
       const sourceRecordId = `suunto-planned-day-source-${Date.now()}`;
       createdTemplateIds.add(templateId);
       createdPlanIds.add(planId);
+      createdTemplateIds.add(cyclingTemplateId);
+      createdPlanIds.add(cyclingPlanId);
 
       const { error: templateError } = await client.from('endurance_workout_templates').insert({
         id: templateId,
@@ -743,14 +783,33 @@ async function main(): Promise<void> {
       ]);
       if (stepsError) throw new Error(`insert same-day endurance steps failed: ${stepsError.message}`);
 
-      const { error: planError } = await client.from('workout_plans').insert({
-        id: planId,
+      const { error: cyclingTemplateError } = await client.from('endurance_workout_templates').insert({
+        id: cyclingTemplateId,
         user_id: userId,
-        planned_date: '2026-06-14',
-        status: 'planned',
-        endurance_template_id: templateId,
+        base_name: 'Planned cycling workout',
+        sport_type: 'cycling',
+        total_distance_m: 5156,
+        total_duration_s: 1980,
       });
-      if (planError) throw new Error(`insert same-day workout plan failed: ${planError.message}`);
+      if (cyclingTemplateError) throw cyclingTemplateError;
+
+      const { error: planError } = await client.from('workout_plans').insert([
+        {
+          id: planId,
+          user_id: userId,
+          planned_date: '2026-06-14',
+          status: 'planned',
+          endurance_template_id: templateId,
+        },
+        {
+          id: cyclingPlanId,
+          user_id: userId,
+          planned_date: '2026-06-14',
+          status: 'planned',
+          endurance_template_id: cyclingTemplateId,
+        },
+      ]);
+      if (planError) throw new Error(`insert same-day workout plans failed: ${planError.message}`);
 
       const laps = [
         { distanceM: 1149, durationSeconds: 481, avgHeartRate: 124 },
@@ -855,6 +914,13 @@ async function main(): Promise<void> {
       if (matchedPlanError) throw new Error(`read same-day workout plan failed: ${matchedPlanError.message}`);
       assert.equal(matchedPlan.status, 'completed', 'the unique scheduled plan is completed');
       assert.equal(matchedPlan.activity_session_id, sessionId);
+      const { data: cyclingPlan, error: cyclingPlanReadError } = await client
+        .from('workout_plans')
+        .select('status')
+        .eq('id', cyclingPlanId)
+        .single();
+      if (cyclingPlanReadError) throw cyclingPlanReadError;
+      assert.equal(cyclingPlan.status, 'planned', 'the cycling plan must remain untouched');
       const { count: lapCount } = await client
         .from('activity_laps')
         .select('id', { count: 'exact', head: true })
@@ -862,6 +928,59 @@ async function main(): Promise<void> {
         .eq('split_group', 'custom');
       assert.equal(lapCount, 3, 'all three Suunto laps are retained on the linked session');
       pass('endurance same-day plan: unique run linked despite another run, plan completed, all three laps retained');
+    }
+
+    // --- Endurance SAME-DAY PLAN SAFETY: the only plan still needs matching evidence ---
+    {
+      const templateId = randomUUID();
+      const planId = randomUUID();
+      createdTemplateIds.add(templateId);
+      createdPlanIds.add(planId);
+      const { error: templateError } = await client.from('endurance_workout_templates').insert({
+        id: templateId,
+        user_id: userId,
+        base_name: 'Long planned run',
+        sport_type: 'running',
+        total_distance_m: 24000,
+        total_duration_s: 7200,
+      });
+      if (templateError) throw templateError;
+      const { error: planError } = await client.from('workout_plans').insert({
+        id: planId,
+        user_id: userId,
+        planned_date: '2026-06-16',
+        status: 'planned',
+        endurance_template_id: templateId,
+      });
+      if (planError) throw planError;
+      const sessionId = await insertSession({
+        sport_type: 'running',
+        start_time: '2026-06-16T10:00:00Z',
+        started_at_local: '2026-06-16T10:00:00',
+        timezone: '+00:00',
+        source: 'imported',
+        provider: 'suunto',
+        provider_activity_id: `suunto-unrelated-run-${Date.now()}`,
+        distance_m: 1000,
+        duration_s: 600,
+      });
+      await reconciliation.runEnduranceTemplateMatch(userId, sessionId);
+
+      const session = await getSession(sessionId);
+      assert.equal(
+        session.endurance_template_id,
+        null,
+        'an unrelated short run must not complete the sole long run plan',
+      );
+      const { data: plan, error: planReadError } = await client
+        .from('workout_plans')
+        .select('status, activity_session_id')
+        .eq('id', planId)
+        .single();
+      if (planReadError) throw planReadError;
+      assert.equal(plan.status, 'planned');
+      assert.equal(plan.activity_session_id, null);
+      pass('endurance same-day safety: an unrelated imported run does not complete the only plan');
     }
 
     // --- Endurance SAME-DAY PLAN SAFETY: equally plausible planned runs need a choice ---

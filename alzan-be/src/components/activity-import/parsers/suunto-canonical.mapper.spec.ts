@@ -1067,7 +1067,7 @@ function assertSuuntoWorkoutExtensionsFillMissingMetrics(): void {
   assert.equal(streamMetrics.summary.epoc, 52.3);
 }
 
-function assertSuuntoIntervalExtensionReconstructsMissingWarmupAndCooldown(): void {
+function assertSuuntoIntervalExtensionDoesNotInventWarmupOrCooldown(): void {
   const activity = parseSuuntoActivityFileToCanonical(
     buildTestFit({
       sport: 1,
@@ -1108,19 +1108,11 @@ function assertSuuntoIntervalExtensionReconstructsMissingWarmupAndCooldown(): vo
     ],
   });
 
+  assert.deepEqual(enriched.laps, activity.laps);
   assert.deepEqual(
-    enriched.laps.map(lap => ({
-      lapIndex: lap.lapIndex,
-      distanceM: lap.distanceM,
-      durationSeconds: lap.durationSeconds,
-    })),
-    [
-      { lapIndex: 1, distanceM: 1149, durationSeconds: 481 },
-      { lapIndex: 2, distanceM: 2204, durationSeconds: 840 },
-      { lapIndex: 3, distanceM: 1803, durationSeconds: 554 },
-    ],
+    enriched.intervalLaps?.map(lap => [lap.distanceM, lap.durationSeconds]),
+    [[2204, 840]],
   );
-  assert.ok(enriched.laps.every(lap => lap.startOffsetSeconds != null && lap.endOffsetSeconds != null));
 
   const normalRun = applySuuntoWorkoutExtensions(activity, { extensions: [] });
   assert.equal(normalRun.laps.length, 1);
@@ -1141,7 +1133,7 @@ function assertSuuntoIntervalExtensionReconstructsMissingWarmupAndCooldown(): vo
   assert.equal(mismatchedInterval.laps.length, 1);
 }
 
-function assertSuuntoLapExtensionsReconstructMultipleWorkoutSections(): void {
+function assertSuuntoLapExtensionsKeepExplicitMarkerWindows(): void {
   const activity = parseSuuntoActivityFileToCanonical(
     buildTestFit({
       sport: 1,
@@ -1173,21 +1165,25 @@ function assertSuuntoLapExtensionsReconstructMultipleWorkoutSections(): void {
       {
         type: 'ManualLapStreamExtension',
         markers: [
-          { startTime: Date.parse('2026-05-01T08:10:00Z'), endTime: Date.parse('2026-05-01T08:20:00Z') },
+          {
+            startTime: Date.parse('2026-05-01T08:10:00Z'),
+            endTime: Date.parse('2026-05-01T08:20:10Z'),
+            totals: { distance: 1000, elapsedSeconds: 610 },
+          },
           { startTime: Date.parse('2026-05-01T08:30:00Z'), endTime: Date.parse('2026-05-01T08:50:00Z') },
+          { startTime: Date.parse('2026-05-01T08:50:00Z'), duration: 600 },
+          { startTime: 'invalid', endTime: Date.parse('2026-05-01T08:55:00Z') },
         ],
       },
     ],
   });
 
+  assert.deepEqual(enriched.laps, activity.laps);
   assert.deepEqual(
-    enriched.laps.map(lap => [lap.lapIndex, lap.lapType, lap.distanceM, lap.durationSeconds]),
+    enriched.intervalLaps?.map(lap => [lap.lapIndex, lap.lapType, lap.distanceM, lap.durationSeconds]),
     [
-      [1, 'unknown', 1000, 600],
-      [2, 'manual', 1000, 600],
-      [3, 'unknown', 1000, 600],
-      [4, 'unknown', 1500, 1200],
-      [5, 'unknown', 1500, 600],
+      [1, 'manual', 1000, 600],
+      [2, 'manual', 1500, 1200],
     ],
   );
 }
@@ -1355,6 +1351,22 @@ function assertSuuntoWorkoutExtensionsPreserveNamedIntervalsSeparatelyFromFitLap
       ['Relajación', 791, 300],
     ],
   );
+
+  const refreshed = applySuuntoWorkoutExtensions(enriched, {
+    payload: {
+      extensions: [
+        {
+          type: 'IntervalStreamExtension',
+          intervals: [
+            { startOffsetSeconds: 0, endOffsetSeconds: 480, distance: 1149 },
+            { startOffsetSeconds: 480, endOffsetSeconds: 1320, distance: 2204 },
+            { startOffsetSeconds: 1320, endOffsetSeconds: 1620, distance: 791 },
+          ],
+        },
+      ],
+    },
+  });
+  assert.deepEqual(refreshed.intervalLaps, enriched.intervalLaps);
 }
 
 function assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks(): void {
@@ -1521,8 +1533,8 @@ assertSuuntoFitCanonicalPreservesOriginalLocalTime();
 assertSuuntoSummaryOffsetOverridesFitFallback();
 assertSuuntoWorkoutExtensionsFillMissingMetrics();
 assertSuuntoWorkoutExtensionsPreserveNamedIntervalsSeparatelyFromFitLaps();
-assertSuuntoIntervalExtensionReconstructsMissingWarmupAndCooldown();
-assertSuuntoLapExtensionsReconstructMultipleWorkoutSections();
+assertSuuntoIntervalExtensionDoesNotInventWarmupOrCooldown();
+assertSuuntoLapExtensionsKeepExplicitMarkerWindows();
 assertSuuntoFitWithoutGpsStillParsesAsRouteImport();
 assertSuuntoJsonCanonicalParsesSummary();
 assertSuuntoJsonCanonicalUsesHeaderActivityNameFallbacks();

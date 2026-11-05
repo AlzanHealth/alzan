@@ -523,7 +523,8 @@ export const EnduranceSessionDetailScreen = () => {
           group.splitDistanceM != null &&
           derivedDistanceGroups.some(derivedGroup => derivedGroup.splitDistanceM === group.splitDistanceM);
 
-        return !customIsOneKilometer && !duplicatedByDerivedDistance;
+        const hasNamedLaps = group.laps.some(lap => Boolean(lap.lap_name?.trim()));
+        return (!customIsOneKilometer || hasNamedLaps) && !duplicatedByDerivedDistance;
       }),
     ];
 
@@ -579,13 +580,8 @@ export const EnduranceSessionDetailScreen = () => {
     if (activeSplits.some(lap => lap.lap_name != null && lap.lap_name.trim().length > 0)) {
       return activeSplits.map(lap => lap.lap_name?.trim() ?? '');
     }
-    if (!templateSteps) return [];
-    const topLevelPhases = templateSteps
-      .filter(step => !step.is_group && step.parent_step_id == null)
-      .sort((left, right) => left.order_index - right.order_index);
-    if (topLevelPhases.length !== activeSplits.length) return [];
-    return topLevelPhases.map(step => t(getPhaseLabel(step.phase_type)));
-  }, [activeSplitTab?.key, activeSplitTab?.splitGroup, activeSplits, t, templateSteps]);
+    return [];
+  }, [activeSplitTab?.splitGroup, activeSplits]);
   const activeSplitPaceValues = activeSplits
     .map(split => split.avg_pace_s_per_km)
     .filter((value): value is number => value != null && Number.isFinite(value) && value > 0);

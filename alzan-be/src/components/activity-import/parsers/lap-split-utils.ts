@@ -241,7 +241,7 @@ function buildSampledDistanceLaps(
   let startOffsetSeconds = 0;
   let distancePointIndex = 1;
 
-  while (startDistanceM < totalDistanceM - SPLIT_DISTANCE_TOLERANCE_M) {
+  while (totalDistanceM - startDistanceM > 0.001) {
     const endDistanceM = Math.min(startDistanceM + splitDistanceM, totalDistanceM);
     while (
       distancePointIndex < distancePoints.length - 1 &&
@@ -252,7 +252,7 @@ function buildSampledDistanceLaps(
     const previousPoint = distancePoints[Math.max(0, distancePointIndex - 1)];
     const currentPoint = distancePoints[distancePointIndex];
     const endOffsetSeconds = interpolateOffsetAtDistance(previousPoint, currentPoint, endDistanceM);
-    if (endOffsetSeconds == null || endOffsetSeconds <= startOffsetSeconds) break;
+    if (endOffsetSeconds == null || endOffsetSeconds <= startOffsetSeconds) return [];
 
     const distanceM = endDistanceM - startDistanceM;
     const durationSeconds = endOffsetSeconds - startOffsetSeconds;

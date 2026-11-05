@@ -12,6 +12,7 @@ import { normaliseCanonicalActivityLaps } from '../../activity-import/parsers/ca
 import {
   buildDistanceSplitBucketsFromLaps,
   buildDistanceSplitBucketsFromSamples,
+  buildDistanceSplitTargets,
   isOneKilometerAutoLapSequence,
 } from '../../activity-import/parsers/lap-split-utils';
 import { encodePolyline } from '../../activity-import/parsers/route-import.parser';
@@ -698,7 +699,7 @@ export class CanonicalActivityWriterService {
     const intervalLaps = normaliseCanonicalActivityLaps(activity.intervalLaps ?? [], activity.summary);
     if (laps.length === 0 && intervalLaps.length === 0 && activity.streams.distance.length === 0) return [];
 
-    const hasOneKilometerAutoLaps = isOneKilometerAutoLapSequence(laps);
+    const hasOneKilometerAutoLaps = isOneKilometerAutoLapSequence(laps) && !laps.some(lap => lap.lapName?.trim());
     const sampledDistanceBuckets = buildDistanceSplitBucketsFromSamples(
       activity.streams.distance,
       activity.streams.heartRate,
@@ -706,10 +707,18 @@ export class CanonicalActivityWriterService {
       activity.summary.durationSeconds,
       laps,
     );
-    const distanceBuckets =
-      sampledDistanceBuckets.length > 0
-        ? sampledDistanceBuckets
-        : buildDistanceSplitBucketsFromLaps(laps, activity.summary.distanceM);
+    const expectedTargets = buildDistanceSplitTargets(activity.summary.distanceM ?? 0);
+    const needsLapFallback =
+      sampledDistanceBuckets.length === 0 ||
+      expectedTargets.some(target => !sampledDistanceBuckets.some(bucket => bucket.splitDistanceM === target));
+    const distanceBuckets = needsLapFallback
+      ? [
+          ...sampledDistanceBuckets,
+          ...buildDistanceSplitBucketsFromLaps(laps, activity.summary.distanceM).filter(
+            fallback => !sampledDistanceBuckets.some(bucket => bucket.splitDistanceM === fallback.splitDistanceM),
+          ),
+        ].sort((left, right) => left.splitDistanceM - right.splitDistanceM)
+      : sampledDistanceBuckets;
     const distanceRows = distanceBuckets.flatMap((bucket, bucketIndex) =>
       bucket.laps.map(lap =>
         this.buildActivityLapInsert({

@@ -177,8 +177,8 @@ function assertIncrementalAndRepairLookbacks(): void {
   const dayMs = 24 * 60 * 60 * 1000;
   const lastSuccessAt = new Date(now).toISOString();
 
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 19, false, lastSuccessAt), now - 3 * dayMs);
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 19, true, lastSuccessAt), now - 20 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 21, false, lastSuccessAt), now - 3 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 21, true, lastSuccessAt), now - 20 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 11, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 9, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 7, false, lastSuccessAt), now - 30 * dayMs);
@@ -322,10 +322,10 @@ async function assertSyncRepairsOlderVersionAndSkipsCurrentWorkout(): Promise<vo
   assert.deepEqual(
     [...claimedCanonicalVersions].sort((left, right) => left.sourceRecordId.localeCompare(right.sourceRecordId)),
     [
-      { sourceRecordId: 'broken-workout', version: 19 },
-      { sourceRecordId: 'current-workout', version: 19 },
-      { sourceRecordId: 'existing-workout', version: 19 },
-      { sourceRecordId: 'new-workout', version: 19 },
+      { sourceRecordId: 'broken-workout', version: 21 },
+      { sourceRecordId: 'current-workout', version: 21 },
+      { sourceRecordId: 'existing-workout', version: 21 },
+      { sourceRecordId: 'new-workout', version: 21 },
     ],
   );
   assert.equal(result.activitiesImported, 1);
