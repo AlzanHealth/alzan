@@ -44,6 +44,7 @@ type FakeRecordedMutation = {
 };
 
 interface CanonicalActivityWriterServicePrivate {
+  preserveNamedSuuntoLaps(input: UpsertActivityInput, sessionId: string): Promise<UpsertActivityInput>;
   insertInChunks(table: InsertableTable, rows: Array<Record<string, unknown>>, errorCode: string): Promise<void>;
   persistActivityBundle(params: {
     clearProvenanceSessionId: string | null;
@@ -1158,7 +1159,50 @@ function assertStaticOrInvalidPositionSamplesAreDropped(): void {
   );
 }
 
+async function assertCloudResyncPreservesNamedOriginalPhases(): Promise<void> {
+  const rows = ['Calentamiento', 'Intervalo', 'Relajación'].map((name, index) => ({
+    lap_index: index + 1,
+    lap_name: name,
+    lap_type: 'manual',
+    distance_m: 1000,
+    duration_s: 300,
+    avg_pace_s_per_km: 300,
+    avg_heart_rate: 140,
+    max_heart_rate: 155,
+    start_offset_s: index * 300,
+    end_offset_s: (index + 1) * 300,
+  }));
+  const response = Promise.resolve({ data: rows, error: null });
+  const query: { eq: () => object; then: typeof response.then } = {
+    eq: () => query,
+    then: response.then.bind(response),
+  };
+  const client = { from: () => ({ select: () => query }) };
+  const service = new CanonicalActivityWriterService(
+    { client } as unknown as SupabaseAdminService,
+    {} as RawPayloadService,
+    {} as DedupeService,
+    {} as ImportReconciliationService,
+  ) as unknown as CanonicalActivityWriterServicePrivate;
+  const input = buildLifecycleInput(buildCanonicalRun());
+  const preserved = await service.preserveNamedSuuntoLaps(input, 'session-1');
+  assert.deepEqual(
+    preserved.activity.laps.map(lap => lap.lapName),
+    rows.map(row => row.lap_name),
+  );
+  assert.equal(preserved.activity.summary, input.activity.summary);
+  assert.equal(preserved.activity.streams, input.activity.streams);
+  const namedInput = { ...input, activity: { ...input.activity, laps: preserved.activity.laps } };
+  assert.equal(await service.preserveNamedSuuntoLaps(namedInput, 'session-1'), namedInput);
+  const fileInput: UpsertActivityInput = {
+    ...input,
+    provenance: { ...input.provenance, sourceChannel: 'file_import' },
+  };
+  assert.equal(await service.preserveNamedSuuntoLaps(fileInput, 'session-1'), fileInput);
+}
+
 async function run(): Promise<void> {
+  await assertCloudResyncPreservesNamedOriginalPhases();
   assertPositionSamplesAreSanitizedForValidRoutes();
   assertStaticOrInvalidPositionSamplesAreDropped();
   await assertStreamSamplesUseTransportSafeChunks();

@@ -2450,6 +2450,7 @@ export default {
     runningShoeSaveError: 'No se han podido cambiar las zapatillas de esta carrera. Inténtalo de nuevo.',
     runningShoeNoShoes: 'Añade tus zapatillas de running en Ajustes para asociarlas a esta carrera.',
     runningShoeManage: 'Gestionar zapatillas',
+    runningShoeMileageLabel: 'Kilómetros de este par',
     completedStatus: 'Completado',
     viewSummary: 'Ver resumen',
     finishedDraftCleanupError:
@@ -2791,6 +2792,8 @@ export default {
     activityEffortSection: 'Esfuerzo y frecuencia cardiaca',
     activityDateSection: 'Fecha y hora',
     splitCustom: 'Personalizado',
+    suuntoUnidentifiedSegments:
+      'Suunto no ha facilitado los detalles de fase de algunos tramos. Los límites disponibles pueden diferir de las fases de su app.',
     split1k: '1 km',
     split5k: '5 km',
     split10k: '10 km',

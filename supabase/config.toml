@@ -79,6 +79,7 @@ sql_paths = [
   "./seeds/11_sport_catalog_options.sql",
   "./seeds/12_cardio_evolution.sql",
   "./seeds/13_nutrition_pdf_demo.sql",
+  "./seeds/14_running_shoes_demo.sql",
   "./seeds/20_exercise_catalog_demo.sql",
 ]
 

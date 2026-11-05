@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../../context/ThemeContext';
 import { Alert } from '../../../components/common/Alert';
+import { GlassCard } from '../../../components/GlassCard';
 import { useEnduranceSessions } from '../../../hooks/useEnduranceSessions';
 import { useRunningShoes } from '../hooks/useRunningShoes';
 import { RunningShoeWithMileage } from '../services/runningShoesService';
@@ -17,7 +18,7 @@ type RunningShoeAssignmentProps = {
 };
 
 export const RunningShoeAssignment = ({ sessionId, runningShoeId }: RunningShoeAssignmentProps) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { colors } = useTheme();
   const navigation = useNavigation<TrainingScreenNavigationProp>();
   const { shoes, isLoading } = useRunningShoes();
@@ -25,6 +26,9 @@ export const RunningShoeAssignment = ({ sessionId, runningShoeId }: RunningShoeA
   const [selectorVisible, setSelectorVisible] = useState(false);
 
   const selectedShoe = shoes.find(shoe => shoe.id === runningShoeId);
+  const selectedShoeDistance = selectedShoe
+    ? (selectedShoe.total_distance_m / 1000).toLocaleString(i18n.language, { maximumFractionDigits: 1 })
+    : null;
 
   const assignShoe = assignRunningShoe.mutateAsync;
   const assign = useCallback(
@@ -65,39 +69,58 @@ export const RunningShoeAssignment = ({ sessionId, runningShoeId }: RunningShoeA
   );
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surfaceSolid, borderColor: colors.border }]}>
-      <View style={styles.header}>
-        <View style={[styles.icon, { backgroundColor: colors.selectedOptionBackground }]}>
-          <Footprints size={18} color={colors.primary} />
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t('training.runningShoeSelectorLabel')}</Text>
+      <GlassCard style={styles.card}>
+        <View style={styles.header}>
+          <View style={[styles.icon, { backgroundColor: colors.selectedOptionBackground }]}>
+            <Footprints size={18} color={colors.primary} />
+          </View>
+          <View style={styles.labelBlock}>
+            <Text style={[styles.value, { color: colors.textPrimary }]} numberOfLines={1}>
+              {selectedShoe?.name ?? t('training.runningShoeNone')}
+            </Text>
+            {selectedShoe && selectedShoeDistance !== null && (
+              <View style={styles.mileageRow}>
+                <Text style={[styles.mileageLabel, { color: colors.textSecondary }]}>
+                  {t('training.runningShoeMileageLabel')}
+                </Text>
+                <Text style={[styles.mileageValue, { color: colors.textPrimary }]}>
+                  {t('settings.runningShoesMileage', { distance: selectedShoeDistance })}
+                </Text>
+              </View>
+            )}
+          </View>
+          {isLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : shoes.length > 0 ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t('training.runningShoeSelectorTitle')}
+              style={styles.changeButton}
+              onPress={() => setSelectorVisible(true)}
+              activeOpacity={0.75}
+            >
+              <ChevronRight size={22} color={colors.primary} />
+            </TouchableOpacity>
+          ) : null}
         </View>
-        <View style={styles.labelBlock}>
-          <Text style={[styles.label, { color: colors.textPrimary }]}>{t('training.runningShoeSelectorLabel')}</Text>
-          <Text style={[styles.value, { color: colors.textSecondary }]}>
-            {selectedShoe?.name ?? t('training.runningShoeNone')}
-          </Text>
-        </View>
-        {isLoading ? (
-          <ActivityIndicator size="small" color={colors.primary} />
-        ) : shoes.length > 0 ? (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={t('training.runningShoeSelectorTitle')}
-            style={styles.changeButton}
-            onPress={() => setSelectorVisible(true)}
-          >
-            <ChevronRight size={21} color={colors.primary} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
 
-      {!isLoading && shoes.length === 0 ? (
-        <View style={[styles.emptyActions, { borderTopColor: colors.border }]}>
-          <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('training.runningShoeNoShoes')}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings', { screen: 'RunningShoesSettings' })}>
-            <Text style={[styles.manageText, { color: colors.primary }]}>{t('training.runningShoeManage')}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
+        {!isLoading && shoes.length === 0 ? (
+          <View style={[styles.emptyActions, { borderTopColor: colors.border }]}>
+            <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('training.runningShoeNoShoes')}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={styles.manageButton}
+              onPress={() => navigation.navigate('Settings', { screen: 'RunningShoesSettings' })}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.manageText, { color: colors.primary }]}>{t('training.runningShoeManage')}</Text>
+              <ChevronRight size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </GlassCard>
 
       <Modal
         visible={selectorVisible}
@@ -137,26 +160,36 @@ export const RunningShoeAssignment = ({ sessionId, runningShoeId }: RunningShoeA
 };
 
 const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    borderRadius: borderRadius.l,
-    padding: spacing.m,
-    marginHorizontal: spacing.m,
-    marginTop: spacing.m,
-  },
+  section: { marginHorizontal: spacing.m, marginTop: spacing.l },
+  sectionTitle: { ...typography.h3, marginBottom: spacing.m },
+  card: { padding: spacing.m },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.s },
-  icon: { width: 36, height: 36, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
-  labelBlock: { flex: 1, gap: 2 },
-  label: { ...typography.body, fontWeight: '600' },
-  value: { ...typography.caption },
-  changeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  icon: { width: 40, height: 40, borderRadius: borderRadius.full, alignItems: 'center', justifyContent: 'center' },
+  labelBlock: { flex: 1, gap: 3 },
+  value: { ...typography.body, fontWeight: '600' },
+  mileageRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.s },
+  mileageLabel: { ...typography.caption },
+  mileageValue: { ...typography.caption, fontWeight: '600' },
+  changeButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.full,
+  },
   emptyActions: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: spacing.m,
     paddingTop: spacing.m,
     gap: spacing.s,
   },
   hint: { ...typography.caption, lineHeight: 18 },
+  manageButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+  },
   manageText: { ...typography.body, fontWeight: '600' },
   modalOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.m },
   modalCard: { width: '100%', maxWidth: 440, maxHeight: '85%', borderRadius: borderRadius.l, padding: spacing.m },

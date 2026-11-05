@@ -2419,6 +2419,7 @@ const en = {
     runningShoeSaveError: 'Could not update the shoe for this run. Please try again.',
     runningShoeNoShoes: 'Add your running shoes in Settings to assign them to this run.',
     runningShoeManage: 'Manage shoes',
+    runningShoeMileageLabel: 'Mileage on this pair',
     completedStatus: 'Completed',
     viewSummary: 'View summary',
     finishedDraftCleanupError: 'The session was saved, but its local copy could not be cleared. Do not save it again.',
@@ -2750,6 +2751,8 @@ const en = {
     activityEffortSection: 'Effort and heart rate',
     activityDateSection: 'Date and time',
     splitCustom: 'Custom',
+    suuntoUnidentifiedSegments:
+      'Suunto has not provided phase details for some segments. Their available boundaries may differ from the phases in the Suunto app.',
     split1k: '1 km',
     split5k: '5 km',
     split10k: '10 km',
