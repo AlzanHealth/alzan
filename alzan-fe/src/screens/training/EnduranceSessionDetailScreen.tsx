@@ -1791,10 +1791,6 @@ export const EnduranceSessionDetailScreen = () => {
             )}
           </View>
 
-          {session.sport_type === 'running' && (
-            <RunningShoeAssignment sessionId={session.id} runningShoeId={session.running_shoe_id} />
-          )}
-
           {/* Route Map — shown only for endurance sessions with a polyline */}
           {!isGymSession && routePolyline && (
             <View style={{ marginTop: 8, marginBottom: 24 }}>
@@ -2392,9 +2388,12 @@ export const EnduranceSessionDetailScreen = () => {
             </View>
           )}
 
-          {/* Keep programmed workout at the very bottom of the detail screen */}
+          {/* Keep the programmed workout and shoe assignment at the bottom of the detail screen */}
           {renderRecordedBreakdown()}
           {renderProgrammedWorkoutSection()}
+          {session.sport_type === 'running' && (
+            <RunningShoeAssignment sessionId={session.id} runningShoeId={session.running_shoe_id} />
+          )}
         </ScrollView>
       </SafeAreaView>
 
