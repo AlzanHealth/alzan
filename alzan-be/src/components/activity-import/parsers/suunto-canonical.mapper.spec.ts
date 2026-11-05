@@ -1658,6 +1658,72 @@ function assertSummaryLastFitPreservesExplicitLapEndWithoutElapsedTime(): void {
   assert.equal(activity.laps[0].endOffsetSeconds, 610);
 }
 
+function assertNamedCloudPhasesBecomePrimaryCustomLaps(): void {
+  for (const repetitions of [1, 7, 15]) {
+    const phases = [
+      { name: 'Calentamiento', duration: 480 },
+      ...Array.from({ length: repetitions }, () => [
+        { name: 'Intervalo', duration: 60 },
+        { name: 'Recuperación', duration: 30 },
+      ]).flat(),
+      { name: 'Enfriamiento', duration: 300 },
+    ];
+    let offset = 0;
+    const intervals = phases.map(phase => {
+      const interval = {
+        ...phase,
+        startOffsetSeconds: offset,
+        endOffsetSeconds: offset + phase.duration,
+        distance: phase.duration * 3,
+      };
+      offset += phase.duration;
+      return interval;
+    });
+    for (const variant of [
+      { sparseFit: true, trailingSeconds: 0 },
+      { sparseFit: false, trailingSeconds: 0 },
+      { sparseFit: true, trailingSeconds: 120 },
+      { sparseFit: false, trailingSeconds: 120 },
+    ]) {
+      const { sparseFit, trailingSeconds } = variant;
+      const activity = parseSuuntoActivityFileToCanonical(
+        buildTestFit({
+          sport: 1,
+          subSport: 0,
+          distanceM: offset * 3,
+          durationSeconds: offset + trailingSeconds,
+          records: [
+            { offsetSeconds: 0, distanceM: 0 },
+            { offsetSeconds: offset + trailingSeconds, distanceM: offset * 3 },
+          ],
+          laps: (sparseFit ? intervals.slice(1, 2) : intervals).map(phase => ({
+            startOffsetSeconds: phase.startOffsetSeconds,
+            durationSeconds: phase.duration,
+            distanceM: phase.distance,
+            lapTrigger: 8,
+          })),
+        }),
+        'cloud-phases.fit',
+      );
+      const enriched = applySuuntoWorkoutExtensions(activity, {
+        extensions: [{ type: 'IntervalStreamExtension', intervals }],
+      });
+      assert.deepEqual(
+        enriched.laps.map(lap => [lap.lapName, lap.durationSeconds, lap.distanceM]),
+        intervals.map(phase => [phase.name, phase.duration, phase.distance]),
+        `Primary custom laps must retain every named phase (${repetitions} repetitions, sparse=${sparseFit})`,
+      );
+      assert.deepEqual(applySuuntoWorkoutExtensions(enriched, {}).laps, enriched.laps);
+      const invalidPhases = enriched.intervalLaps!.map((lap, index, laps) =>
+        index === laps.length - 1 ? { ...lap, endOffsetSeconds: offset + trailingSeconds + 100 } : lap,
+      );
+      const guarded = applySuuntoWorkoutExtensions({ ...activity, intervalLaps: invalidPhases }, {});
+      assert.ok(guarded.laps.every(lap => (lap.endOffsetSeconds ?? 0) <= offset + trailingSeconds + 1));
+    }
+  }
+}
+
+assertNamedCloudPhasesBecomePrimaryCustomLaps();
 assertSummaryLastFitPreservesExplicitLapEndWithoutElapsedTime();
 assertPartialIntervalResponsesKeepAllDisjointRepetitions();
 assertCloudPartialLapsRetainRecordedCoverageAndPauseTimes();

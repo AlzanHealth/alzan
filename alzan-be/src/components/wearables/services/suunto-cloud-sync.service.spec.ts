@@ -160,6 +160,23 @@ async function assertIntervalExtensionFallbackUsesOfficialV3Endpoint(): Promise<
     true,
   );
   assert.equal(service.shouldFetchWorkoutExtensions({ extensionTypes: ['SUMMARY'] }, activity), false);
+  for (const extensionType of [
+    'INTERVAL',
+    'ManualLapStreamExtension',
+    'DistanceLapExtension',
+    'DurationLapExtension',
+    'VerticalLapExtension',
+  ]) {
+    assert.equal(
+      service.shouldFetchWorkoutExtensions({ extensionTypes: [extensionType] }, {
+        ...activity,
+        laps: [{ lapName: 'Intervalo' }, { lapName: 'Recuperación' }],
+        intervalLaps: [{ lapName: 'Intervalo' }],
+      } as unknown as CanonicalActivity),
+      true,
+      `Named FIT laps do not prove that ${extensionType} contains no additional laps`,
+    );
+  }
 
   const result = await service.fetchWorkoutExtensions('access-token', 'workout-key');
   assert.deepEqual(result, [response]);
@@ -177,8 +194,8 @@ function assertIncrementalAndRepairLookbacks(): void {
   const dayMs = 24 * 60 * 60 * 1000;
   const lastSuccessAt = new Date(now).toISOString();
 
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 23, false, lastSuccessAt), now - 3 * dayMs);
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 23, true, lastSuccessAt), now - 20 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 24, false, lastSuccessAt), now - 3 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 24, true, lastSuccessAt), now - 20 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 11, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 9, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 7, false, lastSuccessAt), now - 30 * dayMs);
@@ -322,10 +339,10 @@ async function assertSyncRepairsOlderVersionAndSkipsCurrentWorkout(): Promise<vo
   assert.deepEqual(
     [...claimedCanonicalVersions].sort((left, right) => left.sourceRecordId.localeCompare(right.sourceRecordId)),
     [
-      { sourceRecordId: 'broken-workout', version: 23 },
-      { sourceRecordId: 'current-workout', version: 23 },
-      { sourceRecordId: 'existing-workout', version: 23 },
-      { sourceRecordId: 'new-workout', version: 23 },
+      { sourceRecordId: 'broken-workout', version: 24 },
+      { sourceRecordId: 'current-workout', version: 24 },
+      { sourceRecordId: 'existing-workout', version: 24 },
+      { sourceRecordId: 'new-workout', version: 24 },
     ],
   );
   assert.equal(result.activitiesImported, 1);

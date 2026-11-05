@@ -700,6 +700,28 @@ function completeSuuntoCustomLapCoverage(
   intervalLaps: CanonicalActivityLap[],
   sources: unknown[],
 ): CanonicalActivityLap[] {
+  const nativeManualLaps = activity.laps.filter(lap => lap.lapType === 'manual');
+  const nativeStructure = nativeManualLaps.length > 0 ? nativeManualLaps : activity.laps;
+  const recordedEnd = activity.summary.elapsedSeconds;
+  const hasNamedPhaseSequence =
+    intervalLaps.length > 0 &&
+    intervalLaps.every(
+      (lap, index) =>
+        Boolean(lap.lapName?.trim()) &&
+        lap.startOffsetSeconds != null &&
+        lap.endOffsetSeconds != null &&
+        Number.isFinite(lap.startOffsetSeconds) &&
+        Number.isFinite(lap.endOffsetSeconds) &&
+        lap.startOffsetSeconds >= 0 &&
+        lap.endOffsetSeconds > lap.startOffsetSeconds &&
+        (recordedEnd == null || lap.endOffsetSeconds <= recordedEnd + 1) &&
+        (index === 0 || lap.startOffsetSeconds >= (intervalLaps[index - 1].endOffsetSeconds ?? Infinity)),
+    );
+  // Provider phases need not cover the entire recording. Keep their actual
+  // boundaries instead of replacing them with inferred leading/trailing gaps.
+  if (hasNamedPhaseSequence && intervalLaps.length >= nativeStructure.length) {
+    return intervalLaps.map((lap, index) => ({ ...lap, lapIndex: index + 1 }));
+  }
   const elapsedSeconds = activity.summary.elapsedSeconds;
   const timerSeconds = activity.summary.durationSeconds;
   const startedAtMs = Date.parse(activity.summary.startedAt ?? '');
