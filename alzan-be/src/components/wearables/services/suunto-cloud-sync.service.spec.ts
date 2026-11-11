@@ -1,4 +1,6 @@
 import { strict as assert } from 'assert';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { CanonicalActivity } from '../../activity-import/parsers/activity-import-canonical.types';
@@ -7,7 +9,7 @@ import { IntegrationSyncStateService } from './integration-sync-state.service';
 import { RawPayloadService } from './raw-payload.service';
 import { SuuntoCloudSyncService } from './suunto-cloud-sync.service';
 import { WearableImportLifecycleService } from './wearable-import-lifecycle.service';
-import { UnverifiedSinglePageWorkoutPaginationStrategy } from './suunto-workout-pagination.strategy';
+import { OffsetWorkoutPaginationStrategy } from './suunto-workout-pagination.strategy';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -32,14 +34,20 @@ type CapturedRequest = {
   path: string | null;
 };
 
-function assertUnverifiedStrategyNeverInventsAnOffset(): void {
-  const strategy = new UnverifiedSinglePageWorkoutPaginationStrategy(100);
-  assert.deepEqual(strategy.buildRequest('123'), { since: '123', limit: '100' });
+function assertStrategyUsesDocumentedOffset(): void {
+  const strategy = new OffsetWorkoutPaginationStrategy(100);
+  assert.deepEqual(strategy.buildRequest('123', '456', 100), {
+    since: '123',
+    until: '456',
+    limit: '100',
+    offset: '100',
+    'filter-by-modification-time': 'false',
+  });
   assert.equal(strategy.isComplete(99), true);
   assert.equal(strategy.isComplete(100), false);
 }
 
-function createService(response: JsonRecord[]): {
+function createService(response: JsonRecord | JsonRecord[]): {
   capturedRequest: CapturedRequest;
   service: SuuntoCloudSyncServicePrivate;
 } {
@@ -82,7 +90,9 @@ async function assertFirstWorkoutSyncIsLimitedToLastThirtyDays(): Promise<void> 
 
     const actualResult = await service.fetchWorkoutSummaries('access-token');
 
-    assert.equal(capturedRequest.path, '/v2/workouts');
+    assert.equal(capturedRequest.path, '/v3/workouts');
+    assert.equal(capturedRequest.params?.['filter-by-modification-time'], 'false');
+    assert.equal(capturedRequest.params?.until, String(fixedNowMs));
     assert.equal(capturedRequest.accessToken, 'access-token');
     assert.equal(capturedRequest.params?.since, String(cutoffMs));
     assert.deepEqual(
@@ -94,28 +104,121 @@ async function assertFirstWorkoutSyncIsLimitedToLastThirtyDays(): Promise<void> 
   }
 }
 
-async function assertSaturatedWorkoutListIsReportedAsUnverified(): Promise<void> {
-  const { service } = createService([]);
-  const requestedOffsets: number[] = [];
-  service.getSuunto = async <T>(_path: string, _token: string, params?: Record<string, string>): Promise<T> => {
-    const offset = Number(params?.offset ?? 0);
-    requestedOffsets.push(offset);
-    return Array.from({ length: 100 }, (_, index) => ({
-      workoutKey: `workout-${offset + index}`,
-      startTime: Date.now(),
-    })) as T;
-  };
+async function assertWorkoutPaginationLoadsAllPages(): Promise<void> {
+  for (const count of [0, 99, 100, 205]) {
+    const { service } = createService([]);
+    const requests: Record<string, string>[] = [];
+    service.getSuunto = async <T>(_path: string, _token: string, params?: Record<string, string>): Promise<T> => {
+      requests.push(params!);
+      const offset = Number(params?.offset ?? 0);
+      return {
+        error: null,
+        payload: Array.from({ length: Math.max(0, Math.min(100, count - offset)) }, (_, index) => ({
+          workoutKey: `workout-${offset + index}`,
+          startTime: Date.now() - 1000,
+        })),
+      } as T;
+    };
+    const result = await service.fetchWorkoutSummaries('access-token');
+    assert.equal(result.workouts.length, count);
+    assert.equal(result.isPaginationVerified, true);
+    assert.deepEqual(
+      requests.map(request => Number(request.offset)),
+      Array.from({ length: Math.floor(count / 100) + 1 }, (_, index) => index * 100),
+    );
+    assert.equal(new Set(requests.map(request => request.until)).size, 1);
+  }
+}
 
+async function assertRepeatedPageStopsAsPartial(): Promise<void> {
+  const page = Array.from({ length: 100 }, (_, index) => ({
+    workoutKey: `workout-${index}`,
+    startTime: Date.now() - 1000,
+  }));
+  const { service } = createService(page);
   const result = await service.fetchWorkoutSummaries('access-token');
-
   assert.equal(result.workouts.length, 100);
   assert.equal(result.isPaginationVerified, false);
-  assert.deepEqual(requestedOffsets, [0]);
+}
+
+async function assertMalformedWorkoutListIsNotEmptySuccess(): Promise<void> {
+  for (const response of [
+    { error: { code: 'FAILED' }, payload: [] },
+    { error: null, payload: null },
+    { payload: [null] },
+  ]) {
+    const { service } = createService([]);
+    service.getSuunto = async <T>(): Promise<T> => response as T;
+    await assert.rejects(() => service.fetchWorkoutSummaries('access-token'));
+  }
+}
+
+async function assertInvalidExtensionResponseIsRejected(): Promise<void> {
+  for (const response of [
+    { error: null, payload: null },
+    { payload: {} },
+    { payload: { extensions: null } },
+    { error: { code: 'FAILED' }, payload: { extensions: [] } },
+  ]) {
+    const { service } = createService(response);
+    await assert.rejects(() => service.fetchWorkoutExtensions('token', 'key'));
+  }
+  const valid = { error: null, payload: { extensions: [] } };
+  const { service } = createService(valid);
+  assert.deepEqual(await service.fetchWorkoutExtensions('token', 'key'), valid);
+}
+
+async function assertExtensionFailureDoesNotPersistIncompleteActivity(): Promise<void> {
+  let persisted = 0;
+  const service = new SuuntoCloudSyncService(
+    {} as ConfigService,
+    {} as SupabaseAdminService,
+    { storeRawPayload: async () => ({ id: 'raw-id' }) } as unknown as RawPayloadService,
+    {} as IntegrationSyncStateService,
+    {
+      upsertActivity: async () => {
+        persisted += 1;
+        return 'session-id';
+      },
+    } as unknown as CanonicalActivityWriterService,
+    {} as WearableImportLifecycleService,
+  ) as unknown as {
+    fetchWorkoutFit(): Promise<Uint8Array>;
+    fetchWorkoutExtensions(): Promise<JsonRecord>;
+    importWorkout(
+      user: string,
+      token: string,
+      key: string,
+      summary: JsonRecord,
+      importId: string,
+      jobId: string,
+      durations: JsonRecord,
+    ): Promise<string>;
+  };
+  service.fetchWorkoutFit = async () =>
+    new Uint8Array(
+      readFileSync(
+        resolve(__dirname, '../../activity-import/__fixtures__/providers/suunto/running-fit-user-redacted.fit'),
+      ),
+    );
+  service.fetchWorkoutExtensions = async () => {
+    throw new Error('extension-download-failed');
+  };
+  await assert.rejects(() =>
+    service.importWorkout('user', 'token', 'key', { extensionTypes: ['INTERVAL'] }, 'import', 'job', {}),
+  );
+  assert.equal(persisted, 0);
+  service.fetchWorkoutExtensions = async () => ({ error: null, payload: { extensions: [] } });
+  assert.equal(
+    await service.importWorkout('user', 'token', 'key', { extensionTypes: ['INTERVAL'] }, 'import', 'job', {}),
+    'session-id',
+  );
+  assert.equal(persisted, 1);
 }
 
 async function assertIntervalExtensionFallbackUsesOfficialV3Endpoint(): Promise<void> {
   const response = { payload: { extensions: [{ type: 'IntervalStreamExtension', intervals: [] }] } };
-  const { capturedRequest, service } = createService([response]);
+  const { capturedRequest, service } = createService(response);
   const activity = {
     laps: [{}],
     summary: { vo2Max: 47.5, epoc: 52.3, pte: 3.2 },
@@ -160,14 +263,31 @@ async function assertIntervalExtensionFallbackUsesOfficialV3Endpoint(): Promise<
     true,
   );
   assert.equal(service.shouldFetchWorkoutExtensions({ extensionTypes: ['SUMMARY'] }, activity), false);
+  for (const extensionType of [
+    'INTERVAL',
+    'ManualLapStreamExtension',
+    'DistanceLapExtension',
+    'DurationLapExtension',
+    'VerticalLapExtension',
+  ]) {
+    assert.equal(
+      service.shouldFetchWorkoutExtensions({ extensionTypes: [extensionType] }, {
+        ...activity,
+        laps: [{ lapName: 'Intervalo' }, { lapName: 'Recuperación' }],
+        intervalLaps: [{ lapName: 'Intervalo' }],
+      } as unknown as CanonicalActivity),
+      true,
+      `Named FIT laps do not prove that ${extensionType} contains no additional laps`,
+    );
+  }
 
   const result = await service.fetchWorkoutExtensions('access-token', 'workout-key');
-  assert.deepEqual(result, [response]);
+  assert.deepEqual(result, response);
   assert.equal(capturedRequest.path, '/v3/workouts/workout-key');
   assert.equal(capturedRequest.accessToken, 'access-token');
   assert.deepEqual(capturedRequest.params, {
     extensions:
-      'FitnessExtension,SummaryExtension,EpocStreamExtension,IntervalStreamExtension,ManualLapStreamExtension,DistanceLapExtension,DurationLapExtension,VerticalLapExtension',
+      'FitnessExtension,SummaryExtension,EpocStreamExtension,IntervalStreamExtension,ManualLapStreamExtension,DistanceLapExtension,DurationLapExtension,VerticalLapExtension,PauseMarkerExtension',
   });
 }
 
@@ -177,8 +297,8 @@ function assertIncrementalAndRepairLookbacks(): void {
   const dayMs = 24 * 60 * 60 * 1000;
   const lastSuccessAt = new Date(now).toISOString();
 
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 21, false, lastSuccessAt), now - 3 * dayMs);
-  assert.equal(service.selectWorkoutLookbackStartMs(now, 21, true, lastSuccessAt), now - 20 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 25, false, lastSuccessAt), now - 3 * dayMs);
+  assert.equal(service.selectWorkoutLookbackStartMs(now, 25, true, lastSuccessAt), now - 20 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 11, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 9, false, lastSuccessAt), now - 30 * dayMs);
   assert.equal(service.selectWorkoutLookbackStartMs(now, 7, false, lastSuccessAt), now - 30 * dayMs);
@@ -322,10 +442,10 @@ async function assertSyncRepairsOlderVersionAndSkipsCurrentWorkout(): Promise<vo
   assert.deepEqual(
     [...claimedCanonicalVersions].sort((left, right) => left.sourceRecordId.localeCompare(right.sourceRecordId)),
     [
-      { sourceRecordId: 'broken-workout', version: 21 },
-      { sourceRecordId: 'current-workout', version: 21 },
-      { sourceRecordId: 'existing-workout', version: 21 },
-      { sourceRecordId: 'new-workout', version: 21 },
+      { sourceRecordId: 'broken-workout', version: 25 },
+      { sourceRecordId: 'current-workout', version: 25 },
+      { sourceRecordId: 'existing-workout', version: 25 },
+      { sourceRecordId: 'new-workout', version: 25 },
     ],
   );
   assert.equal(result.activitiesImported, 1);
@@ -343,9 +463,13 @@ async function assertSyncRepairsOlderVersionAndSkipsCurrentWorkout(): Promise<vo
 }
 
 async function run(): Promise<void> {
-  assertUnverifiedStrategyNeverInventsAnOffset();
+  assertStrategyUsesDocumentedOffset();
   await assertFirstWorkoutSyncIsLimitedToLastThirtyDays();
-  await assertSaturatedWorkoutListIsReportedAsUnverified();
+  await assertWorkoutPaginationLoadsAllPages();
+  await assertRepeatedPageStopsAsPartial();
+  await assertMalformedWorkoutListIsNotEmptySuccess();
+  await assertInvalidExtensionResponseIsRejected();
+  await assertExtensionFailureDoesNotPersistIncompleteActivity();
   await assertIntervalExtensionFallbackUsesOfficialV3Endpoint();
   assertIncrementalAndRepairLookbacks();
   await assertRateLimitRetriesRespectRetryAfter();
