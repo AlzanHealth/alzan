@@ -16,12 +16,13 @@ type FakeCondition =
   | { kind: 'eq' | 'lt'; column: string; value: unknown }
   | { kind: 'in'; column: string; value: unknown[] }
   | { kind: 'not'; column: string; operator: string; value: unknown };
-type FakeSort = { column: string; ascending: boolean };
+type FakeSort = { column: string; ascending: boolean; nullsFirst?: boolean };
 type FakeOperation = 'delete' | 'insert' | 'select' | 'update' | 'upsert';
 type FakeEvent = {
   args?: FakeRow;
   kind: 'delete' | 'download' | 'insert' | 'rpc' | 'select' | 'update' | 'upload' | 'upsert';
   objectPath?: string;
+  sorts?: FakeSort[];
   table?: string;
 };
 
@@ -68,8 +69,8 @@ class FakeQuery implements PromiseLike<FakeQueryResult> {
     return this;
   }
 
-  public order(column: string, options?: { ascending?: boolean }): this {
-    this.sorts.push({ column, ascending: options?.ascending !== false });
+  public order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): this {
+    this.sorts.push({ column, ascending: options?.ascending !== false, nullsFirst: options?.nullsFirst });
     return this;
   }
 
@@ -228,15 +229,23 @@ class FakeArchiveClient {
   public execute(query: FakeQuery): FakeQueryResult {
     const rows = this.tables.get(query.table) ?? [];
     if (query.operation === 'select') {
-      this.events.push({ kind: 'select', table: query.table });
+      this.events.push({ kind: 'select', table: query.table, sorts: query.sorts.map(sort => ({ ...sort })) });
       const filtered = rows.filter(row => this.matches(row, query.conditions));
       if (query.countMode && query.headOnly) return { data: null, error: null, count: filtered.length };
       let selected = filtered.map(row => ({ ...row }));
       for (const sort of [...query.sorts].reverse()) {
         selected.sort((left, right) => {
-          const leftValue = String(left[sort.column] ?? '');
-          const rightValue = String(right[sort.column] ?? '');
-          const comparison = leftValue.localeCompare(rightValue);
+          const leftValue = left[sort.column];
+          const rightValue = right[sort.column];
+          if (leftValue === null || leftValue === undefined || rightValue === null || rightValue === undefined) {
+            if (leftValue === rightValue) return 0;
+            const nullsFirst = sort.nullsFirst ?? !sort.ascending;
+            return leftValue === null || leftValue === undefined ? (nullsFirst ? -1 : 1) : nullsFirst ? 1 : -1;
+          }
+          const comparison =
+            typeof leftValue === 'number' && typeof rightValue === 'number'
+              ? leftValue - rightValue
+              : String(leftValue).localeCompare(String(rightValue));
           return sort.ascending ? comparison : -comparison;
         });
       }
@@ -666,15 +675,22 @@ async function assertDiscardOnlySamplesAreRemovedWithoutCreatingArchive(): Promi
 }
 
 async function assertSamplePaginationDoesNotTruncateArchive(): Promise<void> {
+  const streamTypes = ['heart_rate', 'speed', 'power', 'cadence'];
   const sampleRows = Array.from({ length: 1001 }, (_, index) => ({
     id: `sample-${String(index).padStart(4, '0')}`,
     session_id: SESSION_ID,
     user_id: USER_ID,
-    stream_type: 'heart_rate',
-    timestamp: new Date(Date.parse('2026-05-03T09:00:00.000Z') + index * 1000).toISOString(),
-    offset_s: index,
+    stream_type: streamTypes[index % streamTypes.length],
+    timestamp:
+      index % 7 === 0 && index % 5 !== 0
+        ? null
+        : new Date(Date.parse('2026-05-03T09:00:00.000Z') + index * 1000).toISOString(),
+    offset_s: index % 5 === 0 ? null : index,
     value: 100 + (index % 80),
   }));
+  const expectedArchivedSampleCount = sampleRows.filter(sample =>
+    ['heart_rate', 'speed', 'power'].includes(String(sample.stream_type)),
+  ).length;
   const { client, service } = createFixture({ sampleRows });
 
   const summary = await service.archiveBefore();
@@ -683,9 +699,22 @@ async function assertSamplePaginationDoesNotTruncateArchive(): Promise<void> {
   const payload = JSON.parse(gunzipSync(archiveBytes).toString('utf8')) as { samples: unknown[] };
 
   assert.equal(summary.source_sample_count, 1001);
-  assert.equal(summary.archived_sample_count, 1001);
-  assert.equal(payload.samples.length, 1001);
+  assert.equal(summary.archived_sample_count, expectedArchivedSampleCount);
+  assert.equal(payload.samples.length, expectedArchivedSampleCount);
   assert.equal(client.tables.get('activity_stream_samples')?.length, 0);
+
+  const readResult = await service.readForUser(USER_ID, [SESSION_ID]);
+  assert.equal(readResult.samples.length, expectedArchivedSampleCount);
+  const sampleQueries = client.events.filter(
+    event => event.kind === 'select' && event.table === 'activity_stream_samples',
+  );
+  assert.ok(sampleQueries.length >= 2);
+  for (const query of sampleQueries) {
+    assert.deepEqual(
+      query.sorts?.map(sort => sort.column),
+      ['stream_type', 'offset_s', 'timestamp'],
+    );
+  }
 }
 
 async function assertReadDoesNotLeakOtherUsersArchives(): Promise<void> {

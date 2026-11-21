@@ -255,7 +255,10 @@ export class ActivityStreamArchiveService {
         .eq('user_id', userId)
         .eq('session_id', sessionId)
         .in('stream_type', ['heart_rate', 'speed', 'power'])
-        .order('id', { ascending: true })
+        // Keep page order on the per-session sample indexes, not the global UUID primary key.
+        .order('stream_type', { ascending: true })
+        .order('offset_s', { ascending: true, nullsFirst: true })
+        .order('timestamp', { ascending: true, nullsFirst: true })
         .range(start, start + SAMPLE_PAGE_SIZE - 1);
       if (error) throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_LIVE_SAMPLE_READ_FAILED');
       const pageSamples = (data ?? []).map(sample => ({ ...sample }));
@@ -481,7 +484,10 @@ export class ActivityStreamArchiveService {
         .select('id, stream_type, timestamp, offset_s, value')
         .eq('session_id', sessionId)
         .eq('user_id', userId)
-        .order('id', { ascending: true })
+        // The unique (session, stream, offset/time) keys make this stable and avoid scanning the global UUID index.
+        .order('stream_type', { ascending: true })
+        .order('offset_s', { ascending: true, nullsFirst: true })
+        .order('timestamp', { ascending: true, nullsFirst: true })
         .range(start, start + SAMPLE_PAGE_SIZE - 1);
       if (error) throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_SAMPLE_READ_FAILED');
       samples.push(...(data ?? []));
