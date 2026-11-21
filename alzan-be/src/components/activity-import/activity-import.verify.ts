@@ -77,6 +77,18 @@ const verificationCases: VerificationCase[] = [
   {
     kind: 'service',
     provider: 'suunto',
+    check: 'Suunto health sync preserves mapped metrics and handles partial failures',
+    specFile: 'src/components/wearables/services/suunto-health-sync.service.spec.ts',
+  },
+  {
+    kind: 'service',
+    provider: 'health',
+    check: 'canonical health writes omit duplicate raw payload bodies',
+    specFile: 'src/components/wearables/services/canonical-health-writer.service.spec.ts',
+  },
+  {
+    kind: 'service',
+    provider: 'suunto',
     check: 'Suunto sync jobs finish without overwriting concurrent cancellation requests',
     specFile: 'src/components/wearables/services/wearable-import-lifecycle.service.spec.ts',
   },

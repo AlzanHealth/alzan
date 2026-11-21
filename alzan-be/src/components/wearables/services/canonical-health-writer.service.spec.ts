@@ -221,8 +221,12 @@ async function assertDailyActivityConflictFallsBackToUpdate(): Promise<void> {
   assert.equal(dailyStepsId, 'existing-daily-steps-id');
   assert.equal(client.inserts.filter(insert => insert.table === 'daily_steps').length, 1);
   assert.equal(client.updates.filter(update => update.table === 'daily_steps').length, 1);
+  assert.equal(client.inserts.find(insert => insert.table === 'daily_steps')?.rows?.[0]?.raw_payload, null);
+  assert.equal(client.updates.find(update => update.table === 'daily_steps')?.payload?.raw_payload, null);
   assert.equal(client.deletes.filter(item => item.table === 'step_intervals').length, 1);
-  assert.equal(client.inserts.filter(insert => insert.table === 'step_intervals')[0]?.rows?.length, 1);
+  const insertedIntervals = client.inserts.filter(insert => insert.table === 'step_intervals')[0]?.rows ?? [];
+  assert.equal(insertedIntervals.length, 1);
+  assert.ok(insertedIntervals.every(row => row.raw_payload === null));
   assert.deepEqual(rawPayloadService.links, [
     { rawPayloadId: 'raw-1', relatedTable: 'daily_steps', relatedId: 'existing-daily-steps-id' },
   ]);

@@ -62,6 +62,15 @@ jobs:
       - name: Verify activity import
         run: pnpm run verify:activity-import
 
+      - name: Verify activity stream archive safety
+        run: pnpm run verify:activity-stream-archive
+
+      - name: Verify wearable payload retention
+        run: pnpm run verify:wearable-payload-retention
+
+      - name: Verify COROS integration
+        run: pnpm run verify:coros
+
       - name: Verify import review safety
         run: pnpm run verify:import-review
 
