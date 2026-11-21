@@ -50,7 +50,7 @@ Deleting or nulling values makes their space reusable, but does not guarantee th
 VACUUM (FULL, ANALYZE) public.activity_stream_samples;
 ```
 
-`VACUUM FULL` takes an exclusive lock and needs additional temporary disk space. Review current database disk headroom and schedule an acceptable maintenance window before running it. It is intentionally not part of the archive CLI or migrations. This branch's local preview found no eligible sample rows, so `VACUUM FULL` was not run.
+`VACUUM FULL` takes an exclusive lock and needs additional temporary disk space. Review current database disk headroom and schedule an acceptable maintenance window before running it. It is intentionally not part of the archive CLI or migrations. The development database preview found no eligible sample rows; run a separate preview against the target environment before deciding whether archival or vacuuming is warranted.
 
 ## Implementation references
 
@@ -59,9 +59,10 @@ VACUUM (FULL, ANALYZE) public.activity_stream_samples;
 - Unused wearable payload removal and processed raw-body cleanup: `supabase/migrations/20261121130000_minimize_unrendered_wearable_payloads.sql`
 - Raw-body recovery-state handling and removal of legacy wearable route-point copies: `supabase/migrations/20261121133000_keep_retry_payloads_only.sql`
 - Body retention limited to COROS recovery plus removal of empty provider-field rows: `supabase/migrations/20261121134000_retain_only_coros_webhook_bodies.sql`
+- Dead-letter COROS webhook bodies are cleared after retries are exhausted: `supabase/migrations/20261121135000_discard_dead_letter_webhook_bodies.sql`
 - Archive, verification, merged reads, cleanup, and 90-day policy: `alzan-be/src/components/wearables/services/activity-stream-archive.service.ts`
 - Safe-by-default operator command: `alzan-be/src/components/wearables/services/archive-activity-streams.ts`
 - Authenticated archive endpoint: `alzan-be/src/components/wearables/controllers/activity-stream-archive.controller.ts`
 - Cardio history fallback: `alzan-fe/src/modules/health/hooks/useCardioEvolution.ts`
 
-The migrations and code must be deployed before running the apply command against any environment. This branch has applied its migrations locally only and has removed no production data.
+Deploy the backend code and apply the migrations before running the archive command. `supabase db push` applies schema and cleanup migrations; it does not archive old activity samples. Run a read-only preview against the target environment, review its counts and storage estimate, then use the guarded apply command if the result is expected. The migrations also clear redundant raw payload bodies and historical wearable route-point copies as described above.

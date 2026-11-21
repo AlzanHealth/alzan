@@ -274,9 +274,11 @@ export class ActivityStreamArchiveService {
     const addSample = (sample: ArchivedActivityStreamSample): void => {
       const offsetKey = sample.offset_s === null ? null : `${sample.stream_type}:offset:${sample.offset_s}`;
       const timestampKey = sample.timestamp === null ? null : `${sample.stream_type}:timestamp:${sample.timestamp}`;
+      // Absolute timestamps are stable across partial resyncs; offsets may shift
+      // when a provider corrects the activity start time or rounds samples.
       const existingIndex =
-        (offsetKey ? indexByOffset.get(offsetKey) : undefined) ??
-        (timestampKey ? indexByTimestamp.get(timestampKey) : undefined);
+        (timestampKey ? indexByTimestamp.get(timestampKey) : undefined) ??
+        (offsetKey ? indexByOffset.get(offsetKey) : undefined);
       const index = existingIndex ?? merged.length;
       if (existingIndex === undefined) merged.push(sample);
       else merged[index] = sample;
