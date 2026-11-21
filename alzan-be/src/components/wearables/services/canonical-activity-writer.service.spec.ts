@@ -10,7 +10,7 @@ import { DedupeService } from './dedupe.service';
 import { ImportReconciliationService } from './import-reconciliation.service';
 import { RawPayloadService } from './raw-payload.service';
 
-type InsertableTable = 'activity_route_points' | 'activity_stream_samples';
+type InsertableTable = 'activity_stream_samples';
 
 type FakeSupabaseError = {
   code: string;
@@ -395,19 +395,6 @@ async function assertStreamSamplesUseTransportSafeChunks(): Promise<void> {
   );
 }
 
-async function assertRoutePointsUseSmallChunks(): Promise<void> {
-  const client = createFakeSupabaseClient(100);
-  const service = createService(client);
-  const rows = Array.from({ length: 450 }, (_, index) => ({ point_index: index }));
-
-  await service.insertInChunks('activity_route_points', rows, 'WEARABLE_ACTIVITY_ROUTE_INSERT_FAILED');
-
-  assert.deepEqual(
-    client.inserts.map(insert => insert.rowCount),
-    [200, 200, 50],
-  );
-}
-
 async function assertRetryableChunkFailuresAreSplit(): Promise<void> {
   const client = createFakeSupabaseClient(60);
   const service = createService(client);
@@ -546,12 +533,15 @@ async function assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate(): P
     ),
   );
   assert.ok(
-    client.inserts.some(
-      insert =>
-        insert.table === 'activity_route_points' &&
-        insert.rows?.every(row => row.lat != null && row.lon != null) === true,
+    client.rpcCalls.some(
+      call => typeof call.args.p_route_polyline === 'string' && call.args.p_route_polyline.length > 0,
     ),
-    'compact route points should contain lat/lon fields',
+    'route geometry should be persisted as a compact polyline',
+  );
+  assert.equal(
+    client.inserts.some(insert => insert.table === 'activity_route_points'),
+    false,
+    'route points should not be duplicated in the database',
   );
   assert.ok(
     client.inserts.some(
@@ -660,7 +650,10 @@ async function assertRetryableBundleFailureRetriesFullPayloadWithoutDegrading():
   assert.equal(client.rpcCalls.length, 2);
   assert.equal(client.rpcCalls[1]?.args.p_import_id, 'import-1');
   assert.notEqual(client.rpcCalls[1]?.args.p_route_polyline, null);
-  assert.ok(client.inserts.some(insert => insert.table === 'activity_route_points'));
+  assert.equal(
+    client.inserts.some(insert => insert.table === 'activity_route_points'),
+    false,
+  );
 }
 
 async function assertLostBundleResponseUsesAtomicallyCommittedFullPayload(): Promise<void> {
@@ -697,7 +690,11 @@ async function assertLostBundleResponseUsesAtomicallyCommittedFullPayload(): Pro
   });
 
   assert.equal(client.rpcCalls.length, 1, 'a committed atomic bundle must not be replayed after a lost response');
-  assert.ok(client.inserts.some(insert => insert.table === 'activity_route_points'));
+  assert.notEqual(client.rpcCalls[0]?.args.p_route_polyline, null);
+  assert.equal(
+    client.inserts.some(insert => insert.table === 'activity_route_points'),
+    false,
+  );
 }
 
 async function assertGenericLifecycleFallbackRemainsRetryable(): Promise<void> {
@@ -1206,7 +1203,6 @@ async function run(): Promise<void> {
   assertPositionSamplesAreSanitizedForValidRoutes();
   assertStaticOrInvalidPositionSamplesAreDropped();
   await assertStreamSamplesUseTransportSafeChunks();
-  await assertRoutePointsUseSmallChunks();
   await assertRetryableChunkFailuresAreSplit();
   await assertStrongPendingDuplicateWritesToSurvivor();
   await assertResyncWritesSurvivorArtifactsForStrongPendingDuplicate();
