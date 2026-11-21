@@ -906,6 +906,8 @@ type ActivityStreamArchivesTable = {
     compressed_bytes: number;
     sha256: string;
     archive_version: number;
+    source_sample_count: number | null;
+    source_sample_ids_md5: string | null;
     archived_at: string;
   };
   Insert: {
@@ -916,6 +918,8 @@ type ActivityStreamArchivesTable = {
     compressed_bytes: number;
     sha256: string;
     archive_version?: number;
+    source_sample_count?: number | null;
+    source_sample_ids_md5?: string | null;
     archived_at?: string;
   };
   Update: {
@@ -926,6 +930,8 @@ type ActivityStreamArchivesTable = {
     compressed_bytes?: number;
     sha256?: string;
     archive_version?: number;
+    source_sample_count?: number | null;
+    source_sample_ids_md5?: string | null;
     archived_at?: string;
   };
   Relationships: [];

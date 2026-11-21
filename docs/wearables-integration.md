@@ -37,11 +37,11 @@ Key tables:
 - `provider_data_origins`: stores available source identities such as Health Connect package names.
 - `health_connect_provider_selection`: stores the single selected Health Connect origin per user.
 - `integration_sync_state`: stores provider/domain cursors, Health Connect change tokens, and HealthKit anchors.
-- `external_raw_payloads_v2`: stores raw payload JSON and hashes before normalization. RLS is enabled with no client policy; backend service role owns writes.
+- `external_raw_payloads_v2`: synchronous imports retain hashes and source identifiers without persisting the raw body or byte size. COROS webhook bodies remain only while pending or retryable; processing or exhausting retries clears the body and byte size while retaining the fingerprint and processing metadata. RLS has no client policy; the backend service role owns writes.
 - `provider_connection_tokens`: private token table for OAuth secrets. Client-facing `user_connections` keeps metadata only.
-- `activity_route_points`: timestamped GPS points.
-- `activity_stream_samples`: queryable HR, cadence, power, speed, distance, altitude, and temperature samples.
-- `activity_provider_fields`: provider-specific workout metadata, events, segments, and dedupe fingerprints.
+- `activity_route_points`: legacy timestamped GPS points. New wearable imports keep the app-visible encoded route polyline on the session, and the migration removes historical wearable point-by-point copies.
+- `activity_stream_samples`: queryable heart-rate, speed, and power samples used by cardio history and heart-rate analysis. Wearable imports do not persist other per-sample metrics.
+- `activity_provider_fields`: legacy provider metadata table; empty imports are not persisted here because required provenance is already on `activity_sessions`.
 - `health_metric_samples`: generic 24/7 biomarkers such as HRV, SpO2, respiratory rate, temperature, resting HR, weight, and VO2 max.
 - `vo2_max_logs`: VO2 max history when a provider sends point measurements.
 
@@ -53,11 +53,11 @@ Module path: `alzan-be/src/components/wearables/wearables.module.ts`.
 
 Main services:
 
-- `RawPayloadService`: hashes and stores incoming payloads, then links them to domain rows.
+- `RawPayloadService`: hashes incoming payloads and links provenance to normalized rows; it persists a body only for COROS webhooks that need durable retry or recovery.
 - `ProviderOriginService`: upserts origins, lists Health Connect origins, and stores the selected Health Connect origin.
 - `IntegrationSyncStateService`: stores cursors/anchors by user, provider, channel, package, and sync domain.
-- `CanonicalActivityWriterService`: upserts workouts, laps, HR zones, JSON streams, normalized stream samples, route points, and provider fields.
-- `CanonicalHealthWriterService`: upserts daily steps, step intervals, sleep sessions, stages, daily recovery, health samples, VO2 max logs, weight logs, and resting HR logs.
+- `CanonicalActivityWriterService`: upserts workouts, laps, HR zones, app-used cardio samples, encoded route polylines, and provider fields. It omits duplicate JSON streams and point-by-point route rows for wearable imports.
+- `CanonicalHealthWriterService`: upserts normalized daily steps, step intervals, sleep sessions and stages, daily recovery, health samples, VO2 max logs, weight logs, and resting HR logs without duplicating raw provider JSON.
 - `LocalHealthSyncService`: orchestrates Apple Health and Health Connect batch imports.
 - `PolarAccessLinkService`: pulls Polar AccessLink exercises and writes them through the canonical activity writer.
 
@@ -237,7 +237,7 @@ Polar:
 2. Connect from Settings through `/oauth/polar/authorize`.
 3. OAuth callback registers the Polar AccessLink user at `/v3/users`.
 4. Run `POST /wearables/cloud/polar/sync`.
-5. Verify imported rows in `activity_sessions`, `activity_streams`, `activity_stream_samples`, `activity_route_points`, and `external_raw_payloads_v2`.
+5. Verify imported rows in `activity_sessions`, `activity_laps`, `activity_heart_rate_zones`, `activity_stream_samples`, and `external_raw_payloads_v2`. New wearable imports do not create duplicate `activity_streams` or point-by-point `activity_route_points` rows; provider-origin requests omit their unused raw JSON.
 
 ## Security Notes
 

@@ -12,6 +12,7 @@ export class RawPayloadService {
 
   public async storeRawPayload(input: RawPayloadInput): Promise<StoredRawPayload> {
     const payloadJson = this.toJson(input.payload);
+    const retainPayloadForRetry = input.retainPayloadForRetry === true;
     const payloadHash = this.hashPayload({
       provider: input.provider,
       sourceChannel: input.sourceChannel,
@@ -29,8 +30,8 @@ export class RawPayloadService {
       p_object_type: input.objectType,
       p_source_record_id: input.sourceRecordId as string,
       p_payload_hash: payloadHash,
-      p_payload: payloadJson,
-      p_size_bytes: Buffer.byteLength(JSON.stringify(payloadJson), 'utf8'),
+      p_payload: retainPayloadForRetry ? payloadJson : null,
+      p_size_bytes: retainPayloadForRetry ? Buffer.byteLength(JSON.stringify(payloadJson), 'utf8') : 0,
       p_trace_id: input.traceId as string,
     });
 

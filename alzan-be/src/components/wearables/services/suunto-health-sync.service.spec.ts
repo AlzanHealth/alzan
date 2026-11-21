@@ -242,7 +242,7 @@ async function assertCorrectedSampleUpdatesWithoutChangingOtherOwners(): Promise
       unit: 'bpm',
       local_date: '2026-09-10',
       timezone: 'UTC',
-      raw_payload: { HR: 70 },
+      raw_payload: null,
     },
     {
       id: 'other-user',
@@ -256,7 +256,7 @@ async function assertCorrectedSampleUpdatesWithoutChangingOtherOwners(): Promise
       unit: 'bpm',
       local_date: '2026-09-10',
       timezone: 'UTC',
-      raw_payload: { HR: 90 },
+      raw_payload: null,
     },
     {
       id: 'other-provider',
@@ -270,7 +270,7 @@ async function assertCorrectedSampleUpdatesWithoutChangingOtherOwners(): Promise
       unit: 'bpm',
       local_date: '2026-09-10',
       timezone: 'UTC',
-      raw_payload: { HR: 100 },
+      raw_payload: null,
     },
     {
       id: 'other-package',
@@ -284,7 +284,7 @@ async function assertCorrectedSampleUpdatesWithoutChangingOtherOwners(): Promise
       unit: 'bpm',
       local_date: '2026-09-10',
       timezone: 'UTC',
-      raw_payload: { HR: 110 },
+      raw_payload: null,
     },
   ];
   let updates = 0;
@@ -358,7 +358,7 @@ async function assertCorrectedSampleUpdatesWithoutChangingOtherOwners(): Promise
         unit: 'bpm',
         local_date: '2026-09-10',
         timezone: 'UTC',
-        raw_payload: { HR: 75 },
+        raw_payload: null,
       },
     ],
   } as never;
@@ -367,7 +367,7 @@ async function assertCorrectedSampleUpdatesWithoutChangingOtherOwners(): Promise
   assert.equal(stored[1].value, 90);
   assert.equal(stored[2].value, 100);
   assert.equal(stored[3].value, 110);
-  assert.equal(stored[0].raw_payload.HR, 75);
+  assert.equal(stored[0].raw_payload, null);
   assert.equal(updates, 1);
   assert.equal(inserts, 0);
   assert.equal(await writer.replaceHealthMetricSamples(input), 0);

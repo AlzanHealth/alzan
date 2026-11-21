@@ -15,23 +15,41 @@ const ARCHIVE_MINIMUM_AGE_DAYS = 90;
 const ARCHIVE_STORAGE_BUDGET_BYTES = 512 * 1024 * 1024;
 const MAX_ARCHIVE_FILE_BYTES = 50 * 1024 * 1024;
 const SAMPLE_PAGE_SIZE = 1000;
-const ARCHIVE_FORMAT_VERSION = 1;
+const ARCHIVE_FORMAT_VERSION = 2;
+const ARCHIVED_STREAM_TYPES = ['heart_rate', 'speed', 'power'] as const;
+type ArchivedStreamType = (typeof ARCHIVED_STREAM_TYPES)[number];
 
 type ActivityStreamSampleRow = Row<'activity_stream_samples'>;
+type ActivityStreamSourceRow = Pick<ActivityStreamSampleRow, 'id' | 'stream_type' | 'timestamp' | 'offset_s' | 'value'>;
 type ActivityStreamArchiveManifest = Row<'activity_stream_archives'>;
 type ArchiveSession = Pick<Row<'activity_sessions'>, 'id' | 'user_id' | 'start_time'>;
-type ArchivePayload = {
-  archive_version: typeof ARCHIVE_FORMAT_VERSION;
+type ArchiveSample = Pick<ActivityStreamSourceRow, 'stream_type' | 'timestamp' | 'offset_s' | 'value'> & {
+  stream_type: ArchivedStreamType;
+};
+type ArchivePayloadV2 = {
+  archive_version: 2;
+  session_id: string;
+  user_id: string;
+  sample_count: number;
+  source_sample_count: number;
+  source_sample_ids_md5: string;
+  samples: ArchiveSample[];
+};
+type ArchivePayloadV1 = {
+  archive_version: 1;
   session_id: string;
   user_id: string;
   sample_count: number;
   samples: ActivityStreamSampleRow[];
 };
+type VerifiedArchivePayload = ArchivePayloadV1 | ArchivePayloadV2;
 type PreparedArchive = {
-  payload: ArchivePayload;
-  compressed: Buffer;
-  checksum: string;
+  payload: ArchivePayloadV2 | null;
+  compressed: Buffer | null;
+  checksum: string | null;
+  sourceSampleCount: number;
   idsMd5: string;
+  discardedSampleCount: number;
   uncompressedBytes: number;
 };
 export type ActivityStreamArchiveRunSummary = {
@@ -45,7 +63,11 @@ export type ActivityStreamArchiveRunSummary = {
   changed_during_archive_sessions: number;
   duplicate_live_sessions: number;
   duplicate_sample_count: number;
-  sample_count: number;
+  source_sample_count: number;
+  archived_sample_count: number;
+  discarded_sample_count: number;
+  sessions_without_cardio_samples: number;
+  discarded_only_sessions: number;
   uncompressed_bytes: number;
   compressed_bytes: number;
   existing_archive_bytes: number;
@@ -66,8 +88,41 @@ export type ReadArchivedActivityStreamsResult = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+const hasOnlyKeys = (record: Record<string, unknown>, keys: readonly string[]): boolean =>
+  Object.keys(record).every(key => keys.includes(key));
 
-const isStreamSampleRow = (value: unknown, sessionId: string, userId: string): value is ActivityStreamSampleRow => {
+const isArchivedStreamType = (value: unknown): value is ArchivedStreamType =>
+  typeof value === 'string' && (ARCHIVED_STREAM_TYPES as readonly string[]).includes(value);
+
+const isAppConsumedCardioSample = (
+  sample: ActivityStreamSourceRow,
+): sample is ActivityStreamSourceRow & { stream_type: ArchivedStreamType } =>
+  isArchivedStreamType(sample.stream_type) &&
+  (sample.timestamp !== null || sample.offset_s !== null) &&
+  (sample.timestamp === null || Number.isFinite(Date.parse(sample.timestamp))) &&
+  (sample.offset_s === null || (Number.isInteger(sample.offset_s) && sample.offset_s >= 0)) &&
+  Number.isFinite(sample.value);
+
+const isArchiveSample = (value: unknown): value is ArchiveSample => {
+  if (!isRecord(value)) return false;
+  return (
+    hasOnlyKeys(value, ['stream_type', 'timestamp', 'offset_s', 'value']) &&
+    isArchivedStreamType(value.stream_type) &&
+    (typeof value.timestamp === 'string' || value.timestamp === null) &&
+    (typeof value.offset_s === 'number' || value.offset_s === null) &&
+    (value.timestamp !== null || value.offset_s !== null) &&
+    (value.timestamp === null || Number.isFinite(Date.parse(value.timestamp))) &&
+    (value.offset_s === null || (Number.isInteger(value.offset_s) && value.offset_s >= 0)) &&
+    typeof value.value === 'number' &&
+    Number.isFinite(value.value)
+  );
+};
+
+const isLegacyStreamSampleRow = (
+  value: unknown,
+  sessionId: string,
+  userId: string,
+): value is ActivityStreamSampleRow => {
   if (!isRecord(value)) return false;
   return (
     typeof value.id === 'string' &&
@@ -76,6 +131,7 @@ const isStreamSampleRow = (value: unknown, sessionId: string, userId: string): v
     typeof value.stream_type === 'string' &&
     (typeof value.timestamp === 'string' || value.timestamp === null) &&
     (typeof value.offset_s === 'number' || value.offset_s === null) &&
+    (value.timestamp !== null || value.offset_s !== null) &&
     typeof value.value === 'number' &&
     Number.isFinite(value.value) &&
     typeof value.created_at === 'string'
@@ -145,6 +201,13 @@ export class ActivityStreamArchiveService {
       }
       const prepared = await this.prepareArchive(session);
       if (!prepared) continue;
+      if (!prepared.payload) {
+        const deleted = await this.deleteSourceSamples(session, prepared.sourceSampleCount, prepared.idsMd5);
+        summary = deleted
+          ? { ...summary, discarded_only_sessions: summary.discarded_only_sessions + 1 }
+          : { ...summary, changed_during_archive_sessions: summary.changed_during_archive_sessions + 1 };
+        continue;
+      }
       const result = await this.persistArchive(session, prepared);
       if (result === 'archived') {
         summary = { ...summary, archived_sessions: summary.archived_sessions + 1 };
@@ -160,7 +223,9 @@ export class ActivityStreamArchiveService {
     if (sessionIds.length === 0) return { archived_session_ids: [], samples: [] };
     const { data: manifests, error } = await this.supabaseAdminService.client
       .from('activity_stream_archives')
-      .select('session_id, user_id, object_path, sample_count, compressed_bytes, sha256, archive_version, archived_at')
+      .select(
+        'session_id, user_id, object_path, sample_count, compressed_bytes, sha256, archive_version, source_sample_count, source_sample_ids_md5, archived_at',
+      )
       .eq('user_id', userId)
       .in('session_id', sessionIds);
     if (error) throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_MANIFEST_READ_FAILED');
@@ -171,7 +236,10 @@ export class ActivityStreamArchiveService {
       const payload = await this.downloadAndVerifyArchive(manifest, userId);
       archivedSessionIds.push(manifest.session_id);
       samples.push(
-        ...this.mergeCardioSamples(payload.samples, await this.loadCardioSamples(userId, manifest.session_id)),
+        ...this.mergeCardioSamples(
+          this.getArchiveCardioSamples(payload),
+          await this.loadCardioSamples(userId, manifest.session_id),
+        ),
       );
     }
     return { archived_session_ids: archivedSessionIds, samples };
@@ -197,7 +265,7 @@ export class ActivityStreamArchiveService {
   }
 
   private mergeCardioSamples(
-    archiveRows: ActivityStreamSampleRow[],
+    archiveRows: ArchivedActivityStreamSample[],
     liveRows: ArchivedActivityStreamSample[],
   ): ArchivedActivityStreamSample[] {
     const merged: ArchivedActivityStreamSample[] = [];
@@ -216,17 +284,7 @@ export class ActivityStreamArchiveService {
       if (timestampKey) indexByTimestamp.set(timestampKey, index);
     };
 
-    for (const row of archiveRows) {
-      if (row.stream_type === 'heart_rate' || row.stream_type === 'speed' || row.stream_type === 'power') {
-        addSample({
-          session_id: row.session_id,
-          stream_type: row.stream_type,
-          offset_s: row.offset_s,
-          timestamp: row.timestamp,
-          value: row.value,
-        });
-      }
-    }
+    for (const row of archiveRows) addSample(row);
     for (const row of liveRows) addSample(row);
     return merged;
   }
@@ -325,7 +383,11 @@ export class ActivityStreamArchiveService {
       changed_during_archive_sessions: 0,
       duplicate_live_sessions: 0,
       duplicate_sample_count: 0,
-      sample_count: 0,
+      source_sample_count: 0,
+      archived_sample_count: 0,
+      discarded_sample_count: 0,
+      sessions_without_cardio_samples: 0,
+      discarded_only_sessions: 0,
       uncompressed_bytes: 0,
       compressed_bytes: 0,
       existing_archive_bytes: 0,
@@ -354,15 +416,43 @@ export class ActivityStreamArchiveService {
   }
 
   private async prepareArchive(session: ArchiveSession): Promise<PreparedArchive | null> {
-    const samples = await this.loadSamples(session.id, session.user_id);
-    if (samples.length === 0) return null;
+    const sourceSamples = await this.loadSamples(session.id, session.user_id);
+    if (sourceSamples.length === 0) return null;
 
-    const payload: ArchivePayload = {
+    const archivedSamples = sourceSamples.flatMap(sample =>
+      isAppConsumedCardioSample(sample)
+        ? [
+            {
+              stream_type: sample.stream_type,
+              timestamp: sample.timestamp,
+              offset_s: sample.offset_s,
+              value: sample.value,
+            },
+          ]
+        : [],
+    );
+    const idsMd5 = this.hashSampleIds(sourceSamples);
+    const discardedSampleCount = sourceSamples.length - archivedSamples.length;
+    if (archivedSamples.length === 0) {
+      return {
+        payload: null,
+        compressed: null,
+        checksum: null,
+        sourceSampleCount: sourceSamples.length,
+        idsMd5,
+        discardedSampleCount,
+        uncompressedBytes: 0,
+      };
+    }
+
+    const payload: ArchivePayloadV2 = {
       archive_version: ARCHIVE_FORMAT_VERSION,
       session_id: session.id,
       user_id: session.user_id,
-      sample_count: samples.length,
-      samples,
+      sample_count: archivedSamples.length,
+      source_sample_count: sourceSamples.length,
+      source_sample_ids_md5: idsMd5,
+      samples: archivedSamples,
     };
     const json = new Uint8Array(Buffer.from(JSON.stringify(payload)));
     const compressed = gzipSync(json, { level: 9 });
@@ -373,18 +463,20 @@ export class ActivityStreamArchiveService {
       payload,
       compressed,
       checksum: createHash('sha256').update(new Uint8Array(compressed)).digest('hex'),
-      idsMd5: this.hashSampleIds(samples),
+      sourceSampleCount: sourceSamples.length,
+      idsMd5,
+      discardedSampleCount,
       uncompressedBytes: json.byteLength,
     };
   }
 
-  private async loadSamples(sessionId: string, userId: string): Promise<ActivityStreamSampleRow[]> {
-    const samples: ActivityStreamSampleRow[] = [];
+  private async loadSamples(sessionId: string, userId: string): Promise<ActivityStreamSourceRow[]> {
+    const samples: ActivityStreamSourceRow[] = [];
     for (let page = 0; ; page += 1) {
       const start = page * SAMPLE_PAGE_SIZE;
       const { data, error } = await this.supabaseAdminService.client
         .from('activity_stream_samples')
-        .select('*')
+        .select('id, stream_type, timestamp, offset_s, value')
         .eq('session_id', sessionId)
         .eq('user_id', userId)
         .order('id', { ascending: true })
@@ -396,6 +488,9 @@ export class ActivityStreamArchiveService {
   }
 
   private async persistArchive(session: ArchiveSession, prepared: PreparedArchive): Promise<'archived' | 'changed'> {
+    if (!prepared.payload || !prepared.compressed || !prepared.checksum) {
+      throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_PAYLOAD_INVALID');
+    }
     // Content-addressed paths prevent concurrent archivers from replacing another snapshot.
     const objectPath = `${session.user_id}/${session.id}/${prepared.checksum}.json.gz`;
     const { error: uploadError } = await this.supabaseAdminService.client.storage
@@ -407,7 +502,15 @@ export class ActivityStreamArchiveService {
     try {
       verification = await this.downloadObject(objectPath);
       this.verifyCompressedArchive(verification, prepared.checksum, prepared.compressed.byteLength);
-      this.validatePayload(this.decodeJson(verification), session.id, session.user_id, prepared.payload.sample_count);
+      this.validatePayload(
+        this.decodeJson(verification),
+        session.id,
+        session.user_id,
+        prepared.payload.sample_count,
+        ARCHIVE_FORMAT_VERSION,
+        prepared.payload.source_sample_count,
+        prepared.payload.source_sample_ids_md5,
+      );
     } catch (error) {
       await this.enqueueCleanupIfUnreferenced(objectPath, session.user_id);
       throw error;
@@ -421,6 +524,8 @@ export class ActivityStreamArchiveService {
       compressed_bytes: prepared.compressed.byteLength,
       sha256: prepared.checksum,
       archive_version: ARCHIVE_FORMAT_VERSION,
+      source_sample_count: prepared.sourceSampleCount,
+      source_sample_ids_md5: prepared.idsMd5,
     });
     if (insertError) {
       const existingManifest = await this.getManifest(session.id, session.user_id);
@@ -435,7 +540,7 @@ export class ActivityStreamArchiveService {
       {
         p_session_id: session.id,
         p_user_id: session.user_id,
-        p_expected_sample_count: prepared.payload.sample_count,
+        p_expected_sample_count: prepared.sourceSampleCount,
         p_expected_ids_md5: prepared.idsMd5,
         p_minimum_age_days: ARCHIVE_MINIMUM_AGE_DAYS,
       },
@@ -452,41 +557,54 @@ export class ActivityStreamArchiveService {
     session: ArchiveSession,
     manifest: ActivityStreamArchiveManifest,
   ): Promise<boolean> {
-    const { count, error } = await this.supabaseAdminService.client
-      .from('activity_stream_samples')
-      .select('id', { count: 'exact', head: true })
-      .eq('session_id', session.id)
-      .eq('user_id', session.user_id);
-    if (error) throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_SAMPLE_COUNT_READ_FAILED');
-    if (!count) return false;
+    return (await this.getExactArchivedDuplicateSamples(session, manifest)) !== null;
+  }
 
-    const payload = await this.downloadAndVerifyArchive(manifest, session.user_id);
+  private async getExactArchivedDuplicateSamples(
+    session: ArchiveSession,
+    manifest: ActivityStreamArchiveManifest,
+  ): Promise<ActivityStreamSourceRow[] | null> {
     const liveSamples = await this.loadSamples(session.id, session.user_id);
-    return (
-      liveSamples.length === payload.sample_count &&
-      liveSamples.length === count &&
-      this.hashSampleRows(liveSamples) === this.hashSampleRows(payload.samples)
-    );
+    if (liveSamples.length === 0) return null;
+    const payload = await this.downloadAndVerifyArchive(manifest, session.user_id);
+    if (payload.archive_version === 1) {
+      const legacySamples = payload.samples;
+      const isExactLegacySnapshot =
+        liveSamples.length === legacySamples.length &&
+        this.hashSampleIds(liveSamples) === this.hashSampleIds(legacySamples) &&
+        this.hashAppSamples(liveSamples) === this.hashAppSamples(legacySamples);
+      return isExactLegacySnapshot ? liveSamples : null;
+    }
+
+    const isExactCurrentSnapshot =
+      manifest.source_sample_count === liveSamples.length &&
+      manifest.source_sample_ids_md5 === this.hashSampleIds(liveSamples) &&
+      this.hashAppSamples(this.getCardioSourceSamples(liveSamples)) === this.hashAppSamples(payload.samples);
+    return isExactCurrentSnapshot ? liveSamples : null;
   }
 
   private async deleteExactArchivedDuplicate(
     session: ArchiveSession,
     manifest: ActivityStreamArchiveManifest,
   ): Promise<boolean> {
-    if (!(await this.hasExactArchivedDuplicate(session, manifest))) return false;
-    const liveSamples = await this.loadSamples(session.id, session.user_id);
+    const liveSamples = await this.getExactArchivedDuplicateSamples(session, manifest);
+    if (!liveSamples) return false;
+    return this.deleteSourceSamples(session, liveSamples.length, this.hashSampleIds(liveSamples));
+  }
+
+  private async deleteSourceSamples(session: ArchiveSession, expectedSampleCount: number, expectedIdsMd5: string) {
     const { data, error } = await this.supabaseAdminService.client.rpc('delete_archived_activity_stream_samples', {
       p_session_id: session.id,
       p_user_id: session.user_id,
-      p_expected_sample_count: liveSamples.length,
-      p_expected_ids_md5: this.hashSampleIds(liveSamples),
+      p_expected_sample_count: expectedSampleCount,
+      p_expected_ids_md5: expectedIdsMd5,
       p_minimum_age_days: ARCHIVE_MINIMUM_AGE_DAYS,
     });
     if (error) throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_SAMPLE_DELETE_FAILED');
     return data;
   }
 
-  private hashSampleIds(samples: ActivityStreamSampleRow[]): string {
+  private hashSampleIds(samples: Array<Pick<ActivityStreamSourceRow, 'id'>>): string {
     return createHash('md5')
       .update(
         samples
@@ -497,9 +615,44 @@ export class ActivityStreamArchiveService {
       .digest('hex');
   }
 
-  private hashSampleRows(samples: ActivityStreamSampleRow[]): string {
-    const orderedRows = [...samples].sort((left, right) => left.id.localeCompare(right.id));
-    return createHash('sha256').update(JSON.stringify(orderedRows)).digest('hex');
+  private hashAppSamples(
+    samples: Array<Pick<ActivityStreamSourceRow, 'stream_type' | 'timestamp' | 'offset_s' | 'value'>>,
+  ): string {
+    const orderedValues = samples
+      .map(sample => [sample.stream_type, sample.offset_s, sample.timestamp, sample.value])
+      .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    return createHash('sha256').update(JSON.stringify(orderedValues)).digest('hex');
+  }
+
+  private getCardioSourceSamples(samples: ActivityStreamSourceRow[]): ArchiveSample[] {
+    return samples.flatMap(sample =>
+      isAppConsumedCardioSample(sample)
+        ? [
+            {
+              stream_type: sample.stream_type,
+              timestamp: sample.timestamp,
+              offset_s: sample.offset_s,
+              value: sample.value,
+            },
+          ]
+        : [],
+    );
+  }
+
+  private getArchiveCardioSamples(payload: VerifiedArchivePayload): ArchivedActivityStreamSample[] {
+    return payload.samples.flatMap(sample =>
+      isArchivedStreamType(sample.stream_type)
+        ? [
+            {
+              session_id: payload.session_id,
+              stream_type: sample.stream_type,
+              timestamp: sample.timestamp,
+              offset_s: sample.offset_s,
+              value: sample.value,
+            },
+          ]
+        : [],
+    );
   }
 
   private async enqueueCleanupIfUnreferenced(objectPath: string, userId: string): Promise<void> {
@@ -519,7 +672,9 @@ export class ActivityStreamArchiveService {
   private async getManifest(sessionId: string, userId: string): Promise<ActivityStreamArchiveManifest | null> {
     const { data, error } = await this.supabaseAdminService.client
       .from('activity_stream_archives')
-      .select('session_id, user_id, object_path, sample_count, compressed_bytes, sha256, archive_version, archived_at')
+      .select(
+        'session_id, user_id, object_path, sample_count, compressed_bytes, sha256, archive_version, source_sample_count, source_sample_ids_md5, archived_at',
+      )
       .eq('session_id', sessionId)
       .eq('user_id', userId)
       .maybeSingle();
@@ -545,14 +700,26 @@ export class ActivityStreamArchiveService {
   private async downloadAndVerifyArchive(
     manifest: ActivityStreamArchiveManifest,
     userId: string,
-  ): Promise<ArchivePayload> {
+  ): Promise<VerifiedArchivePayload> {
     const expectedPath = `${userId}/${manifest.session_id}/${manifest.sha256}.json.gz`;
-    if (manifest.user_id !== userId || manifest.object_path !== expectedPath || manifest.archive_version !== 1) {
+    if (
+      manifest.user_id !== userId ||
+      manifest.object_path !== expectedPath ||
+      (manifest.archive_version !== 1 && manifest.archive_version !== ARCHIVE_FORMAT_VERSION)
+    ) {
       throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_MANIFEST_INVALID');
     }
     const compressed = await this.downloadObject(manifest.object_path);
     this.verifyCompressedArchive(compressed, manifest.sha256, manifest.compressed_bytes);
-    return this.validatePayload(this.decodeJson(compressed), manifest.session_id, userId, manifest.sample_count);
+    return this.validatePayload(
+      this.decodeJson(compressed),
+      manifest.session_id,
+      userId,
+      manifest.sample_count,
+      manifest.archive_version,
+      manifest.source_sample_count,
+      manifest.source_sample_ids_md5,
+    );
   }
 
   private async downloadObject(objectPath: string): Promise<Buffer> {
@@ -576,20 +743,58 @@ export class ActivityStreamArchiveService {
     }
   }
 
-  private validatePayload(input: unknown, sessionId: string, userId: string, sampleCount: number): ArchivePayload {
+  private validatePayload(
+    input: unknown,
+    sessionId: string,
+    userId: string,
+    sampleCount: number,
+    archiveVersion: number,
+    expectedSourceSampleCount: number | null,
+    expectedSourceSampleIdsMd5: string | null,
+  ): VerifiedArchivePayload {
     if (
       !isRecord(input) ||
-      input.archive_version !== ARCHIVE_FORMAT_VERSION ||
+      (archiveVersion === ARCHIVE_FORMAT_VERSION &&
+        !hasOnlyKeys(input, [
+          'archive_version',
+          'session_id',
+          'user_id',
+          'sample_count',
+          'source_sample_count',
+          'source_sample_ids_md5',
+          'samples',
+        ])) ||
+      input.archive_version !== archiveVersion ||
       input.session_id !== sessionId ||
       input.user_id !== userId ||
       input.sample_count !== sampleCount ||
       !Array.isArray(input.samples) ||
-      input.samples.length !== sampleCount ||
-      !input.samples.every(sample => isStreamSampleRow(sample, sessionId, userId))
+      input.samples.length !== sampleCount
     ) {
       throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_PAYLOAD_INVALID');
     }
-    return input as ArchivePayload;
+
+    if (archiveVersion === 1) {
+      if (!input.samples.every(sample => isLegacyStreamSampleRow(sample, sessionId, userId))) {
+        throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_PAYLOAD_INVALID');
+      }
+      return input as ArchivePayloadV1;
+    }
+
+    if (
+      archiveVersion !== ARCHIVE_FORMAT_VERSION ||
+      input.source_sample_count !== expectedSourceSampleCount ||
+      input.source_sample_ids_md5 !== expectedSourceSampleIdsMd5 ||
+      typeof input.source_sample_count !== 'number' ||
+      !Number.isInteger(input.source_sample_count) ||
+      input.source_sample_count < sampleCount ||
+      typeof input.source_sample_ids_md5 !== 'string' ||
+      !/^[0-9a-f]{32}$/.test(input.source_sample_ids_md5) ||
+      !input.samples.every(isArchiveSample)
+    ) {
+      throw new InternalServerErrorException('ACTIVITY_STREAM_ARCHIVE_PAYLOAD_INVALID');
+    }
+    return input as ArchivePayloadV2;
   }
 
   private addPreparedArchive(
@@ -598,9 +803,12 @@ export class ActivityStreamArchiveService {
   ): ActivityStreamArchiveRunSummary {
     return {
       ...summary,
-      sample_count: summary.sample_count + prepared.payload.sample_count,
+      source_sample_count: summary.source_sample_count + prepared.sourceSampleCount,
+      archived_sample_count: summary.archived_sample_count + (prepared.payload?.sample_count ?? 0),
+      discarded_sample_count: summary.discarded_sample_count + prepared.discardedSampleCount,
+      sessions_without_cardio_samples: summary.sessions_without_cardio_samples + (prepared.payload ? 0 : 1),
       uncompressed_bytes: summary.uncompressed_bytes + prepared.uncompressedBytes,
-      compressed_bytes: summary.compressed_bytes + prepared.compressed.byteLength,
+      compressed_bytes: summary.compressed_bytes + (prepared.compressed?.byteLength ?? 0),
     };
   }
 }

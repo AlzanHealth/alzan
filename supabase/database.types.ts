@@ -909,6 +909,8 @@ export type Database = {
           sample_count: number
           session_id: string
           sha256: string
+          source_sample_count: number | null
+          source_sample_ids_md5: string | null
           user_id: string
         }
         Insert: {
@@ -919,6 +921,8 @@ export type Database = {
           sample_count: number
           session_id: string
           sha256: string
+          source_sample_count?: number | null
+          source_sample_ids_md5?: string | null
           user_id: string
         }
         Update: {
@@ -929,6 +933,8 @@ export type Database = {
           sample_count?: number
           session_id?: string
           sha256?: string
+          source_sample_count?: number | null
+          source_sample_ids_md5?: string | null
           user_id?: string
         }
         Relationships: [

@@ -38,7 +38,6 @@ export interface ProviderOriginInput {
   sourceProviderKey: string | null;
   displayName: string | null;
   platform: string | null;
-  rawPayload: Record<string, unknown> | null;
 }
 
 export interface ProviderOrigin {
@@ -67,6 +66,7 @@ export interface RawPayloadInput {
   sourceRecordId: string | null;
   payload: unknown;
   traceId: string | null;
+  retainPayloadForRetry?: boolean;
 }
 
 export interface RawPayloadLinkInput {
