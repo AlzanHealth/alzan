@@ -5,7 +5,6 @@ export type HealthConnectDataOrigin = {
   appName?: string;
   providerKey?: string;
   platform?: 'android';
-  raw?: Record<string, unknown>;
 };
 
 export type HealthConnectLocalSyncBatch = {
@@ -23,5 +22,4 @@ export const toHealthConnectProviderOrigin = (origin: HealthConnectDataOrigin): 
   source_provider_key: origin.providerKey,
   display_name: origin.appName,
   platform: origin.platform ?? 'android',
-  raw_payload: origin.raw,
 });

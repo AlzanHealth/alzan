@@ -56,7 +56,6 @@ export class LocalHealthSyncController {
           sourceProviderKey: origin.source_provider_key ?? null,
           displayName: origin.display_name ?? null,
           platform: origin.platform ?? null,
-          rawPayload: origin.raw_payload ?? null,
         });
       }),
     );

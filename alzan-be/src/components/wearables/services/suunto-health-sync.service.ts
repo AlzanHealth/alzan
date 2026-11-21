@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { Insert } from '../../../types/requests.types';
+import { CanonicalHealthMetricSample } from '../../activity-import/parsers/activity-import-canonical.types';
 import {
   mapSuuntoDailyActivityToCanonical,
   mapSuuntoRecoveryToCanonical,
@@ -373,7 +374,6 @@ export class SuuntoHealthSyncService {
             mapped.timezone,
             raw,
             unit,
-            record,
           ),
         );
       }
@@ -397,7 +397,6 @@ export class SuuntoHealthSyncService {
             mapped.timezone,
             raw,
             unit,
-            record,
           ),
         );
       }
@@ -414,7 +413,6 @@ export class SuuntoHealthSyncService {
     timezone: string,
     value: number,
     unit: string,
-    raw: unknown,
   ): Insert<'health_metric_samples'> {
     return {
       user_id: userId,
@@ -431,7 +429,7 @@ export class SuuntoHealthSyncService {
       sleep_session_id: null,
       activity_session_id: null,
       raw_payload_id: null,
-      raw_payload: this.toJson(raw),
+      raw_payload: null,
     };
   }
 
@@ -441,7 +439,7 @@ export class SuuntoHealthSyncService {
     unit: string,
     recordedAt: string,
     payload: JsonRecord,
-  ) {
+  ): CanonicalHealthMetricSample | null {
     if (value == null || !Number.isFinite(value)) return null;
     return { metricType, value, unit, recordedAt, rawPayload: payload };
   }
@@ -488,10 +486,6 @@ export class SuuntoHealthSyncService {
       default:
         return false;
     }
-  }
-
-  private toJson(value: unknown): Insert<'health_metric_samples'>['raw_payload'] {
-    return JSON.parse(JSON.stringify(value ?? null)) as Insert<'health_metric_samples'>['raw_payload'];
   }
 
   private errorCode(error: unknown): string {

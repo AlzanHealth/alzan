@@ -130,6 +130,21 @@ export const wearablesLocalHealthApi = {
     requestJson<CorosDisconnectResult>('/wearables/connections/coros', {
       method: 'DELETE',
     }),
+
+  getArchivedActivityStreamSamples: (sessionIds: string[]) =>
+    requestJson<{
+      archived_session_ids: string[];
+      samples: Array<{
+        session_id: string;
+        stream_type: 'heart_rate' | 'speed' | 'power';
+        offset_s: number | null;
+        timestamp: string | null;
+        value: number;
+      }>;
+    }>('/wearables/activity-stream-archives/read', {
+      method: 'POST',
+      body: { session_ids: sessionIds },
+    }),
 };
 
 export { WearablesApiError };

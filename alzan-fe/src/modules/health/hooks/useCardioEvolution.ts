@@ -3,6 +3,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { supabase } from '../../../lib/supabaseClient';
 import type { ActivitySession } from '../../../types/requests.types';
 import type { CardioPeriod } from '../algorithms/cardioEvolution';
+import { wearablesLocalHealthApi } from '../../wearables/localHealthSyncApi';
 import { healthQueryKeys } from './healthQueryKeys';
 import { normalizeCardioSportType } from '../algorithms/cardioSportNormalization';
 import {
@@ -26,6 +27,7 @@ import {
 
 const HISTORY_PAGE_SIZE = 1000;
 const STREAM_PAGE_SIZE = 1000;
+const ARCHIVE_READ_SESSION_BATCH_SIZE = 20;
 const ZONE_PAGE_SIZE = 1000;
 const ZONE_SESSION_BATCH_SIZE = 100;
 const DETAIL_SESSION_BATCH_SIZE = 100;
@@ -93,14 +95,23 @@ const toCardioActivity = (session: CardioSessionSelection): CardioActivity => ({
 
 const loadStreamSamples = async (userId: string, sessionIds: string[]): Promise<CardioStreamSample[]> => {
   if (sessionIds.length === 0) return [];
+  const archivedSessionIds = new Set<string>();
   const samples: CardioStreamSample[] = [];
+  for (let batchStart = 0; batchStart < sessionIds.length; batchStart += ARCHIVE_READ_SESSION_BATCH_SIZE) {
+    const batch = sessionIds.slice(batchStart, batchStart + ARCHIVE_READ_SESSION_BATCH_SIZE);
+    const archived = await wearablesLocalHealthApi.getArchivedActivityStreamSamples(batch);
+    archived.archived_session_ids.forEach(sessionId => archivedSessionIds.add(sessionId));
+    samples.push(...archived.samples.map(sample => ({ ...sample })));
+  }
+  const liveSessionIds = sessionIds.filter(sessionId => !archivedSessionIds.has(sessionId));
+  if (liveSessionIds.length === 0) return samples;
   for (let page = 0; ; page += 1) {
     const start = page * STREAM_PAGE_SIZE;
     const { data, error } = await supabase
       .from('activity_stream_samples')
       .select('session_id, stream_type, offset_s, timestamp, value')
       .eq('user_id', userId)
-      .in('session_id', sessionIds)
+      .in('session_id', liveSessionIds)
       .in('stream_type', ['heart_rate', 'speed', 'power'])
       .order('session_id', { ascending: true })
       .order('offset_s', { ascending: true, nullsFirst: false })

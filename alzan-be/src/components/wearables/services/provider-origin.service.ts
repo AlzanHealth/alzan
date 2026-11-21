@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Json } from '../../../types/database.types';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import { ProviderOrigin, ProviderOriginInput } from '../domain/wearable.types';
 
@@ -29,7 +28,6 @@ export class ProviderOriginService {
           source_provider_key: input.sourceProviderKey,
           display_name: input.displayName,
           platform: input.platform,
-          raw_payload: this.toJson(input.rawPayload),
           last_seen_at: now,
           updated_at: now,
         })
@@ -52,7 +50,6 @@ export class ProviderOriginService {
         source_provider_key: input.sourceProviderKey,
         display_name: input.displayName,
         platform: input.platform,
-        raw_payload: this.toJson(input.rawPayload),
       })
       .select(
         'id,user_id,source_channel,provider,source_package,source_provider_key,display_name,platform,last_seen_at',
@@ -158,10 +155,5 @@ export class ProviderOriginService {
       platform: row.platform,
       lastSeenAt: row.last_seen_at,
     };
-  }
-
-  private toJson(value: Record<string, unknown> | null): Json | null {
-    if (!value) return null;
-    return value as Json;
   }
 }

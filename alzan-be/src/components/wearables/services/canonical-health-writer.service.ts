@@ -1,5 +1,4 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { Json } from '../../../types/database.types';
 import { Insert, Update } from '../../../types/requests.types';
 import { SupabaseAdminService } from '../../../core/supabase/supabase.service';
 import {
@@ -121,7 +120,7 @@ export class CanonicalHealthWriterService {
       sleep_session_id: input.sleepSessionId ?? null,
       activity_session_id: input.activitySessionId ?? null,
       raw_payload_id: input.rawPayloadId ?? null,
-      raw_payload: this.toJson(input.rawPayload),
+      raw_payload: null,
     };
     const sampleId = existingId
       ? await this.updateHealthSample(existingId, payload)
@@ -189,7 +188,7 @@ export class CanonicalHealthWriterService {
           recorded_at: row.recorded_at,
           local_date: row.local_date,
           timezone: row.timezone,
-          raw_payload: row.raw_payload,
+          raw_payload: null,
         })
         .eq('id', existing.id)
         .eq('user_id', input.userId)
@@ -201,7 +200,7 @@ export class CanonicalHealthWriterService {
     for (let index = 0; index < unseenRows.length; index += INSERT_CHUNK_SIZE) {
       const { error } = await this.supabaseAdminService.client
         .from('health_metric_samples')
-        .insert(unseenRows.slice(index, index + INSERT_CHUNK_SIZE));
+        .insert(unseenRows.slice(index, index + INSERT_CHUNK_SIZE).map(row => ({ ...row, raw_payload: null })));
       if (error) throw new InternalServerErrorException('WEARABLE_HEALTH_SAMPLES_INSERT_FAILED');
     }
     return unseenRows.length;
@@ -251,7 +250,7 @@ export class CanonicalHealthWriterService {
       data_quality: daily.totalSteps == null ? 'partial' : 'complete',
       source_record_id: input.provenance.sourceRecordId ?? daily.sourceRecordId ?? null,
       source_updated_at: input.provenance.sourceUpdatedAt ?? daily.sourceUpdatedAt ?? null,
-      raw_payload: this.toJson(daily.rawPayload),
+      raw_payload: null,
       source_channel: input.provenance.sourceChannel,
       source_package: input.provenance.sourcePackage,
       source_provider_key: input.provenance.sourceProviderKey,
@@ -323,7 +322,7 @@ export class CanonicalHealthWriterService {
           distance_m: interval.distanceM,
           calories_kcal: interval.caloriesKcal,
           source_record_id: provenance.sourceRecordId,
-          raw_payload: this.toJson(interval.rawPayload),
+          raw_payload: null,
           source_channel: provenance.sourceChannel,
           source_package: provenance.sourcePackage,
           source_provider_key: provenance.sourceProviderKey,
@@ -407,7 +406,7 @@ export class CanonicalHealthWriterService {
       source_sleep_id: sleep.sourceSleepId,
       source_record_id: input.provenance.sourceRecordId ?? sleep.sourceRecordId ?? sleep.sourceSleepId,
       source_updated_at: input.provenance.sourceUpdatedAt ?? sleep.sourceUpdatedAt ?? null,
-      raw_payload: this.toJson(sleep.rawPayload),
+      raw_payload: null,
       source_channel: input.provenance.sourceChannel,
       source_package: input.provenance.sourcePackage,
       source_provider_key: input.provenance.sourceProviderKey,
@@ -454,7 +453,7 @@ export class CanonicalHealthWriterService {
       stage: stage.stage,
       provider_stage: stage.providerStage,
       confidence: stage.confidence,
-      raw_payload: this.toJson(stage.rawPayload),
+      raw_payload: null,
       source_channel: provenance.sourceChannel,
       source_package: provenance.sourcePackage,
       source_record_id: provenance.sourceRecordId,
@@ -504,7 +503,7 @@ export class CanonicalHealthWriterService {
       spo2_avg_pct: recovery.spo2AvgPct,
       data_quality: 'partial',
       source_record_id: input.provenance.sourceRecordId ?? recovery.sourceRecordId ?? null,
-      raw_payload: this.toJson(recovery.rawPayload),
+      raw_payload: null,
       source_channel: input.provenance.sourceChannel,
       source_package: input.provenance.sourcePackage,
       source_provider_key: input.provenance.sourceProviderKey,
@@ -745,11 +744,6 @@ export class CanonicalHealthWriterService {
     const endMs = Date.parse(endTime);
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 1 / 60;
     return (endMs - startMs) / 60000;
-  }
-
-  private toJson(value: Record<string, unknown> | null | undefined): Json | null {
-    if (!value) return null;
-    return value as Json;
   }
 
   private async insertInChunks<T extends StepIntervalInsert | SleepStageIntervalInsert>(

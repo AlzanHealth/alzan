@@ -81,6 +81,7 @@ export class CorosWebhookService implements OnModuleInit, OnModuleDestroy {
         sourceRecordId: labelId,
         payload: summary,
         traceId: null,
+        retainPayloadForRetry: true,
       });
       if (!stored.id) {
         throw new ServiceUnavailableException('COROS_WEBHOOK_PERSISTENCE_FAILED');

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SourceChannel, WearableProvider } from '../domain/wearable.types';
 
@@ -48,11 +48,6 @@ export class ProviderOriginDto {
   @IsOptional()
   @IsString()
   platform?: string;
-
-  @ApiPropertyOptional({ type: Object })
-  @IsOptional()
-  @IsObject()
-  raw_payload?: Record<string, unknown>;
 }
 
 export class UpsertProviderOriginsDto {

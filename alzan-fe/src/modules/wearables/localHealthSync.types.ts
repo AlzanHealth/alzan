@@ -32,7 +32,6 @@ export type ProviderOriginInput = {
   source_provider_key?: string;
   display_name?: string;
   platform?: string;
-  raw_payload?: Record<string, unknown>;
 };
 
 export type ProviderOrigin = {

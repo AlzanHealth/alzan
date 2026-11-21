@@ -99,11 +99,11 @@ La matriz vive en `alzan-be/src/components/wearables/services/provider-steps-aud
 | `provider_data_origins`             | Guarda origenes detectados, por ejemplo `com.fitbit.FitbitMobile` dentro de Health Connect. |
 | `health_connect_provider_selection` | Guarda el unico origin seleccionado por usuario en Android.                                 |
 | `integration_sync_state`            | Guarda cursores, change tokens y anchors por usuario, provider, canal, package y dominio.   |
-| `external_raw_payloads_v2`          | Raw payload generico para actividades, sleep, recovery, daily, body y samples.              |
+| `external_raw_payloads_v2`          | Cuerpos temporales para procesar/reintentar; al completarse queda hash y procedencia.         |
 | `provider_connection_tokens`        | Tabla privada para access/refresh tokens OAuth.                                             |
-| `activity_route_points`             | GPS punto a punto con timestamp, offset, altitud y accuracy.                                |
-| `activity_stream_samples`           | Streams normalizados consultables por tiempo u offset.                                      |
-| `activity_provider_fields`          | Campos especificos del proveedor, eventos, segmentos y fingerprints.                        |
+| `activity_route_points`             | Tabla legacy; se eliminan puntos históricos de `wearable_import`. La app muestra la polilínea codificada de la sesión. |
+| `activity_stream_samples`           | Muestras de FC, velocidad y potencia usadas por cardio y zonas de FC; no se guardan otros streams por muestra. |
+| `activity_provider_fields`          | Tabla legacy; no guarda filas vacías. La procedencia necesaria vive en `activity_sessions`.    |
 | `activity_files`                    | Referencias a FIT/TCX/GPX/JSON/XML o payloads asociados.                                    |
 | `health_metric_samples`             | Biomarcadores 24/7: HRV, SpO2, respiracion, temperatura, peso, VO2, resting HR.             |
 | `vo2_max_logs`                      | Historico puntual de VO2 max.                                                               |

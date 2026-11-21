@@ -858,6 +858,84 @@ export type Database = {
           },
         ];
       };
+      activity_stream_archive_cleanup_queue: {
+        Row: {
+          attempts: number;
+          last_error: string | null;
+          object_path: string;
+          queued_at: string;
+          user_id: string;
+        };
+        Insert: {
+          attempts?: number;
+          last_error?: string | null;
+          object_path: string;
+          queued_at?: string;
+          user_id: string;
+        };
+        Update: {
+          attempts?: number;
+          last_error?: string | null;
+          object_path?: string;
+          queued_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      activity_stream_archives: {
+        Row: {
+          archive_version: number;
+          archived_at: string;
+          compressed_bytes: number;
+          object_path: string;
+          sample_count: number;
+          session_id: string;
+          sha256: string;
+          source_sample_count: number | null;
+          source_sample_ids_md5: string | null;
+          user_id: string;
+        };
+        Insert: {
+          archive_version?: number;
+          archived_at?: string;
+          compressed_bytes: number;
+          object_path: string;
+          sample_count: number;
+          session_id: string;
+          sha256: string;
+          source_sample_count?: number | null;
+          source_sample_ids_md5?: string | null;
+          user_id: string;
+        };
+        Update: {
+          archive_version?: number;
+          archived_at?: string;
+          compressed_bytes?: number;
+          object_path?: string;
+          sample_count?: number;
+          session_id?: string;
+          sha256?: string;
+          source_sample_count?: number | null;
+          source_sample_ids_md5?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'activity_stream_archives_session_id_fkey';
+            columns: ['session_id'];
+            isOneToOne: true;
+            referencedRelation: 'activity_sessions';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'activity_stream_archives_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       activity_stream_samples: {
         Row: {
           created_at: string;
@@ -5635,6 +5713,16 @@ export type Database = {
           assigned_sessions: number;
           shoe_id: string;
         }[];
+      };
+      delete_archived_activity_stream_samples: {
+        Args: {
+          p_expected_ids_md5: string;
+          p_expected_sample_count: number;
+          p_minimum_age_days: number;
+          p_session_id: string;
+          p_user_id: string;
+        };
+        Returns: boolean;
       };
       delete_coros_user_data: { Args: { p_user_id: string }; Returns: Json };
       delete_training_template: {

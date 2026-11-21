@@ -27,6 +27,8 @@
     "format": "pnpm --prefix alzan-be format && pnpm --prefix alzan-fe format",
     "typecheck": "pnpm --prefix alzan-be typecheck && pnpm --prefix alzan-fe typecheck",
     "verify:activity-import": "pnpm --prefix alzan-be run verify:activity-import",
+    "verify:activity-stream-archive": "pnpm --prefix alzan-be run verify:activity-stream-archive",
+    "verify:wearable-payload-retention": "pnpm --prefix alzan-be run verify:wearable-payload-retention",
     "verify:import-review": "pnpm --prefix alzan-be run verify:import-review",
     "verify:steps-providers": "pnpm --prefix alzan-be run verify:steps-providers",
     "verify:oauth-redirect": "pnpm --prefix alzan-be run verify:oauth-redirect",

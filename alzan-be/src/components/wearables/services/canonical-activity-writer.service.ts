@@ -30,8 +30,6 @@ type ActivitySessionInsert = Insert<'activity_sessions'>;
 type ActivitySessionUpdate = Update<'activity_sessions'>;
 type ActivityLapInsert = Insert<'activity_laps'>;
 type ActivityHeartRateZoneInsert = Insert<'activity_heart_rate_zones'>;
-type ActivityStreamInsert = Insert<'activity_streams'>;
-type ActivityRoutePointInsert = Insert<'activity_route_points'>;
 type ActivityStreamSampleInsert = Insert<'activity_stream_samples'>;
 type ActivityProviderFieldsInsert = Insert<'activity_provider_fields'>;
 type StreamType = Database['public']['Enums']['stream_type_enum'];
@@ -54,7 +52,6 @@ type ExistingSessionMeta = {
 };
 
 const WEARABLE_IMPORT_SOURCE = 'wearable_import';
-const ROUTE_POINT_INSERT_CHUNK_SIZE = 200;
 const STREAM_SAMPLE_INSERT_CHUNK_SIZE = 100;
 const MIN_RETRY_INSERT_CHUNK_SIZE = 25;
 const INSERT_RETRY_BASE_DELAY_MS = 150;
@@ -80,10 +77,11 @@ export class CanonicalActivityWriterService {
   constructor(
     private readonly supabaseAdminService: SupabaseAdminService,
     rawPayloadService: RawPayloadService,
-    private readonly dedupeService: DedupeService,
+    dedupeService: DedupeService,
     private readonly importReconciliationService: ImportReconciliationService,
   ) {
     void rawPayloadService;
+    void dedupeService;
   }
 
   public async upsertActivity(input: UpsertActivityInput): Promise<string> {
@@ -524,26 +522,7 @@ export class CanonicalActivityWriterService {
   }): Promise<void> {
     const { input, sessionId } = params;
     const positionSamples = this.sanitizePositionSamples(input.activity.streams.position);
-    const routePoints: ActivityRoutePointInsert[] = positionSamples.map((point, index) => ({
-      session_id: sessionId,
-      user_id: input.userId,
-      point_index: index,
-      timestamp: point.timestamp,
-      offset_s: point.offsetSeconds,
-      lat: point.lat,
-      lon: point.lon,
-      altitude_m: point.altitudeM,
-      distance_m: point.distanceM,
-      speed_mps: point.speedMps,
-      horizontal_accuracy_m: point.horizontalAccuracyM,
-      vertical_accuracy_m: point.verticalAccuracyM,
-      source: 'wearable_import',
-      source_channel: input.provenance.sourceChannel,
-      source_package: input.provenance.sourcePackage ?? null,
-      source_record_id: input.provenance.sourceRecordId ?? null,
-      raw_payload_id: input.provenance.rawPayloadId ?? null,
-    }));
-    const providerFields = this.buildProviderFieldsPayload(sessionId, input.userId, input.activity, input.provenance);
+    const providerFields = this.buildProviderFieldsPayload(sessionId, input.userId, input.provenance);
     const lapRows = this.buildLapRows(sessionId, input.userId, input.activity);
     this.logger.log({
       provider: input.provenance.provider,
@@ -558,7 +537,6 @@ export class CanonicalActivityWriterService {
       duration_s: zone.durationSeconds,
       percentage: Number.parseFloat(Math.max(0, Math.min(100, zone.percentage)).toFixed(2)),
     }));
-    const streams = this.buildStreamRows(sessionId, input.userId, input.activity, input.provenance);
     const baseBundle = {
       p_user_id: input.userId,
       p_session_id: sessionId,
@@ -567,7 +545,10 @@ export class CanonicalActivityWriterService {
       p_replace_laps: params.replaceLaps,
       p_laps: this.toJson(lapRows),
       p_heart_rate_zones: this.toJson(heartRateZones),
-      p_streams: this.toJson(streams),
+      // The detailed JSON streams duplicate activity_stream_samples and have
+      // no wearable UI reader. Keep the separate table empty; the UI reads the
+      // compact cardio samples below instead.
+      p_streams: [],
       p_stream_samples: [],
       p_route_points: [],
       p_route_polyline:
@@ -616,19 +597,13 @@ export class CanonicalActivityWriterService {
       throw new ServiceUnavailableException(DEGRADED_BUNDLE_ERROR_CODE);
     }
 
-    const sampleRows = usedGenericFallback
-      ? []
-      : this.buildStreamSampleRows(sessionId, input.userId, input.activity, input.provenance);
+    const sampleRows = usedGenericFallback ? [] : this.buildStreamSampleRows(sessionId, input.userId, input.activity);
     if (sampleRows.length > 0) {
       await this.insertInChunks(
         'activity_stream_samples',
         sampleRows,
         'WEARABLE_ACTIVITY_STREAM_SAMPLES_INSERT_FAILED',
       );
-    }
-
-    if (!usedGenericFallback && routePoints.length > 0) {
-      await this.insertInChunks('activity_route_points', routePoints, 'WEARABLE_ACTIVITY_ROUTE_INSERT_FAILED');
     }
   }
 
@@ -831,24 +806,13 @@ export class CanonicalActivityWriterService {
     if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_ZONES_INSERT_FAILED');
   }
 
-  public async replaceStreams(
-    sessionId: string,
-    userId: string,
-    activity: CanonicalActivity,
-    provenance: CanonicalProvenance,
-  ): Promise<void> {
+  public async replaceStreams(sessionId: string, userId: string, activity: CanonicalActivity): Promise<void> {
     const { error: deleteStreamsError } = await this.supabaseAdminService.client
       .from('activity_streams')
       .delete()
       .eq('session_id', sessionId)
       .eq('source', WEARABLE_IMPORT_SOURCE);
     if (deleteStreamsError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_STREAMS_DELETE_FAILED');
-
-    const streamRows = this.buildStreamRows(sessionId, userId, activity, provenance);
-    if (streamRows.length > 0) {
-      const { error } = await this.supabaseAdminService.client.from('activity_streams').insert(streamRows);
-      if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_STREAMS_INSERT_FAILED');
-    }
 
     const { error: deleteSamplesError } = await this.supabaseAdminService.client
       .from('activity_stream_samples')
@@ -857,48 +821,16 @@ export class CanonicalActivityWriterService {
       .eq('source', WEARABLE_IMPORT_SOURCE);
     if (deleteSamplesError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_STREAM_SAMPLES_DELETE_FAILED');
 
-    const sampleRows = this.buildStreamSampleRows(sessionId, userId, activity, provenance);
+    const sampleRows = this.buildStreamSampleRows(sessionId, userId, activity);
     await this.insertInChunks('activity_stream_samples', sampleRows, 'WEARABLE_ACTIVITY_STREAM_SAMPLES_INSERT_FAILED');
-  }
-
-  private buildStreamRows(
-    sessionId: string,
-    userId: string,
-    activity: CanonicalActivity,
-    provenance: CanonicalProvenance,
-  ): ActivityStreamInsert[] {
-    return this.getMetricStreams(activity).flatMap(stream => {
-      const samples = this.dedupeSamples(stream.samples);
-      if (samples.length === 0) return [];
-      return [
-        {
-          session_id: sessionId,
-          user_id: userId,
-          stream_type: stream.streamType,
-          unit: stream.unit,
-          sample_hz: null,
-          source: WEARABLE_IMPORT_SOURCE,
-          source_channel: provenance.sourceChannel,
-          source_package: provenance.sourcePackage,
-          source_record_id: provenance.sourceRecordId,
-          raw_payload_id: provenance.rawPayloadId,
-          data: {
-            provider: activity.provider,
-            sourcePackage: provenance.sourcePackage,
-            samples,
-          } as unknown as Json,
-        },
-      ];
-    });
   }
 
   private buildStreamSampleRows(
     sessionId: string,
     userId: string,
     activity: CanonicalActivity,
-    provenance: CanonicalProvenance,
   ): ActivityStreamSampleInsert[] {
-    return this.getMetricStreams(activity).flatMap(stream =>
+    return this.getCardioMetricStreams(activity).flatMap(stream =>
       this.dedupeSamples(stream.samples).map(sample => ({
         session_id: sessionId,
         user_id: userId,
@@ -906,56 +838,9 @@ export class CanonicalActivityWriterService {
         timestamp: sample.timestamp,
         offset_s: sample.offsetSeconds,
         value: sample.value,
-        unit: stream.unit,
         source: WEARABLE_IMPORT_SOURCE,
-        source_channel: provenance.sourceChannel,
-        source_package: provenance.sourcePackage,
-        source_record_id: provenance.sourceRecordId,
-        raw_payload_id: provenance.rawPayloadId,
-        raw_payload: null,
       })),
     );
-  }
-
-  public async replaceRoutePoints(
-    sessionId: string,
-    userId: string,
-    activity: CanonicalActivity,
-    provenance: CanonicalProvenance,
-  ): Promise<void> {
-    const { error: deleteError } = await this.supabaseAdminService.client
-      .from('activity_route_points')
-      .delete()
-      .eq('session_id', sessionId);
-    if (deleteError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_ROUTE_DELETE_FAILED');
-    const positionSamples = this.sanitizePositionSamples(activity.streams.position);
-    if (positionSamples.length === 0) {
-      await this.clearRoutePolyline(sessionId);
-      return;
-    }
-
-    const rows: ActivityRoutePointInsert[] = positionSamples.map((point, index) => ({
-      session_id: sessionId,
-      user_id: userId,
-      point_index: index,
-      timestamp: point.timestamp,
-      offset_s: point.offsetSeconds,
-      lat: point.lat,
-      lon: point.lon,
-      source: WEARABLE_IMPORT_SOURCE,
-      source_channel: provenance.sourceChannel,
-      source_package: provenance.sourcePackage,
-      source_record_id: provenance.sourceRecordId,
-      raw_payload_id: provenance.rawPayloadId,
-    }));
-    await this.insertInChunks('activity_route_points', rows, 'WEARABLE_ACTIVITY_ROUTE_INSERT_FAILED');
-
-    const polyline = encodePolyline(positionSamples.map(point => [point.lat, point.lon] as [number, number]));
-    const { error: polylineError } = await this.supabaseAdminService.client
-      .from('activity_sessions')
-      .update({ route_polyline: polyline })
-      .eq('id', sessionId);
-    if (polylineError) throw new InternalServerErrorException('WEARABLE_ACTIVITY_POLYLINE_UPDATE_FAILED');
   }
 
   private sanitizePositionSamples(
@@ -975,31 +860,9 @@ export class CanonicalActivityWriterService {
     return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
   }
 
-  private async clearRoutePolyline(sessionId: string): Promise<void> {
-    const { error } = await this.supabaseAdminService.client
-      .from('activity_sessions')
-      .update({ route_polyline: null })
-      .eq('id', sessionId);
-    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_POLYLINE_UPDATE_FAILED');
-  }
-
-  public async upsertProviderFields(
-    sessionId: string,
-    userId: string,
-    activity: CanonicalActivity,
-    provenance: CanonicalProvenance,
-  ): Promise<void> {
-    const payload = this.buildProviderFieldsPayload(sessionId, userId, activity, provenance);
-    const { error } = await this.supabaseAdminService.client
-      .from('activity_provider_fields')
-      .upsert(payload, { onConflict: 'session_id' });
-    if (error) throw new InternalServerErrorException('WEARABLE_ACTIVITY_PROVIDER_FIELDS_UPSERT_FAILED');
-  }
-
   private buildProviderFieldsPayload(
     sessionId: string,
     userId: string,
-    activity: CanonicalActivity,
     provenance: CanonicalProvenance,
   ): ActivityProviderFieldsInsert {
     return {
@@ -1008,29 +871,22 @@ export class CanonicalActivityWriterService {
       provider: provenance.provider,
       source_channel: provenance.sourceChannel,
       source_package: provenance.sourcePackage,
-      fields: {
-        ...activity.vendorFields,
-        activityFingerprint: this.dedupeService.buildActivityFingerprint(userId, activity),
-        strongIdentityKey: this.dedupeService.buildStrongActivityKey(userId, provenance),
-      } as Json,
-      raw_metadata: this.readRawMetadata(activity.vendorFields),
+      // Retain the minimal provider ownership row required by the bundle RPC.
+      // Vendor metadata and unused fingerprints are not exposed or read by the app.
+      fields: {} as Json,
+      raw_metadata: null,
       updated_at: new Date().toISOString(),
     };
   }
 
-  private getMetricStreams(activity: CanonicalActivity): Array<{
+  private getCardioMetricStreams(activity: CanonicalActivity): Array<{
     streamType: StreamType;
-    unit: string;
     samples: CanonicalActivityMetricSample[];
   }> {
     return [
-      { streamType: 'heart_rate', unit: 'bpm', samples: activity.streams.heartRate },
-      { streamType: 'speed', unit: 'm/s', samples: activity.streams.speed },
-      { streamType: 'distance', unit: 'm', samples: activity.streams.distance },
-      { streamType: 'altitude', unit: 'm', samples: activity.streams.altitude },
-      { streamType: 'cadence', unit: 'rpm', samples: activity.streams.cadence },
-      { streamType: 'power', unit: 'W', samples: activity.streams.power },
-      { streamType: 'temperature', unit: 'C', samples: activity.streams.temperature },
+      { streamType: 'heart_rate', samples: activity.streams.heartRate },
+      { streamType: 'speed', samples: activity.streams.speed },
+      { streamType: 'power', samples: activity.streams.power },
     ];
   }
 
@@ -1044,11 +900,6 @@ export class CanonicalActivityWriterService {
     });
   }
 
-  private readRawMetadata(vendorFields: Record<string, unknown>): Json | null {
-    const rawMetadata = vendorFields.rawMetadata ?? vendorFields.appleHealthMetadata;
-    return rawMetadata == null ? null : (rawMetadata as Json);
-  }
-
   private toJson(value: unknown): Json {
     return JSON.parse(JSON.stringify(value)) as Json;
   }
@@ -1058,22 +909,21 @@ export class CanonicalActivityWriterService {
     return provider;
   }
 
-  private async insertInChunks<T extends ActivityRoutePointInsert | ActivityStreamSampleInsert>(
-    table: 'activity_route_points' | 'activity_stream_samples',
-    rows: T[],
+  private async insertInChunks(
+    table: 'activity_stream_samples',
+    rows: ActivityStreamSampleInsert[],
     errorCode: string,
   ): Promise<void> {
-    const chunkSize =
-      table === 'activity_stream_samples' ? STREAM_SAMPLE_INSERT_CHUNK_SIZE : ROUTE_POINT_INSERT_CHUNK_SIZE;
+    const chunkSize = STREAM_SAMPLE_INSERT_CHUNK_SIZE;
     for (let startIndex = 0; startIndex < rows.length; startIndex += chunkSize) {
       const chunk = rows.slice(startIndex, startIndex + chunkSize);
       await this.insertChunkWithRecovery(table, chunk, errorCode, startIndex, rows.length);
     }
   }
 
-  private async insertChunkWithRecovery<T extends ActivityRoutePointInsert | ActivityStreamSampleInsert>(
-    table: 'activity_route_points' | 'activity_stream_samples',
-    rows: T[],
+  private async insertChunkWithRecovery(
+    table: 'activity_stream_samples',
+    rows: ActivityStreamSampleInsert[],
     errorCode: string,
     startIndex: number,
     totalRows: number,
@@ -1096,9 +946,9 @@ export class CanonicalActivityWriterService {
     this.throwChunkInsertError(table, errorCode, startIndex, rows.length, totalRows, error);
   }
 
-  private async retrySmallChunk<T extends ActivityRoutePointInsert | ActivityStreamSampleInsert>(
-    table: 'activity_route_points' | 'activity_stream_samples',
-    rows: T[],
+  private async retrySmallChunk(
+    table: 'activity_stream_samples',
+    rows: ActivityStreamSampleInsert[],
     errorCode: string,
     startIndex: number,
     totalRows: number,
@@ -1121,7 +971,7 @@ export class CanonicalActivityWriterService {
   }
 
   private throwChunkInsertError(
-    table: 'activity_route_points' | 'activity_stream_samples',
+    table: 'activity_stream_samples',
     errorCode: string,
     startIndex: number,
     chunkLength: number,

@@ -58,6 +58,10 @@ The training JSON contract accepts `duration_s` without repetitions for catalog 
 
 Migration `20261028120000_allow_timed_workout_sets_without_repetitions.sql` removes the `NOT NULL` requirement on `workout_sets.reps`, preserving existing values. Apply this migration **before deploying the updated frontend**; the previous schema rejects completed timed sets with null repetitions. The database types were regenerated from local Supabase using `pnpm run supabase:types`, not edited by hand. This migration was applied only locally during this review.
 
+## Wearable activity stream retention
+
+The activity stream archive work is tracked on `codex/supabase-free-usage-audit`. After its migration and backend/frontend changes are deployed, operators can preview or archive completed sessions at least 90 days old while preserving the original activity, laps, route, zones, and summary. The migration also removes the redundant non-unique sample-offset index. The archive uses private storage, per-session checksums, an age-and-owner guarded delete, and an authenticated read path that merges archived samples with any newer samples from a later resync. It does not run automatically and does not execute `VACUUM FULL`; see the [activity stream archive runbook](activity-stream-archive.md) for the preview/apply commands and physical disk-reclamation caveat. No cloud migration or production row deletion was performed while preparing this branch.
+
 ## Verification
 
 Run from the repository root:
