@@ -26,6 +26,8 @@ import { CorosConnectionService } from './services/coros-connection.service';
 import { CorosHistoryImportController } from './controllers/coros-history-import.controller';
 import { CorosHistoryImportService } from './services/coros-history-import.service';
 import { WearableImportLifecycleService } from './services/wearable-import-lifecycle.service';
+import { ActivityStreamArchiveController } from './controllers/activity-stream-archive.controller';
+import { ActivityStreamArchiveService } from './services/activity-stream-archive.service';
 
 @Api(SwaggerApi.WEARABLES_API)
 @Module({
@@ -37,6 +39,7 @@ import { WearableImportLifecycleService } from './services/wearable-import-lifec
     CorosWebhookController,
     CorosConnectionController,
     CorosHistoryImportController,
+    ActivityStreamArchiveController,
   ],
   providers: [
     RawPayloadService,
@@ -56,6 +59,7 @@ import { WearableImportLifecycleService } from './services/wearable-import-lifec
     CorosWebhookService,
     CorosConnectionService,
     CorosHistoryImportService,
+    ActivityStreamArchiveService,
   ],
   exports: [
     RawPayloadService,

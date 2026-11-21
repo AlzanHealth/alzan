@@ -990,6 +990,65 @@ type ActivityStreamSamplesTable = {
   Relationships: [];
 };
 
+type ActivityStreamArchivesTable = {
+  Row: {
+    session_id: string;
+    user_id: string;
+    object_path: string;
+    sample_count: number;
+    compressed_bytes: number;
+    sha256: string;
+    archive_version: number;
+    archived_at: string;
+  };
+  Insert: {
+    session_id: string;
+    user_id: string;
+    object_path: string;
+    sample_count: number;
+    compressed_bytes: number;
+    sha256: string;
+    archive_version?: number;
+    archived_at?: string;
+  };
+  Update: {
+    session_id?: string;
+    user_id?: string;
+    object_path?: string;
+    sample_count?: number;
+    compressed_bytes?: number;
+    sha256?: string;
+    archive_version?: number;
+    archived_at?: string;
+  };
+  Relationships: [];
+};
+
+type ActivityStreamArchiveCleanupQueueTable = {
+  Row: {
+    object_path: string;
+    user_id: string;
+    queued_at: string;
+    attempts: number;
+    last_error: string | null;
+  };
+  Insert: {
+    object_path: string;
+    user_id: string;
+    queued_at?: string;
+    attempts?: number;
+    last_error?: string | null;
+  };
+  Update: {
+    object_path?: string;
+    user_id?: string;
+    queued_at?: string;
+    attempts?: number;
+    last_error?: string | null;
+  };
+  Relationships: [];
+};
+
 type ActivityProviderFieldsTable = {
   Row: {
     session_id: string;
@@ -1186,6 +1245,8 @@ type TableOverrides = {
   activity_heart_rate_zones: ActivityHeartRateZonesOverride;
   activity_route_points: ActivityRoutePointsTable;
   activity_stream_samples: ActivityStreamSamplesTable;
+  activity_stream_archives: ActivityStreamArchivesTable;
+  activity_stream_archive_cleanup_queue: ActivityStreamArchiveCleanupQueueTable;
   activity_provider_fields: ActivityProviderFieldsTable;
   activity_files: ActivityFilesTable;
   daily_steps: DailyStepsOverride;
@@ -1217,6 +1278,16 @@ type ExtendedTables = Omit<GeneratedTables, keyof TableOverrides> &
 type GeneratedFunctions = PublicSchema["Functions"];
 
 type FunctionOverrides = {
+  delete_archived_activity_stream_samples: {
+    Args: {
+      p_session_id: string;
+      p_user_id: string;
+      p_expected_sample_count: number;
+      p_expected_ids_md5: string;
+      p_minimum_age_days: number;
+    };
+    Returns: boolean;
+  };
   log_recipe_usage: {
     Args: { p_recipe_id: string; p_context: RecipeUsageContext };
     Returns: undefined;
